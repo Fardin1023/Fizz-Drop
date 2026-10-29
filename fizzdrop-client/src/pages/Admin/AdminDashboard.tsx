@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import AdminLogin from './AdminLogin';
 import { ProductManagement } from './ProductManagement';
@@ -22,7 +22,6 @@ import { NotificationPopup } from '../../components/Notifications/NotificationPo
 export const AdminDashboard: React.FC = () => {
   const { user, isSupplier, isSuperadmin, isAuthenticated, logout, isLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<'catalog' | 'request' | 'history' | 'profile'>('catalog');
-  const [isScrolled, setIsScrolled] = useState<boolean>(false);
 
   const {
     notifications,
@@ -32,19 +31,6 @@ export const AdminDashboard: React.FC = () => {
     markAsRead,
     markAllAsRead,
   } = useNotifications('SUPPLIER', user?.user_id || 4);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      if (window.scrollY > 25) {
-        setIsScrolled(true);
-      } else {
-        setIsScrolled(false);
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
 
   if (isLoading) {
     return (
@@ -88,157 +74,96 @@ export const AdminDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Top Admin Sub-Header (Sticky & Dynamic Shrinking on Scroll) */}
-      <div
-        className={`sticky top-16 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/90 transition-all duration-300 ease-in-out ${
-          isScrolled ? 'shadow-md py-1' : 'shadow-2xs py-2.5 sm:py-3.5'
-        }`}
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div
-            className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 transition-all duration-300 ease-in-out ${
-              isScrolled ? 'py-0.5' : 'py-1 sm:py-1.5'
-            }`}
-          >
-            {/* Title & Supplier Role Badge */}
-            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-              <div
-                className={`bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-blue-500/20 transition-all duration-300 ease-in-out ${
-                  isScrolled ? 'w-7 h-7 sm:w-8 sm:h-8 rounded-xl' : 'w-10 h-10 rounded-2xl'
-                }`}
-              >
-                <Truck className={`transition-all duration-300 ${isScrolled ? 'w-4 h-4' : 'w-5 h-5'}`} />
+      {/* Top Admin Sub-Header (Small, Fixed & Static for Maximum Content Visibility) */}
+      <div className="sticky top-16 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-2xs">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
+          {/* Top Row: Title, Role Badge, and Controls */}
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                <Truck className="w-3.5 h-3.5" />
               </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h1
-                    className={`font-oswald font-bold tracking-tight uppercase text-zinc-900 transition-all duration-300 ${
-                      isScrolled ? 'text-sm sm:text-base' : 'text-base sm:text-lg'
-                    }`}
-                  >
-                    Regional Supplier & Logistics Portal
-                  </h1>
-                  <span
-                    className={`rounded-full font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200 uppercase tracking-wider transition-all duration-300 ${
-                      isScrolled ? 'text-[9px] px-2 py-0.2' : 'text-[10px] px-2.5 py-0.5'
-                    }`}
-                  >
-                    {isSuperadmin ? 'Role 4: Superadmin' : 'Role 3: Region-Bound Supplier'}
-                  </span>
-                </div>
-                {/* Secondary subtitle collapses smoothly when scrolled */}
-                <div
-                  className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                    isScrolled ? 'max-h-0 opacity-0' : 'max-h-8 opacity-100 mt-0.5'
-                  }`}
-                >
-                  <p className="text-[11px] text-slate-500 truncate">
-                    Logged in as <code className="text-zinc-800 font-semibold">{user?.email}</code> • Region-bound catalog, stock requisitions & depot setup
-                  </p>
-                </div>
+              <div className="flex items-center gap-2 flex-wrap min-w-0">
+                <h1 className="font-oswald text-sm sm:text-base font-bold tracking-tight uppercase text-zinc-900 truncate">
+                  Regional Supplier & Logistics Portal
+                </h1>
+                <span className="rounded-full font-mono font-bold text-[9px] px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 uppercase tracking-wider shrink-0">
+                  {isSuperadmin ? 'Role 4: Superadmin' : 'Role 3: Supplier'}
+                </span>
+                <span className="text-[11px] text-slate-400 font-mono hidden lg:inline truncate">
+                  ({user?.email})
+                </span>
               </div>
             </div>
 
             {/* User Controls */}
-            <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
-              {!isScrolled && (
-                <span className="text-[11px] font-semibold text-slate-400 hidden sm:inline transition-opacity duration-300">
-                  Depot Operations
-                </span>
-              )}
-
-              {/* Notification Bell Dropdown */}
+            <div className="flex items-center gap-1.5 shrink-0">
               <NotificationDropdown
                 notifications={notifications}
                 unreadCount={unreadCount}
                 onMarkAsRead={markAsRead}
                 onMarkAllAsRead={markAllAsRead}
                 onSelectNotification={() => setActiveTab('history')}
-                isScrolled={isScrolled}
+                isScrolled={true}
               />
 
-              {/* Logout Button */}
               <button
                 onClick={logout}
-                className={`text-slate-500 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 transition-all duration-300 cursor-pointer ${
-                  isScrolled ? 'p-1.5 rounded-lg' : 'p-2 rounded-xl'
-                }`}
+                className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 transition-colors cursor-pointer"
                 title="Sign out of Supplier Portal"
               >
-                <LogOut className={`transition-all duration-300 ${isScrolled ? 'w-3.5 h-3.5' : 'w-4 h-4'}`} />
+                <LogOut className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
 
           {/* Supplier Sub-Navigation Tabs */}
-          <div
-            className={`flex items-center gap-1.5 sm:gap-2 overflow-x-auto transition-all duration-300 ease-in-out scrollbar-none ${
-              isScrolled
-                ? 'pt-1 pb-1 border-t border-slate-100/70'
-                : 'pt-2 pb-2.5 sm:pb-3 border-t border-slate-100'
-            }`}
-          >
+          <div className="flex items-center gap-1.5 overflow-x-auto pt-1.5 mt-1.5 border-t border-slate-100/80 scrollbar-none">
             <button
               onClick={() => setActiveTab('catalog')}
-              className={`font-semibold flex items-center transition-all duration-200 cursor-pointer whitespace-nowrap ${
-                isScrolled
-                  ? 'px-3 py-1 rounded-lg text-[11px] gap-1.5'
-                  : 'px-4 py-2 rounded-xl text-xs gap-2'
-              } ${
+              className={`font-semibold flex items-center transition-colors cursor-pointer whitespace-nowrap px-3 py-1 rounded-lg text-xs gap-1.5 ${
                 activeTab === 'catalog'
-                  ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white font-bold shadow-md shadow-blue-500/20'
+                  ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white font-bold shadow-xs'
                   : 'bg-white text-slate-700 hover:text-blue-600 hover:bg-slate-50 border border-slate-200'
               }`}
             >
-              <Package className={`transition-all ${isScrolled ? 'w-3 h-3' : 'w-3.5 h-3.5'}`} />
+              <Package className="w-3.5 h-3.5" />
               <span>Catalog & Outlets Stock</span>
             </button>
 
             <button
               onClick={() => setActiveTab('request')}
-              className={`font-semibold flex items-center transition-all duration-200 cursor-pointer whitespace-nowrap ${
-                isScrolled
-                  ? 'px-3 py-1 rounded-lg text-[11px] gap-1.5'
-                  : 'px-4 py-2 rounded-xl text-xs gap-2'
-              } ${
+              className={`font-semibold flex items-center transition-colors cursor-pointer whitespace-nowrap px-3 py-1 rounded-lg text-xs gap-1.5 ${
                 activeTab === 'request'
-                  ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white font-bold shadow-md shadow-blue-500/20'
+                  ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white font-bold shadow-xs'
                   : 'bg-white text-slate-700 hover:text-blue-600 hover:bg-slate-50 border border-slate-200'
               }`}
             >
-              <Truck className={`transition-all ${isScrolled ? 'w-3 h-3' : 'w-3.5 h-3.5'}`} />
+              <Truck className="w-3.5 h-3.5" />
               <span>Request Stock (New Requisition)</span>
             </button>
 
             <button
               onClick={() => setActiveTab('history')}
-              className={`font-semibold flex items-center transition-all duration-200 cursor-pointer whitespace-nowrap ${
-                isScrolled
-                  ? 'px-3 py-1 rounded-lg text-[11px] gap-1.5'
-                  : 'px-4 py-2 rounded-xl text-xs gap-2'
-              } ${
+              className={`font-semibold flex items-center transition-colors cursor-pointer whitespace-nowrap px-3 py-1 rounded-lg text-xs gap-1.5 ${
                 activeTab === 'history'
-                  ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white font-bold shadow-md shadow-blue-500/20'
+                  ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white font-bold shadow-xs'
                   : 'bg-white text-slate-700 hover:text-blue-600 hover:bg-slate-50 border border-slate-200'
               }`}
             >
-              <ClipboardList className={`transition-all ${isScrolled ? 'w-3 h-3' : 'w-3.5 h-3.5'}`} />
+              <ClipboardList className="w-3.5 h-3.5" />
               <span>Requisition History & Status</span>
             </button>
 
             <button
               onClick={() => setActiveTab('profile')}
-              className={`font-semibold flex items-center transition-all duration-200 cursor-pointer whitespace-nowrap ${
-                isScrolled
-                  ? 'px-3 py-1 rounded-lg text-[11px] gap-1.5'
-                  : 'px-4 py-2 rounded-xl text-xs gap-2'
-              } ${
+              className={`font-semibold flex items-center transition-colors cursor-pointer whitespace-nowrap px-3 py-1 rounded-lg text-xs gap-1.5 ${
                 activeTab === 'profile'
-                  ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white font-bold shadow-md shadow-blue-500/20'
+                  ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white font-bold shadow-xs'
                   : 'bg-white text-slate-700 hover:text-blue-600 hover:bg-slate-50 border border-slate-200'
               }`}
             >
-              <MapPin className={`transition-all ${isScrolled ? 'w-3 h-3' : 'w-3.5 h-3.5'}`} />
+              <MapPin className="w-3.5 h-3.5" />
               <span>Depot & Territory Settings</span>
             </button>
           </div>
@@ -246,7 +171,7 @@ export const AdminDashboard: React.FC = () => {
       </div>
 
       {/* Main Container */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 flex-1 w-full min-w-0">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-5 flex-1 w-full min-w-0">
         {activeTab === 'catalog' && <ProductManagement />}
         {activeTab === 'request' && (
           <SupplierRequestStock
