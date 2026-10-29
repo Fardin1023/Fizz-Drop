@@ -75,40 +75,41 @@ export const AdminDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Top Admin Sub-Header (Small, Fixed at Top & Static for Maximum Content Visibility) */}
+      {/* Top Admin Sub-Header (Ultra-Compact, Fixed at Top & Static) */}
       <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-2xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-1.5">
           {/* Top Row: Title, Role Badge, Home Navigation, and Controls */}
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2 min-w-0">
               {/* Home / Storefront Navigation Button */}
               <Link
                 to="/"
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-700 hover:text-indigo-600 bg-slate-100 hover:bg-slate-200/90 border border-slate-200 transition-colors shadow-2xs shrink-0"
+                className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-semibold text-slate-700 hover:text-indigo-600 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-colors shadow-2xs shrink-0"
                 title="Return to Customer Storefront / Home"
               >
                 <Home className="w-3.5 h-3.5 text-indigo-600" />
                 <span className="hidden sm:inline">Storefront</span>
               </Link>
 
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+              <div className="w-6 h-6 rounded-md bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
                 <Truck className="w-3.5 h-3.5" />
               </div>
-              <div className="flex items-center gap-2 flex-wrap min-w-0">
-                <h1 className="font-oswald text-sm sm:text-base font-bold tracking-tight uppercase text-zinc-900 truncate">
-                  Regional Supplier & Logistics Portal
-                </h1>
-                <span className="rounded-full font-mono font-bold text-[9px] px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 uppercase tracking-wider shrink-0">
-                  {isSuperadmin ? 'Role 4: Superadmin' : 'Role 3: Supplier'}
-                </span>
-                <span className="text-[11px] text-slate-400 font-mono hidden lg:inline truncate">
-                  ({user?.email})
-                </span>
-              </div>
+
+              <span className="font-oswald font-bold tracking-tight uppercase text-zinc-900 text-xs sm:text-sm truncate">
+                Regional Supplier & Logistics Portal
+              </span>
+
+              <span className="rounded-full font-mono font-bold text-[9px] px-1.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 uppercase tracking-wider shrink-0">
+                {isSuperadmin ? 'Role 4: Superadmin' : 'Role 3: Supplier'}
+              </span>
             </div>
 
             {/* User Controls */}
             <div className="flex items-center gap-1.5 shrink-0">
+              <span className="text-[11px] text-slate-400 font-mono hidden md:inline truncate">
+                ({user?.email})
+              </span>
+
               <NotificationDropdown
                 notifications={notifications}
                 unreadCount={unreadCount}
@@ -120,7 +121,7 @@ export const AdminDashboard: React.FC = () => {
 
               <button
                 onClick={logout}
-                className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 transition-colors cursor-pointer"
+                className="p-1 rounded-md text-slate-500 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 transition-colors cursor-pointer"
                 title="Sign out of Supplier Portal"
               >
                 <LogOut className="w-3.5 h-3.5" />
@@ -129,52 +130,52 @@ export const AdminDashboard: React.FC = () => {
           </div>
 
           {/* Supplier Sub-Navigation Tabs */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pt-1.5 mt-1.5 border-t border-slate-100/80 scrollbar-none">
+          <div className="flex items-center gap-1 overflow-x-auto pt-1 mt-1 border-t border-slate-100/90 scrollbar-none">
             <button
               onClick={() => setActiveTab('catalog')}
-              className={`font-semibold flex items-center transition-colors cursor-pointer whitespace-nowrap px-3 py-1 rounded-lg text-xs gap-1.5 ${
+              className={`font-semibold flex items-center transition-colors cursor-pointer whitespace-nowrap px-2.5 py-0.5 rounded-md text-[11px] gap-1 ${
                 activeTab === 'catalog'
                   ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white font-bold shadow-xs'
                   : 'bg-white text-slate-700 hover:text-blue-600 hover:bg-slate-50 border border-slate-200'
               }`}
             >
-              <Package className="w-3.5 h-3.5" />
+              <Package className="w-3 h-3" />
               <span>Catalog & Outlets Stock</span>
             </button>
 
             <button
               onClick={() => setActiveTab('request')}
-              className={`font-semibold flex items-center transition-colors cursor-pointer whitespace-nowrap px-3 py-1 rounded-lg text-xs gap-1.5 ${
+              className={`font-semibold flex items-center transition-colors cursor-pointer whitespace-nowrap px-2.5 py-0.5 rounded-md text-[11px] gap-1 ${
                 activeTab === 'request'
                   ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white font-bold shadow-xs'
                   : 'bg-white text-slate-700 hover:text-blue-600 hover:bg-slate-50 border border-slate-200'
               }`}
             >
-              <Truck className="w-3.5 h-3.5" />
+              <Truck className="w-3 h-3" />
               <span>Request Stock (New Requisition)</span>
             </button>
 
             <button
               onClick={() => setActiveTab('history')}
-              className={`font-semibold flex items-center transition-colors cursor-pointer whitespace-nowrap px-3 py-1 rounded-lg text-xs gap-1.5 ${
+              className={`font-semibold flex items-center transition-colors cursor-pointer whitespace-nowrap px-2.5 py-0.5 rounded-md text-[11px] gap-1 ${
                 activeTab === 'history'
                   ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white font-bold shadow-xs'
                   : 'bg-white text-slate-700 hover:text-blue-600 hover:bg-slate-50 border border-slate-200'
               }`}
             >
-              <ClipboardList className="w-3.5 h-3.5" />
+              <ClipboardList className="w-3 h-3" />
               <span>Requisition History & Status</span>
             </button>
 
             <button
               onClick={() => setActiveTab('profile')}
-              className={`font-semibold flex items-center transition-colors cursor-pointer whitespace-nowrap px-3 py-1 rounded-lg text-xs gap-1.5 ${
+              className={`font-semibold flex items-center transition-colors cursor-pointer whitespace-nowrap px-2.5 py-0.5 rounded-md text-[11px] gap-1 ${
                 activeTab === 'profile'
                   ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white font-bold shadow-xs'
                   : 'bg-white text-slate-700 hover:text-blue-600 hover:bg-slate-50 border border-slate-200'
               }`}
             >
-              <MapPin className="w-3.5 h-3.5" />
+              <MapPin className="w-3 h-3" />
               <span>Depot & Territory Settings</span>
             </button>
           </div>
@@ -182,7 +183,7 @@ export const AdminDashboard: React.FC = () => {
       </div>
 
       {/* Main Container */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-5 flex-1 w-full min-w-0">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-3.5 sm:mt-4 flex-1 w-full min-w-0">
         {activeTab === 'catalog' && <ProductManagement />}
         {activeTab === 'request' && (
           <SupplierRequestStock
