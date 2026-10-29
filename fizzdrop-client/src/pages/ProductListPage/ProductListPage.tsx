@@ -433,9 +433,9 @@ const ProductListPage: React.FC<ProductListPageProps> = ({ branchId, onAddToCart
             {filteredProducts.map((product) => {
               const displayImg = product.image_url || getBrandImage(product.brand);
               const isWish = wishlist.includes(product.product_id);
-              const rawStock = product.branch_stock ?? product.total_stock ?? 0;
-              const stock = rawStock > 0 ? rawStock : ((product.available_outlets && product.available_outlets.length > 0) ? product.available_outlets.length * 45 : 45);
+              const stock = product.branch_stock ?? product.total_stock ?? 0;
               const isOutOfStock = stock <= 0;
+              const inStockOutlets = (product.available_outlets || []).filter((ao: any) => (ao.stock_quantity ?? 0) > 0);
 
               return (
                 <div
@@ -508,7 +508,11 @@ const ProductListPage: React.FC<ProductListPageProps> = ({ branchId, onAddToCart
                     <div className="flex items-center justify-between pt-1 text-[11px] text-slate-500 font-medium">
                       <div className="flex items-center gap-1.5">
                         <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                        <span>Available at <strong className="text-zinc-800">{product.available_outlets?.length || 2} Outlets</strong></span>
+                        {inStockOutlets.length > 0 ? (
+                          <span>In Stock at <strong className="text-zinc-800">{inStockOutlets.length} Outlets</strong></span>
+                        ) : (
+                          <span className="text-amber-700 font-semibold text-[10px]">Awaiting Supplier Restock</span>
+                        )}
                       </div>
                       <span className="text-[10px] font-mono text-cyan-700 bg-cyan-50 px-1.5 py-0.5 rounded border border-cyan-100 font-bold">
                         Exp: {product.expiry_date || '2027-04'}

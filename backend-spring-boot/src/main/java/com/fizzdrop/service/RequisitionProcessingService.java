@@ -23,6 +23,7 @@ public class RequisitionProcessingService {
     private final ProductRepository productRepository;
     private final ShopInventoryRepository shopInventoryRepository;
     private final AppNotificationRepository notificationRepository;
+    private final CentralInventoryRepository centralInventoryRepository;
     private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     public RequisitionProcessingService(DistrictRepository districtRepository,
@@ -33,6 +34,7 @@ public class RequisitionProcessingService {
                                         ProductRepository productRepository,
                                         ShopInventoryRepository shopInventoryRepository,
                                         AppNotificationRepository notificationRepository,
+                                        CentralInventoryRepository centralInventoryRepository,
                                         org.springframework.jdbc.core.JdbcTemplate jdbcTemplate) {
         this.districtRepository = districtRepository;
         this.supplierProfileRepository = supplierProfileRepository;
@@ -42,6 +44,7 @@ public class RequisitionProcessingService {
         this.productRepository = productRepository;
         this.shopInventoryRepository = shopInventoryRepository;
         this.notificationRepository = notificationRepository;
+        this.centralInventoryRepository = centralInventoryRepository;
         this.jdbcTemplate = jdbcTemplate;
     }
 
@@ -114,6 +117,54 @@ public class RequisitionProcessingService {
                 });
             }
         }
+
+        // 4. Remove all product stock from retail outlets since products will be provided by suppliers
+        try {
+            jdbcTemplate.execute("UPDATE shop_inventory SET stock_quantity = 0");
+            System.out.println("[Database Init] Outlet product stocks cleared to 0 (to be supplied by suppliers).");
+        } catch (Exception ex) {
+            System.err.println("[Database Init] Failed to reset outlet stocks: " + ex.getMessage());
+        }
+
+        // 5. Maintain Superadmin fixed stock for every category of products for supplying to suppliers
+        try {
+            List<Product> allProducts = productRepository.findAll();
+            for (Product p : allProducts) {
+                var existingOpt = centralInventoryRepository.findByProductId(p.getProductId());
+                int targetFixedStock = getFixedCategoryStock(p.getCategory());
+                if (existingOpt.isEmpty()) {
+                    centralInventoryRepository.save(new CentralInventory(
+                            p.getProductId(),
+                            p.getCategory() != null ? p.getCategory() : "Beverage",
+                            targetFixedStock,
+                            0
+                    ));
+                } else {
+                    CentralInventory ci = existingOpt.get();
+                    if (ci.getAvailableStock() == null || ci.getAvailableStock() == 0) {
+                        ci.setAvailableStock(targetFixedStock);
+                        ci.setCategory(p.getCategory() != null ? p.getCategory() : "Beverage");
+                        ci.setUpdatedAt(LocalDateTime.now());
+                        centralInventoryRepository.save(ci);
+                    }
+                }
+            }
+            System.out.println("[Database Init] Superadmin central fixed category stocks initialized.");
+        } catch (Exception ex) {
+            System.err.println("[Database Init] Failed to initialize central inventory: " + ex.getMessage());
+        }
+    }
+
+    public static int getFixedCategoryStock(String category) {
+        if (category == null) return 1000;
+        return switch (category.trim()) {
+            case "Carbonated Soft Drink" -> 1500;
+            case "Energy Drink" -> 1200;
+            case "Fruit Juice" -> 1000;
+            case "Purified Water" -> 2000;
+            case "Beverage" -> 1500;
+            default -> 1000;
+        };
     }
 
     public List<District> getAllDistricts() {
@@ -293,9 +344,15 @@ public class RequisitionProcessingService {
             var distInv = districtInventoryRepository.findByDistrictIdAndProductId(req.getDistrictId(), it.getProductId());
             it.setRegionalStock(distInv.map(DistrictInventory::getAvailableStock).orElse(0));
 
-            // Central warehouse unallocated stock
-            Integer centralTotal = shopInventoryRepository.getTotalStockByProductId(it.getProductId());
-            it.setCentralStock(centralTotal != null ? centralTotal : 150);
+            // Central warehouse unallocated stock (Superadmin fixed category stock pool)
+            var centralInvOpt = centralInventoryRepository.findByProductId(it.getProductId());
+            int centralStock = centralInvOpt
+                    .map(CentralInventory::getAvailableStock)
+                    .orElseGet(() -> {
+                        Product p = productRepository.findById(it.getProductId()).orElse(null);
+                        return getFixedCategoryStock(p != null ? p.getCategory() : "Beverage");
+                    });
+            it.setCentralStock(centralStock);
         }
 
         req.setItems(items);
@@ -324,6 +381,7 @@ public class RequisitionProcessingService {
                 item.setApprovedQuantity(item.getRequestedQuantity());
                 totalApproved += item.getRequestedQuantity();
                 allocateDistrictStock(req.getDistrictId(), item.getProductId(), item.getRequestedQuantity());
+                deductCentralStock(item.getProductId(), item.getRequestedQuantity());
             }
         } else { // APPROVE_PARTIAL / CUSTOM ALLOWANCE OPTIONS
             Map<Long, Integer> approvedMap = new HashMap<>();
@@ -345,6 +403,7 @@ public class RequisitionProcessingService {
                 if (approved > 0) {
                     allZero = false;
                     allocateDistrictStock(req.getDistrictId(), item.getProductId(), approved);
+                    deductCentralStock(item.getProductId(), approved);
                 }
                 if (approved < item.getRequestedQuantity()) {
                     allFull = false;
@@ -411,6 +470,28 @@ public class RequisitionProcessingService {
             di = new DistrictInventory(districtId, productId, qty, 0);
         }
         districtInventoryRepository.save(di);
+    }
+
+    private void deductCentralStock(Long productId, int qty) {
+        centralInventoryRepository.findByProductId(productId).ifPresent(ci -> {
+            int newAvailable = Math.max(0, ci.getAvailableStock() - qty);
+            ci.setAvailableStock(newAvailable);
+            ci.setUpdatedAt(LocalDateTime.now());
+            centralInventoryRepository.save(ci);
+        });
+    }
+
+    public List<CentralInventory> getCentralInventory() {
+        List<CentralInventory> list = centralInventoryRepository.findAll();
+        for (CentralInventory ci : list) {
+            productRepository.findById(ci.getProductId()).ifPresent(p -> {
+                ci.setBrand(p.getBrand());
+                ci.setFlavorVariant(p.getFlavorVariant());
+                ci.setSku(p.getSku());
+                if (p.getCategory() != null) ci.setCategory(p.getCategory());
+            });
+        }
+        return list;
     }
 
     private void enrichProfile(SupplierProfile profile) {

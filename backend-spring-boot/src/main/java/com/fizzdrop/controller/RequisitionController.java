@@ -4,6 +4,7 @@ import com.fizzdrop.dto.AdminReviewDTO;
 import com.fizzdrop.dto.ApiResponse;
 import com.fizzdrop.dto.CreateRequisitionDTO;
 import com.fizzdrop.dto.SupplierProfileDTO;
+import com.fizzdrop.entity.CentralInventory;
 import com.fizzdrop.entity.District;
 import com.fizzdrop.entity.StockRequisition;
 import com.fizzdrop.entity.SupplierProfile;
@@ -122,5 +123,11 @@ public class RequisitionController {
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));
         }
+    }
+
+    // 5. Superadmin Central Inventory Pool API
+    @GetMapping("/admin/central-inventory")
+    public ResponseEntity<List<CentralInventory>> getCentralInventory() {
+        return ResponseEntity.ok(requisitionService.getCentralInventory());
     }
 }
