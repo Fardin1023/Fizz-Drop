@@ -143,8 +143,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             location_address: o.location_address ?? o.locationAddress ?? 'City Center',
             contact_phone: o.contact_phone ?? o.contactPhone ?? '',
             status: o.status ?? 'Active',
-            stock_quantity: 45,
-            in_stock: true,
+            stock_quantity: 0,
+            in_stock: false,
           }));
           setFallbackOutlets(list);
         })
@@ -158,17 +158,22 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const displayImage = product.image_url || getFallbackImage(product.brand);
   
   // Resolve outlet list
-  const displayOutlets = (product.available_outlets && product.available_outlets.length > 0)
+  const allOutlets = (product.available_outlets && product.available_outlets.length > 0)
     ? product.available_outlets
     : fallbackOutlets;
 
+  // Filter to ONLY hubs where the product is actually available (stock > 0)
+  const availableHubs = allOutlets.filter(
+    (outlet) => (outlet.stock_quantity !== undefined ? outlet.stock_quantity > 0 : Boolean(outlet.in_stock))
+  );
+
   // Compute realistic stock across outlets
-  const rawStock = product.branch_stock ?? product.total_stock ?? 0;
-  const stock = rawStock > 0 
-    ? rawStock 
-    : (displayOutlets.length > 0 ? displayOutlets.reduce((acc, curr) => acc + (curr.stock_quantity || 45), 0) : 50);
+  const rawStock = (branchName && branchName !== 'All Outlets & Hubs' && product.branch_stock !== undefined)
+    ? product.branch_stock
+    : (product.total_stock ?? availableHubs.reduce((acc, curr) => acc + (curr.stock_quantity || 0), 0));
   
-  const isOutOfStock = stock <= 0;
+  const stock = rawStock > 0 ? rawStock : availableHubs.reduce((acc, curr) => acc + (curr.stock_quantity || 0), 0);
+  const isOutOfStock = stock <= 0 || availableHubs.length === 0;
   const unitPrice = Number(product.base_price) || 0;
   const totalPrice = unitPrice * quantity;
 
@@ -335,19 +340,26 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 </div>
               </div>
 
-              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                {displayOutlets.length > 0 ? `${displayOutlets.length} Hubs In Stock` : 'Central Hub Stock'}
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                availableHubs.length > 0
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : 'bg-amber-50 text-amber-700 border-amber-200'
+              }`}>
+                {availableHubs.length > 0
+                  ? `${availableHubs.length} ${availableHubs.length === 1 ? 'Hub Available' : 'Hubs Available'}`
+                  : 'Out of Stock'}
               </span>
             </div>
 
-            {/* List of Outlets */}
+            {/* List of Outlets - Only hubs where product is available */}
             <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-              {displayOutlets.length === 0 ? (
-                <div className="p-3 text-center rounded-xl bg-white border border-slate-100 text-xs text-slate-500">
-                  <span>Available from Central Distribution Hub for immediate doorstep dispatch.</span>
+              {availableHubs.length === 0 ? (
+                <div className="p-3.5 text-center rounded-xl bg-white border border-slate-200/90 text-xs text-slate-500">
+                  <span className="font-semibold text-slate-700">Currently unavailable at franchise outlets.</span>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Please check back soon after regional supplier restocks.</p>
                 </div>
               ) : (
-                displayOutlets.map((outlet, idx) => (
+                availableHubs.map((outlet, idx) => (
                   <div
                     key={outlet.outlet_id || idx}
                     className="p-3 rounded-xl bg-white border border-slate-200/90 shadow-2xs hover:border-blue-300 transition-all flex items-center justify-between gap-3 text-xs"
@@ -373,16 +385,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     </div>
 
                     <div className="text-right shrink-0">
-                      {(outlet.stock_quantity ?? 0) > 0 ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                          In Stock ({outlet.stock_quantity})
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 font-mono">
-                          Awaiting Restock (0)
-                        </span>
-                      )}
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        In Stock
+                      </span>
                     </div>
                   </div>
                 ))

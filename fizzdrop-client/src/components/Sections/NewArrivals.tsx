@@ -73,7 +73,7 @@ const NewArrivals: React.FC<NewArrivalsProps> = ({
           const variant = p.flavor_variant || p.flavorVariant || '';
           const fullName = p.name || (variant ? `${brandName} ${variant}` : brandName);
           const rawStock = p.stockQuantity ?? p.total_stock ?? p.totalStock ?? p.branch_stock ?? p.branchStock;
-          const finalStock = (typeof rawStock === 'number' && rawStock > 0) ? rawStock : 45;
+          const finalStock = typeof rawStock === 'number' ? rawStock : 0;
           const img = p.imageUrl || p.image_url || p.image || '';
 
           return {
