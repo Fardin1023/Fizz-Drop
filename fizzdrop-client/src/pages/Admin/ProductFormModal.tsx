@@ -6,7 +6,6 @@ import {
   Check,
   AlertCircle,
   Package,
-  Warehouse,
   Upload,
   Link as LinkIcon,
   Image as ImageIcon,
@@ -40,7 +39,7 @@ interface ProductFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   onProductCreated: () => void;
-  branches: Branch[];
+  branches?: Branch[];
 }
 
 const BRANDS = ['Pepsi', '7up', 'Mountain Dew', 'Mirinda', 'Sting', 'Aquafina', 'Slice', 'Coca-Cola', 'Sprite', 'Custom'];
@@ -52,7 +51,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   isOpen,
   onClose,
   onProductCreated,
-  branches,
 }) => {
   const { token } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -74,7 +72,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [expiryDate, setExpiryDate] = useState<string>(defaultExpiry());
   const [imageUrl, setImageUrl] = useState<string>('');
   const [imageMode, setImageMode] = useState<'upload' | 'url' | 'presets'>('presets');
-  const [branchStocks, setBranchStocks] = useState<Record<number, number>>({});
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -103,14 +100,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   }, [effectiveBrand, flavorVariant, packaging, sizeVolume]);
 
   if (!isOpen) return null;
-
-  const handleStockChange = (branchId: number, val: string) => {
-    const num = parseInt(val, 10);
-    setBranchStocks((prev) => ({
-      ...prev,
-      [branchId]: isNaN(num) ? 0 : Math.max(0, num),
-    }));
-  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -170,9 +159,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           expiryDate: expiryDate,
           image_url: imageUrl || null,
           imageUrl: imageUrl || null,
-          initialStockByBranch: branchStocks,
           central_stock: parseInt(centralStock, 10) || 1500,
-          total_stock: parseInt(centralStock, 10) || 1500,
+          total_stock: 0,
         }),
       });
 
@@ -194,8 +182,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     }
   };
 
-  const totalAllocatedStock = Object.values(branchStocks).reduce((a, b) => a + b, 0);
-
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 overflow-y-auto bg-black/60 backdrop-blur-md animate-fade-in">
       <div className="relative w-full max-w-4xl bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
@@ -211,7 +197,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 Input Product Details
               </h3>
               <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                Register master catalog item with custom image and branch inventory
+                Register master catalog item with central warehouse stock (outlet distribution managed by suppliers)
               </p>
             </div>
           </div>
@@ -524,45 +510,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 </div>
               )}
             </div>
-
-            {/* Outlets / Branches Inventory Allocation */}
-            <div className="pt-2">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
-                  <Warehouse className="w-4 h-4 text-indigo-500" />
-                  Outlet Inventory Allocation (`Shop_Inventory`)
-                </span>
-                <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-md">
-                  Total: {totalAllocatedStock} units
-                </span>
-              </div>
-              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mb-3">
-                Sets initial physical stock for each active outlet in the database.
-              </p>
-
-              {branches.length === 0 ? (
-                <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs">
-                  No outlets created yet. You can add outlets in the <strong>"Outlets & Locations"</strong> tab anytime!
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {branches.map((b) => (
-                    <div key={b.branch_id} className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/60">
-                      <span className="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-300 truncate" title={b.branch_name}>
-                        {b.branch_name}
-                      </span>
-                      <input
-                        type="number"
-                        min="0"
-                        value={branchStocks[b.branch_id] ?? 0}
-                        onChange={(e) => handleStockChange(b.branch_id, e.target.value)}
-                        className="w-full mt-1.5 px-2.5 py-1.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-xs font-bold text-center text-zinc-900 dark:text-zinc-100"
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
           </form>
 
           {/* Right Preview Card: 4 cols */}
@@ -612,9 +559,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   </span>
                 </div>
                 <div className="text-right">
-                  <span className="text-[10px] text-zinc-400 uppercase block font-semibold">Stock</span>
+                  <span className="text-[10px] text-zinc-400 uppercase block font-semibold">Central Pool</span>
                   <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                    {totalAllocatedStock} units
+                    {centralStock || '0'} cases
                   </span>
                 </div>
               </div>
@@ -622,7 +569,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
             <div className="mt-4 text-center">
               <p className="text-[11px] text-zinc-400">
-                Universal audit fields: <code className="text-indigo-500">created_by: Supplier</code>, <code className="text-indigo-500">created_date: NOW()</code>
+                Universal audit fields: <code className="text-indigo-500">created_by: Superadmin</code>, <code className="text-indigo-500">created_date: NOW()</code>
               </p>
             </div>
           </div>

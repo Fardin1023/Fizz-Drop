@@ -31,7 +31,6 @@ interface ProductRecord {
 export const SuperadminProductCatalog: React.FC = () => {
   const { token } = useAuth();
   const [products, setProducts] = useState<ProductRecord[]>([]);
-  const [branches, setBranches] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [search, setSearch] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
@@ -41,21 +40,13 @@ export const SuperadminProductCatalog: React.FC = () => {
   const fetchCatalogAndBranches = async () => {
     setLoading(true);
     try {
-      const [prodRes, branchRes] = await Promise.all([
-        fetch('http://localhost:8080/api/products'),
-        fetch('http://localhost:8080/api/outlets'),
-      ]);
+      const prodRes = await fetch('http://localhost:8080/api/products');
 
       if (prodRes.ok) {
         const prodData = await prodRes.json();
         setProducts(Array.isArray(prodData) ? prodData : []);
       } else {
         setProducts([]);
-      }
-
-      if (branchRes.ok) {
-        const branchData = await branchRes.json();
-        setBranches(Array.isArray(branchData) ? branchData : []);
       }
     } catch (err) {
       console.error('Error fetching master products catalog:', err);
@@ -404,7 +395,6 @@ export const SuperadminProductCatalog: React.FC = () => {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onProductCreated={fetchCatalogAndBranches}
-        branches={branches}
       />
     </div>
   );

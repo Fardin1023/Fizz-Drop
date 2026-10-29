@@ -6,7 +6,9 @@ import {
   RefreshCw,
   Boxes,
   Layers,
+  Store,
 } from 'lucide-react';
+import { SupplyStockModal, type OutletOption } from './SupplyStockModal';
 
 interface AvailableProduct {
   product_id: number;
@@ -21,6 +23,11 @@ interface AvailableProduct {
   image_url?: string;
   total_stock?: number;
   central_stock?: number;
+  available_outlets?: Array<{
+    outlet_id: number;
+    outlet_name?: string;
+    stock_quantity: number;
+  }>;
 }
 
 interface SupplierAvailableProductsProps {
@@ -31,19 +38,40 @@ export const SupplierAvailableProducts: React.FC<SupplierAvailableProductsProps>
   onRequestStock,
 }) => {
   const [products, setProducts] = useState<AvailableProduct[]>([]);
+  const [outlets, setOutlets] = useState<OutletOption[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [search, setSearch] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
 
+  // Supply Stock to Outlet Modal state
+  const [isSupplyModalOpen, setIsSupplyModalOpen] = useState<boolean>(false);
+  const [targetProduct, setTargetProduct] = useState<number | null>(null);
+
   const fetchAvailableProducts = async () => {
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:8080/api/products');
-      if (res.ok) {
-        const data = await res.json();
-        setProducts(Array.isArray(data) ? data : []);
+      const [prodRes, outletRes] = await Promise.all([
+        fetch('http://localhost:8080/api/products'),
+        fetch('http://localhost:8080/api/outlets'),
+      ]);
+
+      if (prodRes.ok) {
+        const prodData = await prodRes.json();
+        setProducts(Array.isArray(prodData) ? prodData : []);
       } else {
         setProducts([]);
+      }
+
+      if (outletRes.ok) {
+        const outletData = await outletRes.json();
+        const formatted = (Array.isArray(outletData) ? outletData : []).map((o: any) => ({
+          outlet_id: o.outlet_id ?? o.branch_id ?? o.outletId,
+          outlet_name: o.outlet_name ?? o.branch_name ?? o.outletName ?? 'Outlet',
+          location_address: o.location_address ?? o.locationAddress ?? '',
+          contact_phone: o.contact_phone ?? o.contactPhone ?? '',
+          status: o.status ?? 'Active',
+        }));
+        setOutlets(formatted);
       }
     } catch (err) {
       console.error('Error fetching available products from superadmin:', err);
@@ -98,15 +126,30 @@ export const SupplierAvailableProducts: React.FC<SupplierAvailableProductsProps>
           </p>
         </div>
 
-        {/* Quick Requisition Button */}
-        <button
-          type="button"
-          onClick={() => onRequestStock()}
-          className="py-2.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold text-xs shadow-md shadow-blue-500/20 flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap active:scale-95 shrink-0"
-        >
-          <Truck className="w-4 h-4 text-white" />
-          <span>Request Stock (New Requisition)</span>
-        </button>
+        {/* Quick Requisition & Supply Actions */}
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setTargetProduct(null);
+              setIsSupplyModalOpen(true);
+            }}
+            className="py-2.5 px-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap active:scale-95 shadow-2xs"
+            title="Allocate and deliver stock to specific retail franchise outlets"
+          >
+            <Store className="w-4 h-4 text-emerald-400" />
+            <span>Supply Stock to Outlets</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onRequestStock()}
+            className="py-2.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold text-xs shadow-md shadow-blue-500/20 flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap active:scale-95 shrink-0"
+          >
+            <Truck className="w-4 h-4 text-white" />
+            <span>Request Stock (New Requisition)</span>
+          </button>
+        </div>
       </div>
 
       {/* Metric Counters */}
@@ -227,10 +270,10 @@ export const SupplierAvailableProducts: React.FC<SupplierAvailableProductsProps>
                   <th className="py-3.5 px-4">Beverage Product</th>
                   <th className="py-3.5 px-4">SKU</th>
                   <th className="py-3.5 px-4">Packaging & Size</th>
-                  <th className="py-3.5 px-4">Category</th>
                   <th className="py-3.5 px-4">Wholesale Price</th>
-                  <th className="py-3.5 px-4 text-center">Central Availability</th>
-                  <th className="py-3.5 px-4 text-right">Stock Action</th>
+                  <th className="py-3.5 px-4 text-center">Superadmin Central Stock</th>
+                  <th className="py-3.5 px-4">Outlets Stock Distribution</th>
+                  <th className="py-3.5 px-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -281,12 +324,6 @@ export const SupplierAvailableProducts: React.FC<SupplierAvailableProductsProps>
                       </td>
 
                       <td className="py-3 px-4">
-                        <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                          {p.category}
-                        </span>
-                      </td>
-
-                      <td className="py-3 px-4">
                         <span className="font-mono font-bold text-zinc-900 text-xs">
                           ৳{Number(p.base_price).toFixed(2)}
                         </span>
@@ -308,6 +345,39 @@ export const SupplierAvailableProducts: React.FC<SupplierAvailableProductsProps>
                         </span>
                       </td>
 
+                      <td className="py-3 px-4">
+                        <div className="space-y-1 max-w-[260px]">
+                          <div className="flex flex-wrap gap-1">
+                            {p.available_outlets && p.available_outlets.length > 0 ? (
+                              p.available_outlets.map((ao) => (
+                                <span
+                                  key={ao.outlet_id}
+                                  className="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-md border bg-slate-50 border-slate-200 text-slate-700"
+                                >
+                                  <span className="font-semibold truncate max-w-[90px]">{ao.outlet_name}:</span>
+                                  <strong className={ao.stock_quantity > 0 ? 'text-emerald-600' : 'text-slate-400'}>
+                                    {ao.stock_quantity}
+                                  </strong>
+                                </span>
+                              ))
+                            ) : (
+                              <span className="text-[10px] text-slate-400 italic">No outlet stock allocated</span>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTargetProduct(p.product_id);
+                              setIsSupplyModalOpen(true);
+                            }}
+                            className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-1 cursor-pointer pt-0.5"
+                          >
+                            <Store className="w-3 h-3 text-indigo-500" />
+                            <span>Supply / Adjust Outlets</span>
+                          </button>
+                        </div>
+                      </td>
+
                       <td className="py-3 px-4 text-right">
                         <button
                           type="button"
@@ -327,6 +397,16 @@ export const SupplierAvailableProducts: React.FC<SupplierAvailableProductsProps>
           </div>
         )}
       </div>
+
+      {/* Supplier Outlet Stock Allocation & Supply Modal */}
+      <SupplyStockModal
+        isOpen={isSupplyModalOpen}
+        onClose={() => setIsSupplyModalOpen(false)}
+        onSupplied={fetchAvailableProducts}
+        products={products as any}
+        outlets={outlets}
+        initialProductId={targetProduct}
+      />
     </div>
   );
 };
