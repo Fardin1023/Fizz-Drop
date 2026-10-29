@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS `Roles` (
     CONSTRAINT `chk_roles_name_not_empty` CHECK (CHAR_LENGTH(TRIM(`role_name`)) > 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Domain 1: Identity and Access Control - Branches
+-- Domain 1: Identity and Access Control - Branches & Outlets
 CREATE TABLE IF NOT EXISTS `Branches` (
     `branch_id` INT AUTO_INCREMENT PRIMARY KEY,
     `branch_name` VARCHAR(100) NOT NULL,
@@ -44,6 +44,20 @@ CREATE TABLE IF NOT EXISTS `Branches` (
     `updated_by` INT NULL,
     `updated_date` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT `chk_branches_name_not_empty` CHECK (CHAR_LENGTH(TRIM(`branch_name`)) > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `Outlets` (
+    `outlet_id` INT AUTO_INCREMENT PRIMARY KEY,
+    `outlet_name` VARCHAR(100) NOT NULL,
+    `location_address` VARCHAR(255) NOT NULL,
+    `contact_phone` VARCHAR(50) NULL,
+    `status` VARCHAR(20) NOT NULL DEFAULT 'Active',
+    -- Standard Universal Audit Columns
+    `created_by` INT NULL,
+    `created_date` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_by` INT NULL,
+    `updated_date` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT `chk_outlets_name_not_empty` CHECK (CHAR_LENGTH(TRIM(`outlet_name`)) > 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================================
@@ -121,6 +135,7 @@ CREATE TABLE IF NOT EXISTS `Products` (
     `sku` VARCHAR(50) NOT NULL UNIQUE,
     `base_price` DECIMAL(10,2) NOT NULL,
     `category` VARCHAR(50) NOT NULL DEFAULT 'Beverage',
+    `image_url` LONGTEXT NULL,
     -- Standard Universal Audit Columns
     `created_by` INT NULL,
     `created_date` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

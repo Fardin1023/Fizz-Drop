@@ -1,0 +1,15 @@
+{
+  "scripts": {
+    "server": "powershell -ExecutionPolicy Bypass -File ./run-backend.ps1",
+    "backend:spring": "powershell -ExecutionPolicy Bypass -File ./run-backend.ps1",
+    "client": "npm --prefix fizzdrop-client run dev"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^9.5.0",
+    "@mui/material": "^9.5.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "tailwindcss": "^4.3.3"
+  }
+}

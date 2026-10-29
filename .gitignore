@@ -13,3 +13,9 @@
 .externalNativeBuild
 .cxx
 local.properties
+node_modules/
+**/node_modules/
+*.log
+.vscode/
+backend-spring-boot/target/
+fizzdrop-client/dist/
