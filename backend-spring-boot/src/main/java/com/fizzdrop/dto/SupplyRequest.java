@@ -24,6 +24,14 @@ public class SupplyRequest {
     @JsonProperty("notes")
     private String notes;
 
+    @JsonProperty("user_id")
+    @JsonAlias({"user_id", "userId"})
+    private Long userId;
+
+    @JsonProperty("district_id")
+    @JsonAlias({"district_id", "districtId"})
+    private Long districtId;
+
     public SupplyRequest() {}
 
     public SupplyRequest(Long outletId, Long productId, Integer quantity, String mode) {
@@ -47,4 +55,10 @@ public class SupplyRequest {
 
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
+
+    public Long getUserId() { return userId; }
+    public void setUserId(Long userId) { this.userId = userId; }
+
+    public Long getDistrictId() { return districtId; }
+    public void setDistrictId(Long districtId) { this.districtId = districtId; }
 }

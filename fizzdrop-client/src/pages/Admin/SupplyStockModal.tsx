@@ -21,10 +21,13 @@ export interface ProductOption {
   product_id: number;
   brand: string;
   flavor_variant: string;
+  category?: string;
   sku?: string;
   base_price?: number | string;
   image_url?: string;
   total_stock?: number;
+  central_stock?: number;
+  supplier_stock?: number;
   available_outlets?: Array<{
     outlet_id: number;
     stock_quantity: number;
@@ -39,6 +42,7 @@ interface SupplyStockModalProps {
   outlets: OutletOption[];
   initialProductId?: number | null;
   initialOutletId?: number | null;
+  userId?: number;
 }
 
 export const SupplyStockModal: React.FC<SupplyStockModalProps> = ({
@@ -49,6 +53,7 @@ export const SupplyStockModal: React.FC<SupplyStockModalProps> = ({
   outlets,
   initialProductId = null,
   initialOutletId = null,
+  userId = 4,
 }) => {
   const [selectedProductId, setSelectedProductId] = useState<number | string>(
     initialProductId || (products.length > 0 ? products[0].product_id : '')
@@ -123,6 +128,7 @@ export const SupplyStockModal: React.FC<SupplyStockModalProps> = ({
           quantity: qty,
           mode,
           notes: notes.trim() || undefined,
+          user_id: userId || 4,
         }),
       });
 
@@ -241,6 +247,29 @@ export const SupplyStockModal: React.FC<SupplyStockModalProps> = ({
                   ))}
                 </select>
               )}
+            </div>
+
+            {/* Supplier Depot Stock & Category Information Card */}
+            <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-50/80 to-teal-50/80 border border-emerald-200/90 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-emerald-800 tracking-wider flex items-center gap-1.5">
+                  <Package className="w-3.5 h-3.5 text-emerald-600" />
+                  Your Available Depot Stock
+                </span>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded bg-white text-emerald-800 border border-emerald-200">
+                    Category: {currentProduct?.category || 'Beverage'}
+                  </span>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="font-oswald text-xl font-black text-emerald-800 block">
+                  {(currentProduct?.supplier_stock ?? 0).toLocaleString()} <span className="text-xs font-sans font-bold">cases</span>
+                </span>
+                <span className="text-[9px] text-emerald-600 font-mono">
+                  {(currentProduct?.supplier_stock ?? 0) > 0 ? 'In Regional Depot' : 'Empty (Request Stock)'}
+                </span>
+              </div>
             </div>
 
             {/* Current Stock vs Resulting Stock Telemetry */}

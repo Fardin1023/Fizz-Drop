@@ -105,6 +105,16 @@ public class Product {
     @JsonAlias({"central_stock", "centralStock", "available_central_stock"})
     private Integer centralStock;
 
+    @Transient
+    @JsonProperty("supplier_stock")
+    @JsonAlias({"supplier_stock", "supplierStock", "regional_stock", "regionalStock"})
+    private Integer supplierStock = 0;
+
+    @Transient
+    @JsonProperty("depot_breakdown")
+    @JsonAlias({"depot_breakdown", "depotBreakdown"})
+    private java.util.List<java.util.Map<String, Object>> depotBreakdown;
+
     public Product() {
         this.createdDate = LocalDateTime.now();
         this.updatedDate = LocalDateTime.now();
@@ -191,4 +201,10 @@ public class Product {
 
     public Integer getCentralStock() { return centralStock; }
     public void setCentralStock(Integer centralStock) { this.centralStock = centralStock; }
+
+    public Integer getSupplierStock() { return supplierStock; }
+    public void setSupplierStock(Integer supplierStock) { this.supplierStock = supplierStock; }
+
+    public java.util.List<java.util.Map<String, Object>> getDepotBreakdown() { return depotBreakdown; }
+    public void setDepotBreakdown(java.util.List<java.util.Map<String, Object>> depotBreakdown) { this.depotBreakdown = depotBreakdown; }
 }

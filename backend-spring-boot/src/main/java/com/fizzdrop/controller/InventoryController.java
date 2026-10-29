@@ -2,12 +2,16 @@ package com.fizzdrop.controller;
 
 import com.fizzdrop.dto.ApiResponse;
 import com.fizzdrop.dto.SupplyRequest;
+import com.fizzdrop.entity.DistrictInventory;
 import com.fizzdrop.entity.Outlet;
 import com.fizzdrop.entity.Product;
 import com.fizzdrop.entity.ShopInventory;
+import com.fizzdrop.entity.SupplierProfile;
+import com.fizzdrop.repository.DistrictInventoryRepository;
 import com.fizzdrop.repository.OutletRepository;
 import com.fizzdrop.repository.ProductRepository;
 import com.fizzdrop.repository.ShopInventoryRepository;
+import com.fizzdrop.repository.SupplierProfileRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -22,13 +26,19 @@ public class InventoryController {
     private final ShopInventoryRepository inventoryRepository;
     private final ProductRepository productRepository;
     private final OutletRepository outletRepository;
+    private final DistrictInventoryRepository districtInventoryRepository;
+    private final SupplierProfileRepository supplierProfileRepository;
 
     public InventoryController(ShopInventoryRepository inventoryRepository,
                                ProductRepository productRepository,
-                               OutletRepository outletRepository) {
+                               OutletRepository outletRepository,
+                               DistrictInventoryRepository districtInventoryRepository,
+                               SupplierProfileRepository supplierProfileRepository) {
         this.inventoryRepository = inventoryRepository;
         this.productRepository = productRepository;
         this.outletRepository = outletRepository;
+        this.districtInventoryRepository = districtInventoryRepository;
+        this.supplierProfileRepository = supplierProfileRepository;
     }
 
     /**
@@ -84,6 +94,19 @@ public class InventoryController {
         }
 
         inventoryRepository.save(inventory);
+
+        // Deduct supplied stock from supplier's district/depot inventory if tracked
+        Long resolvedUserId = (req.getUserId() != null && req.getUserId() > 0) ? req.getUserId() : 4L;
+        supplierProfileRepository.findByUserId(resolvedUserId).ifPresent(sp -> {
+            Long targetDistId = (req.getDistrictId() != null && req.getDistrictId() > 0) ? req.getDistrictId() : sp.getPrimaryDistrictId();
+            if (targetDistId != null) {
+                districtInventoryRepository.findByDistrictIdAndProductId(targetDistId, product.getProductId()).ifPresent(di -> {
+                    int remaining = Math.max(0, di.getCurrentStock() - req.getQuantity());
+                    di.setCurrentStock(remaining);
+                    districtInventoryRepository.save(di);
+                });
+            }
+        });
 
         // Recalculate total product stock
         Integer totalStock = inventoryRepository.getTotalStockByProductId(product.getProductId());

@@ -46,6 +46,8 @@ interface ProductCatalogItem {
   expiry_date?: string;
   image_url?: string;
   total_stock?: number;
+  central_stock?: number;
+  supplier_stock?: number;
 }
 
 interface SupplierRequestStockProps {
@@ -86,7 +88,7 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
         fetch(`http://localhost:8080/api/v1/supplier/profile?userId=${user?.user_id || 4}`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         }),
-        fetch('http://localhost:8080/api/products'),
+        fetch(`http://localhost:8080/api/products?userId=${user?.user_id || 4}`),
       ]);
 
       if (profRes.ok) {
@@ -403,8 +405,8 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
                         <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 font-mono">
                           {p.brand}
                         </span>
-                        <span className="text-[10px] font-mono text-slate-400">
-                          {p.packaging} • {p.size_volume}
+                        <span className="text-[9px] font-bold font-mono px-2 py-0.2 rounded-full uppercase bg-purple-50 text-purple-700 border border-purple-200">
+                          {p.category || 'Beverage'}
                         </span>
                       </div>
 
@@ -417,7 +419,24 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
                           ৳{Number(p.base_price || 0).toFixed(2)}
                         </span>
                         <span className="text-[10px] font-mono text-slate-400">
-                          SKU: {p.sku}
+                          {p.packaging} • {p.size_volume}
+                        </span>
+                      </div>
+
+                      {/* Stock Telemetry Badges */}
+                      <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                        <span className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded-md border flex items-center gap-1 ${
+                          (p.supplier_stock || 0) > 0
+                            ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                            : 'bg-slate-100 text-slate-500 border-slate-200'
+                        }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${
+                            (p.supplier_stock || 0) > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'
+                          }`}></span>
+                          Depot Stock: {p.supplier_stock || 0} cases
+                        </span>
+                        <span className="text-[9px] font-mono text-slate-500 bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded-md">
+                          Central Pool: {p.central_stock ?? 0}
                         </span>
                       </div>
                     </div>

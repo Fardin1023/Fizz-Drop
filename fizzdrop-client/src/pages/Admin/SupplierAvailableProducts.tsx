@@ -7,7 +7,10 @@ import {
   Boxes,
   Layers,
   Store,
+  Warehouse,
+  Tag,
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 import { SupplyStockModal, type OutletOption } from './SupplyStockModal';
 
 interface AvailableProduct {
@@ -23,6 +26,12 @@ interface AvailableProduct {
   image_url?: string;
   total_stock?: number;
   central_stock?: number;
+  supplier_stock?: number;
+  depot_breakdown?: Array<{
+    district_id: number;
+    district_name: string;
+    stock: number;
+  }>;
   available_outlets?: Array<{
     outlet_id: number;
     outlet_name?: string;
@@ -37,6 +46,7 @@ interface SupplierAvailableProductsProps {
 export const SupplierAvailableProducts: React.FC<SupplierAvailableProductsProps> = ({
   onRequestStock,
 }) => {
+  const { user } = useAuth();
   const [products, setProducts] = useState<AvailableProduct[]>([]);
   const [outlets, setOutlets] = useState<OutletOption[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -50,8 +60,9 @@ export const SupplierAvailableProducts: React.FC<SupplierAvailableProductsProps>
   const fetchAvailableProducts = async () => {
     setLoading(true);
     try {
+      const userId = user?.user_id || 4;
       const [prodRes, outletRes] = await Promise.all([
-        fetch('http://localhost:8080/api/products'),
+        fetch(`http://localhost:8080/api/products?userId=${userId}`),
         fetch('http://localhost:8080/api/outlets'),
       ]);
 
@@ -103,6 +114,7 @@ export const SupplierAvailableProducts: React.FC<SupplierAvailableProductsProps>
   });
 
   const totalCentralCases = products.reduce((sum, p) => sum + (p.central_stock || p.total_stock || 0), 0);
+  const totalSupplierCases = products.reduce((sum, p) => sum + (p.supplier_stock || 0), 0);
 
   return (
     <div className="space-y-4">
@@ -153,87 +165,142 @@ export const SupplierAvailableProducts: React.FC<SupplierAvailableProductsProps>
       </div>
 
       {/* Metric Counters */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-between">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* Metric 1: Supplier's Own Depot Stock */}
+        <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-50/90 to-teal-50/50 border border-emerald-200/90 shadow-2xs flex items-center justify-between">
           <div>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block font-mono">
-              Available Beverages
+            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 block font-mono flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              Your Depot Stock (Holding)
             </span>
-            <span className="text-2xl font-black font-oswald text-zinc-900 mt-1 block">
-              {products.length}
+            <span className="text-2xl font-black font-oswald text-emerald-900 mt-1 block">
+              {totalSupplierCases.toLocaleString()} <span className="text-xs font-sans font-bold text-emerald-700">cases</span>
             </span>
-            <span className="text-[11px] text-slate-500">Provided by Superadmin</span>
+            <span className="text-[11px] text-emerald-700/90">Physical inventory across your depots</span>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
-            <Package className="w-5 h-5" />
+          <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center border border-emerald-300">
+            <Warehouse className="w-5 h-5" />
           </div>
         </div>
 
+        {/* Metric 2: Superadmin Central Pool */}
         <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-between">
           <div>
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block font-mono">
               Central Depot Stock
             </span>
             <span className="text-2xl font-black font-oswald text-indigo-700 mt-1 block">
-              {totalCentralCases.toLocaleString()}
+              {totalCentralCases.toLocaleString()} <span className="text-xs font-sans font-bold text-indigo-500">cases</span>
             </span>
-            <span className="text-[11px] text-slate-500">Total cases in central inventory</span>
+            <span className="text-[11px] text-slate-500">Available from Superadmin</span>
           </div>
           <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100">
             <Boxes className="w-5 h-5" />
           </div>
         </div>
 
+        {/* Metric 3: Product Categories */}
         <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-between">
           <div>
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block font-mono">
               Product Categories
             </span>
-            <span className="text-2xl font-black font-oswald text-cyan-700 mt-1 block">
-              {categories.filter((c) => c !== 'ALL').length}
+            <span className="text-2xl font-black font-oswald text-purple-700 mt-1 block">
+              {categories.filter((c) => c !== 'ALL').length} <span className="text-xs font-sans font-bold text-purple-500">segments</span>
             </span>
-            <span className="text-[11px] text-slate-500">Segments ready to order</span>
+            <span className="text-[11px] text-slate-500">Active beverage groups</span>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center border border-cyan-100">
+          <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center border border-purple-100">
             <Layers className="w-5 h-5" />
+          </div>
+        </div>
+
+        {/* Metric 4: Total SKUs */}
+        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block font-mono">
+              Available Beverages
+            </span>
+            <span className="text-2xl font-black font-oswald text-zinc-900 mt-1 block">
+              {products.length} <span className="text-xs font-sans font-bold text-slate-500">items</span>
+            </span>
+            <span className="text-[11px] text-slate-500">Catalog items in system</span>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
+            <Package className="w-5 h-5" />
           </div>
         </div>
       </div>
 
       {/* Search & Filter Toolbar */}
-      <div className="p-3 rounded-2xl bg-white border border-slate-200/90 shadow-2xs flex flex-wrap items-center justify-between gap-2.5">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search products by brand, flavor, SKU, or category..."
-            className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-zinc-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-          />
+      <div className="space-y-2">
+        <div className="p-3 rounded-2xl bg-white border border-slate-200/90 shadow-2xs flex flex-wrap items-center justify-between gap-2.5">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search products by brand, flavor, SKU, or category..."
+              className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-zinc-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-zinc-800 font-medium focus:outline-none cursor-pointer"
+            >
+              {categories.map((c) => (
+                <option key={c} value={c}>
+                  Category: {c}
+                </option>
+              ))}
+            </select>
+
+            <button
+              type="button"
+              onClick={fetchAvailableProducts}
+              title="Refresh Available Products"
+              className="p-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-500 transition-colors cursor-pointer"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-blue-600' : ''}`} />
+            </button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-zinc-800 font-medium focus:outline-none cursor-pointer"
-          >
-            {categories.map((c) => (
-              <option key={c} value={c}>
-                Category: {c}
-              </option>
-            ))}
-          </select>
+        {/* Visual Category Filter Chips */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+          <span className="text-[10px] font-bold font-mono text-slate-400 uppercase tracking-wider shrink-0 flex items-center gap-1 mr-1">
+            <Tag className="w-3 h-3 text-indigo-500" /> Filter by Category:
+          </span>
+          {categories.map((cat) => {
+            const count = cat === 'ALL'
+              ? products.length
+              : products.filter((p) => (p.category || '').toLowerCase() === cat.toLowerCase()).length;
+            const isSelected = selectedCategory.toLowerCase() === cat.toLowerCase();
 
-          <button
-            type="button"
-            onClick={fetchAvailableProducts}
-            title="Refresh Available Products"
-            className="p-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-500 transition-colors cursor-pointer"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-blue-600' : ''}`} />
-          </button>
+            return (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-3 py-1 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+                  isSelected
+                    ? 'bg-slate-900 text-white shadow-xs font-bold ring-2 ring-slate-900/20'
+                    : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'
+                }`}
+              >
+                <span>{cat}</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                  isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+                }`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -268,9 +335,13 @@ export const SupplierAvailableProducts: React.FC<SupplierAvailableProductsProps>
               <thead className="bg-slate-50 text-[10px] font-bold font-mono text-slate-500 uppercase tracking-wider border-b border-slate-200">
                 <tr>
                   <th className="py-3.5 px-4">Beverage Product</th>
+                  <th className="py-3.5 px-4">Category</th>
                   <th className="py-3.5 px-4">SKU</th>
                   <th className="py-3.5 px-4">Packaging & Size</th>
                   <th className="py-3.5 px-4">Wholesale Price</th>
+                  <th className="py-3.5 px-4 text-center bg-emerald-50/70 border-x border-emerald-100 text-emerald-950 font-black">
+                    Your Depot Stock (Holding)
+                  </th>
                   <th className="py-3.5 px-4 text-center">Superadmin Central Stock</th>
                   <th className="py-3.5 px-4">Outlets Stock Distribution</th>
                   <th className="py-3.5 px-4 text-right">Actions</th>
@@ -280,6 +351,8 @@ export const SupplierAvailableProducts: React.FC<SupplierAvailableProductsProps>
                 {filteredProducts.map((p) => {
                   const centralStock = p.central_stock || p.total_stock || 0;
                   const isAvailable = centralStock > 0;
+                  const hasSupplierStock = (p.supplier_stock || 0) > 0;
+
                   return (
                     <tr key={p.product_id} className="hover:bg-slate-50/70 transition-colors">
                       <td className="py-3 px-4">
@@ -309,6 +382,13 @@ export const SupplierAvailableProducts: React.FC<SupplierAvailableProductsProps>
                       </td>
 
                       <td className="py-3 px-4">
+                        <span className="inline-flex items-center gap-1 font-mono font-bold text-[10px] px-2.5 py-1 rounded-full uppercase tracking-wider bg-purple-50 text-purple-700 border border-purple-200 shadow-2xs">
+                          <Tag className="w-2.5 h-2.5 text-purple-500" />
+                          {p.category || 'Beverage'}
+                        </span>
+                      </td>
+
+                      <td className="py-3 px-4">
                         <span className="font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 text-[11px]">
                           {p.sku}
                         </span>
@@ -330,11 +410,50 @@ export const SupplierAvailableProducts: React.FC<SupplierAvailableProductsProps>
                         <span className="text-[9px] text-slate-400 block font-mono">per case/unit</span>
                       </td>
 
+                      {/* Your Depot Stock (Supplier Holding) */}
+                      <td className="py-3 px-4 text-center bg-emerald-50/20 border-x border-emerald-100/60">
+                        {hasSupplierStock ? (
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="font-mono font-bold text-xs px-3 py-1 rounded-xl bg-emerald-100/90 text-emerald-800 border border-emerald-300 shadow-2xs inline-flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                              {p.supplier_stock!.toLocaleString()} cases
+                            </span>
+                            {p.depot_breakdown && p.depot_breakdown.some((d) => d.stock > 0) && (
+                              <div className="flex flex-wrap gap-1 justify-center max-w-[190px]">
+                                {p.depot_breakdown
+                                  .filter((d) => d.stock > 0)
+                                  .map((d) => (
+                                    <span
+                                      key={d.district_id}
+                                      className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-white border border-emerald-200 text-emerald-700 font-semibold"
+                                    >
+                                      {d.district_name}: {d.stock}
+                                    </span>
+                                  ))}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center">
+                            <span className="font-mono font-bold text-[10px] px-2 py-0.5 rounded-lg bg-amber-50 text-amber-700 border border-amber-200">
+                              0 cases (Depot Empty)
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => onRequestStock(p.product_id)}
+                              className="text-[10px] text-blue-600 hover:text-blue-800 font-bold hover:underline mt-0.5 cursor-pointer"
+                            >
+                              + Request Stock
+                            </button>
+                          </div>
+                        )}
+                      </td>
+
                       <td className="py-3 px-4 text-center">
                         <span
                           className={`font-mono font-bold text-xs px-2.5 py-1 rounded-lg border inline-block ${
                             isAvailable
-                              ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                              ? 'text-indigo-700 bg-indigo-50 border-indigo-200'
                               : 'text-amber-700 bg-amber-50 border-amber-200'
                           }`}
                         >
@@ -406,6 +525,7 @@ export const SupplierAvailableProducts: React.FC<SupplierAvailableProductsProps>
         products={products as any}
         outlets={outlets}
         initialProductId={targetProduct}
+        userId={user?.user_id || 4}
       />
     </div>
   );

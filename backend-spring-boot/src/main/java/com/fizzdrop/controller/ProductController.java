@@ -2,13 +2,19 @@ package com.fizzdrop.controller;
 
 import com.fizzdrop.dto.ApiResponse;
 import com.fizzdrop.entity.CentralInventory;
+import com.fizzdrop.entity.District;
+import com.fizzdrop.entity.DistrictInventory;
 import com.fizzdrop.entity.Outlet;
 import com.fizzdrop.entity.Product;
 import com.fizzdrop.entity.ShopInventory;
+import com.fizzdrop.entity.SupplierProfile;
 import com.fizzdrop.repository.CentralInventoryRepository;
+import com.fizzdrop.repository.DistrictInventoryRepository;
+import com.fizzdrop.repository.DistrictRepository;
 import com.fizzdrop.repository.OutletRepository;
 import com.fizzdrop.repository.ProductRepository;
 import com.fizzdrop.repository.ShopInventoryRepository;
+import com.fizzdrop.repository.SupplierProfileRepository;
 import com.fizzdrop.service.RequisitionProcessingService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -24,18 +30,27 @@ public class ProductController {
     private final ShopInventoryRepository inventoryRepository;
     private final OutletRepository outletRepository;
     private final CentralInventoryRepository centralInventoryRepository;
+    private final DistrictInventoryRepository districtInventoryRepository;
+    private final SupplierProfileRepository supplierProfileRepository;
+    private final DistrictRepository districtRepository;
 
     public ProductController(ProductRepository productRepository, 
                              ShopInventoryRepository inventoryRepository,
                              OutletRepository outletRepository,
-                             CentralInventoryRepository centralInventoryRepository) {
+                             CentralInventoryRepository centralInventoryRepository,
+                             DistrictInventoryRepository districtInventoryRepository,
+                             SupplierProfileRepository supplierProfileRepository,
+                             DistrictRepository districtRepository) {
         this.productRepository = productRepository;
         this.inventoryRepository = inventoryRepository;
         this.outletRepository = outletRepository;
         this.centralInventoryRepository = centralInventoryRepository;
+        this.districtInventoryRepository = districtInventoryRepository;
+        this.supplierProfileRepository = supplierProfileRepository;
+        this.districtRepository = districtRepository;
     }
 
-    private void populateProductMetadata(Product p, Long branchId, List<Outlet> outlets) {
+    private void populateProductMetadata(Product p, Long branchId, Long userId, List<Outlet> outlets) {
         List<Map<String, Object>> outletList = new ArrayList<>();
         int calculatedTotalStock = 0;
 
@@ -77,11 +92,48 @@ public class ProductController {
             p.setBranchStock(calculatedTotalStock);
         }
         p.setAvailableOutlets(outletList);
+
+        // Supplier Depot Stock Calculation
+        Long resolvedSupplierUserId = (userId != null && userId > 0) ? userId : 4L;
+        int totalSupplierDepotStock = 0;
+        List<Map<String, Object>> depotBreakdown = new ArrayList<>();
+
+        var profileOpt = supplierProfileRepository.findByUserId(resolvedSupplierUserId);
+        if (profileOpt.isPresent()) {
+            SupplierProfile sp = profileOpt.get();
+            List<Long> districtIds = new ArrayList<>();
+            if (sp.getCoveredDistrictIds() != null && !sp.getCoveredDistrictIds().trim().isEmpty()) {
+                for (String sid : sp.getCoveredDistrictIds().split(",")) {
+                    try {
+                        districtIds.add(Long.parseLong(sid.trim()));
+                    } catch (NumberFormatException ignored) {}
+                }
+            }
+            if (districtIds.isEmpty() && sp.getPrimaryDistrictId() != null) {
+                districtIds.add(sp.getPrimaryDistrictId());
+            }
+
+            for (Long distId : districtIds) {
+                var distInv = districtInventoryRepository.findByDistrictIdAndProductId(distId, p.getProductId());
+                int st = distInv.map(DistrictInventory::getCurrentStock).orElse(0);
+                totalSupplierDepotStock += st;
+
+                String distName = districtRepository.findById(distId).map(District::getName).orElse("District #" + distId);
+                Map<String, Object> dm = new HashMap<>();
+                dm.put("district_id", distId);
+                dm.put("district_name", distName);
+                dm.put("stock", st);
+                depotBreakdown.add(dm);
+            }
+        }
+        p.setSupplierStock(totalSupplierDepotStock);
+        p.setDepotBreakdown(depotBreakdown);
     }
 
     @GetMapping
     public ResponseEntity<List<Product>> getAllProducts(
             @RequestParam(required = false) Long branchId,
+            @RequestParam(required = false) Long userId,
             @RequestParam(required = false) String brand,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String search) {
@@ -99,27 +151,29 @@ public class ProductController {
 
         List<Outlet> outlets = outletRepository.findAll();
         for (Product p : products) {
-            populateProductMetadata(p, branchId, outlets);
+            populateProductMetadata(p, branchId, userId, outlets);
         }
 
         return ResponseEntity.ok(products);
     }
 
     @GetMapping("/new-arrivals")
-    public ResponseEntity<List<Product>> getNewArrivals(@RequestParam(required = false) Long branchId) {
+    public ResponseEntity<List<Product>> getNewArrivals(
+            @RequestParam(required = false) Long branchId,
+            @RequestParam(required = false) Long userId) {
         List<Product> list = productRepository.findTopNewArrivals();
         if (list.size() > 8) {
             list = list.subList(0, 8);
         }
         List<Outlet> outlets = outletRepository.findAll();
         for (Product p : list) {
-            populateProductMetadata(p, branchId, outlets);
+            populateProductMetadata(p, branchId, userId, outlets);
         }
         return ResponseEntity.ok(list);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<?> getProductById(@PathVariable Long id) {
+    public ResponseEntity<?> getProductById(@PathVariable Long id, @RequestParam(required = false) Long userId) {
         Optional<Product> product = productRepository.findById(id);
         if (product.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -127,7 +181,7 @@ public class ProductController {
         }
         Product p = product.get();
         List<Outlet> outlets = outletRepository.findAll();
-        populateProductMetadata(p, null, outlets);
+        populateProductMetadata(p, null, userId, outlets);
         return ResponseEntity.ok(p);
     }
 
@@ -171,7 +225,7 @@ public class ProductController {
                     ))
             );
 
-            populateProductMetadata(saved, null, outlets);
+            populateProductMetadata(saved, null, null, outlets);
             return ResponseEntity.status(HttpStatus.CREATED).body(saved);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
