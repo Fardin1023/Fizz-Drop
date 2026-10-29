@@ -59,12 +59,13 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
   const [brand, setBrand] = useState('Pepsi');
   const [customBrand, setCustomBrand] = useState('');
-  const [flavorVariant, setFlavorVariant] = useState('Zero Sugar');
-  const [category, setCategory] = useState('Beverage');
+  const [flavorVariant, setFlavorVariant] = useState('');
+  const [category, setCategory] = useState('Carbonated Soft Drink');
   const [packaging, setPackaging] = useState('Bottle');
   const [sizeVolume, setSizeVolume] = useState('500ml');
-  const [basePrice, setBasePrice] = useState<string>('45.00');
+  const [basePrice, setBasePrice] = useState<string>('');
   const [sku, setSku] = useState('');
+  const [centralStock, setCentralStock] = useState<string>('1500');
   const defaultExpiry = () => {
     const d = new Date();
     d.setFullYear(d.getFullYear() + 1);
@@ -93,6 +94,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
   // Auto-generate SKU when key fields change
   useEffect(() => {
+    if (!effectiveBrand || !flavorVariant) return;
     const brandCode = effectiveBrand.substring(0, 3).toUpperCase().replace(/\s+/g, '');
     const flavorCode = flavorVariant.substring(0, 3).toUpperCase().replace(/\s+/g, '');
     const pkgCode = packaging.substring(0, 3).toUpperCase();
@@ -169,6 +171,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           image_url: imageUrl || null,
           imageUrl: imageUrl || null,
           initialStockByBranch: branchStocks,
+          central_stock: parseInt(centralStock, 10) || 1500,
+          total_stock: parseInt(centralStock, 10) || 1500,
         }),
       });
 
@@ -377,6 +381,32 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm font-mono text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
                 />
               </div>
+            </div>
+
+            {/* Superadmin Central Fixed Stock Pool */}
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1.5 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Package className="w-3.5 h-3.5 text-indigo-600" />
+                  Superadmin Central Stock Pool (Cases for Regional Suppliers) *
+                </span>
+                <span className="text-[10px] font-mono text-indigo-600 font-bold bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded border border-indigo-200 dark:border-indigo-800">
+                  Default Benchmark: 1,500 cases
+                </span>
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="50"
+                value={centralStock}
+                onChange={(e) => setCentralStock(e.target.value)}
+                required
+                placeholder="1500"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm font-mono text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+              />
+              <p className="text-[10px] text-zinc-400 mt-1">
+                Stock allocated in the central inventory repository that regional suppliers can request and order.
+              </p>
             </div>
 
             {/* Product Expiry Date Input */}

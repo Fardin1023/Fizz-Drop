@@ -100,6 +100,11 @@ public class Product {
     @JsonAlias({"initialStockByBranch", "initial_stock_by_branch", "branchStocks"})
     private java.util.Map<String, Integer> initialStockByBranch;
 
+    @Transient
+    @JsonProperty("central_stock")
+    @JsonAlias({"central_stock", "centralStock", "available_central_stock"})
+    private Integer centralStock;
+
     public Product() {
         this.createdDate = LocalDateTime.now();
         this.updatedDate = LocalDateTime.now();
@@ -183,4 +188,7 @@ public class Product {
 
     public java.util.Map<String, Integer> getInitialStockByBranch() { return initialStockByBranch; }
     public void setInitialStockByBranch(java.util.Map<String, Integer> initialStockByBranch) { this.initialStockByBranch = initialStockByBranch; }
+
+    public Integer getCentralStock() { return centralStock; }
+    public void setCentralStock(Integer centralStock) { this.centralStock = centralStock; }
 }

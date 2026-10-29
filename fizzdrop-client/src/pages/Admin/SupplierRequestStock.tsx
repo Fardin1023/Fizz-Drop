@@ -51,11 +51,13 @@ interface ProductCatalogItem {
 interface SupplierRequestStockProps {
   onRequisitionSubmitted?: (requisitionCode: string) => void;
   onNavigateToSettings?: () => void;
+  initialProductId?: number;
 }
 
 export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
   onRequisitionSubmitted,
   onNavigateToSettings,
+  initialProductId,
 }) => {
   const { token, user } = useAuth();
   const [profile, setProfile] = useState<any>(null);
@@ -107,6 +109,15 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
   useEffect(() => {
     fetchData();
   }, []);
+
+  useEffect(() => {
+    if (initialProductId && products.some((p) => p.product_id === initialProductId)) {
+      setQuantities((prev) => ({
+        ...prev,
+        [initialProductId]: prev[initialProductId] || 10,
+      }));
+    }
+  }, [initialProductId, products]);
 
   const handleQtyChange = (productId: number, delta: number) => {
     setQuantities((prev) => {
@@ -329,9 +340,28 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
             </select>
           </div>
 
-          {/* Product Cards Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            {filteredProducts.map((p) => {
+          {/* Product Cards Grid or Zero-Data Empty State */}
+          {filteredProducts.length === 0 ? (
+            <div className="py-16 px-4 rounded-3xl bg-white border border-slate-200/90 text-center space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center mx-auto shadow-xs">
+                <Package className="w-6 h-6" />
+              </div>
+              <div>
+                <h4 className="font-oswald text-base font-bold text-zinc-800 uppercase">
+                  {products.length === 0
+                    ? 'No Products Available from Superadmin'
+                    : 'No Products Match Your Filter'}
+                </h4>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
+                  {products.length === 0
+                    ? 'The central product catalog is currently empty. Once Superadmin registers products and central warehouse stock, they will appear here for you to order.'
+                    : 'Try searching with another keyword or resetting the category filter.'}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              {filteredProducts.map((p) => {
               const displayImg = p.image_url || getBrandImage(p.brand);
               const qty = quantities[p.product_id] || 0;
               const isSelected = qty > 0;
@@ -420,7 +450,8 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
                 </div>
               );
             })}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Right Column: Requisition Summary, Urgency Selector & Submission */}

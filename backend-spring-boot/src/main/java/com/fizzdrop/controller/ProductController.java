@@ -1,12 +1,15 @@
 package com.fizzdrop.controller;
 
 import com.fizzdrop.dto.ApiResponse;
+import com.fizzdrop.entity.CentralInventory;
 import com.fizzdrop.entity.Outlet;
 import com.fizzdrop.entity.Product;
 import com.fizzdrop.entity.ShopInventory;
+import com.fizzdrop.repository.CentralInventoryRepository;
 import com.fizzdrop.repository.OutletRepository;
 import com.fizzdrop.repository.ProductRepository;
 import com.fizzdrop.repository.ShopInventoryRepository;
+import com.fizzdrop.service.RequisitionProcessingService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,13 +23,16 @@ public class ProductController {
     private final ProductRepository productRepository;
     private final ShopInventoryRepository inventoryRepository;
     private final OutletRepository outletRepository;
+    private final CentralInventoryRepository centralInventoryRepository;
 
     public ProductController(ProductRepository productRepository, 
                              ShopInventoryRepository inventoryRepository,
-                             OutletRepository outletRepository) {
+                             OutletRepository outletRepository,
+                             CentralInventoryRepository centralInventoryRepository) {
         this.productRepository = productRepository;
         this.inventoryRepository = inventoryRepository;
         this.outletRepository = outletRepository;
+        this.centralInventoryRepository = centralInventoryRepository;
     }
 
     private void populateProductMetadata(Product p, Long branchId, List<Outlet> outlets) {
@@ -61,6 +67,9 @@ public class ProductController {
         }
 
         p.setTotalStock(calculatedTotalStock);
+        var centralOpt = centralInventoryRepository.findByProductId(p.getProductId());
+        p.setCentralStock(centralOpt.map(CentralInventory::getAvailableStock).orElse(0));
+
         if (branchId != null) {
             var inv = inventoryRepository.findByBranchIdAndProductId(branchId, p.getProductId());
             p.setBranchStock(inv.map(ShopInventory::getStockQuantity).orElse(0));
@@ -141,6 +150,27 @@ public class ProductController {
                 }
             }
 
+            // Initialize Superadmin central inventory for this product
+            int targetFixedStock = (product.getCentralStock() != null && product.getCentralStock() > 0)
+                    ? product.getCentralStock()
+                    : (product.getTotalStock() != null && product.getTotalStock() > 0)
+                    ? product.getTotalStock()
+                    : RequisitionProcessingService.getFixedCategoryStock(saved.getCategory());
+
+            centralInventoryRepository.findByProductId(saved.getProductId()).ifPresentOrElse(
+                    ci -> {
+                        ci.setAvailableStock(targetFixedStock);
+                        ci.setCategory(saved.getCategory());
+                        centralInventoryRepository.save(ci);
+                    },
+                    () -> centralInventoryRepository.save(new CentralInventory(
+                            saved.getProductId(),
+                            saved.getCategory() != null ? saved.getCategory() : "Beverage",
+                            targetFixedStock,
+                            0
+                    ))
+            );
+
             populateProductMetadata(saved, null, outlets);
             return ResponseEntity.status(HttpStatus.CREATED).body(saved);
         } catch (Exception e) {
@@ -163,6 +193,14 @@ public class ProductController {
             if (productUpdates.getExpiryDate() != null) existing.setExpiryDate(productUpdates.getExpiryDate());
             
             Product updated = productRepository.save(existing);
+
+            if (productUpdates.getCategory() != null) {
+                centralInventoryRepository.findByProductId(existing.getProductId()).ifPresent(ci -> {
+                    ci.setCategory(existing.getCategory());
+                    centralInventoryRepository.save(ci);
+                });
+            }
+
             return ResponseEntity.ok(updated);
         }).orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(null));
@@ -174,6 +212,10 @@ public class ProductController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(ApiResponse.fail("Product with ID " + id + " not found"));
         }
+        centralInventoryRepository.findByProductId(id).ifPresent(centralInventoryRepository::delete);
+        try {
+            inventoryRepository.deleteAll(inventoryRepository.findAll().stream().filter(i -> id.equals(i.getProductId())).toList());
+        } catch (Exception ignored) {}
         productRepository.deleteById(id);
         return ResponseEntity.ok(ApiResponse.ok("Product deleted successfully", id));
     }

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import AdminLogin from './AdminLogin';
-import { ProductManagement } from './ProductManagement';
+import { SupplierAvailableProducts } from './SupplierAvailableProducts';
 import { SupplierRequestStock } from './SupplierRequestStock';
 import { SupplierRequisitionHistory } from './SupplierRequisitionHistory';
 import { SupplierProfileSettings } from './SupplierProfileSettings';
@@ -23,6 +23,7 @@ import { NotificationPopup } from '../../components/Notifications/NotificationPo
 export const AdminDashboard: React.FC = () => {
   const { user, isSupplier, isSuperadmin, isAuthenticated, logout, isLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<'catalog' | 'request' | 'history' | 'profile'>('catalog');
+  const [selectedProductId, setSelectedProductId] = useState<number | undefined>(undefined);
 
   const {
     notifications,
@@ -140,7 +141,7 @@ export const AdminDashboard: React.FC = () => {
               }`}
             >
               <Package className="w-3 h-3" />
-              <span>Catalog & Outlets Stock</span>
+              <span>Available Products from Superadmin</span>
             </button>
 
             <button
@@ -184,10 +185,21 @@ export const AdminDashboard: React.FC = () => {
 
       {/* Main Container */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-3.5 sm:mt-4 flex-1 w-full min-w-0">
-        {activeTab === 'catalog' && <ProductManagement />}
+        {activeTab === 'catalog' && (
+          <SupplierAvailableProducts
+            onRequestStock={(prodId) => {
+              setSelectedProductId(prodId);
+              setActiveTab('request');
+            }}
+          />
+        )}
         {activeTab === 'request' && (
           <SupplierRequestStock
-            onRequisitionSubmitted={() => setActiveTab('history')}
+            initialProductId={selectedProductId}
+            onRequisitionSubmitted={() => {
+              setSelectedProductId(undefined);
+              setActiveTab('history');
+            }}
             onNavigateToSettings={() => setActiveTab('profile')}
           />
         )}

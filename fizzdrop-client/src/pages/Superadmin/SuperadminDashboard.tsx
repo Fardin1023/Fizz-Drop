@@ -7,6 +7,7 @@ import { SqlQueryConsole } from '../Admin/SqlQueryConsole';
 import { DatabaseConfigModal } from '../Admin/DatabaseConfigModal';
 import { StockDistributionView } from '../Admin/StockDistributionView';
 import { SuperadminRequisitionsHub } from './SuperadminRequisitionsHub';
+import { SuperadminProductCatalog } from './SuperadminProductCatalog';
 import {
   ShieldCheck,
   Building2,
@@ -19,6 +20,7 @@ import {
   Boxes,
   ClipboardList,
   Home,
+  Package,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useNotifications } from '../../hooks/useNotifications';
@@ -27,7 +29,7 @@ import { NotificationPopup } from '../../components/Notifications/NotificationPo
 
 export const SuperadminDashboard: React.FC = () => {
   const { user, isSuperadmin, isAuthenticated, logout, isLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<'requisitions' | 'tables' | 'outlets' | 'inventory' | 'query'>('requisitions');
+  const [activeTab, setActiveTab] = useState<'products' | 'requisitions' | 'tables' | 'outlets' | 'inventory' | 'query'>('products');
   const [consoleInitialQuery, setConsoleInitialQuery] = useState<string>('SELECT * FROM Outlets LIMIT 25;');
   const [isDbConfigOpen, setIsDbConfigOpen] = useState(false);
   const [dbStatus, setDbStatus] = useState<any>(null);
@@ -184,6 +186,18 @@ export const SuperadminDashboard: React.FC = () => {
           {/* Segmented Security-Developer Navigation Tabs */}
           <div className="flex items-center gap-1 overflow-x-auto pt-1 mt-1 border-t border-slate-100/90 scrollbar-none">
             <button
+              onClick={() => setActiveTab('products')}
+              className={`font-semibold flex items-center transition-colors cursor-pointer whitespace-nowrap px-2.5 py-0.5 rounded-md text-[11px] gap-1 ${
+                activeTab === 'products'
+                  ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white shadow-xs font-bold'
+                  : 'bg-white text-slate-700 hover:text-blue-700 hover:bg-blue-50/50 border border-slate-200/80'
+              }`}
+            >
+              <Package className="w-3 h-3" />
+              <span>Master Products & Input</span>
+            </button>
+
+            <button
               onClick={() => setActiveTab('requisitions')}
               className={`font-semibold flex items-center transition-colors cursor-pointer whitespace-nowrap px-2.5 py-0.5 rounded-md text-[11px] gap-1 ${
                 activeTab === 'requisitions'
@@ -248,6 +262,7 @@ export const SuperadminDashboard: React.FC = () => {
 
       {/* Main Content Workspace Container */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-3.5 sm:mt-4 flex-1 w-full min-w-0">
+        {activeTab === 'products' && <SuperadminProductCatalog />}
         {activeTab === 'requisitions' && <SuperadminRequisitionsHub />}
         {activeTab === 'tables' && (
           <DatabaseExplorer onOpenQueryWithTable={handleOpenQueryWithTable} />

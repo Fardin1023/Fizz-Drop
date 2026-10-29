@@ -383,20 +383,20 @@ const ProductListPage: React.FC<ProductListPageProps> = ({ branchId, onAddToCart
                 Catalog Ready For Drops
               </span>
               <h3 className="font-oswald text-3xl font-black uppercase tracking-tight text-zinc-900">
-                No Seed Data • Awaiting Manual Inventory
+                Awaiting Superadmin Products
               </h3>
               <p className="text-xs text-zinc-500 max-w-md mx-auto leading-relaxed">
-                Dummy seed data has been removed. Products inputted by the supplier from the Admin Dashboard will appear here immediately with real-time stock and images.
+                Dummy seed data has been removed. Products registered by the Superadmin from the Superadmin Operations Hub will appear here immediately with real-time central and branch stock.
               </p>
             </div>
 
             <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
               <Link
-                to="/admin/login"
+                to="/superadmin"
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs shadow-md shadow-blue-500/20 transition-all cursor-pointer"
               >
                 <PlusCircle className="w-4 h-4" />
-                <span>Go to Supplier Dashboard to Add Products</span>
+                <span>Go to Superadmin Portal to Input Products</span>
               </Link>
 
               <button
