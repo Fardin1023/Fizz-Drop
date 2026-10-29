@@ -9,6 +9,10 @@ public class CreateRequisitionDTO {
     @JsonProperty("urgency")
     private String urgency = "NORMAL";
 
+    @JsonProperty("district_id")
+    @JsonAlias({"district_id", "districtId", "city_id", "cityId"})
+    private Long districtId;
+
     @JsonProperty("supplier_remarks")
     @JsonAlias({"supplier_remarks", "supplierRemarks", "remarks"})
     private String supplierRemarks;
@@ -42,6 +46,9 @@ public class CreateRequisitionDTO {
 
     public String getUrgency() { return urgency; }
     public void setUrgency(String urgency) { this.urgency = urgency; }
+
+    public Long getDistrictId() { return districtId; }
+    public void setDistrictId(Long districtId) { this.districtId = districtId; }
 
     public String getSupplierRemarks() { return supplierRemarks; }
     public void setSupplierRemarks(String supplierRemarks) { this.supplierRemarks = supplierRemarks; }

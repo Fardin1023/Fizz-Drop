@@ -69,6 +69,7 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
 
   // Quantities selected: productId -> quantity
   const [quantities, setQuantities] = useState<Record<number, number>>({});
+  const [destinationDistrictId, setDestinationDistrictId] = useState<number | null>(null);
   const [urgency, setUrgency] = useState<'LOW' | 'NORMAL' | 'CRITICAL'>('NORMAL');
   const [remarks, setRemarks] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<string>('CORPORATE_BANK_TRANSFER');
@@ -91,6 +92,9 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
       if (profRes.ok) {
         const profData = await profRes.json();
         setProfile(profData);
+        if (profData.primary_district_id) {
+          setDestinationDistrictId(profData.primary_district_id);
+        }
         if (profData.default_payment_method) {
           setPaymentMethod(profData.default_payment_method);
         }
@@ -175,6 +179,7 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
 
     try {
       const payload = {
+        district_id: Number(destinationDistrictId || profile?.primary_district_id || 1),
         urgency,
         supplier_remarks: remarks,
         payment_method: paymentMethod,
@@ -257,16 +262,22 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
             <MapPin className="w-5 h-5" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
-                LOCKED REGION
+                {profile?.division_name || 'Dhaka'} DIVISION
               </span>
               <h2 className="font-oswald text-base font-bold text-zinc-900 uppercase tracking-tight">
-                Operating Territory: <strong className="text-blue-600">{profile?.district_name || 'Dhaka'}</strong> ({profile?.division_name || 'Dhaka'} Division)
+                Territory: <strong className="text-blue-600">{profile?.assigned_districts?.length || 1} Covered {profile?.assigned_districts?.length === 1 ? 'City' : 'Cities'}</strong>
               </h2>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Depot: <span className="font-semibold text-zinc-700">{profile?.business_name || 'Central Beverage Depot'}</span> • Address: {profile?.depot_address || 'Central Hub'}
+            <p className="text-xs text-slate-500 mt-0.5 flex flex-wrap items-center gap-1.5">
+              <span>Depot: <strong className="text-zinc-700">{profile?.business_name || 'Central Beverage Depot'}</strong></span>
+              <span>• Primary Hub: <strong className="text-blue-700">{profile?.district_name || 'Dhaka'}</strong></span>
+              {profile?.assigned_districts && profile.assigned_districts.length > 1 && (
+                <span className="text-[11px] text-slate-400">
+                  (Cities: {profile.assigned_districts.map((d: any) => d.name).join(', ')})
+                </span>
+              )}
             </p>
           </div>
         </div>
@@ -277,7 +288,7 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
             onClick={onNavigateToSettings}
             className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1 shrink-0 cursor-pointer self-start sm:self-auto"
           >
-            <span>Change Depot Territory</span>
+            <span>Configure Cities & Territory</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         )}
@@ -513,6 +524,41 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
               <span className="font-oswald text-2xl font-black text-blue-700">
                 {totalCasesRequested} <span className="text-xs font-sans font-bold">cases</span>
               </span>
+            </div>
+
+            {/* Destination City Selection within Supplier's Single Division */}
+            <div className="space-y-1.5 p-3.5 rounded-2xl bg-gradient-to-r from-blue-50/70 to-indigo-50/50 border border-blue-200/80">
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-blue-950 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                  Destination City ({profile?.division_name || 'Dhaka'} Division) *
+                </span>
+                <span className="text-[10px] text-blue-600 font-mono font-bold">
+                  {profile?.assigned_districts?.length || 1} available
+                </span>
+              </label>
+
+              {profile?.assigned_districts && profile.assigned_districts.length > 1 ? (
+                <select
+                  value={destinationDistrictId || profile?.primary_district_id || ''}
+                  onChange={(e) => setDestinationDistrictId(Number(e.target.value))}
+                  className="w-full px-3 py-2 rounded-xl bg-white border border-blue-200 text-xs font-bold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500/40 cursor-pointer shadow-2xs"
+                >
+                  {profile.assigned_districts.map((d: any) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name} {d.id === profile?.primary_district_id ? '★ (Primary Hub)' : ''}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-white border border-blue-200 text-xs font-semibold text-zinc-800 shadow-2xs">
+                  <span>{profile?.district_name || 'Dhaka'} ({profile?.division_name || 'Dhaka'} Division)</span>
+                  <span className="text-[10px] text-blue-600 font-mono font-bold">Primary Hub</span>
+                </div>
+              )}
+              <p className="text-[10px] text-slate-500">
+                Stock requisition delivery destination will be assigned to this depot territory.
+              </p>
             </div>
 
             {/* Commercial Payment Method Selection */}

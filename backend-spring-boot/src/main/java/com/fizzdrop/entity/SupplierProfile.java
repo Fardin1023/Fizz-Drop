@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
 
 @Entity
 @Table(name = "supplier_profiles")
@@ -82,14 +84,28 @@ public class SupplierProfile {
     @JsonProperty("updated_at")
     private LocalDateTime updatedAt;
 
+    @Column(name = "division_name", length = 100)
+    @JsonProperty("division_name")
+    @JsonAlias({"division_name", "divisionName", "division"})
+    private String divisionName;
+
+    @Column(name = "covered_district_ids", length = 500)
+    @JsonProperty("covered_district_ids")
+    @JsonAlias({"covered_district_ids", "coveredDistrictIds"})
+    private String coveredDistrictIds;
+
     // Transient helper fields for API JSON serialization
     @Transient
     @JsonProperty("district_name")
     private String districtName;
 
     @Transient
-    @JsonProperty("division_name")
-    private String divisionName;
+    @JsonProperty("covered_district_ids_list")
+    private List<Long> coveredDistrictIdsList;
+
+    @Transient
+    @JsonProperty("assigned_districts")
+    private List<Map<String, Object>> assignedDistricts;
 
     public SupplierProfile() {
         this.createdAt = LocalDateTime.now();
@@ -167,4 +183,13 @@ public class SupplierProfile {
 
     public String getMobileBankingNumber() { return mobileBankingNumber; }
     public void setMobileBankingNumber(String mobileBankingNumber) { this.mobileBankingNumber = mobileBankingNumber; }
+
+    public String getCoveredDistrictIds() { return coveredDistrictIds; }
+    public void setCoveredDistrictIds(String coveredDistrictIds) { this.coveredDistrictIds = coveredDistrictIds; }
+
+    public List<Long> getCoveredDistrictIdsList() { return coveredDistrictIdsList; }
+    public void setCoveredDistrictIdsList(List<Long> coveredDistrictIdsList) { this.coveredDistrictIdsList = coveredDistrictIdsList; }
+
+    public List<Map<String, Object>> getAssignedDistricts() { return assignedDistricts; }
+    public void setAssignedDistricts(List<Map<String, Object>> assignedDistricts) { this.assignedDistricts = assignedDistricts; }
 }

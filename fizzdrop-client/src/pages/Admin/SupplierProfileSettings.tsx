@@ -11,6 +11,8 @@ import {
   ShieldCheck,
   Truck,
   CreditCard,
+  Check,
+  Layers,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -28,8 +30,16 @@ export interface SupplierProfileData {
   primary_district_id: number;
   district_name?: string;
   division_name?: string;
+  covered_district_ids?: string;
+  covered_district_ids_list?: number[];
+  assigned_districts?: Array<{ id: number; name: string; division: string }>;
   depot_address: string;
   phone_number: string;
+  default_payment_method?: string;
+  bank_name?: string;
+  bank_account_number?: string;
+  bank_account_name?: string;
+  mobile_banking_number?: string;
   is_verified: boolean;
   created_at?: string;
   updated_at?: string;
@@ -51,6 +61,8 @@ export const SupplierProfileSettings: React.FC<SupplierProfileSettingsProps> = (
   // Form states
   const [businessName, setBusinessName] = useState('');
   const [tradeLicense, setTradeLicense] = useState('');
+  const [selectedDivision, setSelectedDivision] = useState<string>('Dhaka');
+  const [coveredDistrictIds, setCoveredDistrictIds] = useState<number[]>([1]);
   const [primaryDistrictId, setPrimaryDistrictId] = useState<number>(1);
   const [depotAddress, setDepotAddress] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -81,7 +93,16 @@ export const SupplierProfileSettings: React.FC<SupplierProfileSettingsProps> = (
         setProfile(profData);
         setBusinessName(profData.business_name || '');
         setTradeLicense(profData.trade_license_number || '');
-        setPrimaryDistrictId(profData.primary_district_id || 1);
+        
+        const divName = profData.division_name || 'Dhaka';
+        setSelectedDivision(divName);
+
+        const covered: number[] = profData.covered_district_ids_list && profData.covered_district_ids_list.length > 0
+          ? profData.covered_district_ids_list
+          : (profData.primary_district_id ? [profData.primary_district_id] : [1]);
+        setCoveredDistrictIds(covered);
+        setPrimaryDistrictId(profData.primary_district_id || covered[0] || 1);
+
         setDepotAddress(profData.depot_address || '');
         setPhoneNumber(profData.phone_number || '');
         setDefaultPaymentMethod(profData.default_payment_method || 'CORPORATE_BANK_TRANSFER');
@@ -110,10 +131,61 @@ export const SupplierProfileSettings: React.FC<SupplierProfileSettingsProps> = (
     return acc;
   }, {});
 
+  const divisionsList = Object.keys(groupedDistricts).sort();
+  const currentCitiesInDivision = groupedDistricts[selectedDivision] || [];
   const currentDistrict = districts.find((d) => d.id === Number(primaryDistrictId));
+  const coveredDistrictsList = districts.filter((d) => coveredDistrictIds.includes(d.id));
+
+  // Switch administrative division: resets covered cities to the first city of the new division
+  const handleDivisionChange = (newDiv: string) => {
+    setSelectedDivision(newDiv);
+    const citiesInDiv = groupedDistricts[newDiv] || [];
+    const firstCityId = citiesInDiv.length > 0 ? citiesInDiv[0].id : 1;
+    setCoveredDistrictIds([firstCityId]);
+    setPrimaryDistrictId(firstCityId);
+  };
+
+  // Toggle city in the single selected division
+  const toggleDistrict = (districtId: number) => {
+    setErrorMsg(null);
+    setCoveredDistrictIds((prev) => {
+      if (prev.includes(districtId)) {
+        if (prev.length === 1) {
+          setErrorMsg('A supplier must cover at least one city within the selected division.');
+          return prev;
+        }
+        const next = prev.filter((id) => id !== districtId);
+        if (primaryDistrictId === districtId) {
+          setPrimaryDistrictId(next[0]);
+        }
+        return next;
+      } else {
+        return [...prev, districtId];
+      }
+    });
+  };
+
+  const handleSelectAllInDivision = () => {
+    const allIds = currentCitiesInDivision.map((d) => d.id);
+    setCoveredDistrictIds(allIds);
+  };
+
+  const handleResetToPrimary = () => {
+    if (primaryDistrictId && coveredDistrictIds.includes(primaryDistrictId)) {
+      setCoveredDistrictIds([primaryDistrictId]);
+    } else if (currentCitiesInDivision.length > 0) {
+      setCoveredDistrictIds([currentCitiesInDivision[0].id]);
+      setPrimaryDistrictId(currentCitiesInDivision[0].id);
+    }
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (coveredDistrictIds.length === 0) {
+      setErrorMsg('Please select at least one city within the operational division.');
+      return;
+    }
+
     setSaving(true);
     setErrorMsg(null);
     setSuccessMsg(null);
@@ -128,6 +200,8 @@ export const SupplierProfileSettings: React.FC<SupplierProfileSettingsProps> = (
         body: JSON.stringify({
           business_name: businessName,
           trade_license_number: tradeLicense,
+          division_name: selectedDivision,
+          covered_district_ids: coveredDistrictIds,
           primary_district_id: Number(primaryDistrictId),
           depot_address: depotAddress,
           phone_number: phoneNumber,
@@ -146,7 +220,7 @@ export const SupplierProfileSettings: React.FC<SupplierProfileSettingsProps> = (
 
       const updated = await res.json();
       setProfile(updated);
-      setSuccessMsg('Operational territory and depot profile updated successfully!');
+      setSuccessMsg(`Territory updated successfully! ${coveredDistrictIds.length} cities assigned in ${selectedDivision} Division.`);
       if (onProfileUpdated) onProfileUpdated(updated);
       setTimeout(() => setSuccessMsg(null), 4000);
     } catch (err: any) {
@@ -171,36 +245,59 @@ export const SupplierProfileSettings: React.FC<SupplierProfileSettingsProps> = (
       <div className="rounded-3xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 p-6 text-white shadow-xl shadow-blue-500/15 relative overflow-hidden">
         <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 w-48 h-48 bg-white/10 rounded-full blur-2xl pointer-events-none" />
 
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono uppercase bg-white/20 tracking-wider text-cyan-100 flex items-center gap-1">
                 <ShieldCheck className="w-3 h-3 text-cyan-200" />
-                Territory Bound
+                Single Division Jurisdiction
               </span>
-              <span className="text-xs text-blue-100 font-medium">Primary Hub Operational Anchor</span>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono uppercase bg-cyan-400/20 text-white border border-cyan-300/30">
+                {selectedDivision} Division
+              </span>
+              <span className="text-xs text-blue-100 font-medium">
+                {coveredDistrictIds.length} Covered {coveredDistrictIds.length === 1 ? 'City' : 'Cities'}
+              </span>
             </div>
 
-            <h2 className="text-2xl font-black font-oswald uppercase tracking-tight text-white flex items-center gap-2">
-              <span>Bound Region:</span>
+            <h2 className="text-2xl font-black font-oswald uppercase tracking-tight text-white flex flex-wrap items-center gap-2">
+              <span>Primary Depot Hub:</span>
               <span className="text-cyan-200 underline decoration-cyan-300 underline-offset-4">
-                {currentDistrict?.name || 'Dhaka'} District
+                {currentDistrict?.name || 'Dhaka'}
               </span>
               <span className="text-sm font-normal text-blue-100 font-sans">
-                ({currentDistrict?.division || 'Dhaka'} Division)
+                ({selectedDivision} Division)
               </span>
             </h2>
 
-            <p className="text-xs text-blue-100 max-w-xl leading-relaxed">
-              Your supplier account is locked to <strong>{currentDistrict?.name || 'Dhaka'}</strong>. All inventory requisitions, product dispatches, and warehouse stock reconciliation automatically route through this regional jurisdiction.
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              <span className="text-[11px] text-blue-100 font-medium mr-1 flex items-center gap-1">
+                <MapPin className="w-3 h-3 text-cyan-300" /> Covered Cities:
+              </span>
+              {coveredDistrictsList.map((d) => (
+                <span
+                  key={d.id}
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border ${
+                    d.id === Number(primaryDistrictId)
+                      ? 'bg-cyan-400/30 border-cyan-300 text-white font-mono'
+                      : 'bg-white/10 border-white/20 text-cyan-100'
+                  }`}
+                >
+                  {d.name} {d.id === Number(primaryDistrictId) && '★ (Primary)'}
+                </span>
+              ))}
+            </div>
+
+            <p className="text-xs text-blue-100 max-w-xl leading-relaxed pt-1">
+              Supplier operations are localized to <strong>{selectedDivision} Division</strong> across {coveredDistrictIds.length} designated cities. Inbound stock requisitions and outlet supply dispatches are strictly fulfilled within these territories.
             </p>
           </div>
 
           <div className="text-right shrink-0">
-            <div className="inline-flex flex-col items-center justify-center p-3.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 text-center">
+            <div className="inline-flex flex-col items-center justify-center p-4 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 text-center min-w-[120px]">
               <Truck className="w-6 h-6 text-cyan-200 mb-1" />
-              <span className="text-[10px] uppercase font-bold text-blue-100 tracking-wider">64 Districts</span>
-              <span className="text-xs font-mono font-bold text-white">Active Grid</span>
+              <span className="text-[10px] uppercase font-bold text-blue-100 tracking-wider">{selectedDivision} Division</span>
+              <span className="text-sm font-mono font-black text-white">{coveredDistrictIds.length} Cities</span>
             </div>
           </div>
         </div>
@@ -237,10 +334,10 @@ export const SupplierProfileSettings: React.FC<SupplierProfileSettingsProps> = (
           <div>
             <h3 className="font-oswald text-lg font-bold uppercase text-zinc-900 tracking-tight flex items-center gap-2">
               <Building className="w-5 h-5 text-blue-600" />
-              Supplier Depot & Operational Region Configuration
+              Regional Logistics Territory & Depot Settings
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Select your primary district among Bangladesh's 64 districts and configure physical logistics credentials.
+              Select your single operational division and choose multiple cities/districts covered within that division.
             </p>
           </div>
           <button
@@ -253,32 +350,143 @@ export const SupplierProfileSettings: React.FC<SupplierProfileSettingsProps> = (
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {/* Primary Operational District Selector (64 Districts Grouped by Division) */}
-          <div className="md:col-span-2 space-y-1.5 p-4 rounded-2xl bg-blue-50/50 border border-blue-100">
-            <label className="block text-xs font-bold uppercase tracking-wider text-blue-900 flex items-center gap-1.5">
-              <MapPin className="w-4 h-4 text-blue-600" />
-              Primary Operational District (64 Districts by Division) *
-            </label>
-            <p className="text-[11px] text-blue-700/80 mb-2">
-              All product lines and emergency stock-out tickets will be tagged with this chosen home district.
-            </p>
-            <select
-              value={primaryDistrictId}
-              onChange={(e) => setPrimaryDistrictId(Number(e.target.value))}
-              className="w-full px-4 py-2.5 rounded-xl bg-white border border-blue-200 text-xs font-semibold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500/40 cursor-pointer shadow-2xs"
-            >
-              {Object.entries(groupedDistricts).map(([division, list]) => (
-                <optgroup key={division} label={`── ${division} Division (${list.length} Districts) ──`}>
-                  {list.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name} ({division} Division)
+        <div className="space-y-5">
+          {/* Section 1: Single Operational Division & Multi-City Grid */}
+          <div className="p-5 rounded-2xl bg-gradient-to-br from-blue-50/70 to-indigo-50/40 border border-blue-100/90 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-blue-100 pb-3">
+              <div>
+                <span className="text-[11px] font-bold text-blue-600 uppercase tracking-wider flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5" /> Step 1: Single Operational Division
+                </span>
+                <h4 className="text-sm font-bold text-slate-900">Choose Administrative Division</h4>
+                <p className="text-[11px] text-slate-500">
+                  A supplier operates within a single division and can cover multiple cities within it.
+                </p>
+              </div>
+
+              {/* Division Selector */}
+              <div className="min-w-[200px]">
+                <select
+                  value={selectedDivision}
+                  onChange={(e) => handleDivisionChange(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl bg-white border border-blue-200 text-xs font-bold text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500/40 shadow-2xs cursor-pointer"
+                >
+                  {divisionsList.map((div) => (
+                    <option key={div} value={div}>
+                      {div} Division ({groupedDistricts[div]?.length || 0} Cities)
                     </option>
                   ))}
-                </optgroup>
-              ))}
-            </select>
+                </select>
+              </div>
+            </div>
+
+            {/* Step 2: Multi-City Selector within Division */}
+            <div className="space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <span className="text-[11px] font-bold text-indigo-700 uppercase tracking-wider flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-indigo-600" /> Step 2: Multiple Covered Cities in {selectedDivision} Division *
+                  </span>
+                  <p className="text-[11px] text-slate-600">
+                    Select all cities/districts you supply and operate within {selectedDivision} Division.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleSelectAllInDivision}
+                    className="px-2.5 py-1 text-[11px] font-semibold text-blue-700 bg-white border border-blue-200 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                  >
+                    Select All ({currentCitiesInDivision.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResetToPrimary}
+                    className="px-2.5 py-1 text-[11px] font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer"
+                  >
+                    Reset to Primary Only
+                  </button>
+                </div>
+              </div>
+
+              {/* Interactive City Chips Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 pt-1">
+                {currentCitiesInDivision.map((city) => {
+                  const isChecked = coveredDistrictIds.includes(city.id);
+                  const isPrimary = Number(primaryDistrictId) === city.id;
+
+                  return (
+                    <div
+                      key={city.id}
+                      onClick={() => toggleDistrict(city.id)}
+                      className={`p-3 rounded-xl border text-xs font-semibold cursor-pointer transition-all flex flex-col justify-between select-none relative ${
+                        isChecked
+                          ? 'bg-white border-blue-400 text-blue-950 ring-2 ring-blue-500/20 shadow-xs'
+                          : 'bg-white/60 border-slate-200/80 text-slate-500 hover:bg-white hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-bold text-slate-900 truncate">{city.name}</span>
+                        <div
+                          className={`w-4 h-4 rounded-md flex items-center justify-center shrink-0 transition-colors ${
+                            isChecked ? 'bg-blue-600 text-white' : 'border border-slate-300'
+                          }`}
+                        >
+                          {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
+                        </div>
+                      </div>
+
+                      <div className="mt-2 flex items-center justify-between text-[10px]">
+                        <span className="text-slate-400 font-mono">ID #{city.id}</span>
+                        {isPrimary ? (
+                          <span className="font-bold font-mono text-cyan-700 bg-cyan-50 px-1.5 py-0.2 rounded border border-cyan-200">
+                            ★ Primary Hub
+                          </span>
+                        ) : isChecked ? (
+                          <span className="text-blue-600 font-medium">Covered</span>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {coveredDistrictIds.length === 0 && (
+                <p className="text-xs text-rose-600 font-semibold pt-1">
+                  ⚠️ Please select at least one city in {selectedDivision} Division.
+                </p>
+              )}
+            </div>
+
+            {/* Step 3: Primary Depot City Selector */}
+            <div className="pt-3 border-t border-blue-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-blue-950">
+                  Step 3: Primary Depot Hub (Anchor District) *
+                </label>
+                <p className="text-[11px] text-slate-500">
+                  Select your primary central logistics anchor among your {coveredDistrictIds.length} selected cities.
+                </p>
+              </div>
+
+              <div className="min-w-[220px]">
+                <select
+                  value={primaryDistrictId}
+                  onChange={(e) => setPrimaryDistrictId(Number(e.target.value))}
+                  className="w-full px-3.5 py-2 rounded-xl bg-white border border-blue-200 text-xs font-bold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500/40 shadow-2xs cursor-pointer"
+                >
+                  {coveredDistrictsList.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name} ({d.division} Division)
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
           </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
 
           {/* Business / Depot Name */}
           <div className="space-y-1.5">
@@ -460,6 +668,7 @@ export const SupplierProfileSettings: React.FC<SupplierProfileSettingsProps> = (
               </div>
             </div>
           </div>
+        </div>
         </div>
 
         {/* Submit Action Bar */}

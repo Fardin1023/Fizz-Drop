@@ -94,6 +94,8 @@ public class RequisitionProcessingService {
                     "Road 11, Plot 42, Gulshan-1 Depot, Dhaka",
                     "+8801700112233"
             );
+            defaultProf.setDivisionName("Dhaka");
+            defaultProf.setCoveredDistrictIds(String.valueOf(defaultDistrictId));
             defaultProf.setTradeLicenseNumber("TRD-DHK-2026-9812");
             defaultProf.setIsVerified(true);
             defaultProf.setDefaultPaymentMethod("CORPORATE_BANK_TRANSFER");
@@ -102,6 +104,20 @@ public class RequisitionProcessingService {
             defaultProf.setBankAccountName("FizzDrop Regional Logistics Depot");
             defaultProf.setMobileBankingNumber("+8801700112233");
             supplierProfileRepository.save(defaultProf);
+        } else {
+            SupplierProfile p = supplierProfileRepository.findByUserId(4L).get();
+            boolean needSave = false;
+            if (p.getDivisionName() == null || p.getDivisionName().trim().isEmpty()) {
+                p.setDivisionName("Dhaka");
+                needSave = true;
+            }
+            if (p.getCoveredDistrictIds() == null || p.getCoveredDistrictIds().trim().isEmpty()) {
+                p.setCoveredDistrictIds(String.valueOf(p.getPrimaryDistrictId() != null ? p.getPrimaryDistrictId() : defaultDistrictId));
+                needSave = true;
+            }
+            if (needSave) {
+                supplierProfileRepository.save(p);
+            }
         }
 
         // 3. Seed initial district inventory for active products in Dhaka & key districts if empty
@@ -187,6 +203,8 @@ public class RequisitionProcessingService {
                     "Primary Regional Logistics Hub",
                     "+8801700000000"
             );
+            newProf.setDivisionName("Dhaka");
+            newProf.setCoveredDistrictIds(String.valueOf(defaultDistrictId));
             newProf.setTradeLicenseNumber("TRD-PENDING-" + userId);
             return supplierProfileRepository.save(newProf);
         });
@@ -203,11 +221,43 @@ public class RequisitionProcessingService {
             return p;
         });
 
-        if (dto.getPrimaryDistrictId() != null) {
-            districtRepository.findById(dto.getPrimaryDistrictId()).orElseThrow(
+        String targetDivision = dto.getDivisionName();
+        List<Long> coveredIds = dto.getCoveredDistrictIds();
+
+        if (coveredIds != null && !coveredIds.isEmpty()) {
+            List<District> selectedDistricts = districtRepository.findAllById(coveredIds);
+            if (selectedDistricts.isEmpty()) {
+                throw new IllegalArgumentException("Selected districts cannot be empty.");
+            }
+
+            String determinedDivision = (targetDivision != null && !targetDivision.trim().isEmpty())
+                    ? targetDivision.trim()
+                    : selectedDistricts.get(0).getDivision();
+
+            for (District d : selectedDistricts) {
+                if (!d.getDivision().equalsIgnoreCase(determinedDivision)) {
+                    throw new IllegalArgumentException("All selected cities must belong to the single chosen division: '" 
+                            + determinedDivision + "'. City '" + d.getName() + "' is in '" + d.getDivision() + "' division.");
+                }
+            }
+
+            profile.setDivisionName(determinedDivision);
+            profile.setCoveredDistrictIds(String.join(",", coveredIds.stream().map(String::valueOf).toList()));
+
+            if (dto.getPrimaryDistrictId() != null && coveredIds.contains(dto.getPrimaryDistrictId())) {
+                profile.setPrimaryDistrictId(dto.getPrimaryDistrictId());
+            } else if (profile.getPrimaryDistrictId() == null || !coveredIds.contains(profile.getPrimaryDistrictId())) {
+                profile.setPrimaryDistrictId(coveredIds.get(0));
+            }
+        } else if (dto.getPrimaryDistrictId() != null) {
+            District d = districtRepository.findById(dto.getPrimaryDistrictId()).orElseThrow(
                     () -> new IllegalArgumentException("District with ID " + dto.getPrimaryDistrictId() + " does not exist.")
             );
-            profile.setPrimaryDistrictId(dto.getPrimaryDistrictId());
+            profile.setPrimaryDistrictId(d.getId());
+            profile.setDivisionName(d.getDivision());
+            profile.setCoveredDistrictIds(String.valueOf(d.getId()));
+        } else if (targetDivision != null && !targetDivision.trim().isEmpty()) {
+            profile.setDivisionName(targetDivision.trim());
         }
 
         if (dto.getBusinessName() != null && !dto.getBusinessName().trim().isEmpty()) {
@@ -248,6 +298,13 @@ public class RequisitionProcessingService {
     public StockRequisition createRequisition(Long userId, CreateRequisitionDTO dto) {
         SupplierProfile profile = getSupplierProfile(userId);
         Long districtId = profile.getPrimaryDistrictId();
+
+        if (dto.getDistrictId() != null) {
+            District targetDist = districtRepository.findById(dto.getDistrictId()).orElse(null);
+            if (targetDist != null) {
+                districtId = targetDist.getId();
+            }
+        }
 
         if (dto.getItems() == null || dto.getItems().isEmpty()) {
             throw new IllegalArgumentException("Requisition must contain at least one product item.");
@@ -539,9 +596,41 @@ public class RequisitionProcessingService {
         if (profile.getPrimaryDistrictId() != null) {
             districtRepository.findById(profile.getPrimaryDistrictId()).ifPresent(d -> {
                 profile.setDistrictName(d.getName());
-                profile.setDivisionName(d.getDivision());
+                if (profile.getDivisionName() == null || profile.getDivisionName().trim().isEmpty()) {
+                    profile.setDivisionName(d.getDivision());
+                }
             });
         }
+
+        String coveredIdsStr = profile.getCoveredDistrictIds();
+        List<Long> idList = new ArrayList<>();
+        if (coveredIdsStr != null && !coveredIdsStr.trim().isEmpty()) {
+            for (String s : coveredIdsStr.split(",")) {
+                String trimmed = s.trim();
+                if (!trimmed.isEmpty()) {
+                    try {
+                        idList.add(Long.parseLong(trimmed));
+                    } catch (NumberFormatException ignored) {}
+                }
+            }
+        }
+        if (idList.isEmpty() && profile.getPrimaryDistrictId() != null) {
+            idList.add(profile.getPrimaryDistrictId());
+        }
+
+        List<Map<String, Object>> assignedDistricts = new ArrayList<>();
+        for (Long dId : idList) {
+            districtRepository.findById(dId).ifPresent(d -> {
+                Map<String, Object> map = new HashMap<>();
+                map.put("id", d.getId());
+                map.put("name", d.getName());
+                map.put("division", d.getDivision());
+                assignedDistricts.add(map);
+            });
+        }
+
+        profile.setCoveredDistrictIdsList(idList);
+        profile.setAssignedDistricts(assignedDistricts);
     }
 
     private void enrichRequisition(StockRequisition req, SupplierProfile sp) {

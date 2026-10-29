@@ -2,12 +2,21 @@ package com.fizzdrop.dto;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.List;
 
 public class SupplierProfileDTO {
 
     @JsonProperty("primary_district_id")
     @JsonAlias({"primary_district_id", "primaryDistrictId", "district_id", "districtId"})
     private Long primaryDistrictId;
+
+    @JsonProperty("division_name")
+    @JsonAlias({"division_name", "divisionName", "division"})
+    private String divisionName;
+
+    @JsonProperty("covered_district_ids")
+    @JsonAlias({"covered_district_ids", "coveredDistrictIds"})
+    private List<Long> coveredDistrictIds;
 
     @JsonProperty("business_name")
     @JsonAlias({"business_name", "businessName"})
@@ -47,6 +56,12 @@ public class SupplierProfileDTO {
 
     public Long getPrimaryDistrictId() { return primaryDistrictId; }
     public void setPrimaryDistrictId(Long primaryDistrictId) { this.primaryDistrictId = primaryDistrictId; }
+
+    public String getDivisionName() { return divisionName; }
+    public void setDivisionName(String divisionName) { this.divisionName = divisionName; }
+
+    public List<Long> getCoveredDistrictIds() { return coveredDistrictIds; }
+    public void setCoveredDistrictIds(List<Long> coveredDistrictIds) { this.coveredDistrictIds = coveredDistrictIds; }
 
     public String getBusinessName() { return businessName; }
     public void setBusinessName(String businessName) { this.businessName = businessName; }
