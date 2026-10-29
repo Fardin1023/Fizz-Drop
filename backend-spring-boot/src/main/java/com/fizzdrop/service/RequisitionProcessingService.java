@@ -22,6 +22,7 @@ public class RequisitionProcessingService {
     private final StockRequisitionItemRepository requisitionItemRepository;
     private final ProductRepository productRepository;
     private final ShopInventoryRepository shopInventoryRepository;
+    private final AppNotificationRepository notificationRepository;
     private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     public RequisitionProcessingService(DistrictRepository districtRepository,
@@ -31,6 +32,7 @@ public class RequisitionProcessingService {
                                         StockRequisitionItemRepository requisitionItemRepository,
                                         ProductRepository productRepository,
                                         ShopInventoryRepository shopInventoryRepository,
+                                        AppNotificationRepository notificationRepository,
                                         org.springframework.jdbc.core.JdbcTemplate jdbcTemplate) {
         this.districtRepository = districtRepository;
         this.supplierProfileRepository = supplierProfileRepository;
@@ -39,6 +41,7 @@ public class RequisitionProcessingService {
         this.requisitionItemRepository = requisitionItemRepository;
         this.productRepository = productRepository;
         this.shopInventoryRepository = shopInventoryRepository;
+        this.notificationRepository = notificationRepository;
         this.jdbcTemplate = jdbcTemplate;
     }
 
@@ -217,6 +220,24 @@ public class RequisitionProcessingService {
         savedReq.setTotalApprovedCases(0);
         enrichRequisition(savedReq, profile);
 
+        // Real-time Notification for Superadmin
+        try {
+            String distName = savedReq.getDistrictName() != null ? savedReq.getDistrictName() : "Regional";
+            String bizName = profile.getBusinessName() != null ? profile.getBusinessName() : "Supplier";
+            AppNotification superadminNotification = new AppNotification(
+                    "SUPERADMIN",
+                    null,
+                    "New Stock Requisition: " + reqCode,
+                    "Supplier " + bizName + " (" + distName + " Depot) requested " + totalCases + " cases with " + req.getUrgency() + " priority.",
+                    "NEW_REQUISITION",
+                    reqCode,
+                    savedReq.getId()
+            );
+            notificationRepository.save(superadminNotification);
+        } catch (Exception ex) {
+            System.err.println("[Notification Error] Superadmin notification creation failed: " + ex.getMessage());
+        }
+
         return savedReq;
     }
 
@@ -352,6 +373,30 @@ public class RequisitionProcessingService {
         enrichRequisition(saved, sp);
         saved.setItems(items);
         saved.setTotalApprovedCases(totalApproved);
+
+        // Real-time Notification for Supplier
+        try {
+            Long supplierUserId = sp != null ? sp.getUserId() : null;
+            String statusBadge = saved.getStatus().replace('_', ' ');
+            String remarksPart = (reviewDto.getAdminRemarks() != null && !reviewDto.getAdminRemarks().trim().isEmpty())
+                    ? " Remarks: " + reviewDto.getAdminRemarks().trim()
+                    : "";
+            String msg = "Superadmin has processed requisition " + saved.getRequisitionCode() +
+                    ". Decision: " + statusBadge + " (" + totalApproved + "/" + saved.getTotalRequestedCases() + " cases permitted)." + remarksPart;
+
+            AppNotification supplierNotification = new AppNotification(
+                    "SUPPLIER",
+                    supplierUserId,
+                    "Stock Requisition " + statusBadge + ": " + saved.getRequisitionCode(),
+                    msg,
+                    saved.getStatus(),
+                    saved.getRequisitionCode(),
+                    saved.getId()
+            );
+            notificationRepository.save(supplierNotification);
+        } catch (Exception ex) {
+            System.err.println("[Notification Error] Supplier notification creation failed: " + ex.getMessage());
+        }
 
         return saved;
     }

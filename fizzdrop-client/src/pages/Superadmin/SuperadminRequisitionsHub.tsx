@@ -16,6 +16,7 @@ import {
   Check,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { broadcastRealtimeEvent } from '../../utils/broadcast';
 import pepsiImg from '../../assets/img/pepsi.PNG';
 import sevenUpImg from '../../assets/img/7up.PNG';
 import dewImg from '../../assets/img/mountain dew.PNG';
@@ -233,6 +234,20 @@ export const SuperadminRequisitionsHub: React.FC = () => {
         const errData = await res.json();
         throw new Error(errData.error || 'Failed to process requisition action');
       }
+
+      const updated = await res.json();
+
+      // Broadcast real-time update to Supplier Portal
+      broadcastRealtimeEvent({
+        type: 'REQUISITION_ACTION',
+        recipientRole: 'SUPPLIER',
+        recipientUserId: updated.supplier_id,
+        title: `Requisition ${updated.status?.replace('_', ' ')}: ${updated.requisition_code}`,
+        message: `Superadmin has reviewed ticket ${updated.requisition_code} (${updated.total_approved_cases || 0}/${updated.total_requested_cases || 0} cases permitted).`,
+        referenceCode: updated.requisition_code,
+        referenceId: updated.id,
+        status: updated.status,
+      });
 
       setActionMsg(`Requisition ${activeReconciliation.requisition_code} stock allowance options confirmed and committed successfully!`);
       setConfirmModalOpen(false);

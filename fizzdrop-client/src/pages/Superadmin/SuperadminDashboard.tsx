@@ -21,6 +21,9 @@ import {
   ClipboardList,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useNotifications } from '../../hooks/useNotifications';
+import { NotificationDropdown } from '../../components/Notifications/NotificationDropdown';
+import { NotificationPopup } from '../../components/Notifications/NotificationPopup';
 
 export const SuperadminDashboard: React.FC = () => {
   const { user, isSuperadmin, isAuthenticated, logout, isLoading } = useAuth();
@@ -29,6 +32,15 @@ export const SuperadminDashboard: React.FC = () => {
   const [isDbConfigOpen, setIsDbConfigOpen] = useState(false);
   const [dbStatus, setDbStatus] = useState<any>(null);
   const [isScrolled, setIsScrolled] = useState<boolean>(false);
+
+  const {
+    notifications,
+    unreadCount,
+    popupNotification,
+    dismissPopup,
+    markAsRead,
+    markAllAsRead,
+  } = useNotifications('SUPERADMIN');
 
   const fetchTelemetry = async () => {
     try {
@@ -87,6 +99,13 @@ export const SuperadminDashboard: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50/70 text-slate-900 flex flex-col pb-16 selection:bg-blue-500/20 selection:text-blue-900 relative">
       
+      {/* Real-time Animated Notification Pop-up Window */}
+      <NotificationPopup
+        notification={popupNotification}
+        onDismiss={dismissPopup}
+        onAction={() => setActiveTab('requisitions')}
+      />
+
       {/* Security-Developer Dot-Matrix Subtle Technical Grid Background */}
       <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:20px_20px] opacity-60" />
 
@@ -183,6 +202,16 @@ export const SuperadminDashboard: React.FC = () => {
                 <span>Supplier Portal</span>
                 <ArrowUpRight className="w-3 h-3 text-blue-600" />
               </Link>
+
+              {/* Notification Bell Dropdown */}
+              <NotificationDropdown
+                notifications={notifications}
+                unreadCount={unreadCount}
+                onMarkAsRead={markAsRead}
+                onMarkAllAsRead={markAllAsRead}
+                onSelectNotification={() => setActiveTab('requisitions')}
+                isScrolled={isScrolled}
+              />
 
               {/* Logout Button */}
               <button

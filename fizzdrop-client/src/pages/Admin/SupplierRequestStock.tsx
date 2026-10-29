@@ -12,6 +12,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { broadcastRealtimeEvent } from '../../utils/broadcast';
 import pepsiImg from '../../assets/img/pepsi.PNG';
 import sevenUpImg from '../../assets/img/7up.PNG';
 import dewImg from '../../assets/img/mountain dew.PNG';
@@ -172,6 +173,16 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
       setQuantities({});
       setRemarks('');
       setUrgency('NORMAL');
+
+      // Broadcast real-time alert to Superadmin
+      broadcastRealtimeEvent({
+        type: 'NEW_REQUISITION',
+        recipientRole: 'SUPERADMIN',
+        title: `New Stock Requisition: ${created.requisition_code}`,
+        message: `Supplier submitted a requisition ticket for ${totalCasesRequested} cases (${selectedEntries.length} SKUs).`,
+        referenceCode: created.requisition_code,
+        referenceId: created.id,
+      });
 
       if (onRequisitionSubmitted) {
         setTimeout(() => onRequisitionSubmitted(created.requisition_code), 1500);

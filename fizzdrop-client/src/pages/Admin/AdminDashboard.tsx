@@ -15,11 +15,23 @@ import {
   MapPin,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useNotifications } from '../../hooks/useNotifications';
+import { NotificationDropdown } from '../../components/Notifications/NotificationDropdown';
+import { NotificationPopup } from '../../components/Notifications/NotificationPopup';
 
 export const AdminDashboard: React.FC = () => {
   const { user, isSupplier, isSuperadmin, isAuthenticated, logout, isLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<'catalog' | 'request' | 'history' | 'profile'>('catalog');
   const [isScrolled, setIsScrolled] = useState<boolean>(false);
+
+  const {
+    notifications,
+    unreadCount,
+    popupNotification,
+    dismissPopup,
+    markAsRead,
+    markAllAsRead,
+  } = useNotifications('SUPPLIER', user?.user_id || 4);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -50,6 +62,13 @@ export const AdminDashboard: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50/70 text-zinc-900 flex flex-col pb-16 selection:bg-blue-500/20 selection:text-blue-900">
       
+      {/* Real-time Animated Notification Pop-up Window */}
+      <NotificationPopup
+        notification={popupNotification}
+        onDismiss={dismissPopup}
+        onAction={() => setActiveTab('history')}
+      />
+
       {/* Superadmin Notification Banner if Superadmin is visiting this page */}
       {isSuperadmin && (
         <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-purple-900 text-white px-4 py-2 text-xs flex items-center justify-between">
@@ -127,6 +146,16 @@ export const AdminDashboard: React.FC = () => {
                   Depot Operations
                 </span>
               )}
+
+              {/* Notification Bell Dropdown */}
+              <NotificationDropdown
+                notifications={notifications}
+                unreadCount={unreadCount}
+                onMarkAsRead={markAsRead}
+                onMarkAllAsRead={markAllAsRead}
+                onSelectNotification={() => setActiveTab('history')}
+                isScrolled={isScrolled}
+              />
 
               {/* Logout Button */}
               <button
