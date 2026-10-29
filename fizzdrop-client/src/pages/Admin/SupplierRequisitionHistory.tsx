@@ -364,21 +364,37 @@ export const SupplierRequisitionHistory: React.FC<SupplierRequisitionHistoryProp
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {selectedTicket.items?.map((item, idx) => (
-                      <tr key={item.id || idx}>
-                        <td className="py-2.5 px-3">
-                          <span className="font-bold text-zinc-900 block">
-                            Product #{item.product_id}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 text-center font-mono font-bold text-zinc-900">
-                          {item.requested_quantity} cases
-                        </td>
-                        <td className="py-2.5 px-3 text-center font-mono font-bold text-emerald-700">
-                          {item.approved_quantity} cases
-                        </td>
-                      </tr>
-                    ))}
+                    {selectedTicket.items?.map((item, idx) => {
+                      const isPending = selectedTicket.status === 'PENDING';
+                      const isAllowed = item.approved_quantity > 0;
+                      return (
+                        <tr key={item.id || idx}>
+                          <td className="py-2.5 px-3">
+                            <span className="font-bold text-zinc-900 block">
+                              Product #{item.product_id}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-mono font-bold text-zinc-900">
+                            {item.requested_quantity} cases
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-mono font-bold">
+                            {isPending ? (
+                              <span className="text-amber-600 bg-amber-50 px-2 py-0.5 rounded text-[11px] border border-amber-200">
+                                Pending Review
+                              </span>
+                            ) : isAllowed ? (
+                              <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded text-[11px] border border-emerald-200">
+                                ✓ {item.approved_quantity} cases Allowed
+                              </span>
+                            ) : (
+                              <span className="text-rose-700 bg-rose-50 px-2 py-0.5 rounded text-[11px] border border-rose-200">
+                                ✕ Not Allowed (0)
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

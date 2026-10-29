@@ -304,8 +304,7 @@ public class RequisitionProcessingService {
                 totalApproved += item.getRequestedQuantity();
                 allocateDistrictStock(req.getDistrictId(), item.getProductId(), item.getRequestedQuantity());
             }
-        } else { // APPROVE_PARTIAL
-            req.setStatus("PARTIALLY_APPROVED");
+        } else { // APPROVE_PARTIAL / CUSTOM ALLOWANCE OPTIONS
             Map<Long, Integer> approvedMap = new HashMap<>();
             if (reviewDto.getItems() != null) {
                 for (AdminReviewDTO.ItemApproval ia : reviewDto.getItems()) {
@@ -315,13 +314,28 @@ public class RequisitionProcessingService {
                 }
             }
 
+            boolean allZero = true;
+            boolean allFull = true;
+
             for (StockRequisitionItem item : items) {
                 int approved = approvedMap.getOrDefault(item.getId(), item.getRequestedQuantity());
                 item.setApprovedQuantity(approved);
                 totalApproved += approved;
                 if (approved > 0) {
+                    allZero = false;
                     allocateDistrictStock(req.getDistrictId(), item.getProductId(), approved);
                 }
+                if (approved < item.getRequestedQuantity()) {
+                    allFull = false;
+                }
+            }
+
+            if (allZero) {
+                req.setStatus("REJECTED");
+            } else if (allFull) {
+                req.setStatus("APPROVED");
+            } else {
+                req.setStatus("PARTIALLY_APPROVED");
             }
         }
 

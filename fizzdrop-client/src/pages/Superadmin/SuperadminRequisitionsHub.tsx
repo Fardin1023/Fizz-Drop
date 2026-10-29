@@ -13,6 +13,7 @@ import {
   X,
   AlertCircle,
   Package,
+  Check,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import pepsiImg from '../../assets/img/pepsi.PNG';
@@ -90,9 +91,13 @@ export const SuperadminRequisitionsHub: React.FC = () => {
   // Reconciliation Modal state
   const [activeReconciliation, setActiveReconciliation] = useState<RequisitionTicket | null>(null);
   const [approvedQuantities, setApprovedQuantities] = useState<Record<number, number>>({});
+  const [allowStockOptions, setAllowStockOptions] = useState<Record<number, boolean>>({});
   const [adminRemarks, setAdminRemarks] = useState<string>('');
   const [submittingAction, setSubmittingAction] = useState<boolean>(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [isEditingProcessed, setIsEditingProcessed] = useState<boolean>(false);
+  const [confirmModalOpen, setConfirmModalOpen] = useState<boolean>(false);
+  const [pendingActionType, setPendingActionType] = useState<'APPROVE_FULL' | 'APPROVE_PARTIAL' | 'REJECT' | null>(null);
 
   const fetchDistrictsAndTickets = async () => {
     setLoading(true);
@@ -125,6 +130,9 @@ export const SuperadminRequisitionsHub: React.FC = () => {
   const handleOpenReconciliation = async (ticket: RequisitionTicket) => {
     setFormError(null);
     setAdminRemarks(ticket.admin_remarks || '');
+    setIsEditingProcessed(false);
+    setConfirmModalOpen(false);
+    setPendingActionType(null);
 
     try {
       const res = await fetch(`http://localhost:8080/api/v1/admin/requisitions/${ticket.id}/stock-overview`);
@@ -132,13 +140,20 @@ export const SuperadminRequisitionsHub: React.FC = () => {
         const fullTicket: RequisitionTicket = await res.json();
         setActiveReconciliation(fullTicket);
 
-        // Prepopulate approved quantities with requested quantities if stock available
+        // Prepopulate approved quantities & allow options
         const initialApproved: Record<number, number> = {};
+        const initialAllow: Record<number, boolean> = {};
+
         fullTicket.items?.forEach((it) => {
-          // If already approved/partially approved, use that, else requested
+          const isAllowed = fullTicket.status === 'REJECTED'
+            ? false
+            : (it.approved_quantity > 0 || fullTicket.status === 'PENDING');
+          initialAllow[it.id] = isAllowed;
           initialApproved[it.id] = it.approved_quantity > 0 ? it.approved_quantity : it.requested_quantity;
         });
+
         setApprovedQuantities(initialApproved);
+        setAllowStockOptions(initialAllow);
       } else {
         setActiveReconciliation(ticket);
       }
@@ -148,24 +163,56 @@ export const SuperadminRequisitionsHub: React.FC = () => {
     }
   };
 
+  const handleSetAllowAll = (allow: boolean) => {
+    if (!activeReconciliation?.items) return;
+    const newAllow: Record<number, boolean> = {};
+    const newApproved: Record<number, number> = {};
+    activeReconciliation.items.forEach((it) => {
+      newAllow[it.id] = allow;
+      newApproved[it.id] = allow ? it.requested_quantity : 0;
+    });
+    setAllowStockOptions(newAllow);
+    setApprovedQuantities(newApproved);
+  };
+
+  const handleToggleItemAllow = (itemId: number, allow: boolean, requestedQty: number) => {
+    setAllowStockOptions((prev) => ({ ...prev, [itemId]: allow }));
+    if (!allow) {
+      setApprovedQuantities((prev) => ({ ...prev, [itemId]: 0 }));
+    } else {
+      setApprovedQuantities((prev) => ({
+        ...prev,
+        [itemId]: prev[itemId] && prev[itemId] > 0 ? prev[itemId] : requestedQty,
+      }));
+    }
+  };
+
+  const handlePromptConfirmation = (actionType: 'APPROVE_FULL' | 'APPROVE_PARTIAL' | 'REJECT') => {
+    setFormError(null);
+    if ((actionType === 'APPROVE_PARTIAL' || actionType === 'REJECT') && !adminRemarks.trim()) {
+      setFormError(`Please provide administrative remarks / audit justification when confirming this stock option.`);
+      return;
+    }
+    setPendingActionType(actionType);
+    setConfirmModalOpen(true);
+  };
+
   const handleApproveAction = async (actionType: 'APPROVE_FULL' | 'APPROVE_PARTIAL' | 'REJECT') => {
     if (!activeReconciliation) return;
     setFormError(null);
 
-    if ((actionType === 'APPROVE_PARTIAL' || actionType === 'REJECT') && !adminRemarks.trim()) {
-      setFormError(`Please provide administrative remarks when executing a ${actionType.toLowerCase().replace('_', ' ')} action.`);
-      return;
-    }
-
     setSubmittingAction(true);
 
     try {
-      const itemsPayload = activeReconciliation.items?.map((it) => ({
-        item_id: it.id,
-        approved_quantity: actionType === 'APPROVE_FULL'
-          ? it.requested_quantity
-          : (actionType === 'REJECT' ? 0 : (approvedQuantities[it.id] ?? it.requested_quantity)),
-      }));
+      const itemsPayload = activeReconciliation.items?.map((it) => {
+        const isAllowed = allowStockOptions[it.id] ?? true;
+        return {
+          item_id: it.id,
+          approved_quantity: actionType === 'APPROVE_FULL'
+            ? it.requested_quantity
+            : (actionType === 'REJECT' || !isAllowed ? 0 : (approvedQuantities[it.id] ?? it.requested_quantity)),
+        };
+      });
 
       const payload = {
         action: actionType,
@@ -187,7 +234,9 @@ export const SuperadminRequisitionsHub: React.FC = () => {
         throw new Error(errData.error || 'Failed to process requisition action');
       }
 
-      setActionMsg(`Requisition ${activeReconciliation.requisition_code} successfully processed (${actionType})!`);
+      setActionMsg(`Requisition ${activeReconciliation.requisition_code} stock allowance options confirmed and committed successfully!`);
+      setConfirmModalOpen(false);
+      setPendingActionType(null);
       setActiveReconciliation(null);
       fetchDistrictsAndTickets();
       setTimeout(() => setActionMsg(null), 4000);
@@ -604,7 +653,7 @@ export const SuperadminRequisitionsHub: React.FC = () => {
 
             {/* Dual Column Side-By-Side Reconciliation Grid */}
             <div className="rounded-2xl border border-slate-200 overflow-hidden">
-              <div className="grid grid-cols-12 bg-slate-100 text-[11px] font-bold font-mono text-slate-600 uppercase border-b border-slate-200 py-2.5 px-4">
+              <div className="grid grid-cols-12 bg-slate-100 text-[11px] font-bold font-mono text-slate-600 uppercase border-b border-slate-200 py-2.5 px-4 items-center">
                 <div className="col-span-4 flex items-center gap-1.5">
                   <Package className="w-3.5 h-3.5 text-blue-600" />
                   <span>Product Line (Requested)</span>
@@ -616,19 +665,48 @@ export const SuperadminRequisitionsHub: React.FC = () => {
                   <MapPin className="w-3 h-3" />
                   <span>Depot Stock ({activeReconciliation.district_name})</span>
                 </div>
-                <div className="col-span-3 text-right text-indigo-700 font-extrabold pr-2">
-                  Approve / Allocate
+                <div className="col-span-3 text-right">
+                  <div className="flex items-center justify-end gap-2">
+                    <span className="text-indigo-700 font-extrabold">Stock Options</span>
+                    {(activeReconciliation.status === 'PENDING' || isEditingProcessed) && (
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleSetAllowAll(true)}
+                          className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 hover:bg-emerald-200 text-[9px] font-bold cursor-pointer"
+                          title="Allow stock for all items"
+                        >
+                          Allow All
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSetAllowAll(false)}
+                          className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 hover:bg-rose-200 text-[9px] font-bold cursor-pointer"
+                          title="Disallow stock for all items"
+                        >
+                          Disallow All
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
               <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto">
                 {activeReconciliation.items?.map((item) => {
                   const displayImg = item.image_url || getBrandImage(item.brand || 'Pepsi');
-                  const currentApprove = approvedQuantities[item.id] ?? item.requested_quantity;
+                  const isAllowed = allowStockOptions[item.id] ?? true;
+                  const currentApprove = isAllowed ? (approvedQuantities[item.id] ?? item.requested_quantity) : 0;
                   const isStockShortage = (item.regional_stock || 0) < item.requested_quantity;
+                  const canEdit = activeReconciliation.status === 'PENDING' || isEditingProcessed;
 
                   return (
-                    <div key={item.id} className="grid grid-cols-12 items-center p-3.5 text-xs hover:bg-slate-50/80 transition-colors">
+                    <div
+                      key={item.id}
+                      className={`grid grid-cols-12 items-center p-3.5 text-xs transition-colors ${
+                        !isAllowed ? 'bg-rose-50/40 hover:bg-rose-50/60' : 'hover:bg-slate-50/80'
+                      }`}
+                    >
                       {/* Left: Product Line */}
                       <div className="col-span-4 flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-slate-100 p-1 flex items-center justify-center shrink-0 border border-slate-200">
@@ -666,34 +744,90 @@ export const SuperadminRequisitionsHub: React.FC = () => {
                         </span>
                         {isStockShortage && (
                           <span className="inline-flex items-center gap-1 text-[9px] text-amber-700 font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
-                            Local depot shortage (Transfer triggers from Central)
+                            Local shortage (Transfer from Central)
                           </span>
                         )}
                       </div>
 
-                      {/* Allocation Counter */}
-                      <div className="col-span-3 flex items-center justify-end gap-1.5 pr-2">
-                        {activeReconciliation.status === 'PENDING' ? (
-                          <div className="flex items-center gap-1">
-                            <input
-                              type="number"
-                              min="0"
-                              value={currentApprove}
-                              onChange={(e) => {
-                                const val = parseInt(e.target.value, 10);
-                                setApprovedQuantities((prev) => ({
-                                  ...prev,
-                                  [item.id]: isNaN(val) ? 0 : Math.max(0, val),
-                                }));
-                              }}
-                              className="w-20 px-2 py-1 text-center font-mono font-bold text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/40 bg-white"
-                            />
-                            <span className="text-[11px] font-mono text-slate-500 font-semibold">cases</span>
-                          </div>
+                      {/* Option to Allow Stock or Not & Quantity Allocation */}
+                      <div className="col-span-3 flex flex-col items-end gap-1.5 pr-2">
+                        {canEdit ? (
+                          <>
+                            {/* Allow / Disallow Option Selector */}
+                            <div className="flex items-center gap-1 p-0.5 rounded-lg bg-slate-100 border border-slate-200">
+                              <button
+                                type="button"
+                                onClick={() => handleToggleItemAllow(item.id, true, item.requested_quantity)}
+                                className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono transition-all cursor-pointer ${
+                                  isAllowed
+                                    ? 'bg-emerald-600 text-white shadow-2xs'
+                                    : 'text-slate-600 hover:text-emerald-700'
+                                }`}
+                              >
+                                Allow
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleToggleItemAllow(item.id, false, item.requested_quantity)}
+                                className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono transition-all cursor-pointer ${
+                                  !isAllowed
+                                    ? 'bg-rose-600 text-white shadow-2xs'
+                                    : 'text-slate-600 hover:text-rose-700'
+                                }`}
+                              >
+                                Do Not Allow
+                              </button>
+                            </div>
+
+                            {/* Quantity Input if Allowed */}
+                            {isAllowed ? (
+                              <div className="flex items-center gap-1 mt-0.5">
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max={Math.max(item.requested_quantity, (item.regional_stock || 0) + (item.central_stock || 0))}
+                                  value={currentApprove}
+                                  onChange={(e) => {
+                                    const val = parseInt(e.target.value, 10);
+                                    setApprovedQuantities((prev) => ({
+                                      ...prev,
+                                      [item.id]: isNaN(val) ? 0 : Math.max(0, val),
+                                    }));
+                                  }}
+                                  className="w-16 px-1.5 py-1 text-center font-mono font-bold text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/40 bg-white"
+                                />
+                                <span className="text-[10px] font-mono text-slate-500 font-semibold">cases</span>
+                                {currentApprove !== item.requested_quantity && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setApprovedQuantities((prev) => ({ ...prev, [item.id]: item.requested_quantity }));
+                                    }}
+                                    className="text-[9px] text-blue-600 hover:underline font-mono"
+                                    title="Reset to requested quantity"
+                                  >
+                                    Reset
+                                  </button>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-[10px] font-mono font-bold text-rose-600 bg-rose-100/60 border border-rose-200 px-2 py-0.5 rounded">
+                                0 cases (Disallowed)
+                              </span>
+                            )}
+                          </>
                         ) : (
-                          <span className="font-mono font-bold text-xs text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
-                            {item.approved_quantity} cases approved
-                          </span>
+                          <div className="text-right">
+                            {item.approved_quantity > 0 ? (
+                              <span className="font-mono font-bold text-xs text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 inline-block">
+                                ✓ {item.approved_quantity} cases Allowed
+                              </span>
+                            ) : (
+                              <span className="font-mono font-bold text-xs text-rose-700 bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200 inline-block">
+                                ✕ Stock Not Allowed
+                              </span>
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>
@@ -709,7 +843,7 @@ export const SuperadminRequisitionsHub: React.FC = () => {
               </label>
               <textarea
                 rows={2}
-                disabled={activeReconciliation.status !== 'PENDING' || submittingAction}
+                disabled={activeReconciliation.status !== 'PENDING' && !isEditingProcessed}
                 value={adminRemarks}
                 onChange={(e) => setAdminRemarks(e.target.value)}
                 placeholder="Log physical inspection notes, transfer batch tokens, or reasons for quantity adjustments..."
@@ -727,46 +861,205 @@ export const SuperadminRequisitionsHub: React.FC = () => {
                 Close Reconciliation
               </button>
 
-              {activeReconciliation.status === 'PENDING' ? (
+              {activeReconciliation.status === 'PENDING' || isEditingProcessed ? (
                 <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
-                  {/* Reject Button */}
+                  {/* Disallow All Button */}
                   <button
                     type="button"
                     disabled={submittingAction}
-                    onClick={() => handleApproveAction('REJECT')}
-                    className="px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                    onClick={() => handlePromptConfirmation('REJECT')}
+                    className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
                   >
                     <XCircle className="w-3.5 h-3.5 text-rose-600" />
-                    <span>Decline Requisition</span>
+                    <span>Disallow All Stock</span>
                   </button>
 
-                  {/* Partial / Adjusted Button */}
+                  {/* Confirm Selected Stock Options */}
                   <button
                     type="button"
                     disabled={submittingAction}
-                    onClick={() => handleApproveAction('APPROVE_PARTIAL')}
-                    className="px-4 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                    onClick={() => handlePromptConfirmation('APPROVE_PARTIAL')}
+                    className="px-3.5 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
                   >
                     <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" />
-                    <span>Approve Adjusted Quantity</span>
+                    <span>Confirm Selected Stock Options</span>
                   </button>
 
-                  {/* Approve Full Button */}
+                  {/* Confirm & Allow Full Stock Button */}
                   <button
                     type="button"
                     disabled={submittingAction}
-                    onClick={() => handleApproveAction('APPROVE_FULL')}
-                    className="px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-500/20 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                    onClick={() => handlePromptConfirmation('APPROVE_FULL')}
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-500/20 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
                   >
                     <CheckCircle2 className="w-4 h-4 text-white" />
-                    <span>Approve Full Requisition</span>
+                    <span>Confirm & Allow Full Stock</span>
                   </button>
                 </div>
               ) : (
-                <span className="text-xs font-mono font-semibold text-slate-400">
-                  Ticket already processed: {activeReconciliation.status}
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-mono font-semibold text-slate-500">
+                    Decision Status: {getStatusBadge(activeReconciliation.status)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingProcessed(true)}
+                    className="px-3.5 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 shadow-2xs"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Modify / Re-confirm Stock Options</span>
+                  </button>
+                </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Dialog for Allowing/Disallowing Stock */}
+      {confirmModalOpen && pendingActionType && activeReconciliation && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
+          <div className="relative w-full max-w-lg rounded-3xl bg-white border border-slate-200 shadow-2xl p-6 space-y-4">
+            {/* Header */}
+            <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
+              <div
+                className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
+                  pendingActionType === 'REJECT'
+                    ? 'bg-rose-50 text-rose-600 border border-rose-100'
+                    : 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                }`}
+              >
+                {pendingActionType === 'REJECT' ? (
+                  <XCircle className="w-5 h-5" />
+                ) : (
+                  <CheckCircle2 className="w-5 h-5" />
+                )}
+              </div>
+              <div>
+                <span className="text-[10px] font-mono uppercase tracking-wider font-bold text-slate-400">
+                  CONFIRMATION REQUIRED
+                </span>
+                <h3 className="font-oswald text-lg font-bold text-zinc-900 uppercase">
+                  Confirm Stock Allowance Decision
+                </h3>
+              </div>
+            </div>
+
+            {/* Decision Details */}
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-mono">Requisition Ticket:</span>
+                <span className="font-mono font-bold text-blue-700">{activeReconciliation.requisition_code}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-mono">Target Depot / Region:</span>
+                <span className="font-bold text-zinc-900">{activeReconciliation.district_name || 'Dhaka'} Depot</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-mono">Action Type:</span>
+                <span
+                  className={`font-mono font-bold px-2 py-0.5 rounded text-[10px] ${
+                    pendingActionType === 'APPROVE_FULL'
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : pendingActionType === 'REJECT'
+                      ? 'bg-rose-100 text-rose-800'
+                      : 'bg-blue-100 text-blue-800'
+                  }`}
+                >
+                  {pendingActionType === 'APPROVE_FULL'
+                    ? 'ALLOW FULL STOCK'
+                    : pendingActionType === 'REJECT'
+                    ? 'DISALLOW ALL STOCK'
+                    : 'ALLOW SELECTED OPTIONS'}
+                </span>
+              </div>
+            </div>
+
+            {/* Line Items Allowance Summary */}
+            <div className="space-y-1.5">
+              <span className="text-[11px] font-bold uppercase font-mono text-slate-500">
+                Products Summary & Allowance:
+              </span>
+              <div className="max-h-40 overflow-y-auto divide-y divide-slate-100 rounded-xl border border-slate-200 text-xs">
+                {activeReconciliation.items?.map((it) => {
+                  const isAllowed = pendingActionType === 'APPROVE_FULL'
+                    ? true
+                    : (pendingActionType === 'REJECT' ? false : (allowStockOptions[it.id] ?? true));
+                  const approvedQty = isAllowed
+                    ? (pendingActionType === 'APPROVE_FULL' ? it.requested_quantity : (approvedQuantities[it.id] ?? it.requested_quantity))
+                    : 0;
+
+                  return (
+                    <div key={it.id} className="p-2.5 flex items-center justify-between">
+                      <div>
+                        <span className="font-bold text-zinc-900 block font-oswald">
+                          {it.brand} {it.flavor_variant}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          Requested: {it.requested_quantity} cases
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        {isAllowed && approvedQty > 0 ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                            <Check className="w-3 h-3 text-emerald-600" />
+                            Allow: {approvedQty} cases
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                            <XCircle className="w-3 h-3 text-rose-600" />
+                            Stock Disallowed (0)
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Audit Remarks Note */}
+            {adminRemarks && (
+              <div className="p-2.5 rounded-xl bg-purple-50/70 border border-purple-200 text-xs text-purple-900">
+                <span className="font-bold block text-[10px] uppercase font-mono text-purple-700">Audit Remarks:</span>
+                <p className="mt-0.5 text-purple-800">{adminRemarks}</p>
+              </div>
+            )}
+
+            {/* Confirmation Buttons */}
+            <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+              <button
+                type="button"
+                disabled={submittingAction}
+                onClick={() => setConfirmModalOpen(false)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
+              >
+                Back / Change Options
+              </button>
+
+              <button
+                type="button"
+                disabled={submittingAction}
+                onClick={() => handleApproveAction(pendingActionType)}
+                className={`px-5 py-2 rounded-xl text-white text-xs font-bold flex items-center gap-1.5 shadow-md transition-all cursor-pointer active:scale-95 disabled:opacity-50 ${
+                  pendingActionType === 'REJECT'
+                    ? 'bg-rose-600 hover:bg-rose-500 shadow-rose-500/20'
+                    : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/20'
+                }`}
+              >
+                {submittingAction ? (
+                  <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                ) : (
+                  <CheckCircle2 className="w-4 h-4 text-white" />
+                )}
+                <span>
+                  {submittingAction
+                    ? 'Committing Decision...'
+                    : pendingActionType === 'REJECT'
+                    ? 'Confirm & Disallow Stock'
+                    : 'Confirm & Permit Stock'}
+                </span>
+              </button>
             </div>
           </div>
         </div>
