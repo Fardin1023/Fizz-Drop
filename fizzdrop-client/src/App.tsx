@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import Navigation from './components/Navigation/Navigation';
 import HomePage from './pages/HomePage';
 import ProductListPage from './pages/ProductListPage/ProductListPage';
@@ -11,6 +11,11 @@ function App() {
   const [cartCount, setCartCount] = useState<number>(0);
   const [selectedBranchId, setSelectedBranchId] = useState<number | string>('');
   const [outlets, setOutlets] = useState<{ branchId: string | number; branchName: string }[]>([]);
+  const location = useLocation();
+
+  // Hide the customer navigation bar on Admin and Superadmin portals
+  const isAdminOrSuperadmin =
+    location.pathname.startsWith('/admin') || location.pathname.startsWith('/superadmin');
 
   useEffect(() => {
     const fetchOutlets = async () => {
@@ -41,13 +46,15 @@ function App() {
   return (
     <AuthProvider>
       <div className="min-h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col">
-        {/* Persistent navbar across routes */}
-        <Navigation
-          cartCount={cartCount}
-          outlets={outlets}
-          selectedBranch={selectedBranchId}
-          onSelectBranch={setSelectedBranchId}
-        />
+        {/* Persistent navbar across customer routes (hidden on Admin & Superadmin pages) */}
+        {!isAdminOrSuperadmin && (
+          <Navigation
+            cartCount={cartCount}
+            outlets={outlets}
+            selectedBranch={selectedBranchId}
+            onSelectBranch={setSelectedBranchId}
+          />
+        )}
 
         <main className="flex-1">
           <Routes>

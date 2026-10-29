@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { ShieldCheck, Crown, Lock, Mail, ArrowRight, AlertCircle, Package } from 'lucide-react';
+import { ShieldCheck, Crown, Lock, Mail, ArrowRight, AlertCircle, Package, Home } from 'lucide-react';
 
 interface AdminLoginProps {
   onSuccess?: () => void;
@@ -62,6 +63,19 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onSuccess, requiredRole = 'any'
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl pointer-events-none" />
 
       <div className="w-full max-w-md relative z-10">
+        <div className="mb-3 flex items-center justify-between px-1">
+          <Link
+            to="/"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+          >
+            <Home className="w-3.5 h-3.5 text-indigo-600" />
+            <span>← Back to Storefront</span>
+          </Link>
+          <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider font-semibold">
+            FizzDrop Control
+          </span>
+        </div>
+
         <div className="bg-white/85 dark:bg-zinc-900/90 backdrop-blur-xl border border-zinc-200/80 dark:border-zinc-800 rounded-3xl p-8 shadow-2xl shadow-indigo-500/5 transition-all">
           
           {/* Header */}

@@ -13,6 +13,7 @@ import {
   Truck,
   ClipboardList,
   MapPin,
+  Home,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useNotifications } from '../../hooks/useNotifications';
@@ -74,12 +75,22 @@ export const AdminDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Top Admin Sub-Header (Small, Fixed & Static for Maximum Content Visibility) */}
-      <div className="sticky top-16 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-2xs">
+      {/* Top Admin Sub-Header (Small, Fixed at Top & Static for Maximum Content Visibility) */}
+      <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-2xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
-          {/* Top Row: Title, Role Badge, and Controls */}
+          {/* Top Row: Title, Role Badge, Home Navigation, and Controls */}
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5 min-w-0">
+              {/* Home / Storefront Navigation Button */}
+              <Link
+                to="/"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-700 hover:text-indigo-600 bg-slate-100 hover:bg-slate-200/90 border border-slate-200 transition-colors shadow-2xs shrink-0"
+                title="Return to Customer Storefront / Home"
+              >
+                <Home className="w-3.5 h-3.5 text-indigo-600" />
+                <span className="hidden sm:inline">Storefront</span>
+              </Link>
+
               <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
                 <Truck className="w-3.5 h-3.5" />
               </div>
