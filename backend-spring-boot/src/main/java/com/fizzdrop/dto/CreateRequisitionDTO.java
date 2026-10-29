@@ -13,6 +13,14 @@ public class CreateRequisitionDTO {
     @JsonAlias({"supplier_remarks", "supplierRemarks", "remarks"})
     private String supplierRemarks;
 
+    @JsonProperty("payment_method")
+    @JsonAlias({"payment_method", "paymentMethod"})
+    private String paymentMethod;
+
+    @JsonProperty("payment_reference")
+    @JsonAlias({"payment_reference", "paymentReference"})
+    private String paymentReference;
+
     @JsonProperty("items")
     private List<ItemRequest> items;
 
@@ -37,6 +45,12 @@ public class CreateRequisitionDTO {
 
     public String getSupplierRemarks() { return supplierRemarks; }
     public void setSupplierRemarks(String supplierRemarks) { this.supplierRemarks = supplierRemarks; }
+
+    public String getPaymentMethod() { return paymentMethod; }
+    public void setPaymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod; }
+
+    public String getPaymentReference() { return paymentReference; }
+    public void setPaymentReference(String paymentReference) { this.paymentReference = paymentReference; }
 
     public List<ItemRequest> getItems() { return items; }
     public void setItems(List<ItemRequest> items) { this.items = items; }

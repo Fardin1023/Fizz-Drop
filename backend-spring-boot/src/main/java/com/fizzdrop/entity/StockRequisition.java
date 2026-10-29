@@ -50,6 +50,31 @@ public class StockRequisition {
     @JsonAlias({"admin_remarks", "adminRemarks"})
     private String adminRemarks;
 
+    @Column(name = "payment_method", length = 50)
+    @JsonProperty("payment_method")
+    @JsonAlias({"payment_method", "paymentMethod"})
+    private String paymentMethod = "CORPORATE_BANK_TRANSFER";
+
+    @Column(name = "payment_status", length = 30)
+    @JsonProperty("payment_status")
+    @JsonAlias({"payment_status", "paymentStatus"})
+    private String paymentStatus = "AUTHORIZED";
+
+    @Column(name = "payment_reference", length = 100)
+    @JsonProperty("payment_reference")
+    @JsonAlias({"payment_reference", "paymentReference"})
+    private String paymentReference;
+
+    @Column(name = "invoice_number", length = 60)
+    @JsonProperty("invoice_number")
+    @JsonAlias({"invoice_number", "invoiceNumber"})
+    private String invoiceNumber;
+
+    @Column(name = "total_amount")
+    @JsonProperty("total_amount")
+    @JsonAlias({"total_amount", "totalAmount"})
+    private java.math.BigDecimal totalAmount;
+
     @Column(name = "created_at", nullable = false)
     @JsonProperty("created_at")
     private LocalDateTime createdAt;
@@ -157,4 +182,19 @@ public class StockRequisition {
 
     public Integer getTotalApprovedCases() { return totalApprovedCases; }
     public void setTotalApprovedCases(Integer totalApprovedCases) { this.totalApprovedCases = totalApprovedCases; }
+
+    public String getPaymentMethod() { return paymentMethod; }
+    public void setPaymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod; }
+
+    public String getPaymentStatus() { return paymentStatus; }
+    public void setPaymentStatus(String paymentStatus) { this.paymentStatus = paymentStatus; }
+
+    public String getPaymentReference() { return paymentReference; }
+    public void setPaymentReference(String paymentReference) { this.paymentReference = paymentReference; }
+
+    public String getInvoiceNumber() { return invoiceNumber; }
+    public void setInvoiceNumber(String invoiceNumber) { this.invoiceNumber = invoiceNumber; }
+
+    public java.math.BigDecimal getTotalAmount() { return totalAmount; }
+    public void setTotalAmount(java.math.BigDecimal totalAmount) { this.totalAmount = totalAmount; }
 }

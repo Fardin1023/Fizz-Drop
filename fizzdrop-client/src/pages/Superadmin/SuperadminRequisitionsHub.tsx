@@ -14,9 +14,12 @@ import {
   AlertCircle,
   Package,
   Check,
+  CreditCard,
+  Printer,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { broadcastRealtimeEvent } from '../../utils/broadcast';
+import { InvoiceModal } from '../../components/Invoice/InvoiceModal';
 import pepsiImg from '../../assets/img/pepsi.PNG';
 import sevenUpImg from '../../assets/img/7up.PNG';
 import dewImg from '../../assets/img/mountain dew.PNG';
@@ -68,6 +71,11 @@ interface RequisitionTicket {
   items?: RequisitionOverviewItem[];
   total_requested_cases?: number;
   total_approved_cases?: number;
+  payment_method?: string;
+  payment_status?: string;
+  payment_reference?: string;
+  invoice_number?: string;
+  total_amount?: number;
 }
 
 interface DistrictOption {
@@ -101,6 +109,42 @@ export const SuperadminRequisitionsHub: React.FC = () => {
   const [pendingActionType, setPendingActionType] = useState<'APPROVE_FULL' | 'APPROVE_PARTIAL' | 'REJECT' | null>(null);
   const [centralInventory, setCentralInventory] = useState<any[]>([]);
   const [showCentralPool, setShowCentralPool] = useState<boolean>(true);
+
+  // Commercial Invoice Modal state
+  const [invoiceTicket, setInvoiceTicket] = useState<any | null>(null);
+  const [isInvoiceOpen, setIsInvoiceOpen] = useState<boolean>(false);
+
+  const formatPaymentBadge = (method?: string, status?: string) => {
+    const m = (method || 'BANK_TRANSFER').toUpperCase();
+    const st = (status || 'PENDING').toUpperCase();
+
+    const labelMap: Record<string, string> = {
+      BANK_TRANSFER: 'Bank Wire / EFT',
+      BKASH_MERCHANT: 'bKash B2B Merchant',
+      NET_30_CREDIT: 'Net-30 Corporate',
+      CASH_ON_DELIVERY: 'Cheque on Delivery',
+    };
+
+    const statusBadgeClass =
+      st === 'PAID'
+        ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+        : st === 'AUTHORIZED'
+        ? 'bg-blue-100 text-blue-800 border-blue-200'
+        : 'bg-amber-100 text-amber-800 border-amber-200';
+
+    return (
+      <div className="space-y-1">
+        <span className="font-semibold text-zinc-800 text-[11px] block truncate">
+          {labelMap[m] || m}
+        </span>
+        <span
+          className={`inline-block px-1.5 py-0.2 rounded font-mono font-bold text-[9px] border uppercase ${statusBadgeClass}`}
+        >
+          {st}
+        </span>
+      </div>
+    );
+  };
 
   const fetchDistrictsAndTickets = async () => {
     setLoading(true);
@@ -582,11 +626,12 @@ export const SuperadminRequisitionsHub: React.FC = () => {
                   <th className="py-3.5 px-4">Ticket Token</th>
                   <th className="py-3.5 px-4">Supplier & Depot</th>
                   <th className="py-3.5 px-4">Operating District</th>
+                  <th className="py-3.5 px-4">Payment Method</th>
                   <th className="py-3.5 px-4">Urgency</th>
                   <th className="py-3.5 px-4 text-center">Requested Items</th>
                   <th className="py-3.5 px-4">Status</th>
                   <th className="py-3.5 px-4">Submission Time</th>
-                  <th className="py-3.5 px-4 text-right">Reconciliation Action</th>
+                  <th className="py-3.5 px-4 text-right">Actions & Invoice</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -621,6 +666,10 @@ export const SuperadminRequisitionsHub: React.FC = () => {
                     </td>
 
                     <td className="py-3.5 px-4">
+                      {formatPaymentBadge(t.payment_method, t.payment_status)}
+                    </td>
+
+                    <td className="py-3.5 px-4">
                       {getUrgencyBadge(t.urgency)}
                     </td>
 
@@ -642,17 +691,32 @@ export const SuperadminRequisitionsHub: React.FC = () => {
                     </td>
 
                     <td className="py-3.5 px-4 text-right">
-                      <button
-                        onClick={() => handleOpenReconciliation(t)}
-                        className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 ml-auto transition-all cursor-pointer shadow-2xs ${
-                          t.status === 'PENDING'
-                            ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-500/20 active:scale-95'
-                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
-                        }`}
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        <span>{t.status === 'PENDING' ? 'Reconcile & Allocate' : 'View Audit'}</span>
-                      </button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setInvoiceTicket(t);
+                            setIsInvoiceOpen(true);
+                          }}
+                          className="px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs active:scale-95"
+                          title="Print / Save Official B2B Commercial Tax Invoice"
+                        >
+                          <Printer className="w-3.5 h-3.5 text-cyan-400" />
+                          <span className="hidden sm:inline">Invoice</span>
+                        </button>
+
+                        <button
+                          onClick={() => handleOpenReconciliation(t)}
+                          className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs ${
+                            t.status === 'PENDING'
+                              ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-500/20 active:scale-95'
+                              : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
+                          }`}
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>{t.status === 'PENDING' ? 'Reconcile' : 'Audit'}</span>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -718,6 +782,60 @@ export const SuperadminRequisitionsHub: React.FC = () => {
               <div>
                 <span className="text-[10px] uppercase font-bold text-slate-400 block font-mono">Queue Status</span>
                 <span className="mt-0.5 block">{getStatusBadge(activeReconciliation.status)}</span>
+              </div>
+            </div>
+
+            {/* Commercial & Payment Method Overview Ribbon */}
+            <div className="p-3.5 rounded-2xl bg-gradient-to-br from-indigo-50/70 to-blue-50/50 border border-indigo-100 flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
+                  <CreditCard className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-mono uppercase font-bold text-indigo-600 block">
+                    Commercial Settlement & Invoicing
+                  </span>
+                  <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                    <span className="font-bold text-zinc-900">
+                      Method: {activeReconciliation.payment_method?.replace(/_/g, ' ') || 'Bank Wire Transfer'}
+                    </span>
+                    <span className="text-slate-300">•</span>
+                    <span className="font-mono text-slate-600 text-[11px]">
+                      Invoice #: {activeReconciliation.invoice_number || `INV-${new Date().getFullYear()}-${String(activeReconciliation.id).padStart(4, '0')}`}
+                    </span>
+                    {activeReconciliation.payment_reference && (
+                      <>
+                        <span className="text-slate-300">•</span>
+                        <span className="font-mono text-slate-600 text-[11px]">
+                          Ref: {activeReconciliation.payment_reference}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block font-mono">
+                    Payable Subtotal + VAT
+                  </span>
+                  <span className="font-mono font-black text-sm text-indigo-700">
+                    ৳{activeReconciliation.total_amount ? Number(activeReconciliation.total_amount).toLocaleString('en-US', { minimumFractionDigits: 2 }) : 'Calculated Upon Approval'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInvoiceTicket(activeReconciliation);
+                    setIsInvoiceOpen(true);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95"
+                  title="View / Download Commercial Tax Invoice"
+                >
+                  <Printer className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Download Invoice (PDF)</span>
+                </button>
               </div>
             </div>
 
@@ -1153,6 +1271,13 @@ export const SuperadminRequisitionsHub: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Official B2B Commercial Tax Invoice Modal & Downloader */}
+      <InvoiceModal
+        isOpen={isInvoiceOpen}
+        invoice={invoiceTicket}
+        onClose={() => setIsInvoiceOpen(false)}
+      />
     </div>
   );
 };

@@ -10,9 +10,12 @@ import {
   ArrowRight,
   CheckCircle2,
   AlertCircle,
+  CreditCard,
+  Printer,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { broadcastRealtimeEvent } from '../../utils/broadcast';
+import { InvoiceModal, type InvoiceData } from '../../components/Invoice/InvoiceModal';
 import pepsiImg from '../../assets/img/pepsi.PNG';
 import sevenUpImg from '../../assets/img/7up.PNG';
 import dewImg from '../../assets/img/mountain dew.PNG';
@@ -66,6 +69,10 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
   const [quantities, setQuantities] = useState<Record<number, number>>({});
   const [urgency, setUrgency] = useState<'LOW' | 'NORMAL' | 'CRITICAL'>('NORMAL');
   const [remarks, setRemarks] = useState<string>('');
+  const [paymentMethod, setPaymentMethod] = useState<string>('CORPORATE_BANK_TRANSFER');
+  const [paymentReference, setPaymentReference] = useState<string>('');
+  const [submittedRequisition, setSubmittedRequisition] = useState<InvoiceData | null>(null);
+  const [isInvoiceOpen, setIsInvoiceOpen] = useState<boolean>(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -80,7 +87,11 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
       ]);
 
       if (profRes.ok) {
-        setProfile(await profRes.json());
+        const profData = await profRes.json();
+        setProfile(profData);
+        if (profData.default_payment_method) {
+          setPaymentMethod(profData.default_payment_method);
+        }
       }
       if (prodRes.ok) {
         const prodData = await prodRes.json();
@@ -133,6 +144,13 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
 
   const totalCasesRequested = selectedEntries.reduce((sum, e) => sum + e.quantity, 0);
 
+  const subtotal = selectedEntries.reduce(
+    (sum, e) => sum + (Number(e.product!.base_price || 48) * e.quantity),
+    0
+  );
+  const vatAmount = subtotal * 0.05;
+  const grandTotal = subtotal + vatAmount;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedEntries.length === 0) {
@@ -148,6 +166,8 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
       const payload = {
         urgency,
         supplier_remarks: remarks,
+        payment_method: paymentMethod,
+        payment_reference: paymentReference,
         items: selectedEntries.map((e) => ({
           product_id: e.product!.product_id,
           requested_quantity: e.quantity,
@@ -169,7 +189,8 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
       }
 
       const created = await res.json();
-      setSuccessMsg(`Requisition ${created.requisition_code} submitted successfully with PENDING status!`);
+      setSubmittedRequisition(created);
+      setSuccessMsg(`Requisition ${created.requisition_code} submitted successfully with PENDING status! Tax Invoice is available below.`);
       setQuantities({});
       setRemarks('');
       setUrgency('NORMAL');
@@ -179,13 +200,14 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
         type: 'NEW_REQUISITION',
         recipientRole: 'SUPERADMIN',
         title: `New Stock Requisition: ${created.requisition_code}`,
-        message: `Supplier submitted a requisition ticket for ${totalCasesRequested} cases (${selectedEntries.length} SKUs).`,
+        message: `Supplier submitted a requisition ticket for ${totalCasesRequested} cases (${selectedEntries.length} SKUs). Payment Method: ${paymentMethod.replace(/_/g, ' ')}.`,
         referenceCode: created.requisition_code,
         referenceId: created.id,
       });
 
+      // Allow user to download invoice right away or navigate
       if (onRequisitionSubmitted) {
-        setTimeout(() => onRequisitionSubmitted(created.requisition_code), 1500);
+        setTimeout(() => onRequisitionSubmitted(created.requisition_code), 3500);
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'Error communicating with server');
@@ -462,6 +484,74 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
               </span>
             </div>
 
+            {/* Commercial Payment Method Selection */}
+            <div className="space-y-2 p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-800 flex items-center gap-1.5">
+                <CreditCard className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Consignment Payment Method *</span>
+              </label>
+
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: 'CORPORATE_BANK_TRANSFER', label: 'Bank Wire / EFT', desc: 'Dutch-Bangla / BRAC' },
+                  { id: 'BKASH_MERCHANT', label: 'bKash B2B', desc: 'Merchant Direct' },
+                  { id: 'NET_30_CREDIT', label: 'Net-30 Terms', desc: 'Corporate Credit' },
+                  { id: 'COMPANY_CHEQUE', label: 'Company Cheque', desc: 'On Depot Delivery' },
+                ].map((pm) => (
+                  <label
+                    key={pm.id}
+                    className={`p-2 rounded-xl border cursor-pointer transition-all flex flex-col justify-between ${
+                      paymentMethod === pm.id
+                        ? 'bg-indigo-50/80 ring-2 ring-indigo-500 border-indigo-400 font-bold'
+                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold">{pm.label}</span>
+                      <input
+                        type="radio"
+                        name="paymentMethod"
+                        value={pm.id}
+                        checked={paymentMethod === pm.id}
+                        onChange={(e) => setPaymentMethod(e.target.value)}
+                        className="sr-only"
+                      />
+                    </div>
+                    <span className="text-[9px] font-mono text-slate-500">{pm.desc}</span>
+                  </label>
+                ))}
+              </div>
+
+              {/* Payment Reference Input */}
+              <input
+                type="text"
+                value={paymentReference}
+                onChange={(e) => setPaymentReference(e.target.value)}
+                placeholder="Optional Bank Slip # / Cheque # / TrxID..."
+                className="w-full px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-mono text-zinc-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+              />
+            </div>
+
+            {/* Live Financial Breakdown Box */}
+            {selectedEntries.length > 0 && (
+              <div className="p-3.5 rounded-2xl bg-indigo-50/60 border border-indigo-100 space-y-1.5 text-xs">
+                <div className="flex justify-between text-slate-600">
+                  <span>Merchandise Subtotal:</span>
+                  <span className="font-mono font-bold">৳ {subtotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex justify-between text-slate-600">
+                  <span>Wholesale VAT (5% Mushak):</span>
+                  <span className="font-mono font-bold">৳ {vatAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm font-black text-indigo-950 border-t border-indigo-200/80 pt-1.5">
+                  <span>Estimated Total:</span>
+                  <span className="font-mono text-indigo-600 font-black">
+                    ৳ {grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              </div>
+            )}
+
             {/* Urgency Radio Selector */}
             <div className="space-y-1.5">
               <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-700">
@@ -519,9 +609,28 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
               <Send className="w-4 h-4" />
               <span>{submitting ? 'Submitting to Superadmin...' : 'Commit Stock Requisition'}</span>
             </button>
+
+            {/* Immediate Download Invoice Action if just submitted */}
+            {submittedRequisition && (
+              <button
+                type="button"
+                onClick={() => setIsInvoiceOpen(true)}
+                className="w-full py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs"
+              >
+                <Printer className="w-3.5 h-3.5 text-cyan-400" />
+                <span>View & Download Tax Invoice ({submittedRequisition.requisition_code})</span>
+              </button>
+            )}
           </form>
         </div>
       </div>
+
+      {/* Downloadable Tax Invoice Modal */}
+      <InvoiceModal
+        invoice={submittedRequisition}
+        isOpen={isInvoiceOpen}
+        onClose={() => setIsInvoiceOpen(false)}
+      />
     </div>
   );
 };

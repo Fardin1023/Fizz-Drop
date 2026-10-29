@@ -96,6 +96,11 @@ public class RequisitionProcessingService {
             );
             defaultProf.setTradeLicenseNumber("TRD-DHK-2026-9812");
             defaultProf.setIsVerified(true);
+            defaultProf.setDefaultPaymentMethod("CORPORATE_BANK_TRANSFER");
+            defaultProf.setBankName("Dutch-Bangla Bank PLC");
+            defaultProf.setBankAccountNumber("115.120.984123-DHK");
+            defaultProf.setBankAccountName("FizzDrop Regional Logistics Depot");
+            defaultProf.setMobileBankingNumber("+8801700112233");
             supplierProfileRepository.save(defaultProf);
         }
 
@@ -217,6 +222,21 @@ public class RequisitionProcessingService {
         if (dto.getPhoneNumber() != null) {
             profile.setPhoneNumber(dto.getPhoneNumber().trim());
         }
+        if (dto.getDefaultPaymentMethod() != null && !dto.getDefaultPaymentMethod().trim().isEmpty()) {
+            profile.setDefaultPaymentMethod(dto.getDefaultPaymentMethod().trim());
+        }
+        if (dto.getBankName() != null) {
+            profile.setBankName(dto.getBankName().trim());
+        }
+        if (dto.getBankAccountNumber() != null) {
+            profile.setBankAccountNumber(dto.getBankAccountNumber().trim());
+        }
+        if (dto.getBankAccountName() != null) {
+            profile.setBankAccountName(dto.getBankAccountName().trim());
+        }
+        if (dto.getMobileBankingNumber() != null) {
+            profile.setMobileBankingNumber(dto.getMobileBankingNumber().trim());
+        }
 
         profile.setUpdatedAt(LocalDateTime.now());
         SupplierProfile saved = supplierProfileRepository.save(profile);
@@ -251,20 +271,41 @@ public class RequisitionProcessingService {
                 dto.getSupplierRemarks()
         );
 
+        String paymentMethod = (dto.getPaymentMethod() != null && !dto.getPaymentMethod().trim().isEmpty())
+                ? dto.getPaymentMethod().trim()
+                : (profile.getDefaultPaymentMethod() != null ? profile.getDefaultPaymentMethod() : "CORPORATE_BANK_TRANSFER");
+        req.setPaymentMethod(paymentMethod);
+
+        String paymentRef = (dto.getPaymentReference() != null && !dto.getPaymentReference().trim().isEmpty())
+                ? dto.getPaymentReference().trim()
+                : ("REF-" + reqCode.replace("REQ-", ""));
+        req.setPaymentReference(paymentRef);
+        req.setInvoiceNumber("INV-" + reqCode.replace("REQ-", ""));
+        req.setPaymentStatus("AUTHORIZED");
+
         StockRequisition savedReq = requisitionRepository.save(req);
 
         List<StockRequisitionItem> items = new ArrayList<>();
         int totalCases = 0;
+        java.math.BigDecimal totalAmount = java.math.BigDecimal.ZERO;
 
         for (CreateRequisitionDTO.ItemRequest ir : dto.getItems()) {
             if (ir.getProductId() != null && ir.getRequestedQuantity() != null && ir.getRequestedQuantity() > 0) {
                 StockRequisitionItem item = new StockRequisitionItem(savedReq.getId(), ir.getProductId(), ir.getRequestedQuantity());
                 items.add(item);
                 totalCases += ir.getRequestedQuantity();
+
+                Product p = productRepository.findById(ir.getProductId()).orElse(null);
+                if (p != null && p.getBasePrice() != null) {
+                    totalAmount = totalAmount.add(p.getBasePrice().multiply(java.math.BigDecimal.valueOf(ir.getRequestedQuantity())));
+                }
             }
         }
 
         requisitionItemRepository.saveAll(items);
+
+        savedReq.setTotalAmount(totalAmount);
+        requisitionRepository.save(savedReq);
 
         savedReq.setItems(items);
         savedReq.setTotalRequestedCases(totalCases);
@@ -518,11 +559,40 @@ public class RequisitionProcessingService {
         req.setItems(items);
         int reqCases = 0;
         int appCases = 0;
+        java.math.BigDecimal calculatedTotal = java.math.BigDecimal.ZERO;
+
         for (StockRequisitionItem i : items) {
             reqCases += (i.getRequestedQuantity() != null ? i.getRequestedQuantity() : 0);
             appCases += (i.getApprovedQuantity() != null ? i.getApprovedQuantity() : 0);
+
+            Product p = productRepository.findById(i.getProductId()).orElse(null);
+            if (p != null) {
+                i.setBrand(p.getBrand());
+                i.setFlavorVariant(p.getFlavorVariant());
+                i.setPackaging(p.getPackaging());
+                i.setSizeVolume(p.getSizeVolume());
+                i.setSku(p.getSku());
+                i.setBasePrice(p.getBasePrice());
+
+                if (p.getBasePrice() != null && i.getRequestedQuantity() != null) {
+                    calculatedTotal = calculatedTotal.add(p.getBasePrice().multiply(java.math.BigDecimal.valueOf(i.getRequestedQuantity())));
+                }
+            }
         }
         req.setTotalRequestedCases(reqCases);
         req.setTotalApprovedCases(appCases);
+
+        if (req.getTotalAmount() == null || req.getTotalAmount().compareTo(java.math.BigDecimal.ZERO) == 0) {
+            req.setTotalAmount(calculatedTotal);
+        }
+        if (req.getInvoiceNumber() == null && req.getRequisitionCode() != null) {
+            req.setInvoiceNumber("INV-" + req.getRequisitionCode().replace("REQ-", ""));
+        }
+        if (req.getPaymentMethod() == null) {
+            req.setPaymentMethod("CORPORATE_BANK_TRANSFER");
+        }
+        if (req.getPaymentStatus() == null) {
+            req.setPaymentStatus("AUTHORIZED");
+        }
     }
 }

@@ -10,6 +10,7 @@ import {
   RefreshCw,
   ShieldCheck,
   Truck,
+  CreditCard,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -53,6 +54,11 @@ export const SupplierProfileSettings: React.FC<SupplierProfileSettingsProps> = (
   const [primaryDistrictId, setPrimaryDistrictId] = useState<number>(1);
   const [depotAddress, setDepotAddress] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [defaultPaymentMethod, setDefaultPaymentMethod] = useState('CORPORATE_BANK_TRANSFER');
+  const [bankName, setBankName] = useState('Dutch-Bangla Bank PLC');
+  const [bankAccountNumber, setBankAccountNumber] = useState('');
+  const [bankAccountName, setBankAccountName] = useState('');
+  const [mobileBankingNumber, setMobileBankingNumber] = useState('');
 
   const fetchData = async () => {
     setLoading(true);
@@ -78,6 +84,11 @@ export const SupplierProfileSettings: React.FC<SupplierProfileSettingsProps> = (
         setPrimaryDistrictId(profData.primary_district_id || 1);
         setDepotAddress(profData.depot_address || '');
         setPhoneNumber(profData.phone_number || '');
+        setDefaultPaymentMethod(profData.default_payment_method || 'CORPORATE_BANK_TRANSFER');
+        setBankName(profData.bank_name || 'Dutch-Bangla Bank PLC');
+        setBankAccountNumber(profData.bank_account_number || '');
+        setBankAccountName(profData.bank_account_name || '');
+        setMobileBankingNumber(profData.mobile_banking_number || '');
       }
     } catch (err: any) {
       console.error('Error loading supplier profile:', err);
@@ -120,6 +131,11 @@ export const SupplierProfileSettings: React.FC<SupplierProfileSettingsProps> = (
           primary_district_id: Number(primaryDistrictId),
           depot_address: depotAddress,
           phone_number: phoneNumber,
+          default_payment_method: defaultPaymentMethod,
+          bank_name: bankName,
+          bank_account_number: bankAccountNumber,
+          bank_account_name: bankAccountName,
+          mobile_banking_number: mobileBankingNumber,
         }),
       });
 
@@ -333,6 +349,116 @@ export const SupplierProfileSettings: React.FC<SupplierProfileSettingsProps> = (
               placeholder="Provide exact physical address, gate number, and emergency offload contact details..."
               className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500/30 resize-none"
             />
+          </div>
+
+          {/* Dedicated Section: Commercial Payment Method & Banking Credentials */}
+          <div className="md:col-span-2 p-5 rounded-2xl bg-indigo-50/50 border border-indigo-100 space-y-4">
+            <div className="flex items-center gap-2 border-b border-indigo-100 pb-2.5">
+              <CreditCard className="w-4 h-4 text-indigo-600" />
+              <div>
+                <h3 className="font-oswald text-sm font-bold uppercase tracking-tight text-indigo-950">
+                  Commercial Settlement & Payment Method
+                </h3>
+                <p className="text-[11px] text-indigo-800/80">
+                  Configure your default settlement method and corporate credentials for official tax invoices.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Default Payment Method Selector */}
+              <div className="md:col-span-2 space-y-1.5">
+                <label className="block text-xs font-bold uppercase tracking-wider text-indigo-900">
+                  Default Requisition Payment Method *
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
+                  {[
+                    { id: 'CORPORATE_BANK_TRANSFER', label: 'Bank Wire / EFT', desc: 'Direct corporate settlement' },
+                    { id: 'BKASH_MERCHANT', label: 'bKash Merchant B2B', desc: 'Fast mobile corporate clearing' },
+                    { id: 'NET_30_CREDIT', label: 'Net-30 Terms', desc: 'Wholesale credit account' },
+                    { id: 'COMPANY_CHEQUE', label: 'Cheque on Delivery', desc: 'Depot arrival cheque / COD' },
+                  ].map((pm) => (
+                    <label
+                      key={pm.id}
+                      className={`p-3 rounded-xl border cursor-pointer transition-all flex flex-col justify-between ${
+                        defaultPaymentMethod === pm.id
+                          ? 'bg-white ring-2 ring-indigo-500 border-indigo-400 shadow-xs'
+                          : 'bg-white/70 border-slate-200 hover:bg-white'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-zinc-900">{pm.label}</span>
+                        <input
+                          type="radio"
+                          name="defaultPaymentMethod"
+                          value={pm.id}
+                          checked={defaultPaymentMethod === pm.id}
+                          onChange={(e) => setDefaultPaymentMethod(e.target.value)}
+                          className="text-indigo-600 focus:ring-indigo-500"
+                        />
+                      </div>
+                      <span className="text-[10px] text-slate-500 mt-1">{pm.desc}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Bank Name */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">
+                  Corporate Bank Name
+                </label>
+                <input
+                  type="text"
+                  value={bankName}
+                  onChange={(e) => setBankName(e.target.value)}
+                  placeholder="e.g. Dutch-Bangla Bank PLC"
+                  className="w-full px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                />
+              </div>
+
+              {/* Bank Account Name */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">
+                  Bank Account Title / Beneficiary
+                </label>
+                <input
+                  type="text"
+                  value={bankAccountName}
+                  onChange={(e) => setBankAccountName(e.target.value)}
+                  placeholder="e.g. Central Beverage Logistics Depot Ltd"
+                  className="w-full px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                />
+              </div>
+
+              {/* Bank Account Number */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">
+                  Bank Account Number / IBAN
+                </label>
+                <input
+                  type="text"
+                  value={bankAccountNumber}
+                  onChange={(e) => setBankAccountNumber(e.target.value)}
+                  placeholder="e.g. 115.120.984123-DHK"
+                  className="w-full px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-xs font-mono text-zinc-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                />
+              </div>
+
+              {/* Mobile Financial Services (MFS) Number */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">
+                  bKash / Nagad Corporate Merchant No.
+                </label>
+                <input
+                  type="text"
+                  value={mobileBankingNumber}
+                  onChange={(e) => setMobileBankingNumber(e.target.value)}
+                  placeholder="e.g. +8801700112233"
+                  className="w-full px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-xs font-mono text-zinc-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                />
+              </div>
+            </div>
           </div>
         </div>
 

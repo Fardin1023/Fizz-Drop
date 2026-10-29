@@ -10,8 +10,11 @@ import {
   Eye,
   X,
   MapPin,
+  CreditCard,
+  Printer,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { InvoiceModal } from '../../components/Invoice/InvoiceModal';
 
 export interface RequisitionItemRecord {
   id: number;
@@ -34,8 +37,16 @@ export interface RequisitionRecord {
   district_id: number;
   district_name?: string;
   division_name?: string;
+  depot_address?: string;
+  phone_number?: string;
+  trade_license_number?: string;
   status: string; // PENDING, APPROVED, PARTIALLY_APPROVED, REJECTED, DISPATCHED, COMPLETED
   urgency: string; // LOW, NORMAL, CRITICAL
+  payment_method?: string;
+  payment_status?: string;
+  payment_reference?: string;
+  invoice_number?: string;
+  total_amount?: number;
   supplier_remarks?: string;
   admin_remarks?: string;
   created_at: string;
@@ -60,6 +71,8 @@ export const SupplierRequisitionHistory: React.FC<SupplierRequisitionHistoryProp
 
   // Modal details state
   const [selectedTicket, setSelectedTicket] = useState<RequisitionRecord | null>(null);
+  const [invoiceTicket, setInvoiceTicket] = useState<RequisitionRecord | null>(null);
+  const [isInvoiceOpen, setIsInvoiceOpen] = useState<boolean>(false);
 
   const fetchRequisitions = async () => {
     setLoading(true);
@@ -120,6 +133,26 @@ export const SupplierRequisitionHistory: React.FC<SupplierRequisitionHistoryProp
           </span>
         );
     }
+  };
+
+  const formatPaymentBadge = (method?: string, status?: string) => {
+    const m = (method || 'BANK').toUpperCase();
+    let name = 'Bank Wire';
+    if (m.includes('BKASH')) name = 'bKash B2B';
+    else if (m.includes('NET_30')) name = 'Net-30';
+    else if (m.includes('CHEQUE')) name = 'Cheque';
+
+    return (
+      <div className="space-y-0.5">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-indigo-50 text-indigo-700 border border-indigo-200">
+          <CreditCard className="w-2.5 h-2.5 text-indigo-600" />
+          {name}
+        </span>
+        <span className="block text-[9px] font-mono text-slate-400">
+          {status || 'Authorized'}
+        </span>
+      </div>
+    );
   };
 
   const getUrgencyBadge = (urgency: string) => {
@@ -227,9 +260,10 @@ export const SupplierRequisitionHistory: React.FC<SupplierRequisitionHistoryProp
                   <th className="py-3.5 px-4">Target Region</th>
                   <th className="py-3.5 px-4">Urgency</th>
                   <th className="py-3.5 px-4 text-center">SKUs & Cases</th>
+                  <th className="py-3.5 px-4">Payment Method</th>
                   <th className="py-3.5 px-4">Status</th>
                   <th className="py-3.5 px-4">Submitted Date</th>
-                  <th className="py-3.5 px-4 text-right">Details</th>
+                  <th className="py-3.5 px-4 text-right">Actions & Invoice</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -240,7 +274,7 @@ export const SupplierRequisitionHistory: React.FC<SupplierRequisitionHistoryProp
                         {req.requisition_code}
                       </span>
                       <span className="text-[10px] text-slate-400 font-mono">
-                        ID: #{req.id}
+                        {req.invoice_number || `INV-${req.requisition_code.replace('REQ-', '')}`}
                       </span>
                     </td>
 
@@ -268,6 +302,10 @@ export const SupplierRequisitionHistory: React.FC<SupplierRequisitionHistoryProp
                     </td>
 
                     <td className="py-3.5 px-4">
+                      {formatPaymentBadge(req.payment_method, req.payment_status)}
+                    </td>
+
+                    <td className="py-3.5 px-4">
                       {getStatusBadge(req.status)}
                     </td>
 
@@ -276,13 +314,30 @@ export const SupplierRequisitionHistory: React.FC<SupplierRequisitionHistoryProp
                     </td>
 
                     <td className="py-3.5 px-4 text-right">
-                      <button
-                        onClick={() => setSelectedTicket(req)}
-                        className="px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-bold text-xs flex items-center gap-1 ml-auto transition-all cursor-pointer"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        <span>View</span>
-                      </button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setInvoiceTicket(req);
+                            setIsInvoiceOpen(true);
+                          }}
+                          className="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-1 transition-all cursor-pointer shadow-xs"
+                          title="Download Official Tax Invoice (PDF / Print)"
+                        >
+                          <Printer className="w-3.5 h-3.5 text-cyan-400" />
+                          <span className="hidden sm:inline">Invoice</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setSelectedTicket(req)}
+                          className="px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-bold text-xs flex items-center gap-1 transition-all cursor-pointer"
+                          title="View Requisition Scope & Notes"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>View</span>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -330,6 +385,39 @@ export const SupplierRequisitionHistory: React.FC<SupplierRequisitionHistoryProp
               <div>
                 <span className="text-[10px] uppercase font-bold text-slate-400 block">Submitted</span>
                 <span className="font-mono text-zinc-700 mt-0.5 block">{new Date(selectedTicket.created_at).toLocaleDateString()}</span>
+              </div>
+            </div>
+
+            {/* Commercial & Payment Details */}
+            <div className="p-3.5 rounded-2xl bg-gradient-to-br from-indigo-50/50 to-blue-50/40 border border-indigo-100 text-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono uppercase font-bold text-indigo-700 flex items-center gap-1.5">
+                  <CreditCard className="w-3.5 h-3.5" />
+                  Payment & Commercial Settlement
+                </span>
+                <span className="text-[11px] font-mono font-bold text-slate-600">
+                  Invoice Ref: <span className="text-zinc-900">{selectedTicket.invoice_number || `INV-${new Date().getFullYear()}-${String(selectedTicket.id).padStart(4, '0')}`}</span>
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 text-xs">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-500 block">Payment Method</span>
+                  <div className="mt-0.5">
+                    {formatPaymentBadge(selectedTicket.payment_method, selectedTicket.payment_status)}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-500 block">Transaction Reference</span>
+                  <span className="font-mono font-bold text-zinc-800 mt-0.5 block">
+                    {selectedTicket.payment_reference || 'Pending Allocation'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-500 block">Estimated Valuation</span>
+                  <span className="font-mono font-bold text-indigo-700 mt-0.5 block">
+                    ৳{selectedTicket.total_amount ? Number(selectedTicket.total_amount).toLocaleString('en-US', { minimumFractionDigits: 2 }) : 'Calculated Upon Approval'}
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -400,11 +488,23 @@ export const SupplierRequisitionHistory: React.FC<SupplierRequisitionHistoryProp
               </div>
             </div>
 
-            <div className="pt-2 text-right">
+            <div className="pt-3 flex flex-col sm:flex-row items-center justify-between gap-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setInvoiceTicket(selectedTicket);
+                  setIsInvoiceOpen(true);
+                }}
+                className="w-full sm:w-auto px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs active:scale-95"
+              >
+                <Printer className="w-4 h-4 text-cyan-400" />
+                <span>Download Official Tax Invoice (PDF / Print)</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => setSelectedTicket(null)}
-                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+                className="w-full sm:w-auto px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
               >
                 Close Ticket Details
               </button>
@@ -412,6 +512,13 @@ export const SupplierRequisitionHistory: React.FC<SupplierRequisitionHistoryProp
           </div>
         </div>
       )}
+
+      {/* Official B2B Commercial Tax Invoice Modal & Downloader */}
+      <InvoiceModal
+        isOpen={isInvoiceOpen}
+        invoice={invoiceTicket}
+        onClose={() => setIsInvoiceOpen(false)}
+      />
     </div>
   );
 };

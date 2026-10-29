@@ -44,6 +44,31 @@ public class SupplierProfile {
     @JsonAlias({"phone_number", "phoneNumber"})
     private String phoneNumber;
 
+    @Column(name = "default_payment_method", length = 50)
+    @JsonProperty("default_payment_method")
+    @JsonAlias({"default_payment_method", "defaultPaymentMethod"})
+    private String defaultPaymentMethod = "CORPORATE_BANK_TRANSFER";
+
+    @Column(name = "bank_name", length = 100)
+    @JsonProperty("bank_name")
+    @JsonAlias({"bank_name", "bankName"})
+    private String bankName;
+
+    @Column(name = "bank_account_number", length = 100)
+    @JsonProperty("bank_account_number")
+    @JsonAlias({"bank_account_number", "bankAccountNumber"})
+    private String bankAccountNumber;
+
+    @Column(name = "bank_account_name", length = 150)
+    @JsonProperty("bank_account_name")
+    @JsonAlias({"bank_account_name", "bankAccountName"})
+    private String bankAccountName;
+
+    @Column(name = "mobile_banking_number", length = 30)
+    @JsonProperty("mobile_banking_number")
+    @JsonAlias({"mobile_banking_number", "mobileBankingNumber"})
+    private String mobileBankingNumber;
+
     @Column(name = "is_verified", nullable = false)
     @JsonProperty("is_verified")
     @JsonAlias({"is_verified", "isVerified"})
@@ -127,4 +152,19 @@ public class SupplierProfile {
 
     public String getDivisionName() { return divisionName; }
     public void setDivisionName(String divisionName) { this.divisionName = divisionName; }
+
+    public String getDefaultPaymentMethod() { return defaultPaymentMethod; }
+    public void setDefaultPaymentMethod(String defaultPaymentMethod) { this.defaultPaymentMethod = defaultPaymentMethod; }
+
+    public String getBankName() { return bankName; }
+    public void setBankName(String bankName) { this.bankName = bankName; }
+
+    public String getBankAccountNumber() { return bankAccountNumber; }
+    public void setBankAccountNumber(String bankAccountNumber) { this.bankAccountNumber = bankAccountNumber; }
+
+    public String getBankAccountName() { return bankAccountName; }
+    public void setBankAccountName(String bankAccountName) { this.bankAccountName = bankAccountName; }
+
+    public String getMobileBankingNumber() { return mobileBankingNumber; }
+    public void setMobileBankingNumber(String mobileBankingNumber) { this.mobileBankingNumber = mobileBankingNumber; }
 }
