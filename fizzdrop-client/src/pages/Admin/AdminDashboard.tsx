@@ -8,8 +8,6 @@ import { SupplierProfileView } from './SupplierProfileView';
 import {
   Package,
   LogOut,
-  Crown,
-  ArrowRight,
   Truck,
   ClipboardList,
   Building,
@@ -56,25 +54,6 @@ export const AdminDashboard: React.FC = () => {
         onDismiss={dismissPopup}
         onAction={() => setActiveTab('history')}
       />
-
-      {/* Superadmin Notification Banner if Superadmin is visiting this page */}
-      {isSuperadmin && (
-        <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-purple-900 text-white px-4 py-2 text-xs flex items-center justify-between">
-          <div className="max-w-7xl mx-auto w-full flex items-center justify-between">
-            <span className="flex items-center gap-2 font-semibold">
-              <Crown className="w-4 h-4 text-amber-300" />
-              You are logged in as Superadmin. For Database SQL, Franchise Outlets & Requisition Approvals, switch to Superadmin Center.
-            </span>
-            <Link
-              to="/superadmin"
-              className="px-3 py-1 rounded-lg bg-white/20 hover:bg-white/30 text-white font-bold text-xs flex items-center gap-1 transition-colors"
-            >
-              <span>Go to Superadmin Portal</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-        </div>
-      )}
 
       {/* Top Admin Sub-Header (Ultra-Compact, Fixed at Top & Static) */}
       <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-2xs">
