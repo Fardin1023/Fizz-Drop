@@ -8,6 +8,7 @@ import { DatabaseConfigModal } from '../Admin/DatabaseConfigModal';
 import { StockDistributionView } from '../Admin/StockDistributionView';
 import { SuperadminRequisitionsHub } from './SuperadminRequisitionsHub';
 import { SuperadminProductCatalog } from './SuperadminProductCatalog';
+import { SuperadminSupplierManagement } from './SuperadminSupplierManagement';
 import {
   ShieldCheck,
   Building2,
@@ -21,6 +22,7 @@ import {
   ClipboardList,
   Home,
   Package,
+  Users,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useNotifications } from '../../hooks/useNotifications';
@@ -29,7 +31,7 @@ import { NotificationPopup } from '../../components/Notifications/NotificationPo
 
 export const SuperadminDashboard: React.FC = () => {
   const { user, isSuperadmin, isAuthenticated, logout, isLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<'products' | 'requisitions' | 'tables' | 'outlets' | 'inventory' | 'query'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'requisitions' | 'suppliers' | 'tables' | 'outlets' | 'inventory' | 'query'>('products');
   const [consoleInitialQuery, setConsoleInitialQuery] = useState<string>('SELECT * FROM Outlets LIMIT 25;');
   const [isDbConfigOpen, setIsDbConfigOpen] = useState(false);
   const [dbStatus, setDbStatus] = useState<any>(null);
@@ -210,6 +212,18 @@ export const SuperadminDashboard: React.FC = () => {
             </button>
 
             <button
+              onClick={() => setActiveTab('suppliers')}
+              className={`font-semibold flex items-center transition-colors cursor-pointer whitespace-nowrap px-2.5 py-0.5 rounded-md text-[11px] gap-1 ${
+                activeTab === 'suppliers'
+                  ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white shadow-xs font-bold'
+                  : 'bg-white text-slate-700 hover:text-blue-700 hover:bg-blue-50/50 border border-slate-200/80'
+              }`}
+            >
+              <Users className="w-3 h-3" />
+              <span>Supplier Accounts & City Allotment</span>
+            </button>
+
+            <button
               onClick={() => setActiveTab('tables')}
               className={`font-semibold flex items-center transition-colors cursor-pointer whitespace-nowrap px-2.5 py-0.5 rounded-md text-[11px] gap-1 ${
                 activeTab === 'tables'
@@ -264,6 +278,7 @@ export const SuperadminDashboard: React.FC = () => {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-3.5 sm:mt-4 flex-1 w-full min-w-0">
         {activeTab === 'products' && <SuperadminProductCatalog />}
         {activeTab === 'requisitions' && <SuperadminRequisitionsHub />}
+        {activeTab === 'suppliers' && <SuperadminSupplierManagement />}
         {activeTab === 'tables' && (
           <DatabaseExplorer onOpenQueryWithTable={handleOpenQueryWithTable} />
         )}

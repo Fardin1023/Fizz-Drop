@@ -8,6 +8,15 @@ interface AdminLoginProps {
   requiredRole?: 'superadmin' | 'supplier' | 'any';
 }
 
+interface DynamicSupplier {
+  id: number;
+  user_id: number;
+  user_email?: string;
+  business_name: string;
+  division_name?: string;
+  district_name?: string;
+}
+
 const AdminLogin: React.FC<AdminLoginProps> = ({ onSuccess, requiredRole = 'any' }) => {
   const { login, loginAsSupplier, loginAsSuperadmin } = useAuth();
   const [email, setEmail] = useState(
@@ -16,6 +25,24 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onSuccess, requiredRole = 'any'
   const [password, setPassword] = useState('Password123!');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [suppliersList, setSuppliersList] = useState<DynamicSupplier[]>([]);
+
+  React.useEffect(() => {
+    const fetchSuppliers = async () => {
+      try {
+        const res = await fetch('http://localhost:8080/api/v1/suppliers');
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            setSuppliersList(data);
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    };
+    fetchSuppliers();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -189,66 +216,89 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onSuccess, requiredRole = 'any'
             {/* Supplier Buttons for Multiple Regional Suppliers */}
             <div className="space-y-1.5 pt-1">
               <span className="block text-[10px] font-semibold text-slate-400 dark:text-zinc-500 uppercase tracking-wider text-left pl-1">
-                Regional Suppliers
+                Regional Supplier Accounts
               </span>
-              <button
-                type="button"
-                onClick={() => handleQuickSupplier()}
-                disabled={loading}
-                className="w-full py-2 px-3 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-semibold flex items-center justify-between transition-all cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <Package className="w-3.5 h-3.5 text-indigo-500" />
-                  <span>Central Dhaka Supplier</span>
-                </div>
-                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300">
-                  Dhaka Div.
-                </span>
-              </button>
 
-              <button
-                type="button"
-                onClick={async () => {
-                  setError(null);
-                  setLoading(true);
-                  const res = await loginAsSupplier('chittagong.supplier@fizzdrop.com');
-                  setLoading(false);
-                  if (res.success && onSuccess) onSuccess();
-                  else if (!res.success) setError(res.error || 'Failed to authenticate');
-                }}
-                disabled={loading}
-                className="w-full py-2 px-3 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-semibold flex items-center justify-between transition-all cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <Package className="w-3.5 h-3.5 text-cyan-500" />
-                  <span>Bay Chittagong Supplier</span>
+              {suppliersList.length > 0 ? (
+                <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                  {suppliersList.map((sup) => {
+                    const supEmail = sup.user_email || `supplier_${sup.user_id}@fizzdrop.com`;
+                    return (
+                      <button
+                        key={sup.id}
+                        type="button"
+                        onClick={async () => {
+                          setEmail(supEmail);
+                          setPassword('Password123!');
+                          setError(null);
+                          setLoading(true);
+                          const res = await login(supEmail, 'Password123!');
+                          setLoading(false);
+                          if (res.success && onSuccess) onSuccess();
+                          else if (!res.success) {
+                            // Try Supplier123!
+                            const res2 = await login(supEmail, 'Supplier123!');
+                            if (res2.success && onSuccess) onSuccess();
+                            else if (!res2.success) setError(res2.error || 'Failed to authenticate');
+                          }
+                        }}
+                        disabled={loading}
+                        className="w-full py-2 px-3 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-semibold flex items-center justify-between transition-all cursor-pointer text-left"
+                      >
+                        <div className="flex items-center gap-2 min-w-0 pr-2">
+                          <Package className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                          <div className="min-w-0">
+                            <span className="block truncate font-bold">{sup.business_name}</span>
+                            <span className="block text-[10px] font-mono text-slate-400 dark:text-zinc-400 truncate">{supEmail}</span>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 shrink-0">
+                          {sup.division_name || 'Dhaka'}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
-                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300">
-                  Chittagong Div.
-                </span>
-              </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickSupplier()}
+                    disabled={loading}
+                    className="w-full py-2 px-3 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-semibold flex items-center justify-between transition-all cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Package className="w-3.5 h-3.5 text-indigo-500" />
+                      <span>Central Dhaka Supplier</span>
+                    </div>
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300">
+                      Dhaka Div.
+                    </span>
+                  </button>
 
-              <button
-                type="button"
-                onClick={async () => {
-                  setError(null);
-                  setLoading(true);
-                  const res = await loginAsSupplier('sylhet.supplier@fizzdrop.com');
-                  setLoading(false);
-                  if (res.success && onSuccess) onSuccess();
-                  else if (!res.success) setError(res.error || 'Failed to authenticate');
-                }}
-                disabled={loading}
-                className="w-full py-2 px-3 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-semibold flex items-center justify-between transition-all cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <Package className="w-3.5 h-3.5 text-emerald-500" />
-                  <span>Surma Sylhet Supplier</span>
-                </div>
-                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300">
-                  Sylhet Div.
-                </span>
-              </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setError(null);
+                      setLoading(true);
+                      const res = await loginAsSupplier('chittagong.supplier@fizzdrop.com');
+                      setLoading(false);
+                      if (res.success && onSuccess) onSuccess();
+                      else if (!res.success) setError(res.error || 'Failed to authenticate');
+                    }}
+                    disabled={loading}
+                    className="w-full py-2 px-3 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-semibold flex items-center justify-between transition-all cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Package className="w-3.5 h-3.5 text-cyan-500" />
+                      <span>Bay Chittagong Supplier</span>
+                    </div>
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300">
+                      Chittagong Div.
+                    </span>
+                  </button>
+                </>
+              )}
             </div>
           </div>
 

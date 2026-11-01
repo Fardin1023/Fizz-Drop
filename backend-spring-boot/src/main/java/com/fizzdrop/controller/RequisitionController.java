@@ -55,6 +55,42 @@ public class RequisitionController {
         return ResponseEntity.ok(requisitionService.getAllSupplierProfiles());
     }
 
+    @PostMapping("/suppliers")
+    public ResponseEntity<?> createSupplierAccount(@RequestBody SupplierProfileDTO dto) {
+        try {
+            SupplierProfile created = requisitionService.createSupplierAccount(dto);
+            return ResponseEntity.status(HttpStatus.CREATED).body(created);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));
+        }
+    }
+
+    @PutMapping("/suppliers/{id}")
+    public ResponseEntity<?> updateSupplierById(
+            @PathVariable Long id,
+            @RequestBody SupplierProfileDTO dto) {
+        try {
+            Long targetUserId = dto.getUserId();
+            if (targetUserId == null) {
+                targetUserId = id;
+            }
+            SupplierProfile updated = requisitionService.updateSupplierRegion(targetUserId, dto);
+            return ResponseEntity.ok(updated);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/suppliers/{id}")
+    public ResponseEntity<?> deleteSupplier(@PathVariable Long id) {
+        try {
+            requisitionService.deleteSupplierAccount(id);
+            return ResponseEntity.ok(ApiResponse.ok("Supplier account removed successfully."));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));
+        }
+    }
+
     @GetMapping("/supplier/profile")
     public ResponseEntity<SupplierProfile> getSupplierProfile(
             @RequestHeader(value = "Authorization", required = false) String authHeader,

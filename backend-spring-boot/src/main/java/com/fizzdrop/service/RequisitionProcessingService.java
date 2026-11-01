@@ -368,11 +368,123 @@ public class RequisitionProcessingService {
         if (dto.getMobileBankingNumber() != null) {
             profile.setMobileBankingNumber(dto.getMobileBankingNumber().trim());
         }
+        if (dto.getIsVerified() != null) {
+            profile.setIsVerified(dto.getIsVerified());
+        }
+
+        if (profile.getUserId() != null) {
+            userRepository.findById(profile.getUserId()).ifPresent(u -> {
+                boolean changed = false;
+                if (dto.getEmail() != null && !dto.getEmail().trim().isEmpty()) {
+                    u.setEmail(dto.getEmail().trim().toLowerCase());
+                    changed = true;
+                }
+                if (dto.getPassword() != null && !dto.getPassword().trim().isEmpty()) {
+                    u.setPasswordHash(dto.getPassword().trim());
+                    changed = true;
+                }
+                if (changed) {
+                    u.setUpdatedDate(LocalDateTime.now());
+                    userRepository.save(u);
+                }
+            });
+        }
 
         profile.setUpdatedAt(LocalDateTime.now());
         SupplierProfile saved = supplierProfileRepository.save(profile);
         enrichProfile(saved);
         return saved;
+    }
+
+    @Transactional
+    public SupplierProfile createSupplierAccount(SupplierProfileDTO dto) {
+        if (dto.getEmail() == null || dto.getEmail().trim().isEmpty()) {
+            throw new IllegalArgumentException("Supplier login email is required.");
+        }
+        if (dto.getBusinessName() == null || dto.getBusinessName().trim().isEmpty()) {
+            throw new IllegalArgumentException("Supplier business name is required.");
+        }
+
+        String email = dto.getEmail().trim().toLowerCase();
+        User user = userRepository.findByEmail(email).orElseGet(() -> {
+            User newUser = new User();
+            newUser.setEmail(email);
+            newUser.setPasswordHash(dto.getPassword() != null && !dto.getPassword().trim().isEmpty() 
+                    ? dto.getPassword().trim() 
+                    : "Password123!");
+            newUser.setRoleId(3L); // Supplier role
+            newUser.setBranchId(1L);
+            newUser.setCreatedDate(LocalDateTime.now());
+            newUser.setUpdatedDate(LocalDateTime.now());
+            return userRepository.save(newUser);
+        });
+
+        if (dto.getPassword() != null && !dto.getPassword().trim().isEmpty()) {
+            user.setPasswordHash(dto.getPassword().trim());
+            user.setUpdatedDate(LocalDateTime.now());
+            userRepository.save(user);
+        }
+
+        SupplierProfile profile = supplierProfileRepository.findByUserId(user.getUserId()).orElseGet(() -> {
+            SupplierProfile sp = new SupplierProfile();
+            sp.setUserId(user.getUserId());
+            sp.setCreatedAt(LocalDateTime.now());
+            return sp;
+        });
+
+        profile.setBusinessName(dto.getBusinessName().trim());
+        profile.setTradeLicenseNumber(dto.getTradeLicenseNumber() != null ? dto.getTradeLicenseNumber().trim() : "TRD-" + System.currentTimeMillis());
+        profile.setDepotAddress(dto.getDepotAddress() != null ? dto.getDepotAddress().trim() : "Regional Depot Hub");
+        profile.setPhoneNumber(dto.getPhoneNumber() != null ? dto.getPhoneNumber().trim() : "+8801700000000");
+        profile.setIsVerified(dto.getIsVerified() != null ? dto.getIsVerified() : true);
+        profile.setDefaultPaymentMethod(dto.getDefaultPaymentMethod() != null ? dto.getDefaultPaymentMethod().trim() : "CORPORATE_BANK_TRANSFER");
+        profile.setBankName(dto.getBankName());
+        profile.setBankAccountNumber(dto.getBankAccountNumber());
+        profile.setBankAccountName(dto.getBankAccountName());
+        profile.setMobileBankingNumber(dto.getMobileBankingNumber());
+
+        String targetDivision = dto.getDivisionName();
+        List<Long> coveredIds = dto.getCoveredDistrictIds();
+        if (coveredIds != null && !coveredIds.isEmpty()) {
+            List<District> selectedDistricts = districtRepository.findAllById(coveredIds);
+            String determinedDivision = (targetDivision != null && !targetDivision.trim().isEmpty())
+                    ? targetDivision.trim()
+                    : (selectedDistricts.isEmpty() ? "Dhaka" : selectedDistricts.get(0).getDivision());
+
+            for (District d : selectedDistricts) {
+                if (!d.getDivision().equalsIgnoreCase(determinedDivision)) {
+                    throw new IllegalArgumentException("All selected cities must belong to the single chosen division: '" 
+                            + determinedDivision + "'. City '" + d.getName() + "' is in '" + d.getDivision() + "' division.");
+                }
+            }
+            profile.setDivisionName(determinedDivision);
+            profile.setCoveredDistrictIds(String.join(",", coveredIds.stream().map(String::valueOf).toList()));
+            profile.setPrimaryDistrictId(dto.getPrimaryDistrictId() != null && coveredIds.contains(dto.getPrimaryDistrictId())
+                    ? dto.getPrimaryDistrictId()
+                    : coveredIds.get(0));
+        } else {
+            District dhaka = districtRepository.findByNameIgnoreCase("Dhaka").orElse(null);
+            Long dId = dhaka != null ? dhaka.getId() : 1L;
+            profile.setDivisionName("Dhaka");
+            profile.setCoveredDistrictIds(String.valueOf(dId));
+            profile.setPrimaryDistrictId(dId);
+        }
+
+        profile.setUpdatedAt(LocalDateTime.now());
+        SupplierProfile saved = supplierProfileRepository.save(profile);
+        enrichProfile(saved);
+        return saved;
+    }
+
+    @Transactional
+    public void deleteSupplierAccount(Long profileId) {
+        SupplierProfile profile = supplierProfileRepository.findById(profileId)
+                .orElseThrow(() -> new IllegalArgumentException("Supplier profile not found with ID: " + profileId));
+        Long userId = profile.getUserId();
+        supplierProfileRepository.delete(profile);
+        if (userId != null && userId > 6) {
+            userRepository.deleteById(userId);
+        }
     }
 
     @Transactional

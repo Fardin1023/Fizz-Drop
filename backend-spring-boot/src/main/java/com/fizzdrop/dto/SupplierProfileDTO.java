@@ -54,6 +54,22 @@ public class SupplierProfileDTO {
     @JsonAlias({"mobile_banking_number", "mobileBankingNumber"})
     private String mobileBankingNumber;
 
+    @JsonProperty("email")
+    @JsonAlias({"email", "user_email", "userEmail"})
+    private String email;
+
+    @JsonProperty("password")
+    @JsonAlias({"password", "password_hash", "passwordHash"})
+    private String password;
+
+    @JsonProperty("is_verified")
+    @JsonAlias({"is_verified", "isVerified"})
+    private Boolean isVerified;
+
+    @JsonProperty("user_id")
+    @JsonAlias({"user_id", "userId"})
+    private Long userId;
+
     public Long getPrimaryDistrictId() { return primaryDistrictId; }
     public void setPrimaryDistrictId(Long primaryDistrictId) { this.primaryDistrictId = primaryDistrictId; }
 
@@ -89,4 +105,16 @@ public class SupplierProfileDTO {
 
     public String getMobileBankingNumber() { return mobileBankingNumber; }
     public void setMobileBankingNumber(String mobileBankingNumber) { this.mobileBankingNumber = mobileBankingNumber; }
+
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
+
+    public String getPassword() { return password; }
+    public void setPassword(String password) { this.password = password; }
+
+    public Boolean getIsVerified() { return isVerified; }
+    public void setIsVerified(Boolean isVerified) { this.isVerified = isVerified; }
+
+    public Long getUserId() { return userId; }
+    public void setUserId(Long userId) { this.userId = userId; }
 }
