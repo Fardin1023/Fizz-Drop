@@ -44,6 +44,8 @@ export interface InvoiceData {
   total_requested_cases?: number;
   total_approved_cases?: number;
   total_amount?: number;
+  fulfilled_amount?: number;
+  refund_amount?: number;
 }
 
 interface InvoiceModalProps {
@@ -81,16 +83,33 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ invoice, isOpen, onC
     return 'AUTHORIZED (B2B ESCROW)';
   })();
 
-  // Calculate pricing summary
+  // Calculate pricing summary & refunds
   const items = invoice.items || [];
-  const subtotal = items.reduce((sum, item) => {
-    const qty = invoice.status === 'PENDING' ? item.requested_quantity : (item.approved_quantity > 0 ? item.approved_quantity : item.requested_quantity);
-    const unitPrice = Number(item.base_price || 48.00);
-    return sum + (unitPrice * qty);
-  }, 0);
+  let originalSubtotal = 0;
+  let fulfilledSubtotal = 0;
 
-  const vat = subtotal * 0.05; // 5% wholesale distribution VAT
-  const grandTotal = subtotal + vat;
+  items.forEach((item) => {
+    const unitPrice = Number(item.base_price || 48.00);
+    const reqQty = Number(item.requested_quantity || 0);
+    const appQty = invoice.status === 'PENDING'
+      ? reqQty
+      : (item.approved_quantity !== undefined ? Number(item.approved_quantity) : reqQty);
+
+    originalSubtotal += unitPrice * reqQty;
+    fulfilledSubtotal += unitPrice * appQty;
+  });
+
+  const originalVat = originalSubtotal * 0.05;
+  const originalGrandTotal = Number(invoice.total_amount || (originalSubtotal + originalVat));
+
+  const fulfilledVat = fulfilledSubtotal * 0.05;
+  const fulfilledGrandTotal = Number(invoice.fulfilled_amount !== undefined ? invoice.fulfilled_amount : (fulfilledSubtotal + fulfilledVat));
+
+  const refundAmount = Number(
+    invoice.refund_amount !== undefined
+      ? invoice.refund_amount
+      : Math.max(0, originalGrandTotal - fulfilledGrandTotal)
+  );
 
   // Print invoice
   const handlePrint = () => {
@@ -344,9 +363,12 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ invoice, isOpen, onC
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {items.map((item, idx) => {
-                    const qty = invoice.status === 'PENDING' ? item.requested_quantity : (item.approved_quantity > 0 ? item.approved_quantity : item.requested_quantity);
+                    const reqQty = Number(item.requested_quantity || 0);
+                    const appQty = invoice.status === 'PENDING'
+                      ? reqQty
+                      : (item.approved_quantity !== undefined ? Number(item.approved_quantity) : reqQty);
                     const unitPrice = Number(item.base_price || 48.00);
-                    const lineTotal = unitPrice * qty;
+                    const lineTotal = unitPrice * appQty;
 
                     return (
                       <tr key={item.id || idx}>
@@ -362,10 +384,10 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ invoice, isOpen, onC
                           </span>
                         </td>
                         <td className="py-3 px-3 text-center font-mono text-slate-700">
-                          {item.requested_quantity}
+                          {reqQty}
                         </td>
                         <td className="py-3 px-3 text-center font-mono font-bold text-emerald-700">
-                          {invoice.status === 'PENDING' ? 'Pending' : `${item.approved_quantity} ✓`}
+                          {invoice.status === 'PENDING' ? 'Pending Review' : `${appQty} ✓`}
                         </td>
                         <td className="py-3 px-3 text-right font-mono text-slate-700">
                           ৳ {unitPrice.toFixed(2)}
@@ -385,7 +407,11 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ invoice, isOpen, onC
               <div className="space-y-3">
                 <div className="stamp border-2 border-emerald-600 text-emerald-700 px-3 py-1.5 rounded-xl text-xs font-mono font-black uppercase tracking-wider inline-flex items-center gap-1.5 shadow-xs">
                   <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                  <span>CENTRAL DISPATCH VERIFIED & ALLOCATED</span>
+                  <span>
+                    {refundAmount > 0
+                      ? `DISPATCH VERIFIED • ৳${refundAmount.toLocaleString('en-US', { minimumFractionDigits: 0 })} LEFTOVER REFUNDED`
+                      : 'CENTRAL DISPATCH VERIFIED & ALLOCATED'}
+                  </span>
                 </div>
                 <p className="text-[11px] text-slate-400 max-w-sm">
                   This document serves as an official commercial tax invoice and stock delivery consignment under the national wholesale trade framework.
@@ -394,17 +420,27 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ invoice, isOpen, onC
 
               <div className="summary w-full sm:w-80 space-y-2 text-xs">
                 <div className="summary-row flex justify-between text-slate-600">
-                  <span>Gross Merchandise Subtotal:</span>
-                  <span className="font-mono font-bold">৳ {subtotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                  <span>Initial Authorized Total ({invoice.total_requested_cases || 0} cases):</span>
+                  <span className="font-mono font-bold">৳ {originalGrandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div className="summary-row flex justify-between text-slate-600">
+                  <span>Delivered Merchandise Subtotal:</span>
+                  <span className="font-mono font-bold">৳ {fulfilledSubtotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                 </div>
                 <div className="summary-row flex justify-between text-slate-600">
                   <span>Wholesale Trade VAT (5% Mushak):</span>
-                  <span className="font-mono font-bold">৳ {vat.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                  <span className="font-mono font-bold">৳ {fulfilledVat.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                 </div>
+                {refundAmount > 0 && (
+                  <div className="summary-row flex justify-between text-amber-800 bg-amber-50 px-2 py-1 rounded font-bold border border-amber-200">
+                    <span>Leftover Payment Refund Returned:</span>
+                    <span className="font-mono">- ৳ {refundAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                )}
                 <div className="summary-total flex justify-between items-center text-sm font-black border-t-2 border-zinc-900 pt-2 text-zinc-900">
-                  <span>Total Payable:</span>
+                  <span>Final Settled Payable:</span>
                   <span className="text-base text-indigo-600 font-mono font-black">
-                    ৳ {grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    ৳ {fulfilledGrandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
               </div>

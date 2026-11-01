@@ -47,6 +47,8 @@ export interface RequisitionRecord {
   payment_reference?: string;
   invoice_number?: string;
   total_amount?: number;
+  fulfilled_amount?: number;
+  refund_amount?: number;
   supplier_remarks?: string;
   admin_remarks?: string;
   created_at: string;
@@ -142,14 +144,17 @@ export const SupplierRequisitionHistory: React.FC<SupplierRequisitionHistoryProp
     else if (m.includes('NET_30')) name = 'Net-30';
     else if (m.includes('CHEQUE')) name = 'Cheque';
 
+    const st = (status || 'Authorized').toUpperCase();
+    const isRefunded = st.includes('REFUND');
+
     return (
       <div className="space-y-0.5">
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-indigo-50 text-indigo-700 border border-indigo-200">
           <CreditCard className="w-2.5 h-2.5 text-indigo-600" />
           {name}
         </span>
-        <span className="block text-[9px] font-mono text-slate-400">
-          {status || 'Authorized'}
+        <span className={`block text-[9px] font-mono font-bold ${isRefunded ? 'text-amber-600' : 'text-slate-400'}`}>
+          {isRefunded ? 'Settled + Refunded' : (status || 'Authorized')}
         </span>
       </div>
     );
@@ -293,12 +298,33 @@ export const SupplierRequisitionHistory: React.FC<SupplierRequisitionHistoryProp
                     </td>
 
                     <td className="py-3.5 px-4 text-center">
-                      <span className="font-mono font-bold text-xs text-zinc-900">
+                      <span className="font-mono font-bold text-xs text-zinc-900 block">
                         {req.items?.length || 0} lines
                       </span>
-                      <span className="text-[10px] font-mono text-blue-600 block font-semibold">
-                        {req.total_requested_cases || 0} cases
-                      </span>
+                      {req.status === 'PENDING' ? (
+                        <span className="text-[10px] font-mono text-blue-600 block font-semibold">
+                          {req.total_requested_cases || 0} cases requested
+                        </span>
+                      ) : req.status === 'PARTIALLY_APPROVED' ? (
+                        <div className="space-y-0.5">
+                          <span className="text-[11px] font-mono font-bold text-emerald-700 block bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                            Given: {req.total_approved_cases ?? 0} / {req.total_requested_cases || 0}
+                          </span>
+                          {req.refund_amount !== undefined && req.refund_amount > 0 && (
+                            <span className="text-[9px] font-mono font-bold text-amber-700 block bg-amber-50 px-1 rounded border border-amber-200">
+                              ✓ ৳{Number(req.refund_amount).toLocaleString('en-US', { minimumFractionDigits: 0 })} Refunded
+                            </span>
+                          )}
+                        </div>
+                      ) : req.status === 'APPROVED' ? (
+                        <span className="text-[10px] font-mono font-bold text-emerald-600 block bg-emerald-50 px-1.5 py-0.5 rounded">
+                          Given: {req.total_approved_cases ?? req.total_requested_cases} (Full)
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-mono font-bold text-rose-600 block bg-rose-50 px-1.5 py-0.5 rounded">
+                          0 cases (Refunded)
+                        </span>
+                      )}
                     </td>
 
                     <td className="py-3.5 px-4">
@@ -399,7 +425,7 @@ export const SupplierRequisitionHistory: React.FC<SupplierRequisitionHistoryProp
                   Invoice Ref: <span className="text-zinc-900">{selectedTicket.invoice_number || `INV-${new Date().getFullYear()}-${String(selectedTicket.id).padStart(4, '0')}`}</span>
                 </span>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5 pt-1 text-xs">
                 <div>
                   <span className="text-[10px] uppercase font-bold text-slate-500 block">Payment Method</span>
                   <div className="mt-0.5">
@@ -407,15 +433,23 @@ export const SupplierRequisitionHistory: React.FC<SupplierRequisitionHistoryProp
                   </div>
                 </div>
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-500 block">Transaction Reference</span>
+                  <span className="text-[10px] uppercase font-bold text-slate-500 block">Initial Authorized</span>
                   <span className="font-mono font-bold text-zinc-800 mt-0.5 block">
-                    {selectedTicket.payment_reference || 'Pending Allocation'}
+                    ৳{selectedTicket.total_amount ? Number(selectedTicket.total_amount).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '0.00'}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-500 block">Estimated Valuation</span>
-                  <span className="font-mono font-bold text-indigo-700 mt-0.5 block">
-                    ৳{selectedTicket.total_amount ? Number(selectedTicket.total_amount).toLocaleString('en-US', { minimumFractionDigits: 2 }) : 'Calculated Upon Approval'}
+                  <span className="text-[10px] uppercase font-bold text-slate-500 block">Stock Delivered</span>
+                  <span className="font-mono font-bold text-emerald-700 mt-0.5 block">
+                    ৳{selectedTicket.fulfilled_amount ? Number(selectedTicket.fulfilled_amount).toLocaleString('en-US', { minimumFractionDigits: 2 }) : (selectedTicket.total_amount ? Number(selectedTicket.total_amount).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '0.00')}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-amber-700 block">Leftover Refund Returned</span>
+                  <span className="font-mono font-black text-amber-800 mt-0.5 block">
+                    {selectedTicket.refund_amount !== undefined && selectedTicket.refund_amount > 0
+                      ? `৳${Number(selectedTicket.refund_amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} ✓`
+                      : '৳0.00 (Fully Settled)'}
                   </span>
                 </div>
               </div>
@@ -458,8 +492,11 @@ export const SupplierRequisitionHistory: React.FC<SupplierRequisitionHistoryProp
                       return (
                         <tr key={item.id || idx}>
                           <td className="py-2.5 px-3">
-                            <span className="font-bold text-zinc-900 block">
-                              Product #{item.product_id}
+                            <span className="font-bold text-zinc-900 block font-oswald text-xs">
+                              {item.brand ? `${item.brand} ${item.flavor_variant || ''}` : `Product #${item.product_id}`}
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              SKU: {item.sku || `FD-${item.product_id}`} • {item.packaging || 'Case'} ({item.size_volume || '500ml'})
                             </span>
                           </td>
                           <td className="py-2.5 px-3 text-center font-mono font-bold text-zinc-900">
@@ -470,6 +507,15 @@ export const SupplierRequisitionHistory: React.FC<SupplierRequisitionHistoryProp
                               <span className="text-amber-600 bg-amber-50 px-2 py-0.5 rounded text-[11px] border border-amber-200">
                                 Pending Review
                               </span>
+                            ) : isAllowed && item.approved_quantity < item.requested_quantity ? (
+                              <div className="space-y-0.5">
+                                <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded text-[11px] border border-emerald-200 block">
+                                  ✓ {item.approved_quantity} cases Allowed
+                                </span>
+                                <span className="text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded text-[9px] border border-amber-200 block">
+                                  {item.requested_quantity - item.approved_quantity} shortfall (Refunded)
+                                </span>
+                              </div>
                             ) : isAllowed ? (
                               <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded text-[11px] border border-emerald-200">
                                 ✓ {item.approved_quantity} cases Allowed

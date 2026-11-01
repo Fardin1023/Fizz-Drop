@@ -656,61 +656,99 @@ public class RequisitionProcessingService {
                 () -> new IllegalArgumentException("Requisition with ID " + requisitionId + " not found.")
         );
 
-        String action = reviewDto.getAction() != null ? reviewDto.getAction().toUpperCase() : "APPROVE_FULL";
+        String action = reviewDto.getAction() != null ? reviewDto.getAction().toUpperCase() : "APPROVE_PARTIAL";
         List<StockRequisitionItem> items = requisitionItemRepository.findByRequisitionId(req.getId());
 
         int totalApproved = 0;
+        int totalRequested = 0;
 
-        if ("REJECT".equals(action)) {
-            req.setStatus("REJECTED");
-            for (StockRequisitionItem item : items) {
-                item.setApprovedQuantity(0);
-            }
-        } else if ("APPROVE_FULL".equals(action)) {
-            req.setStatus("APPROVED");
-            for (StockRequisitionItem item : items) {
-                item.setApprovedQuantity(item.getRequestedQuantity());
-                totalApproved += item.getRequestedQuantity();
-                allocateDistrictStock(req.getDistrictId(), item.getProductId(), item.getRequestedQuantity());
-                deductCentralStock(item.getProductId(), item.getRequestedQuantity());
-            }
-        } else { // APPROVE_PARTIAL / CUSTOM ALLOWANCE OPTIONS
-            Map<Long, Integer> approvedMap = new HashMap<>();
-            if (reviewDto.getItems() != null) {
-                for (AdminReviewDTO.ItemApproval ia : reviewDto.getItems()) {
-                    if (ia.getItemId() != null && ia.getApprovedQuantity() != null) {
-                        approvedMap.put(ia.getItemId(), Math.max(0, ia.getApprovedQuantity()));
-                    }
+        Map<Long, Integer> approvedMap = new HashMap<>();
+        if (reviewDto.getItems() != null) {
+            for (AdminReviewDTO.ItemApproval ia : reviewDto.getItems()) {
+                if (ia.getItemId() != null && ia.getApprovedQuantity() != null) {
+                    approvedMap.put(ia.getItemId(), Math.max(0, ia.getApprovedQuantity()));
                 }
-            }
-
-            boolean allZero = true;
-            boolean allFull = true;
-
-            for (StockRequisitionItem item : items) {
-                int approved = approvedMap.getOrDefault(item.getId(), item.getRequestedQuantity());
-                item.setApprovedQuantity(approved);
-                totalApproved += approved;
-                if (approved > 0) {
-                    allZero = false;
-                    allocateDistrictStock(req.getDistrictId(), item.getProductId(), approved);
-                    deductCentralStock(item.getProductId(), approved);
-                }
-                if (approved < item.getRequestedQuantity()) {
-                    allFull = false;
-                }
-            }
-
-            if (allZero) {
-                req.setStatus("REJECTED");
-            } else if (allFull) {
-                req.setStatus("APPROVED");
-            } else {
-                req.setStatus("PARTIALLY_APPROVED");
             }
         }
 
+        boolean allZero = true;
+        boolean allFull = true;
+
+        for (StockRequisitionItem item : items) {
+            int requested = item.getRequestedQuantity() != null ? item.getRequestedQuantity() : 0;
+            totalRequested += requested;
+
+            int approved;
+            if ("REJECT".equals(action)) {
+                approved = 0;
+            } else if (approvedMap.containsKey(item.getId())) {
+                approved = Math.min(requested, approvedMap.get(item.getId()));
+            } else if ("APPROVE_FULL".equals(action)) {
+                approved = requested;
+            } else {
+                approved = requested;
+            }
+
+            item.setApprovedQuantity(approved);
+            totalApproved += approved;
+
+            if (approved > 0) {
+                allZero = false;
+                allocateDistrictStock(req.getDistrictId(), item.getProductId(), approved);
+                deductCentralStock(item.getProductId(), approved);
+            }
+            if (approved < requested) {
+                allFull = false;
+            }
+        }
+
+        if (allZero) {
+            req.setStatus("REJECTED");
+        } else if (allFull) {
+            req.setStatus("APPROVED");
+        } else {
+            req.setStatus("PARTIALLY_APPROVED");
+        }
+
         requisitionItemRepository.saveAll(items);
+
+        // Financial Settlement: Calculate Total Requested, Fulfilled Value, and Leftover Refund
+        java.math.BigDecimal originalSubtotal = java.math.BigDecimal.ZERO;
+        java.math.BigDecimal fulfilledSubtotal = java.math.BigDecimal.ZERO;
+
+        for (StockRequisitionItem item : items) {
+            Product p = productRepository.findById(item.getProductId()).orElse(null);
+            java.math.BigDecimal price = (p != null && p.getBasePrice() != null) ? p.getBasePrice() : java.math.BigDecimal.valueOf(48.0);
+            int reqQty = item.getRequestedQuantity() != null ? item.getRequestedQuantity() : 0;
+            int appQty = item.getApprovedQuantity() != null ? item.getApprovedQuantity() : 0;
+
+            originalSubtotal = originalSubtotal.add(price.multiply(java.math.BigDecimal.valueOf(reqQty)));
+            fulfilledSubtotal = fulfilledSubtotal.add(price.multiply(java.math.BigDecimal.valueOf(appQty)));
+        }
+
+        java.math.BigDecimal vatMultiplier = java.math.BigDecimal.valueOf(1.05); // 5% wholesale distribution VAT
+        java.math.BigDecimal originalTotalWithVat = originalSubtotal.multiply(vatMultiplier).setScale(2, java.math.RoundingMode.HALF_UP);
+        java.math.BigDecimal fulfilledTotalWithVat = fulfilledSubtotal.multiply(vatMultiplier).setScale(2, java.math.RoundingMode.HALF_UP);
+
+        if (req.getTotalAmount() == null || req.getTotalAmount().compareTo(java.math.BigDecimal.ZERO) == 0) {
+            req.setTotalAmount(originalTotalWithVat);
+        }
+
+        java.math.BigDecimal leftoverRefund = req.getTotalAmount().subtract(fulfilledTotalWithVat);
+        if (leftoverRefund.compareTo(java.math.BigDecimal.ZERO) < 0) {
+            leftoverRefund = java.math.BigDecimal.ZERO;
+        }
+
+        req.setFulfilledAmount(fulfilledTotalWithVat);
+        req.setRefundAmount(leftoverRefund);
+
+        if ("REJECTED".equals(req.getStatus())) {
+            req.setPaymentStatus("REFUNDED_FULL");
+        } else if ("PARTIALLY_APPROVED".equals(req.getStatus()) && leftoverRefund.compareTo(java.math.BigDecimal.ZERO) > 0) {
+            req.setPaymentStatus("PARTIALLY_SETTLED_REFUNDED");
+        } else {
+            req.setPaymentStatus("PAID_SETTLED");
+        }
 
         if (reviewDto.getAdminRemarks() != null && !reviewDto.getAdminRemarks().trim().isEmpty()) {
             req.setAdminRemarks(reviewDto.getAdminRemarks().trim());
@@ -722,17 +760,22 @@ public class RequisitionProcessingService {
         SupplierProfile sp = supplierProfileRepository.findById(req.getSupplierId()).orElse(null);
         enrichRequisition(saved, sp);
         saved.setItems(items);
+        saved.setTotalRequestedCases(totalRequested);
         saved.setTotalApprovedCases(totalApproved);
 
-        // Real-time Notification for Supplier
+        // Real-time Notification for Supplier with leftover refund disclosure
         try {
             Long supplierUserId = sp != null ? sp.getUserId() : null;
             String statusBadge = saved.getStatus().replace('_', ' ');
             String remarksPart = (reviewDto.getAdminRemarks() != null && !reviewDto.getAdminRemarks().trim().isEmpty())
                     ? " Remarks: " + reviewDto.getAdminRemarks().trim()
                     : "";
+            String refundPart = leftoverRefund.compareTo(java.math.BigDecimal.ZERO) > 0
+                    ? " Leftover amount of ৳" + leftoverRefund.setScale(2, java.math.RoundingMode.HALF_UP) + " has been returned/refunded to your " + (saved.getPaymentMethod() != null ? saved.getPaymentMethod().replace('_', ' ') : "payment") + " account."
+                    : "";
+
             String msg = "Superadmin has processed requisition " + saved.getRequisitionCode() +
-                    ". Decision: " + statusBadge + " (" + totalApproved + "/" + saved.getTotalRequestedCases() + " cases permitted)." + remarksPart;
+                    ". Decision: " + statusBadge + " (" + totalApproved + "/" + totalRequested + " cases permitted)." + refundPart + remarksPart;
 
             AppNotification supplierNotification = new AppNotification(
                     "SUPPLIER",
@@ -847,11 +890,14 @@ public class RequisitionProcessingService {
         req.setItems(items);
         int reqCases = 0;
         int appCases = 0;
-        java.math.BigDecimal calculatedTotal = java.math.BigDecimal.ZERO;
+        java.math.BigDecimal originalSubtotal = java.math.BigDecimal.ZERO;
+        java.math.BigDecimal fulfilledSubtotal = java.math.BigDecimal.ZERO;
 
         for (StockRequisitionItem i : items) {
-            reqCases += (i.getRequestedQuantity() != null ? i.getRequestedQuantity() : 0);
-            appCases += (i.getApprovedQuantity() != null ? i.getApprovedQuantity() : 0);
+            int rQty = (i.getRequestedQuantity() != null ? i.getRequestedQuantity() : 0);
+            int aQty = (i.getApprovedQuantity() != null ? i.getApprovedQuantity() : 0);
+            reqCases += rQty;
+            appCases += aQty;
 
             Product p = productRepository.findById(i.getProductId()).orElse(null);
             if (p != null) {
@@ -862,17 +908,43 @@ public class RequisitionProcessingService {
                 i.setSku(p.getSku());
                 i.setBasePrice(p.getBasePrice());
 
-                if (p.getBasePrice() != null && i.getRequestedQuantity() != null) {
-                    calculatedTotal = calculatedTotal.add(p.getBasePrice().multiply(java.math.BigDecimal.valueOf(i.getRequestedQuantity())));
-                }
+                java.math.BigDecimal price = p.getBasePrice() != null ? p.getBasePrice() : java.math.BigDecimal.valueOf(48.0);
+                originalSubtotal = originalSubtotal.add(price.multiply(java.math.BigDecimal.valueOf(rQty)));
+                fulfilledSubtotal = fulfilledSubtotal.add(price.multiply(java.math.BigDecimal.valueOf(aQty)));
             }
         }
         req.setTotalRequestedCases(reqCases);
         req.setTotalApprovedCases(appCases);
 
+        java.math.BigDecimal vatMultiplier = java.math.BigDecimal.valueOf(1.05);
+        java.math.BigDecimal calcOriginalWithVat = originalSubtotal.multiply(vatMultiplier).setScale(2, java.math.RoundingMode.HALF_UP);
+        java.math.BigDecimal calcFulfilledWithVat = fulfilledSubtotal.multiply(vatMultiplier).setScale(2, java.math.RoundingMode.HALF_UP);
+
         if (req.getTotalAmount() == null || req.getTotalAmount().compareTo(java.math.BigDecimal.ZERO) == 0) {
-            req.setTotalAmount(calculatedTotal);
+            req.setTotalAmount(calcOriginalWithVat);
         }
+
+        if (req.getFulfilledAmount() == null) {
+            if ("APPROVED".equalsIgnoreCase(req.getStatus())) {
+                req.setFulfilledAmount(req.getTotalAmount());
+            } else if ("REJECTED".equalsIgnoreCase(req.getStatus())) {
+                req.setFulfilledAmount(java.math.BigDecimal.ZERO);
+            } else if ("PARTIALLY_APPROVED".equalsIgnoreCase(req.getStatus())) {
+                req.setFulfilledAmount(calcFulfilledWithVat);
+            }
+        }
+
+        if (req.getRefundAmount() == null) {
+            if ("REJECTED".equalsIgnoreCase(req.getStatus())) {
+                req.setRefundAmount(req.getTotalAmount());
+            } else if ("PARTIALLY_APPROVED".equalsIgnoreCase(req.getStatus())) {
+                java.math.BigDecimal diff = req.getTotalAmount().subtract(req.getFulfilledAmount() != null ? req.getFulfilledAmount() : calcFulfilledWithVat);
+                req.setRefundAmount(diff.compareTo(java.math.BigDecimal.ZERO) > 0 ? diff : java.math.BigDecimal.ZERO);
+            } else {
+                req.setRefundAmount(java.math.BigDecimal.ZERO);
+            }
+        }
+
         if (req.getInvoiceNumber() == null && req.getRequisitionCode() != null) {
             req.setInvoiceNumber("INV-" + req.getRequisitionCode().replace("REQ-", ""));
         }
@@ -880,7 +952,15 @@ public class RequisitionProcessingService {
             req.setPaymentMethod("CORPORATE_BANK_TRANSFER");
         }
         if (req.getPaymentStatus() == null) {
-            req.setPaymentStatus("AUTHORIZED");
+            if ("REJECTED".equalsIgnoreCase(req.getStatus())) {
+                req.setPaymentStatus("REFUNDED_FULL");
+            } else if ("PARTIALLY_APPROVED".equalsIgnoreCase(req.getStatus()) && req.getRefundAmount() != null && req.getRefundAmount().compareTo(java.math.BigDecimal.ZERO) > 0) {
+                req.setPaymentStatus("PARTIALLY_SETTLED_REFUNDED");
+            } else if ("APPROVED".equalsIgnoreCase(req.getStatus())) {
+                req.setPaymentStatus("PAID_SETTLED");
+            } else {
+                req.setPaymentStatus("AUTHORIZED");
+            }
         }
     }
 }

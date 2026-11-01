@@ -76,6 +76,8 @@ interface RequisitionTicket {
   payment_reference?: string;
   invoice_number?: string;
   total_amount?: number;
+  fulfilled_amount?: number;
+  refund_amount?: number;
 }
 
 interface DistrictOption {
@@ -126,11 +128,17 @@ export const SuperadminRequisitionsHub: React.FC = () => {
     };
 
     const statusBadgeClass =
-      st === 'PAID'
+      st.includes('PAID') || st.includes('SETTLED')
         ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+        : st.includes('REFUND')
+        ? 'bg-amber-100 text-amber-800 border-amber-200'
         : st === 'AUTHORIZED'
         ? 'bg-blue-100 text-blue-800 border-blue-200'
         : 'bg-amber-100 text-amber-800 border-amber-200';
+
+    const displayStatus = st.includes('REFUND')
+      ? 'SETTLED + REFUNDED'
+      : st.replace(/_/g, ' ');
 
     return (
       <div className="space-y-1">
@@ -140,7 +148,7 @@ export const SuperadminRequisitionsHub: React.FC = () => {
         <span
           className={`inline-block px-1.5 py-0.2 rounded font-mono font-bold text-[9px] border uppercase ${statusBadgeClass}`}
         >
-          {st}
+          {displayStatus}
         </span>
       </div>
     );
@@ -253,12 +261,36 @@ export const SuperadminRequisitionsHub: React.FC = () => {
     }
   };
 
+  // Live financial & stock calculation for reconciliation
+  const reconciliationSummary = React.useMemo(() => {
+    if (!activeReconciliation?.items) {
+      return { totalReqCases: 0, totalAppCases: 0, originalTotal: 0, fulfilledTotal: 0, refundAmount: 0 };
+    }
+    let totalReqCases = 0;
+    let totalAppCases = 0;
+    let originalSubtotal = 0;
+    let fulfilledSubtotal = 0;
+
+    activeReconciliation.items.forEach((it) => {
+      const isAllowed = allowStockOptions[it.id] ?? true;
+      const appQty = isAllowed ? (approvedQuantities[it.id] ?? it.requested_quantity) : 0;
+      const price = Number(it.base_price || 48.0);
+      totalReqCases += (it.requested_quantity || 0);
+      totalAppCases += appQty;
+      originalSubtotal += (it.requested_quantity || 0) * price;
+      fulfilledSubtotal += appQty * price;
+    });
+
+    const vatMultiplier = 1.05;
+    const originalTotal = Number(activeReconciliation.total_amount || (originalSubtotal * vatMultiplier));
+    const fulfilledTotal = fulfilledSubtotal * vatMultiplier;
+    const refundAmount = Math.max(0, originalTotal - fulfilledTotal);
+
+    return { totalReqCases, totalAppCases, originalTotal, fulfilledTotal, refundAmount };
+  }, [activeReconciliation, approvedQuantities, allowStockOptions]);
+
   const handlePromptConfirmation = (actionType: 'APPROVE_FULL' | 'APPROVE_PARTIAL' | 'REJECT') => {
     setFormError(null);
-    if ((actionType === 'APPROVE_PARTIAL' || actionType === 'REJECT') && !adminRemarks.trim()) {
-      setFormError(`Please provide administrative remarks / audit justification when confirming this stock option.`);
-      return;
-    }
     setPendingActionType(actionType);
     setConfirmModalOpen(true);
   };
@@ -266,23 +298,44 @@ export const SuperadminRequisitionsHub: React.FC = () => {
   const handleApproveAction = async (actionType: 'APPROVE_FULL' | 'APPROVE_PARTIAL' | 'REJECT') => {
     if (!activeReconciliation) return;
     setFormError(null);
-
     setSubmittingAction(true);
 
     try {
       const itemsPayload = activeReconciliation.items?.map((it) => {
-        const isAllowed = allowStockOptions[it.id] ?? true;
+        let appQty = 0;
+        if (actionType === 'REJECT') {
+          appQty = 0;
+        } else if (actionType === 'APPROVE_FULL') {
+          appQty = it.requested_quantity;
+        } else {
+          const isAllowed = allowStockOptions[it.id] ?? true;
+          appQty = isAllowed ? (approvedQuantities[it.id] ?? it.requested_quantity) : 0;
+        }
         return {
           item_id: it.id,
-          approved_quantity: actionType === 'APPROVE_FULL'
-            ? it.requested_quantity
-            : (actionType === 'REJECT' || !isAllowed ? 0 : (approvedQuantities[it.id] ?? it.requested_quantity)),
+          approved_quantity: appQty,
         };
       });
 
+      const totalApprovedQty = itemsPayload?.reduce((acc, curr) => acc + curr.approved_quantity, 0) || 0;
+      const totalReqQty = activeReconciliation.items?.reduce((acc, curr) => acc + curr.requested_quantity, 0) || 0;
+
+      let effectiveAction = actionType;
+      if (totalApprovedQty === 0) {
+        effectiveAction = 'REJECT';
+      } else if (totalApprovedQty < totalReqQty) {
+        effectiveAction = 'APPROVE_PARTIAL';
+      } else {
+        effectiveAction = 'APPROVE_FULL';
+      }
+
+      const defaultRemarks = effectiveAction === 'APPROVE_PARTIAL'
+        ? (adminRemarks.trim() || `Approved ${totalApprovedQty} of ${totalReqQty} cases requested. Leftover payment refund processed.`)
+        : adminRemarks.trim();
+
       const payload = {
-        action: actionType,
-        admin_remarks: adminRemarks.trim(),
+        action: effectiveAction,
+        admin_remarks: defaultRemarks,
         items: itemsPayload,
       };
 
@@ -674,12 +727,33 @@ export const SuperadminRequisitionsHub: React.FC = () => {
                     </td>
 
                     <td className="py-3.5 px-4 text-center">
-                      <span className="font-mono font-bold text-xs text-zinc-900">
+                      <span className="font-mono font-bold text-xs text-zinc-900 block">
                         {t.items?.length || 0} lines
                       </span>
-                      <span className="text-[10px] font-mono text-blue-600 block font-semibold">
-                        {t.total_requested_cases || 0} total cases
-                      </span>
+                      {t.status === 'PENDING' ? (
+                        <span className="text-[10px] font-mono text-blue-600 block font-semibold">
+                          {t.total_requested_cases || 0} cases requested
+                        </span>
+                      ) : t.status === 'PARTIALLY_APPROVED' ? (
+                        <div className="space-y-0.5">
+                          <span className="text-[11px] font-mono font-bold text-emerald-700 block bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                            Given: {t.total_approved_cases ?? 0} / {t.total_requested_cases || 0}
+                          </span>
+                          {t.refund_amount !== undefined && t.refund_amount > 0 && (
+                            <span className="text-[9px] font-mono font-bold text-amber-700 block bg-amber-50 px-1 rounded border border-amber-200">
+                              Refund: ৳{Number(t.refund_amount).toLocaleString('en-US', { minimumFractionDigits: 0 })}
+                            </span>
+                          )}
+                        </div>
+                      ) : t.status === 'APPROVED' ? (
+                        <span className="text-[10px] font-mono font-bold text-emerald-600 block bg-emerald-50 px-1.5 py-0.5 rounded">
+                          Given: {t.total_approved_cases ?? t.total_requested_cases} (Full)
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-mono font-bold text-rose-600 block bg-rose-50 px-1.5 py-0.5 rounded">
+                          0 / {t.total_requested_cases || 0} (Rejected)
+                        </span>
+                      )}
                     </td>
 
                     <td className="py-3.5 px-4">
@@ -818,10 +892,10 @@ export const SuperadminRequisitionsHub: React.FC = () => {
               <div className="flex items-center gap-3">
                 <div className="text-right">
                   <span className="text-[10px] uppercase font-bold text-slate-400 block font-mono">
-                    Payable Subtotal + VAT
+                    Initial Authorized Amount
                   </span>
                   <span className="font-mono font-black text-sm text-indigo-700">
-                    ৳{activeReconciliation.total_amount ? Number(activeReconciliation.total_amount).toLocaleString('en-US', { minimumFractionDigits: 2 }) : 'Calculated Upon Approval'}
+                    ৳{reconciliationSummary.originalTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
                 <button
@@ -836,6 +910,45 @@ export const SuperadminRequisitionsHub: React.FC = () => {
                   <Printer className="w-3.5 h-3.5 text-cyan-400" />
                   <span>Download Invoice (PDF)</span>
                 </button>
+              </div>
+            </div>
+
+            {/* Live Financial Allocation & Leftover Refund Return Ribbon */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-400 block font-mono">Supplier Requested</span>
+                <span className="font-mono font-bold text-blue-700 text-sm mt-0.5 block">
+                  {reconciliationSummary.totalReqCases} cases
+                </span>
+                <span className="text-[10px] text-slate-500 font-mono">
+                  Billed: ৳{reconciliationSummary.originalTotal.toLocaleString('en-US', { minimumFractionDigits: 0 })}
+                </span>
+              </div>
+
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-400 block font-mono">Superadmin Giving</span>
+                <span className="font-mono font-bold text-emerald-700 text-sm mt-0.5 block">
+                  {reconciliationSummary.totalAppCases} cases
+                </span>
+                <span className="text-[10px] text-emerald-600 font-mono">
+                  Delivered: ৳{reconciliationSummary.fulfilledTotal.toLocaleString('en-US', { minimumFractionDigits: 0 })}
+                </span>
+              </div>
+
+              <div className="col-span-2 p-2.5 rounded-xl bg-amber-50/80 border border-amber-200">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase font-bold text-amber-800 font-mono">
+                    Leftover Amount Returned / Refunded
+                  </span>
+                  <span className="font-mono font-black text-sm text-amber-800">
+                    ৳{reconciliationSummary.refundAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <p className="text-[10px] text-amber-700 mt-0.5">
+                  {reconciliationSummary.refundAmount > 0
+                    ? `⚠️ Stock given is less than requested (${reconciliationSummary.totalReqCases - reconciliationSummary.totalAppCases} cases shortfall). Leftover ৳${reconciliationSummary.refundAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} will be automatically returned to the supplier.`
+                    : '✓ Full requested quantity is fulfilled. No refund required.'}
+                </p>
               </div>
             </div>
 
@@ -1078,30 +1191,33 @@ export const SuperadminRequisitionsHub: React.FC = () => {
                     className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
                   >
                     <XCircle className="w-3.5 h-3.5 text-rose-600" />
-                    <span>Disallow All Stock</span>
+                    <span>Disallow All Stock (Full Refund)</span>
                   </button>
 
-                  {/* Confirm Selected Stock Options */}
-                  <button
-                    type="button"
-                    disabled={submittingAction}
-                    onClick={() => handlePromptConfirmation('APPROVE_PARTIAL')}
-                    className="px-3.5 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
-                  >
-                    <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" />
-                    <span>Confirm Selected Stock Options</span>
-                  </button>
-
-                  {/* Confirm & Allow Full Stock Button */}
-                  <button
-                    type="button"
-                    disabled={submittingAction}
-                    onClick={() => handlePromptConfirmation('APPROVE_FULL')}
-                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-500/20 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
-                  >
-                    <CheckCircle2 className="w-4 h-4 text-white" />
-                    <span>Confirm & Allow Full Stock</span>
-                  </button>
+                  {/* Primary Decision Button based on actual current quantities */}
+                  {reconciliationSummary.totalAppCases < reconciliationSummary.totalReqCases ? (
+                    <button
+                      type="button"
+                      disabled={submittingAction}
+                      onClick={() => handlePromptConfirmation('APPROVE_PARTIAL')}
+                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-indigo-500/20 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                    >
+                      <CheckCircle2 className="w-4 h-4 text-white" />
+                      <span>
+                        Permit {reconciliationSummary.totalAppCases} Cases & Refund ৳{reconciliationSummary.refundAmount.toLocaleString('en-US', { minimumFractionDigits: 0 })}
+                      </span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={submittingAction}
+                      onClick={() => handlePromptConfirmation('APPROVE_FULL')}
+                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-500/20 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                    >
+                      <CheckCircle2 className="w-4 h-4 text-white" />
+                      <span>Permit Full {reconciliationSummary.totalReqCases} Cases (No Refund)</span>
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="flex items-center gap-3">
@@ -1163,21 +1279,33 @@ export const SuperadminRequisitionsHub: React.FC = () => {
                 <span className="font-bold text-zinc-900">{activeReconciliation.district_name || 'Dhaka'} Depot</span>
               </div>
               <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-mono">Stock Allowance:</span>
+                <span className="font-mono font-bold text-zinc-900">
+                  {reconciliationSummary.totalAppCases} / {reconciliationSummary.totalReqCases} Cases Given
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-mono">Leftover Refund to Supplier:</span>
+                <span className="font-mono font-bold text-emerald-700">
+                  ৳{reconciliationSummary.refundAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
                 <span className="text-slate-500 font-mono">Action Type:</span>
                 <span
                   className={`font-mono font-bold px-2 py-0.5 rounded text-[10px] ${
-                    pendingActionType === 'APPROVE_FULL'
+                    reconciliationSummary.totalAppCases === reconciliationSummary.totalReqCases
                       ? 'bg-emerald-100 text-emerald-800'
-                      : pendingActionType === 'REJECT'
+                      : reconciliationSummary.totalAppCases === 0
                       ? 'bg-rose-100 text-rose-800'
                       : 'bg-blue-100 text-blue-800'
                   }`}
                 >
-                  {pendingActionType === 'APPROVE_FULL'
+                  {reconciliationSummary.totalAppCases === reconciliationSummary.totalReqCases
                     ? 'ALLOW FULL STOCK'
-                    : pendingActionType === 'REJECT'
+                    : reconciliationSummary.totalAppCases === 0
                     ? 'DISALLOW ALL STOCK'
-                    : 'ALLOW SELECTED OPTIONS'}
+                    : 'PARTIAL STOCK + LEFTOVER REFUND'}
                 </span>
               </div>
             </div>
