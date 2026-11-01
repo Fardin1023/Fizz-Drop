@@ -288,9 +288,9 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
           <button
             type="button"
             onClick={onNavigateToSettings}
-            className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1 shrink-0 cursor-pointer self-start sm:self-auto"
+            className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-1 shrink-0 cursor-pointer self-start sm:self-auto"
           >
-            <span>Configure Cities & Territory</span>
+            <span>View Superadmin Allotment</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         )}

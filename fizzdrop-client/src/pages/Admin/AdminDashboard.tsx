@@ -4,7 +4,7 @@ import AdminLogin from './AdminLogin';
 import { SupplierAvailableProducts } from './SupplierAvailableProducts';
 import { SupplierRequestStock } from './SupplierRequestStock';
 import { SupplierRequisitionHistory } from './SupplierRequisitionHistory';
-import { SupplierProfileSettings } from './SupplierProfileSettings';
+import { SupplierProfileView } from './SupplierProfileView';
 import {
   Package,
   LogOut,
@@ -12,7 +12,7 @@ import {
   ArrowRight,
   Truck,
   ClipboardList,
-  MapPin,
+  Building,
   Home,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -176,8 +176,8 @@ export const AdminDashboard: React.FC = () => {
                   : 'bg-white text-slate-700 hover:text-blue-600 hover:bg-slate-50 border border-slate-200'
               }`}
             >
-              <MapPin className="w-3 h-3" />
-              <span>Depot & Territory Settings</span>
+              <Building className="w-3 h-3" />
+              <span>Assigned Profile & Territory (Superadmin Allotted)</span>
             </button>
           </div>
         </div>
@@ -206,7 +206,7 @@ export const AdminDashboard: React.FC = () => {
         {activeTab === 'history' && (
           <SupplierRequisitionHistory onNewRequisitionClick={() => setActiveTab('request')} />
         )}
-        {activeTab === 'profile' && <SupplierProfileSettings />}
+        {activeTab === 'profile' && <SupplierProfileView />}
       </main>
     </div>
   );

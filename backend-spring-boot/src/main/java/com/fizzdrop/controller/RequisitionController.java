@@ -104,6 +104,10 @@ public class RequisitionController {
             @RequestHeader(value = "Authorization", required = false) String authHeader,
             @RequestParam(value = "userId", required = false) Long userId,
             @RequestBody SupplierProfileDTO dto) {
+        if (authHeader == null || !authHeader.contains("superadmin")) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.fail("Supplier profiles and city coverage are managed exclusively by Superadmin operations. Regional suppliers cannot modify profile settings."));
+        }
         try {
             Long resolvedId = resolveUserId(authHeader, userId);
             SupplierProfile updated = requisitionService.updateSupplierRegion(resolvedId, dto);
