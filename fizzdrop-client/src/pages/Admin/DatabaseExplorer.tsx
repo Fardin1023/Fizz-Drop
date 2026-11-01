@@ -18,14 +18,28 @@ import {
   Sparkles,
   ShieldCheck,
   X,
+  Printer,
+  FileSpreadsheet,
+  ExternalLink,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import {
+  downloadTableSchemaCsv,
+  downloadAllTablesSchemaCsv,
+  downloadTableSchemaPdf,
+  downloadAllTablesSchemaPdf,
+  openPrintableSchemaReport,
+  ExportColumnDef,
+  TableSchemaExportData,
+} from '../../utils/schemaExporter';
 
 interface ColumnDef {
   name: string;
   type: string;
   isPk?: boolean;
   isNullable?: boolean;
+  extra?: string;
+  defaultValue?: string;
 }
 
 interface TableInfo {
@@ -69,6 +83,117 @@ export const DatabaseExplorer: React.FC<DatabaseExplorerProps> = ({ onOpenQueryW
   const [sidebarFilter, setSidebarFilter] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+
+  // Schema Export state
+  const [schemaExportModalOpen, setSchemaExportModalOpen] = useState(false);
+  const [exportingSchema, setExportingSchema] = useState(false);
+  const [exportStatusMsg, setExportStatusMsg] = useState<string | null>(null);
+
+  // Fetch full schema definitions for all tables
+  const fetchAllTablesSchemas = async (): Promise<TableSchemaExportData[]> => {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
+    }
+
+    const allData: TableSchemaExportData[] = [];
+    for (const t of tables) {
+      try {
+        const descRes = await fetch('http://localhost:8080/api/db/query', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ sql: `DESCRIBE \`${t.name}\`;` }),
+        });
+        let cols: ExportColumnDef[] = [];
+        if (descRes.ok) {
+          const descData = await descRes.json();
+          if (descData.results && descData.results.length > 0) {
+            cols = descData.results.map((r: any) => ({
+              name: r.Field,
+              type: r.Type,
+              isPk: r.Key === 'PRI',
+              isNullable: r.Null === 'YES',
+              extra: r.Extra,
+              defaultValue: r.Default,
+            }));
+          }
+        }
+        allData.push({
+          name: t.name,
+          domain: TABLE_CATEGORIES[t.name] || 'Relational Schema',
+          rowCount: t.rowCount || 0,
+          columns: cols,
+        });
+      } catch (err) {
+        console.error(`Error describing table ${t.name}:`, err);
+      }
+    }
+    return allData;
+  };
+
+  const handleDownloadCurrentSchemaCsv = () => {
+    downloadTableSchemaCsv(selectedTable, tableColumns, totalRows, TABLE_CATEGORIES[selectedTable]);
+    setExportStatusMsg(`Downloaded "${selectedTable}" schema as CSV`);
+    setTimeout(() => setExportStatusMsg(null), 3000);
+  };
+
+  const handleDownloadCurrentSchemaPdf = () => {
+    downloadTableSchemaPdf(selectedTable, tableColumns, totalRows, TABLE_CATEGORIES[selectedTable]);
+    setExportStatusMsg(`Downloaded "${selectedTable}" schema as PDF`);
+    setTimeout(() => setExportStatusMsg(null), 3000);
+  };
+
+  const handleDownloadAllSchemasCsv = async () => {
+    setExportingSchema(true);
+    try {
+      const allTables = await fetchAllTablesSchemas();
+      downloadAllTablesSchemaCsv(allTables);
+      setExportStatusMsg(`Downloaded all ${allTables.length} tables schema as CSV`);
+      setTimeout(() => setExportStatusMsg(null), 3000);
+    } catch (e: any) {
+      console.error('Failed to export all tables schema CSV:', e);
+    } finally {
+      setExportingSchema(false);
+    }
+  };
+
+  const handleDownloadAllSchemasPdf = async () => {
+    setExportingSchema(true);
+    try {
+      const allTables = await fetchAllTablesSchemas();
+      downloadAllTablesSchemaPdf(allTables);
+      setExportStatusMsg(`Downloaded complete database schema (${allTables.length} tables) as PDF`);
+      setTimeout(() => setExportStatusMsg(null), 3000);
+    } catch (e: any) {
+      console.error('Failed to export all tables schema PDF:', e);
+    } finally {
+      setExportingSchema(false);
+    }
+  };
+
+  const handleOpenPrintPreview = async (all: boolean = false) => {
+    if (all) {
+      setExportingSchema(true);
+      try {
+        const allTables = await fetchAllTablesSchemas();
+        openPrintableSchemaReport(allTables, 'FizzDrop Enterprise Database Specification');
+      } finally {
+        setExportingSchema(false);
+      }
+    } else {
+      openPrintableSchemaReport(
+        [
+          {
+            name: selectedTable,
+            rowCount: totalRows,
+            domain: TABLE_CATEGORIES[selectedTable] || 'Relational Schema',
+            columns: tableColumns,
+          },
+        ],
+        `Schema Specification: ${selectedTable}`
+      );
+    }
+  };
 
   // Fetch tables metadata with Superadmin auth token
   const fetchTables = async () => {
@@ -153,6 +278,31 @@ export const DatabaseExplorer: React.FC<DatabaseExplorerProps> = ({ onOpenQueryW
               isNullable: true,
             }));
             setTableColumns(cols);
+          }
+
+          // Authoritative column definitions from Aiven Cloud MySQL
+          try {
+            const descRes = await fetch('http://localhost:8080/api/db/query', {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({ sql: `DESCRIBE \`${selectedTable}\`;` }),
+            });
+            if (descRes.ok) {
+              const descData = await descRes.json();
+              if (descData.results && descData.results.length > 0) {
+                const cols: ColumnDef[] = descData.results.map((r: any) => ({
+                  name: r.Field,
+                  type: r.Type,
+                  isPk: r.Key === 'PRI',
+                  isNullable: r.Null === 'YES',
+                  extra: r.Extra,
+                  defaultValue: r.Default,
+                }));
+                setTableColumns(cols);
+              }
+            }
+          } catch (e) {
+            console.warn('Failed to query DESCRIBE for schema columns:', e);
           }
 
           // Count query
@@ -337,6 +487,16 @@ export const DatabaseExplorer: React.FC<DatabaseExplorerProps> = ({ onOpenQueryW
                 </button>
               )}
 
+              {/* Export Schema (CSV / PDF) Button */}
+              <button
+                onClick={() => setSchemaExportModalOpen(true)}
+                className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-xs font-bold text-indigo-700 flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                title="Download database schema tables as CSV or PDF"
+              >
+                <Download className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Export Schema (CSV / PDF)</span>
+              </button>
+
               {/* Export Shortcuts */}
               {activeTab === 'data' && tableData.length > 0 && (
                 <div className="flex items-center gap-1">
@@ -491,14 +651,55 @@ export const DatabaseExplorer: React.FC<DatabaseExplorerProps> = ({ onOpenQueryW
 
           {/* TAB 2: SCHEMA COLUMNS */}
           {activeTab === 'schema' && (
-            <div className="w-full min-w-0 p-4 overflow-x-auto min-h-[360px]">
-              <div className="mb-3 flex items-center justify-between text-xs text-slate-500">
-                <span>
-                  Column definitions for entity <code className="text-blue-700 font-mono font-bold">{selectedTable}</code>
-                </span>
-                <span className="font-mono text-[11px] text-slate-400">
-                  Engine: InnoDB • UTF8MB4
-                </span>
+            <div className="w-full min-w-0 p-4 overflow-x-auto min-h-[360px] space-y-3.5">
+              {/* Schema Download Actions Bar */}
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-slate-50 via-indigo-50/30 to-blue-50/40 border border-slate-200/90 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-2xs">
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold text-slate-800">
+                      Schema Specification for <code className="text-indigo-700 font-mono font-bold bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">{selectedTable}</code>
+                    </span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-100/70 text-blue-800 font-bold border border-blue-200">
+                      {tableColumns.length} columns defined
+                    </span>
+                  </div>
+                  <span className="font-mono text-[10px] text-slate-500 block mt-1">
+                    Live Engine: Aiven Cloud MySQL 8.4.11 • InnoDB • UTF8MB4
+                  </span>
+                </div>
+
+                {/* Direct Download Options for Schema as CSV or PDF */}
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Download Current Table Schema as CSV */}
+                  <button
+                    onClick={handleDownloadCurrentSchemaCsv}
+                    className="px-3 py-1.5 rounded-xl bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-300 text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer active:scale-95"
+                    title={`Download ${selectedTable} schema as CSV file`}
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Download CSV</span>
+                  </button>
+
+                  {/* Download Current Table Schema as PDF */}
+                  <button
+                    onClick={handleDownloadCurrentSchemaPdf}
+                    className="px-3 py-1.5 rounded-xl bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer active:scale-95"
+                    title={`Download ${selectedTable} schema as PDF file`}
+                  >
+                    <FileText className="w-3.5 h-3.5 text-rose-600" />
+                    <span>Download PDF</span>
+                  </button>
+
+                  {/* Open All Tables Schema Options Modal */}
+                  <button
+                    onClick={() => setSchemaExportModalOpen(true)}
+                    className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer active:scale-95"
+                    title="Export complete database schema dictionary for all tables"
+                  >
+                    <Layers className="w-3.5 h-3.5 text-white" />
+                    <span>All Tables (CSV / PDF)...</span>
+                  </button>
+                </div>
               </div>
 
               <table className="w-full text-left text-xs border-collapse">
@@ -664,6 +865,160 @@ export const DatabaseExplorer: React.FC<DatabaseExplorerProps> = ({ onOpenQueryW
           </div>
         </div>
       </div>
+
+      {/* Toast Notification when Schema is Downloaded */}
+      {exportStatusMsg && (
+        <div className="fixed bottom-6 right-6 z-[120] flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-semibold shadow-xl border border-slate-700 animate-fade-in">
+          <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{exportStatusMsg}</span>
+        </div>
+      )}
+
+      {/* Schema Export Modal (CSV & PDF Options) */}
+      {schemaExportModalOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+          <div className="relative w-full max-w-lg rounded-3xl bg-white border border-slate-200 shadow-2xl p-6 space-y-5">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100">
+                  <Download className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-oswald text-lg font-bold uppercase text-slate-900">
+                    Export Schema Tables
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Download relational DDL schemas as formatted CSV or PDF
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setSchemaExportModalOpen(false)}
+                className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Section 1: Active Table Schema */}
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-[11px] font-mono uppercase font-bold text-slate-400 block">
+                    Current Entity
+                  </span>
+                  <span className="text-sm font-bold font-mono text-indigo-700">
+                    {selectedTable} ({tableColumns.length} columns)
+                  </span>
+                </div>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-200/70 text-slate-700 font-semibold">
+                  {TABLE_CATEGORIES[selectedTable] || 'Relational Schema'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleDownloadCurrentSchemaCsv();
+                    setSchemaExportModalOpen(false);
+                  }}
+                  className="px-3 py-2 rounded-xl bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-300 text-xs font-bold flex items-center justify-center gap-2 shadow-2xs transition-all cursor-pointer"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                  <span>Download CSV</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleDownloadCurrentSchemaPdf();
+                    setSchemaExportModalOpen(false);
+                  }}
+                  className="px-3 py-2 rounded-xl bg-white hover:bg-rose-50 text-rose-800 border border-rose-300 text-xs font-bold flex items-center justify-center gap-2 shadow-2xs transition-all cursor-pointer"
+                >
+                  <FileText className="w-4 h-4 text-rose-600" />
+                  <span>Download PDF</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Section 2: Complete Database Schema (All Tables) */}
+            <div className="p-4 rounded-2xl bg-indigo-50/50 border border-indigo-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-[11px] font-mono uppercase font-bold text-indigo-600 block">
+                    Full Relational Architecture
+                  </span>
+                  <span className="text-sm font-bold text-slate-900">
+                    Complete Database Dictionary ({tables.length} tables)
+                  </span>
+                </div>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 font-bold">
+                  Aiven Cloud
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                Exports all entities (products, inventory, outlets, requisitions, districts, users) with full data types and constraints.
+              </p>
+
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  disabled={exportingSchema}
+                  onClick={async () => {
+                    await handleDownloadAllSchemasCsv();
+                    setSchemaExportModalOpen(false);
+                  }}
+                  className="px-3 py-2 rounded-xl bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-300 text-xs font-bold flex items-center justify-center gap-2 shadow-2xs transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {exportingSchema ? <RefreshCw className="w-4 h-4 animate-spin text-emerald-600" /> : <FileSpreadsheet className="w-4 h-4 text-emerald-600" />}
+                  <span>All Tables CSV</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={exportingSchema}
+                  onClick={async () => {
+                    await handleDownloadAllSchemasPdf();
+                    setSchemaExportModalOpen(false);
+                  }}
+                  className="px-3 py-2 rounded-xl bg-white hover:bg-rose-50 text-rose-800 border border-rose-300 text-xs font-bold flex items-center justify-center gap-2 shadow-2xs transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {exportingSchema ? <RefreshCw className="w-4 h-4 animate-spin text-rose-600" /> : <FileText className="w-4 h-4 text-rose-600" />}
+                  <span>All Tables PDF</span>
+                </button>
+              </div>
+
+              {/* Printable Browser PDF Preview */}
+              <button
+                type="button"
+                disabled={exportingSchema}
+                onClick={async () => {
+                  await handleOpenPrintPreview(true);
+                  setSchemaExportModalOpen(false);
+                }}
+                className="w-full mt-2 py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer border border-slate-200"
+              >
+                <Printer className="w-3.5 h-3.5 text-slate-600" />
+                <span>Open Printable Specification / Browser Print</span>
+              </button>
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setSchemaExportModalOpen(false)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
