@@ -138,7 +138,7 @@ export const SupplierProfileView: React.FC = () => {
         <div className="mt-4 pt-4 border-t border-white/10 flex items-start gap-2 text-xs text-slate-300">
           <Info className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
           <span>
-            Territory allotment, covered cities, and financial credentials were provisioned by the Central Superadmin based on physical contract registration dossiers. Suppliers cannot edit these settings.
+            Territory allotment, covered cities, and financial credentials were provisioned by the Central Superadmin based on physical contract registration dossiers. 
           </span>
         </div>
       </div>

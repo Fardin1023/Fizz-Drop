@@ -19,3 +19,6 @@ node_modules/
 .vscode/
 backend-spring-boot/target/
 fizzdrop-client/dist/
+.env
+*.env
+
