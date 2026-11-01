@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, ShoppingBag, Heart, MapPin, ChevronDown, Menu, X, ShieldCheck, Crown } from 'lucide-react';
+import fizzdropLogo from '../../assets/img/fizzdrop-logo.png';
 
 export interface Outlet {
   branchId: number | string;
@@ -25,14 +26,15 @@ const Navigation: React.FC<NavigationProps> = ({
   return (
     <header className="sticky top-0 z-50 w-full bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md border-b border-zinc-200/60 dark:border-zinc-800/60">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-16 items-center justify-between gap-4">
+        <div className="flex h-20 items-center justify-between gap-4">
           
           {/* Brand Logo */}
-          <Link to="/" className="flex items-center gap-2 group">
-            <span className="font-oswald text-2xl font-black tracking-tight uppercase text-zinc-900 dark:text-zinc-50">
-              Fizz<span className="text-indigo-600">Drop</span>
-            </span>
-            <span className="h-2 w-2 rounded-full bg-indigo-600 animate-pulse" />
+          <Link to="/" className="flex items-center group transition-transform duration-200 hover:scale-105" title="FizzDrop Beverage Co.">
+            <img
+              src={fizzdropLogo}
+              alt="FizzDrop Beverage Co."
+              className="h-14 w-14 sm:h-16 sm:w-16 object-contain rounded-full shadow-md bg-white border border-slate-200 p-0.5"
+            />
           </Link>
 
           {/* Desktop Navigation Links */}

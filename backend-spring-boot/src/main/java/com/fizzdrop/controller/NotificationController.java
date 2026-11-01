@@ -50,6 +50,15 @@ public class NotificationController {
         return ResponseEntity.ok(ApiResponse.ok("All notifications marked as read."));
     }
 
+    @DeleteMapping("/clear-old")
+    public ResponseEntity<?> clearOldNotifications(
+            @RequestParam(defaultValue = "SUPERADMIN") String role,
+            @RequestParam(required = false) Long userId,
+            @RequestParam(defaultValue = "false") boolean readOnly) {
+        notificationRepository.deleteOldNotifications(role.toUpperCase(), userId, readOnly);
+        return ResponseEntity.ok(ApiResponse.ok("Notifications cleared successfully."));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteNotification(@PathVariable Long id) {
         if (notificationRepository.existsById(id)) {

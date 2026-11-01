@@ -16,6 +16,11 @@ import {
   Check,
   CreditCard,
   Printer,
+  Sparkles,
+  RotateCcw,
+  DollarSign,
+  HelpCircle,
+  ShieldCheck,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { broadcastRealtimeEvent } from '../../utils/broadcast';
@@ -112,6 +117,14 @@ export const SuperadminRequisitionsHub: React.FC = () => {
   const [centralInventory, setCentralInventory] = useState<any[]>([]);
   const [showCentralPool, setShowCentralPool] = useState<boolean>(true);
 
+  // Return claims review states
+  const [activeHubTab, setActiveHubTab] = useState<'requisitions' | 'returns'>('requisitions');
+  const [returnRequests, setReturnRequests] = useState<any[]>([]);
+  const [returnStatusFilter, setReturnStatusFilter] = useState<string>('ALL');
+  const [selectedReturnForReview, setSelectedReturnForReview] = useState<any | null>(null);
+  const [returnDecisionRemarks, setReturnDecisionRemarks] = useState<string>('');
+  const [submittingReturnDecision, setSubmittingReturnDecision] = useState<boolean>(false);
+
   // Commercial Invoice Modal state
   const [invoiceTicket, setInvoiceTicket] = useState<any | null>(null);
   const [isInvoiceOpen, setIsInvoiceOpen] = useState<boolean>(false);
@@ -157,10 +170,11 @@ export const SuperadminRequisitionsHub: React.FC = () => {
   const fetchDistrictsAndTickets = async () => {
     setLoading(true);
     try {
-      const [distRes, reqRes, centralRes] = await Promise.all([
+      const [distRes, reqRes, centralRes, returnsRes] = await Promise.all([
         fetch('http://localhost:8080/api/v1/districts'),
         fetch('http://localhost:8080/api/v1/admin/requisitions'),
         fetch('http://localhost:8080/api/v1/admin/central-inventory'),
+        fetch('http://localhost:8080/api/v1/admin/returns'),
       ]);
 
       if (distRes.ok) {
@@ -176,6 +190,11 @@ export const SuperadminRequisitionsHub: React.FC = () => {
       if (centralRes.ok) {
         const centralData = await centralRes.json();
         setCentralInventory(Array.isArray(centralData) ? centralData : []);
+      }
+
+      if (returnsRes && returnsRes.ok) {
+        const returnsData = await returnsRes.json();
+        setReturnRequests(Array.isArray(returnsData) ? returnsData : []);
       }
     } catch (err) {
       console.error('Error fetching admin requisitions:', err);
@@ -264,7 +283,7 @@ export const SuperadminRequisitionsHub: React.FC = () => {
   // Live financial & stock calculation for reconciliation
   const reconciliationSummary = React.useMemo(() => {
     if (!activeReconciliation?.items) {
-      return { totalReqCases: 0, totalAppCases: 0, originalTotal: 0, fulfilledTotal: 0, refundAmount: 0 };
+      return { totalReqCases: 0, totalAppCases: 0, originalTotal: 0, fulfilledTotal: 0, refundAmount: 0, dueAmount: 0 };
     }
     let totalReqCases = 0;
     let totalAppCases = 0;
@@ -285,8 +304,9 @@ export const SuperadminRequisitionsHub: React.FC = () => {
     const originalTotal = Number(activeReconciliation.total_amount || (originalSubtotal * vatMultiplier));
     const fulfilledTotal = fulfilledSubtotal * vatMultiplier;
     const refundAmount = Math.max(0, originalTotal - fulfilledTotal);
+    const dueAmount = Math.max(0, fulfilledTotal - originalTotal);
 
-    return { totalReqCases, totalAppCases, originalTotal, fulfilledTotal, refundAmount };
+    return { totalReqCases, totalAppCases, originalTotal, fulfilledTotal, refundAmount, dueAmount };
   }, [activeReconciliation, approvedQuantities, allowStockOptions]);
 
   const handlePromptConfirmation = (actionType: 'APPROVE_FULL' | 'APPROVE_PARTIAL' | 'REJECT') => {
@@ -305,11 +325,11 @@ export const SuperadminRequisitionsHub: React.FC = () => {
         let appQty = 0;
         if (actionType === 'REJECT') {
           appQty = 0;
-        } else if (actionType === 'APPROVE_FULL') {
-          appQty = it.requested_quantity;
         } else {
           const isAllowed = allowStockOptions[it.id] ?? true;
-          appQty = isAllowed ? (approvedQuantities[it.id] ?? it.requested_quantity) : 0;
+          appQty = isAllowed
+            ? (approvedQuantities[it.id] !== undefined ? approvedQuantities[it.id] : it.requested_quantity)
+            : 0;
         }
         return {
           item_id: it.id,
@@ -379,6 +399,52 @@ export const SuperadminRequisitionsHub: React.FC = () => {
       setSubmittingAction(false);
     }
   };
+
+  const handleProcessReturnDecision = async (decision: 'APPROVE' | 'REJECT') => {
+    if (!selectedReturnForReview) return;
+    setSubmittingReturnDecision(true);
+    try {
+      const res = await fetch(`http://localhost:8080/api/v1/admin/returns/${selectedReturnForReview.id}/decision`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          decision,
+          admin_remarks: returnDecisionRemarks.trim() || undefined,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Failed to process return decision');
+      }
+
+      const updated = await res.json();
+      setActionMsg(`Return Claim ${updated.return_code} has been successfully ${decision === 'APPROVE' ? 'APPROVED (Central stock restored & refund/replacement settled)' : 'REJECTED'}!`);
+      setSelectedReturnForReview(null);
+      setReturnDecisionRemarks('');
+      fetchDistrictsAndTickets();
+      setTimeout(() => setActionMsg(null), 4500);
+    } catch (err: any) {
+      alert(err.message || 'Error processing return decision');
+    } finally {
+      setSubmittingReturnDecision(false);
+    }
+  };
+
+  const filteredReturnRequests = returnRequests.filter((ret) => {
+    const s = search.toLowerCase();
+    const matchSearch =
+      !s ||
+      (ret.return_code && ret.return_code.toLowerCase().includes(s)) ||
+      (ret.requisition_code && ret.requisition_code.toLowerCase().includes(s)) ||
+      (ret.supplier_name && ret.supplier_name.toLowerCase().includes(s)) ||
+      (ret.reason_details && ret.reason_details.toLowerCase().includes(s));
+    const matchStatus = returnStatusFilter === 'ALL' || ret.status === returnStatusFilter;
+    return matchSearch && matchStatus;
+  });
 
   const filteredTickets = requisitions.filter((r) => {
     const term = search.toLowerCase();
@@ -590,6 +656,189 @@ export const SuperadminRequisitionsHub: React.FC = () => {
         )}
       </div>
 
+      {/* Hub Navigation Tabs: Stock Requisitions vs Returns & Claims */}
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setActiveHubTab('requisitions')}
+          className={`px-5 py-2.5 rounded-2xl font-bold text-xs flex items-center gap-2 transition-all cursor-pointer ${
+            activeHubTab === 'requisitions'
+              ? 'bg-slate-900 text-white shadow-md'
+              : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+          }`}
+        >
+          <ClipboardList className="w-4 h-4 text-cyan-400" />
+          <span>Stock Requisitions Hub ({requisitions.length})</span>
+          {requisitions.filter((r) => r.status === 'PENDING').length > 0 && (
+            <span className="px-2 py-0.5 rounded-full text-[10px] bg-amber-500 text-slate-950 font-black animate-pulse">
+              {requisitions.filter((r) => r.status === 'PENDING').length} PENDING
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveHubTab('returns')}
+          className={`px-5 py-2.5 rounded-2xl font-bold text-xs flex items-center gap-2 transition-all cursor-pointer ${
+            activeHubTab === 'returns'
+              ? 'bg-slate-900 text-white shadow-md'
+              : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+          }`}
+        >
+          <RotateCcw className="w-4 h-4 text-amber-400" />
+          <span>Stock Returns & Exchange Claims ({returnRequests.length})</span>
+          {returnRequests.filter((r) => r.status === 'PENDING_REVIEW').length > 0 && (
+            <span className="px-2 py-0.5 rounded-full text-[10px] bg-rose-500 text-white font-black animate-bounce">
+              {returnRequests.filter((r) => r.status === 'PENDING_REVIEW').length} TO REVIEW
+            </span>
+          )}
+        </button>
+      </div>
+
+      {activeHubTab === 'returns' ? (
+        /* Returns & Exchange Claims Management View */
+        <div className="space-y-4">
+          <div className="rounded-2xl bg-white border border-slate-200/90 p-3.5 shadow-2xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+            <div className="relative flex-1">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search return claims by return code, requisition code, supplier, or reason..."
+                className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-zinc-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 font-mono"
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <select
+                value={returnStatusFilter}
+                onChange={(e) => setReturnStatusFilter(e.target.value)}
+                className="px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-zinc-800 font-medium focus:outline-none cursor-pointer"
+              >
+                <option value="ALL">All Return Statuses</option>
+                <option value="PENDING_REVIEW">Pending Review</option>
+                <option value="APPROVED">Approved & Refunded</option>
+                <option value="REJECTED">Rejected</option>
+              </select>
+
+              <button
+                type="button"
+                onClick={fetchDistrictsAndTickets}
+                disabled={loading}
+                className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 transition-colors cursor-pointer"
+                title="Refresh Return Claims"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+          </div>
+
+          <div className="rounded-3xl bg-white border border-slate-200 shadow-2xs overflow-hidden">
+            {filteredReturnRequests.length === 0 ? (
+              <div className="p-12 text-center text-slate-400 space-y-2">
+                <RotateCcw className="w-10 h-10 mx-auto text-slate-300 stroke-1" />
+                <div className="text-sm font-bold text-slate-600">No return requests found</div>
+                <div className="text-xs text-slate-400">
+                  Regional suppliers file returns when stock needs to be returned for cash refund or exchanged for alternative products.
+                </div>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-[10px] tracking-wider font-bold">
+                      <th className="py-3 px-4">Claim Code</th>
+                      <th className="py-3 px-4">Requisition</th>
+                      <th className="py-3 px-4">Supplier & Depot</th>
+                      <th className="py-3 px-4">Resolution Mode</th>
+                      <th className="py-3 px-4 text-center">Returned Qty</th>
+                      <th className="py-3 px-4 text-right">Refund / Credit Value</th>
+                      <th className="py-3 px-4">Policy Reason Category</th>
+                      <th className="py-3 px-4">Status</th>
+                      <th className="py-3 px-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredReturnRequests.map((ret) => (
+                      <tr key={ret.id} className="hover:bg-slate-50/50">
+                        <td className="py-3.5 px-4 font-mono font-bold text-amber-700">
+                          {ret.return_code}
+                        </td>
+                        <td className="py-3.5 px-4 font-mono font-bold text-blue-600">
+                          {ret.requisition_code}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span className="font-bold text-zinc-900 block">{ret.supplier_name || 'Regional Depot'}</span>
+                          <span className="text-[10px] text-slate-400 font-mono">{ret.district_name || 'Dhaka Depot'}</span>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          {ret.return_type === 'REFUND_CASH' ? (
+                            <span className="font-bold text-emerald-700 flex items-center gap-1">
+                              <DollarSign className="w-3.5 h-3.5" /> Direct Cash Refund
+                            </span>
+                          ) : (
+                            <span className="font-bold text-purple-700 flex items-center gap-1">
+                              <Package className="w-3.5 h-3.5" /> Exchange: {ret.replacement_product_name || 'Replacement'}
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4 text-center font-bold text-zinc-800">
+                          {ret.returned_quantity} cases
+                        </td>
+                        <td className="py-3.5 px-4 text-right font-mono font-black text-emerald-600">
+                          ৳{Number(ret.refund_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span className="font-bold text-slate-800 block text-[11px]">
+                            {ret.reason_category.replace(/_/g, ' ')}
+                          </span>
+                          <span className="text-[11px] text-slate-500 block max-w-xs truncate" title={ret.reason_details}>
+                            {ret.reason_details}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          {ret.status === 'APPROVED' ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Approved
+                            </span>
+                          ) : ret.status === 'REJECTED' ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">
+                              <XCircle className="w-3 h-3 text-rose-600" /> Rejected
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 animate-pulse">
+                              <Clock className="w-3 h-3 text-amber-600" /> Pending Review
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedReturnForReview(ret);
+                              setReturnDecisionRemarks(ret.admin_remarks || '');
+                            }}
+                            className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-xs ${
+                              ret.status === 'PENDING_REVIEW'
+                                ? 'bg-amber-500 hover:bg-amber-600 text-white'
+                                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                            }`}
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>{ret.status === 'PENDING_REVIEW' ? 'Review & Settle' : 'Inspect'}</span>
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+      <>
       {/* Control & Filter Toolbar */}
       <div className="rounded-2xl bg-white border border-slate-200/90 p-3.5 shadow-2xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
         <div className="relative flex-1">
@@ -799,6 +1048,8 @@ export const SuperadminRequisitionsHub: React.FC = () => {
           </div>
         )}
       </div>
+      </>
+      )}
 
       {/* Dual-Column Reconciliation Modal */}
       {activeReconciliation && (
@@ -935,21 +1186,38 @@ export const SuperadminRequisitionsHub: React.FC = () => {
                 </span>
               </div>
 
-              <div className="col-span-2 p-2.5 rounded-xl bg-amber-50/80 border border-amber-200">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] uppercase font-bold text-amber-800 font-mono">
-                    Leftover Amount Returned / Refunded
-                  </span>
-                  <span className="font-mono font-black text-sm text-amber-800">
-                    ৳{reconciliationSummary.refundAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                  </span>
+              {reconciliationSummary.dueAmount > 0 ? (
+                <div className="col-span-2 p-2.5 rounded-xl bg-indigo-50/90 border border-indigo-200">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] uppercase font-bold text-indigo-900 font-mono flex items-center gap-1">
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                      Additional Stock Allocated (Pending Invoice Due)
+                    </span>
+                    <span className="font-mono font-black text-sm text-indigo-900">
+                      +৳{reconciliationSummary.dueAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-indigo-800 mt-0.5">
+                    🚀 Superadmin is allocating {reconciliationSummary.totalAppCases - reconciliationSummary.totalReqCases} extra cases over the requested quantity. The supplier invoice will update with a balance due of ৳{reconciliationSummary.dueAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} to complete payment.
+                  </p>
                 </div>
-                <p className="text-[10px] text-amber-700 mt-0.5">
-                  {reconciliationSummary.refundAmount > 0
-                    ? `⚠️ Stock given is less than requested (${reconciliationSummary.totalReqCases - reconciliationSummary.totalAppCases} cases shortfall). Leftover ৳${reconciliationSummary.refundAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} will be automatically returned to the supplier.`
-                    : '✓ Full requested quantity is fulfilled. No refund required.'}
-                </p>
-              </div>
+              ) : (
+                <div className="col-span-2 p-2.5 rounded-xl bg-amber-50/80 border border-amber-200">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] uppercase font-bold text-amber-800 font-mono">
+                      Leftover Amount Returned / Refunded
+                    </span>
+                    <span className="font-mono font-black text-sm text-amber-800">
+                      ৳{reconciliationSummary.refundAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-amber-700 mt-0.5">
+                    {reconciliationSummary.refundAmount > 0
+                      ? `⚠️ Stock given is less than requested (${reconciliationSummary.totalReqCases - reconciliationSummary.totalAppCases} cases shortfall). Leftover ৳${reconciliationSummary.refundAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} will be automatically returned to the supplier.`
+                      : '✓ Full requested quantity is fulfilled. No refund required.'}
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Supplier Remarks Note if provided */}
@@ -1104,8 +1372,7 @@ export const SuperadminRequisitionsHub: React.FC = () => {
                               <div className="flex items-center gap-1 mt-0.5">
                                 <input
                                   type="number"
-                                  min="1"
-                                  max={Math.max(item.requested_quantity, (item.regional_stock || 0) + (item.central_stock || 0))}
+                                  min="0"
                                   value={currentApprove}
                                   onChange={(e) => {
                                     const val = parseInt(e.target.value, 10);
@@ -1282,24 +1549,37 @@ export const SuperadminRequisitionsHub: React.FC = () => {
                   {reconciliationSummary.totalAppCases} / {reconciliationSummary.totalReqCases} Cases Given
                 </span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-500 font-mono">Leftover Refund to Supplier:</span>
-                <span className="font-mono font-bold text-emerald-700">
-                  ৳{reconciliationSummary.refundAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                </span>
-              </div>
+              {reconciliationSummary.dueAmount > 0 ? (
+                <div className="flex items-center justify-between">
+                  <span className="text-indigo-900 font-mono font-bold">Additional Balance Due from Supplier:</span>
+                  <span className="font-mono font-black text-indigo-700">
+                    +৳{reconciliationSummary.dueAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 font-mono">Leftover Refund to Supplier:</span>
+                  <span className="font-mono font-bold text-emerald-700">
+                    ৳{reconciliationSummary.refundAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              )}
               <div className="flex items-center justify-between">
                 <span className="text-slate-500 font-mono">Action Type:</span>
                 <span
                   className={`font-mono font-bold px-2 py-0.5 rounded text-[10px] ${
-                    reconciliationSummary.totalAppCases === reconciliationSummary.totalReqCases
+                    reconciliationSummary.dueAmount > 0
+                      ? 'bg-purple-100 text-purple-800'
+                      : reconciliationSummary.totalAppCases === reconciliationSummary.totalReqCases
                       ? 'bg-emerald-100 text-emerald-800'
                       : reconciliationSummary.totalAppCases === 0
                       ? 'bg-rose-100 text-rose-800'
                       : 'bg-blue-100 text-blue-800'
                   }`}
                 >
-                  {reconciliationSummary.totalAppCases === reconciliationSummary.totalReqCases
+                  {reconciliationSummary.dueAmount > 0
+                    ? 'EXTRA STOCK DISPATCH (BALANCE DUE)'
+                    : reconciliationSummary.totalAppCases === reconciliationSummary.totalReqCases
                     ? 'ALLOW FULL STOCK'
                     : reconciliationSummary.totalAppCases === 0
                     ? 'DISALLOW ALL STOCK'
@@ -1315,11 +1595,9 @@ export const SuperadminRequisitionsHub: React.FC = () => {
               </span>
               <div className="max-h-40 overflow-y-auto divide-y divide-slate-100 rounded-xl border border-slate-200 text-xs">
                 {activeReconciliation.items?.map((it) => {
-                  const isAllowed = pendingActionType === 'APPROVE_FULL'
-                    ? true
-                    : (pendingActionType === 'REJECT' ? false : (allowStockOptions[it.id] ?? true));
+                  const isAllowed = pendingActionType === 'REJECT' ? false : (allowStockOptions[it.id] ?? true);
                   const approvedQty = isAllowed
-                    ? (pendingActionType === 'APPROVE_FULL' ? it.requested_quantity : (approvedQuantities[it.id] ?? it.requested_quantity))
+                    ? (approvedQuantities[it.id] !== undefined ? approvedQuantities[it.id] : it.requested_quantity)
                     : 0;
 
                   return (
@@ -1393,6 +1671,186 @@ export const SuperadminRequisitionsHub: React.FC = () => {
                     : 'Dispatch Stock'}
                 </span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      
+      {/* Return Claim Policy Review & Decision Modal */}
+      {selectedReturnForReview && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+          <div className="relative w-full max-w-3xl rounded-3xl bg-white border border-slate-200 shadow-2xl p-6 sm:p-7 space-y-5 max-h-[92vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-start justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-600">
+                  <RotateCcw className="w-6 h-6" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-mono uppercase tracking-wider font-bold text-amber-600">
+                    SUPERADMIN RETURN & POLICY AUDIT
+                  </span>
+                  <h3 className="font-oswald text-2xl font-black text-zinc-900">
+                    Review Claim: {selectedReturnForReview.return_code}
+                  </h3>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedReturnForReview(null)}
+                className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Claim Overview Strip */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-400 block">Requisition Ref</span>
+                <span className="font-mono font-bold text-blue-600 mt-0.5 block">{selectedReturnForReview.requisition_code}</span>
+              </div>
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-400 block">Supplier</span>
+                <span className="font-bold text-zinc-900 mt-0.5 block truncate">{selectedReturnForReview.supplier_name || 'Regional Supplier'}</span>
+              </div>
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-400 block">Resolution Mode</span>
+                <span className="font-bold text-emerald-700 mt-0.5 block">
+                  {selectedReturnForReview.return_type === 'REFUND_CASH' ? 'Cash Refund' : 'Product Replacement'}
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-400 block">Refund / Credit</span>
+                <span className="font-mono font-black text-emerald-600 mt-0.5 block">
+                  ৳{Number(selectedReturnForReview.refund_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
+
+            {/* Supplier's Reason Section */}
+            <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200 space-y-1.5 text-xs">
+              <div className="flex items-center gap-2 font-bold text-amber-900 uppercase text-[10px] tracking-wider">
+                <HelpCircle className="w-3.5 h-3.5 text-amber-600" />
+                <span>Supplier's Stated Reason ({selectedReturnForReview.reason_category.replace(/_/g, ' ')})</span>
+              </div>
+              <div className="text-zinc-800 bg-white p-3 rounded-xl border border-amber-200/60 leading-relaxed font-sans">
+                "{selectedReturnForReview.reason_details}"
+              </div>
+            </div>
+
+            {/* If Replacement Requested */}
+            {selectedReturnForReview.return_type === 'EXCHANGE_PRODUCT' && (
+              <div className="p-3.5 rounded-2xl bg-purple-50 border border-purple-200 text-xs text-purple-950 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-purple-600 block">Replacement Product Requested</span>
+                  <span className="font-bold text-sm text-purple-900">
+                    {selectedReturnForReview.replacement_product_name || 'Replacement SKU'}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] uppercase font-bold text-purple-600 block">Replacement Quantity</span>
+                  <span className="font-black text-base text-purple-900 font-mono">
+                    {selectedReturnForReview.replacement_quantity || selectedReturnForReview.returned_quantity} cases
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Items Breakdown Table */}
+            <div>
+              <label className="text-[10px] uppercase tracking-wider font-bold text-slate-500 block mb-1.5">
+                Returned Stock Verification Breakdown
+              </label>
+              <div className="border border-slate-200 rounded-2xl overflow-hidden">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-[10px] uppercase font-bold text-slate-500">
+                    <tr>
+                      <th className="py-2 px-3">Product SKU</th>
+                      <th className="py-2 px-3 text-center">Received</th>
+                      <th className="py-2 px-3 text-center">Kept</th>
+                      <th className="py-2 px-3 text-center text-amber-700">Returned</th>
+                      <th className="py-2 px-3 text-right">Unit Price</th>
+                      <th className="py-2 px-3 text-right">Line Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {(selectedReturnForReview.items || []).map((it: any) => (
+                      <tr key={it.id}>
+                        <td className="py-2 px-3 font-medium text-zinc-900">
+                          {it.brand} {it.flavor_variant} ({it.size_volume})
+                        </td>
+                        <td className="py-2 px-3 text-center text-slate-600">{it.received_quantity}</td>
+                        <td className="py-2 px-3 text-center text-emerald-600 font-bold">{it.kept_quantity}</td>
+                        <td className="py-2 px-3 text-center text-amber-600 font-bold">{it.returned_quantity}</td>
+                        <td className="py-2 px-3 text-right font-mono">৳{it.unit_price}</td>
+                        <td className="py-2 px-3 text-right font-mono font-bold text-emerald-600">৳{it.line_total}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Admin Policy Decision Remarks */}
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-slate-700 block">
+                Superadmin Policy Decision Remarks (Audit Justification):
+              </label>
+              <textarea
+                rows={2}
+                value={returnDecisionRemarks}
+                onChange={(e) => setReturnDecisionRemarks(e.target.value)}
+                placeholder="e.g. 'Approved under wholesale return policy clause 3.1 - physical packaging damage verified.' or state rejection cause..."
+                className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 text-xs resize-none"
+              />
+            </div>
+
+            {/* Policy Decision Actions */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
+              <div className="text-[11px] text-slate-500 flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                <span>Approval transfers stock back to Central Warehouse and credits supplier.</span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedReturnForReview(null)}
+                  disabled={submittingReturnDecision}
+                  className="px-3.5 py-2 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-xs cursor-pointer"
+                >
+                  Cancel
+                </button>
+
+                {selectedReturnForReview.status === 'PENDING_REVIEW' && (
+                  <>
+                    <button
+                      type="button"
+                      disabled={submittingReturnDecision}
+                      onClick={() => handleProcessReturnDecision('REJECT')}
+                      className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
+                    >
+                      <XCircle className="w-3.5 h-3.5" />
+                      <span>Reject Claim</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={submittingReturnDecision}
+                      onClick={() => handleProcessReturnDecision('APPROVE')}
+                      className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center gap-1.5 shadow-md cursor-pointer disabled:opacity-50"
+                    >
+                      {submittingReturnDecision ? (
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="w-4 h-4" />
+                      )}
+                      <span>Approve Return & Settle</span>
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>

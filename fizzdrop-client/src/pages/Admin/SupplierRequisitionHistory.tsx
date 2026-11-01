@@ -12,7 +12,9 @@ import {
   MapPin,
   CreditCard,
   Printer,
+  RotateCcw,
 } from 'lucide-react';
+import { ReturnStockModal } from '../../components/Modals/ReturnStockModal';
 import { useAuth } from '../../context/AuthContext';
 import { InvoiceModal } from '../../components/Invoice/InvoiceModal';
 
@@ -49,6 +51,7 @@ export interface RequisitionRecord {
   total_amount?: number;
   fulfilled_amount?: number;
   refund_amount?: number;
+  due_amount?: number;
   supplier_remarks?: string;
   admin_remarks?: string;
   created_at: string;
@@ -75,6 +78,7 @@ export const SupplierRequisitionHistory: React.FC<SupplierRequisitionHistoryProp
   const [selectedTicket, setSelectedTicket] = useState<RequisitionRecord | null>(null);
   const [invoiceTicket, setInvoiceTicket] = useState<RequisitionRecord | null>(null);
   const [isInvoiceOpen, setIsInvoiceOpen] = useState<boolean>(false);
+  const [returnTicket, setReturnTicket] = useState<RequisitionRecord | null>(null);
 
   const fetchRequisitions = async () => {
     setLoading(true);
@@ -137,7 +141,7 @@ export const SupplierRequisitionHistory: React.FC<SupplierRequisitionHistoryProp
     }
   };
 
-  const formatPaymentBadge = (method?: string, status?: string) => {
+  const formatPaymentBadge = (method?: string, status?: string, dueAmount?: number) => {
     const m = (method || 'BANK').toUpperCase();
     let name = 'Bank Wire';
     if (m.includes('BKASH')) name = 'bKash B2B';
@@ -146,6 +150,7 @@ export const SupplierRequisitionHistory: React.FC<SupplierRequisitionHistoryProp
 
     const st = (status || 'Authorized').toUpperCase();
     const isRefunded = st.includes('REFUND');
+    const isDue = st.includes('DUE') || (dueAmount !== undefined && dueAmount > 0);
 
     return (
       <div className="space-y-0.5">
@@ -153,9 +158,15 @@ export const SupplierRequisitionHistory: React.FC<SupplierRequisitionHistoryProp
           <CreditCard className="w-2.5 h-2.5 text-indigo-600" />
           {name}
         </span>
-        <span className={`block text-[9px] font-mono font-bold ${isRefunded ? 'text-amber-600' : 'text-slate-400'}`}>
-          {isRefunded ? 'Settled + Refunded' : (status || 'Authorized')}
-        </span>
+        {isDue ? (
+          <span className="block text-[9px] font-mono font-bold text-rose-600 animate-pulse">
+            Payment Due: ৳{Number(dueAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 0 })}
+          </span>
+        ) : (
+          <span className={`block text-[9px] font-mono font-bold ${isRefunded ? 'text-amber-600' : 'text-slate-400'}`}>
+            {isRefunded ? 'Settled + Refunded' : (status || 'Authorized')}
+          </span>
+        )}
       </div>
     );
   };
@@ -301,7 +312,16 @@ export const SupplierRequisitionHistory: React.FC<SupplierRequisitionHistoryProp
                       <span className="font-mono font-bold text-xs text-zinc-900 block">
                         {req.items?.length || 0} lines
                       </span>
-                      {req.status === 'PENDING' ? (
+                      {req.due_amount !== undefined && req.due_amount > 0 ? (
+                        <div className="space-y-0.5">
+                          <span className="text-[11px] font-mono font-bold text-indigo-700 block bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
+                            Given: {req.total_approved_cases ?? 0} ({(req.total_approved_cases || 0) > (req.total_requested_cases || 0) ? `+${(req.total_approved_cases || 0) - (req.total_requested_cases || 0)} extra` : 'Partial'})
+                          </span>
+                          <span className="text-[9px] font-mono font-bold text-rose-600 block bg-rose-50 px-1 rounded border border-rose-200 animate-pulse">
+                            ⚠️ Due: ৳{Number(req.due_amount).toLocaleString('en-US', { minimumFractionDigits: 0 })}
+                          </span>
+                        </div>
+                      ) : req.status === 'PENDING' ? (
                         <span className="text-[10px] font-mono text-blue-600 block font-semibold">
                           {req.total_requested_cases || 0} cases requested
                         </span>
@@ -328,7 +348,7 @@ export const SupplierRequisitionHistory: React.FC<SupplierRequisitionHistoryProp
                     </td>
 
                     <td className="py-3.5 px-4">
-                      {formatPaymentBadge(req.payment_method, req.payment_status)}
+                      {formatPaymentBadge(req.payment_method, req.payment_status, req.due_amount)}
                     </td>
 
                     <td className="py-3.5 px-4">
@@ -341,6 +361,33 @@ export const SupplierRequisitionHistory: React.FC<SupplierRequisitionHistoryProp
 
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
+                        {req.due_amount !== undefined && req.due_amount > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setInvoiceTicket(req);
+                              setIsInvoiceOpen(true);
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs flex items-center gap-1 transition-all cursor-pointer shadow-xs animate-bounce"
+                            title="Complete Remaining Payment for Additional Stock"
+                          >
+                            <CreditCard className="w-3.5 h-3.5" />
+                            <span>Pay Remaining</span>
+                          </button>
+                        )}
+
+                        {(req.status === 'APPROVED' || req.status === 'PARTIALLY_APPROVED') && (
+                          <button
+                            type="button"
+                            onClick={() => setReturnTicket(req)}
+                            className="px-2 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs flex items-center gap-1 transition-all cursor-pointer shadow-xs"
+                            title="File Stock Return or Replacement Claim"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Return / Exchange</span>
+                          </button>
+                        )}
+
                         <button
                           type="button"
                           onClick={() => {
@@ -535,6 +582,21 @@ export const SupplierRequisitionHistory: React.FC<SupplierRequisitionHistoryProp
             </div>
 
             <div className="pt-3 flex flex-col sm:flex-row items-center justify-between gap-2 border-t border-slate-100">
+              {(selectedTicket.status === 'APPROVED' || selectedTicket.status === 'PARTIALLY_APPROVED') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const t = selectedTicket;
+                    setSelectedTicket(null);
+                    setReturnTicket(t);
+                  }}
+                  className="w-full sm:w-auto px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  <span>Return Stock / Request Exchange</span>
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={() => {
@@ -559,11 +621,20 @@ export const SupplierRequisitionHistory: React.FC<SupplierRequisitionHistoryProp
         </div>
       )}
 
+      {/* Policy Return / Exchange Modal */}
+      <ReturnStockModal
+        isOpen={!!returnTicket}
+        requisition={returnTicket}
+        onClose={() => setReturnTicket(null)}
+        onSuccess={fetchRequisitions}
+      />
+
       {/* Official B2B Commercial Tax Invoice Modal & Downloader */}
       <InvoiceModal
         isOpen={isInvoiceOpen}
         invoice={invoiceTicket}
         onClose={() => setIsInvoiceOpen(false)}
+        onPaymentSettled={fetchRequisitions}
       />
     </div>
   );

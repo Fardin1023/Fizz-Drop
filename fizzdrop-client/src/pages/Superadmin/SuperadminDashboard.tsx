@@ -49,6 +49,8 @@ export const SuperadminDashboard: React.FC = () => {
     dismissPopup,
     markAsRead,
     markAllAsRead,
+    deleteNotification,
+    clearOldNotifications,
   } = useNotifications('SUPERADMIN');
 
   const fetchTelemetry = async () => {
@@ -261,6 +263,8 @@ export const SuperadminDashboard: React.FC = () => {
                 unreadCount={unreadCount}
                 onMarkAsRead={markAsRead}
                 onMarkAllAsRead={markAllAsRead}
+                onDeleteNotification={deleteNotification}
+                onClearOldNotifications={clearOldNotifications}
                 onSelectNotification={() => setActiveTab('requisitions')}
                 isScrolled={true}
               />

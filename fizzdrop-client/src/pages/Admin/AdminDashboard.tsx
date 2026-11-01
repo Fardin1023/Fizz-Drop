@@ -5,6 +5,7 @@ import { SupplierAvailableProducts } from './SupplierAvailableProducts';
 import { SupplierRequestStock } from './SupplierRequestStock';
 import { SupplierRequisitionHistory } from './SupplierRequisitionHistory';
 import { SupplierProfileView } from './SupplierProfileView';
+import { SupplierTransactionsView } from './SupplierTransactionsView';
 import {
   Package,
   LogOut,
@@ -16,6 +17,7 @@ import {
   Menu,
   Sparkles,
   ShieldCheck,
+  Receipt,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useNotifications } from '../../hooks/useNotifications';
@@ -24,7 +26,7 @@ import { NotificationPopup } from '../../components/Notifications/NotificationPo
 
 export const AdminDashboard: React.FC = () => {
   const { user, isSupplier, isSuperadmin, isAuthenticated, logout, isLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<'catalog' | 'request' | 'history' | 'profile'>('catalog');
+  const [activeTab, setActiveTab] = useState<'catalog' | 'request' | 'history' | 'profile' | 'transactions'>('catalog');
   const [selectedProductId, setSelectedProductId] = useState<number | undefined>(undefined);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
@@ -35,6 +37,8 @@ export const AdminDashboard: React.FC = () => {
     dismissPopup,
     markAsRead,
     markAllAsRead,
+    deleteNotification,
+    clearOldNotifications,
   } = useNotifications('SUPPLIER', user?.user_id || 4);
 
   if (isLoading) {
@@ -88,6 +92,15 @@ export const AdminDashboard: React.FC = () => {
       gradient: 'from-purple-600 via-pink-600 to-rose-600',
       badge: 'Read-Only',
     },
+    {
+      id: 'transactions' as const,
+      label: 'Financial Ledger & Returns',
+      shortLabel: 'Ledger & Returns',
+      desc: 'Spending, refunds, returns & PDF statements',
+      icon: Receipt,
+      gradient: 'from-emerald-600 via-teal-600 to-cyan-600',
+      badge: 'Statement',
+    },
   ];
 
   return (
@@ -140,6 +153,8 @@ export const AdminDashboard: React.FC = () => {
                 unreadCount={unreadCount}
                 onMarkAsRead={markAsRead}
                 onMarkAllAsRead={markAllAsRead}
+                onDeleteNotification={deleteNotification}
+                onClearOldNotifications={clearOldNotifications}
                 onSelectNotification={() => setActiveTab('history')}
                 isScrolled={true}
               />
@@ -308,6 +323,7 @@ export const AdminDashboard: React.FC = () => {
             <SupplierRequisitionHistory onNewRequisitionClick={() => setActiveTab('request')} />
           )}
           {activeTab === 'profile' && <SupplierProfileView />}
+          {activeTab === 'transactions' && <SupplierTransactionsView />}
         </main>
       </div>
     </div>

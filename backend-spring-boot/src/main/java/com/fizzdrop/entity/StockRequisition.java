@@ -85,6 +85,11 @@ public class StockRequisition {
     @JsonAlias({"refund_amount", "refundAmount"})
     private java.math.BigDecimal refundAmount;
 
+    @Column(name = "due_amount")
+    @JsonProperty("due_amount")
+    @JsonAlias({"due_amount", "dueAmount"})
+    private java.math.BigDecimal dueAmount;
+
     @Column(name = "created_at", nullable = false)
     @JsonProperty("created_at")
     private LocalDateTime createdAt;
@@ -213,4 +218,7 @@ public class StockRequisition {
 
     public java.math.BigDecimal getRefundAmount() { return refundAmount; }
     public void setRefundAmount(java.math.BigDecimal refundAmount) { this.refundAmount = refundAmount; }
+
+    public java.math.BigDecimal getDueAmount() { return dueAmount; }
+    public void setDueAmount(java.math.BigDecimal dueAmount) { this.dueAmount = dueAmount; }
 }

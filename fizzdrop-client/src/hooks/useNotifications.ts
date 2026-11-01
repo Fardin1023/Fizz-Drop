@@ -97,6 +97,42 @@ export const useNotifications = (
     }
   }, [role, userId]);
 
+  // Delete a single notification
+  const deleteNotification = useCallback(async (id: number) => {
+    try {
+      await fetch(`http://localhost:8080/api/v1/notifications/${id}`, {
+        method: 'DELETE',
+      });
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+      setUnreadCount((prev) => {
+        const item = notifications.find((n) => n.id === id);
+        return item && !item.is_read ? Math.max(0, prev - 1) : prev;
+      });
+    } catch (err) {
+      console.error('Failed to delete notification', err);
+    }
+  }, [notifications]);
+
+  // Clear old notifications (can clear only read or all old ones)
+  const clearOldNotifications = useCallback(async (readOnly = false) => {
+    try {
+      await fetch(
+        `http://localhost:8080/api/v1/notifications/clear-old?role=${role}&readOnly=${readOnly}${
+          userId ? `&userId=${userId}` : ''
+        }`,
+        { method: 'DELETE' }
+      );
+      if (readOnly) {
+        setNotifications((prev) => prev.filter((n) => !n.is_read));
+      } else {
+        setNotifications([]);
+        setUnreadCount(0);
+      }
+    } catch (err) {
+      console.error('Failed to clear notifications', err);
+    }
+  }, [role, userId]);
+
   // Broadcast event across browser tabs
   const broadcastEvent = useCallback((payload: RealtimeEventPayload) => {
     try {
@@ -179,6 +215,8 @@ export const useNotifications = (
     dismissPopup,
     markAsRead,
     markAllAsRead,
+    deleteNotification,
+    clearOldNotifications,
     broadcastEvent,
     fetchNotifications,
   };

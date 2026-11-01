@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Printer,
   Download,
@@ -8,6 +8,7 @@ import {
   CreditCard,
   FileText,
   Truck,
+  CheckCircle2,
 } from 'lucide-react';
 
 export interface InvoiceItem {
@@ -46,16 +47,20 @@ export interface InvoiceData {
   total_amount?: number;
   fulfilled_amount?: number;
   refund_amount?: number;
+  due_amount?: number;
 }
 
 interface InvoiceModalProps {
   invoice: InvoiceData | null;
   isOpen: boolean;
   onClose: () => void;
+  onPaymentSettled?: () => void;
 }
 
-export const InvoiceModal: React.FC<InvoiceModalProps> = ({ invoice, isOpen, onClose }) => {
+export const InvoiceModal: React.FC<InvoiceModalProps> = ({ invoice, isOpen, onClose, onPaymentSettled }) => {
   const printRef = useRef<HTMLDivElement>(null);
+  const [payingDue, setPayingDue] = useState(false);
+  const [paySuccess, setPaySuccess] = useState(false);
 
   if (!isOpen || !invoice) return null;
 
@@ -110,6 +115,35 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ invoice, isOpen, onC
       ? invoice.refund_amount
       : Math.max(0, originalGrandTotal - fulfilledGrandTotal)
   );
+
+  const dueAmount = Number(
+    invoice.due_amount !== undefined
+      ? invoice.due_amount
+      : Math.max(0, fulfilledGrandTotal - originalGrandTotal)
+  );
+
+  const handlePayRemainingDue = async () => {
+    if (!invoice.id) return;
+    setPayingDue(true);
+    try {
+      const res = await fetch(`http://localhost:8080/api/v1/supplier/requisitions/${invoice.id}/pay-due`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          paymentMethod: invoice.payment_method || 'bKash Merchant B2B Direct',
+          paymentReference: `SETTLE-TXN-${Date.now().toString().slice(-6)}`,
+        }),
+      });
+      if (res.ok) {
+        setPaySuccess(true);
+        if (onPaymentSettled) onPaymentSettled();
+      }
+    } catch (err) {
+      console.error('Failed to settle due payment', err);
+    } finally {
+      setPayingDue(false);
+    }
+  };
 
   // Print invoice
   const handlePrint = () => {
@@ -222,6 +256,29 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ invoice, isOpen, onC
           </div>
 
           <div className="flex items-center gap-2">
+            {dueAmount > 0 && !paySuccess && (
+              <button
+                type="button"
+                onClick={handlePayRemainingDue}
+                disabled={payingDue}
+                className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                title="Pay Remaining Invoice Balance"
+              >
+                {payingDue ? (
+                  <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <CreditCard className="w-3.5 h-3.5 text-white" />
+                )}
+                <span>Complete Remaining Payment (৳{dueAmount.toLocaleString('en-US', { minimumFractionDigits: 0 })})</span>
+              </button>
+            )}
+            {paySuccess && (
+              <span className="px-2.5 py-1 rounded-xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 font-bold text-xs flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Paid & Settled!</span>
+              </span>
+            )}
+
             <button
               onClick={handlePrint}
               className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
@@ -405,10 +462,16 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ invoice, isOpen, onC
             {/* Financial Summary & Stamp */}
             <div className="flex flex-col sm:flex-row justify-between items-start gap-6 pt-2">
               <div className="space-y-3">
-                <div className="stamp border-2 border-emerald-600 text-emerald-700 px-3 py-1.5 rounded-xl text-xs font-mono font-black uppercase tracking-wider inline-flex items-center gap-1.5 shadow-xs">
-                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                <div className={`stamp border-2 px-3 py-1.5 rounded-xl text-xs font-mono font-black uppercase tracking-wider inline-flex items-center gap-1.5 shadow-xs ${
+                  dueAmount > 0
+                    ? 'border-indigo-600 text-indigo-700 bg-indigo-50/70'
+                    : 'border-emerald-600 text-emerald-700'
+                }`}>
+                  <ShieldCheck className="w-4 h-4" />
                   <span>
-                    {refundAmount > 0
+                    {dueAmount > 0
+                      ? `ADDITIONAL STOCK ALLOCATED • ৳${dueAmount.toLocaleString('en-US', { minimumFractionDigits: 0 })} BALANCE DUE`
+                      : refundAmount > 0
                       ? `DISPATCH VERIFIED • ৳${refundAmount.toLocaleString('en-US', { minimumFractionDigits: 0 })} LEFTOVER REFUNDED`
                       : 'CENTRAL DISPATCH VERIFIED & ALLOCATED'}
                   </span>
@@ -435,6 +498,12 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ invoice, isOpen, onC
                   <div className="summary-row flex justify-between text-amber-800 bg-amber-50 px-2 py-1 rounded font-bold border border-amber-200">
                     <span>Leftover Payment Refund Returned:</span>
                     <span className="font-mono">- ৳ {refundAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                )}
+                {dueAmount > 0 && (
+                  <div className="summary-row flex justify-between text-rose-800 bg-rose-50 px-2 py-1 rounded font-bold border border-rose-200">
+                    <span>Remaining Balance Due:</span>
+                    <span className="font-mono">+ ৳ {dueAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                   </div>
                 )}
                 <div className="summary-total flex justify-between items-center text-sm font-black border-t-2 border-zinc-900 pt-2 text-zinc-900">

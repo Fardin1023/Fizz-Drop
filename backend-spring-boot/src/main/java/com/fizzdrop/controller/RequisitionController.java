@@ -3,6 +3,10 @@ package com.fizzdrop.controller;
 import com.fizzdrop.dto.AdminReviewDTO;
 import com.fizzdrop.dto.ApiResponse;
 import com.fizzdrop.dto.CreateRequisitionDTO;
+import com.fizzdrop.dto.CreateReturnRequestDTO;
+import com.fizzdrop.dto.ReturnReviewDTO;
+import com.fizzdrop.dto.SupplierFinancialSummaryDTO;
+import com.fizzdrop.entity.StockReturnRequest;
 import com.fizzdrop.dto.SupplierProfileDTO;
 import com.fizzdrop.entity.CentralInventory;
 import com.fizzdrop.entity.District;
@@ -14,6 +18,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -140,6 +145,20 @@ public class RequisitionController {
         return ResponseEntity.ok(requisitionService.getSupplierRequisitions(resolvedId));
     }
 
+    @PostMapping("/supplier/requisitions/{id}/pay-due")
+    public ResponseEntity<?> payDueAmount(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, String> payload) {
+        try {
+            String paymentMethod = payload != null ? payload.get("paymentMethod") : null;
+            String paymentRef = payload != null ? payload.get("paymentReference") : null;
+            StockRequisition updated = requisitionService.settleDuePayment(id, paymentMethod, paymentRef);
+            return ResponseEntity.ok(updated);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));
+        }
+    }
+
     // 4. Superadmin Requisitions Hub API
     @GetMapping("/admin/requisitions")
     public ResponseEntity<List<StockRequisition>> getAdminRequisitions(
@@ -175,4 +194,54 @@ public class RequisitionController {
     public ResponseEntity<List<CentralInventory>> getCentralInventory() {
         return ResponseEntity.ok(requisitionService.getCentralInventory());
     }
+
+    // 6. Stock Return & Policy-Driven Refund / Exchange API
+    @PostMapping("/supplier/returns")
+    public ResponseEntity<?> createReturnRequest(
+            @RequestHeader(value = "Authorization", required = false) String authHeader,
+            @RequestParam(value = "userId", required = false) Long userId,
+            @RequestBody CreateReturnRequestDTO dto) {
+        try {
+            Long resolvedId = resolveUserId(authHeader, userId);
+            StockReturnRequest created = requisitionService.createReturnRequest(resolvedId, dto);
+            return ResponseEntity.status(HttpStatus.CREATED).body(created);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));
+        }
+    }
+
+    @GetMapping("/supplier/returns")
+    public ResponseEntity<List<StockReturnRequest>> getSupplierReturns(
+            @RequestHeader(value = "Authorization", required = false) String authHeader,
+            @RequestParam(value = "userId", required = false) Long userId) {
+        Long resolvedId = resolveUserId(authHeader, userId);
+        return ResponseEntity.ok(requisitionService.getSupplierReturnRequests(resolvedId));
+    }
+
+    @GetMapping("/supplier/transactions")
+    public ResponseEntity<SupplierFinancialSummaryDTO> getSupplierTransactions(
+            @RequestHeader(value = "Authorization", required = false) String authHeader,
+            @RequestParam(value = "userId", required = false) Long userId) {
+        Long resolvedId = resolveUserId(authHeader, userId);
+        return ResponseEntity.ok(requisitionService.getSupplierFinancialSummary(resolvedId));
+    }
+
+    @GetMapping("/admin/returns")
+    public ResponseEntity<List<StockReturnRequest>> getAllReturnsForAdmin(
+            @RequestParam(required = false) String status) {
+        return ResponseEntity.ok(requisitionService.getAllReturnRequestsForAdmin(status));
+    }
+
+    @PostMapping("/admin/returns/{id}/decision")
+    public ResponseEntity<?> processReturnDecision(
+            @PathVariable Long id,
+            @RequestBody ReturnReviewDTO reviewDto) {
+        try {
+            StockReturnRequest updated = requisitionService.processReturnDecision(id, reviewDto);
+            return ResponseEntity.ok(updated);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));
+        }
+    }
+
 }

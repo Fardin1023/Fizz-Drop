@@ -8,6 +8,7 @@ import {
   CheckCheck,
   Clock,
   Sparkles,
+  Trash2,
 } from 'lucide-react';
 import type { AppNotification } from '../../types/notification';
 
@@ -16,6 +17,8 @@ interface NotificationDropdownProps {
   unreadCount: number;
   onMarkAsRead: (id: number) => void;
   onMarkAllAsRead: () => void;
+  onDeleteNotification?: (id: number) => void;
+  onClearOldNotifications?: (readOnly?: boolean) => void;
   onSelectNotification?: (notification: AppNotification) => void;
   isScrolled?: boolean;
 }
@@ -25,6 +28,8 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
   unreadCount,
   onMarkAsRead,
   onMarkAllAsRead,
+  onDeleteNotification,
+  onClearOldNotifications,
   onSelectNotification,
   isScrolled = false,
 }) => {
@@ -85,28 +90,47 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
       {isOpen && (
         <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-3xl bg-white/95 backdrop-blur-xl border border-slate-200 shadow-2xl shadow-blue-500/10 z-[130] overflow-hidden animate-fade-in">
           {/* Header */}
-          <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+          <div className="p-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
             <div className="flex items-center gap-2">
               <span className="font-oswald text-sm font-bold uppercase tracking-tight text-zinc-900">
                 Notifications
               </span>
-              {unreadCount > 0 && (
+              {unreadCount > 0 ? (
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-blue-100 text-blue-800">
                   {unreadCount} new
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono text-slate-500 bg-slate-200/60">
+                  {notifications.length}
                 </span>
               )}
             </div>
 
-            {unreadCount > 0 && (
-              <button
-                type="button"
-                onClick={onMarkAllAsRead}
-                className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors cursor-pointer"
-              >
-                <CheckCheck className="w-3.5 h-3.5" />
-                <span>Mark all read</span>
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {unreadCount > 0 && (
+                <button
+                  type="button"
+                  onClick={onMarkAllAsRead}
+                  className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors cursor-pointer"
+                  title="Mark all as read"
+                >
+                  <CheckCheck className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Mark read</span>
+                </button>
+              )}
+
+              {notifications.length > 0 && onClearOldNotifications && (
+                <button
+                  type="button"
+                  onClick={() => onClearOldNotifications(false)}
+                  className="text-[11px] font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-2 py-1 rounded-lg border border-rose-200/70 flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+                  title="Remove old notifications"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  <span>Remove Old</span>
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Notifications List */}
@@ -177,9 +201,24 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
                         >
                           {n.title}
                         </span>
-                        {!n.is_read && (
-                          <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0" />
-                        )}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {!n.is_read && (
+                            <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0" />
+                          )}
+                          {onDeleteNotification && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onDeleteNotification(n.id);
+                              }}
+                              className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                              title="Delete notification"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       <p className="text-[11px] text-slate-500 line-clamp-2 mt-0.5 leading-snug">

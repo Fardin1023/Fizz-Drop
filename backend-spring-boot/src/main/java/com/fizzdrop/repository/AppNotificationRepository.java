@@ -25,4 +25,9 @@ public interface AppNotificationRepository extends JpaRepository<AppNotification
     @Modifying
     @Query("UPDATE AppNotification n SET n.isRead = true WHERE UPPER(n.recipientRole) = UPPER(:role) AND (:userId IS NULL OR n.recipientUserId IS NULL OR n.recipientUserId = :userId)")
     void markAllAsRead(@Param("role") String role, @Param("userId") Long userId);
+
+    @Transactional
+    @Modifying
+    @Query("DELETE FROM AppNotification n WHERE UPPER(n.recipientRole) = UPPER(:role) AND (:userId IS NULL OR n.recipientUserId IS NULL OR n.recipientUserId = :userId) AND (:readOnly = false OR n.isRead = true)")
+    void deleteOldNotifications(@Param("role") String role, @Param("userId") Long userId, @Param("readOnly") boolean readOnly);
 }

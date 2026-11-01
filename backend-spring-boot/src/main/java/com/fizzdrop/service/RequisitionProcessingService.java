@@ -2,6 +2,9 @@ package com.fizzdrop.service;
 
 import com.fizzdrop.dto.AdminReviewDTO;
 import com.fizzdrop.dto.CreateRequisitionDTO;
+import com.fizzdrop.dto.CreateReturnRequestDTO;
+import com.fizzdrop.dto.ReturnReviewDTO;
+import com.fizzdrop.dto.SupplierFinancialSummaryDTO;
 import com.fizzdrop.dto.SupplierProfileDTO;
 import com.fizzdrop.entity.*;
 import com.fizzdrop.repository.*;
@@ -25,6 +28,9 @@ public class RequisitionProcessingService {
     private final AppNotificationRepository notificationRepository;
     private final CentralInventoryRepository centralInventoryRepository;
     private final UserRepository userRepository;
+    private final StockReturnRequestRepository stockReturnRequestRepository;
+    private final StockReturnItemRepository stockReturnItemRepository;
+    private final SupplierTransactionRepository supplierTransactionRepository;
     private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     public RequisitionProcessingService(DistrictRepository districtRepository,
@@ -37,6 +43,9 @@ public class RequisitionProcessingService {
                                         AppNotificationRepository notificationRepository,
                                         CentralInventoryRepository centralInventoryRepository,
                                         UserRepository userRepository,
+                                        StockReturnRequestRepository stockReturnRequestRepository,
+                                        StockReturnItemRepository stockReturnItemRepository,
+                                        SupplierTransactionRepository supplierTransactionRepository,
                                         org.springframework.jdbc.core.JdbcTemplate jdbcTemplate) {
         this.districtRepository = districtRepository;
         this.supplierProfileRepository = supplierProfileRepository;
@@ -48,6 +57,9 @@ public class RequisitionProcessingService {
         this.notificationRepository = notificationRepository;
         this.centralInventoryRepository = centralInventoryRepository;
         this.userRepository = userRepository;
+        this.stockReturnRequestRepository = stockReturnRequestRepository;
+        this.stockReturnItemRepository = stockReturnItemRepository;
+        this.supplierTransactionRepository = supplierTransactionRepository;
         this.jdbcTemplate = jdbcTemplate;
     }
 
@@ -589,6 +601,25 @@ public class RequisitionProcessingService {
         savedReq.setTotalApprovedCases(0);
         enrichRequisition(savedReq, profile);
 
+        try {
+            SupplierTransaction tx = new SupplierTransaction(
+                    "TXN-" + System.currentTimeMillis() + "-" + (100 + new Random().nextInt(900)),
+                    profile.getId(),
+                    savedReq.getId(),
+                    null,
+                    savedReq.getRequisitionCode(),
+                    "STOCK_PURCHASE",
+                    "DEBIT",
+                    savedReq.getTotalAmount(),
+                    savedReq.getPaymentMethod(),
+                    "Initial stock purchase payment for " + totalCases + " cases (" + savedReq.getRequisitionCode() + ")",
+                    "COMPLETED"
+            );
+            supplierTransactionRepository.save(tx);
+        } catch (Exception ex) {
+            System.err.println("[Transaction Error] Initial purchase transaction record failed: " + ex.getMessage());
+        }
+
         // Real-time Notification for Superadmin
         try {
             String distName = savedReq.getDistrictName() != null ? savedReq.getDistrictName() : "Regional";
@@ -703,13 +734,14 @@ public class RequisitionProcessingService {
 
         for (StockRequisitionItem item : items) {
             int requested = item.getRequestedQuantity() != null ? item.getRequestedQuantity() : 0;
+            int previousApproved = item.getApprovedQuantity() != null ? item.getApprovedQuantity() : 0;
             totalRequested += requested;
 
             int approved;
             if ("REJECT".equals(action)) {
                 approved = 0;
             } else if (approvedMap.containsKey(item.getId())) {
-                approved = Math.min(requested, approvedMap.get(item.getId()));
+                approved = Math.max(0, approvedMap.get(item.getId()));
             } else if ("APPROVE_FULL".equals(action)) {
                 approved = requested;
             } else {
@@ -721,11 +753,18 @@ public class RequisitionProcessingService {
 
             if (approved > 0) {
                 allZero = false;
-                allocateDistrictStock(req.getDistrictId(), item.getProductId(), approved);
-                deductCentralStock(item.getProductId(), approved);
             }
             if (approved < requested) {
                 allFull = false;
+            }
+
+            int delta = approved - previousApproved;
+            if (delta > 0) {
+                allocateDistrictStock(req.getDistrictId(), item.getProductId(), delta);
+                deductCentralStock(item.getProductId(), delta);
+            } else if (delta < 0) {
+                reduceDistrictStock(req.getDistrictId(), item.getProductId(), -delta);
+                restoreCentralStock(item.getProductId(), -delta);
             }
         }
 
@@ -757,21 +796,29 @@ public class RequisitionProcessingService {
         java.math.BigDecimal originalTotalWithVat = originalSubtotal.multiply(vatMultiplier).setScale(2, java.math.RoundingMode.HALF_UP);
         java.math.BigDecimal fulfilledTotalWithVat = fulfilledSubtotal.multiply(vatMultiplier).setScale(2, java.math.RoundingMode.HALF_UP);
 
-        if (req.getTotalAmount() == null || req.getTotalAmount().compareTo(java.math.BigDecimal.ZERO) == 0) {
-            req.setTotalAmount(originalTotalWithVat);
-        }
-
-        java.math.BigDecimal leftoverRefund = req.getTotalAmount().subtract(fulfilledTotalWithVat);
-        if (leftoverRefund.compareTo(java.math.BigDecimal.ZERO) < 0) {
-            leftoverRefund = java.math.BigDecimal.ZERO;
-        }
-
+        java.math.BigDecimal initialPaid = (req.getTotalAmount() != null && req.getTotalAmount().compareTo(java.math.BigDecimal.ZERO) > 0)
+                ? req.getTotalAmount()
+                : originalTotalWithVat;
+        req.setTotalAmount(initialPaid);
         req.setFulfilledAmount(fulfilledTotalWithVat);
+
+        java.math.BigDecimal leftoverRefund = java.math.BigDecimal.ZERO;
+        java.math.BigDecimal remainingDue = java.math.BigDecimal.ZERO;
+
+        if (fulfilledTotalWithVat.compareTo(initialPaid) < 0) {
+            leftoverRefund = initialPaid.subtract(fulfilledTotalWithVat);
+        } else if (fulfilledTotalWithVat.compareTo(initialPaid) > 0) {
+            remainingDue = fulfilledTotalWithVat.subtract(initialPaid);
+        }
+
         req.setRefundAmount(leftoverRefund);
+        req.setDueAmount(remainingDue);
 
         if ("REJECTED".equals(req.getStatus())) {
             req.setPaymentStatus("REFUNDED_FULL");
-        } else if ("PARTIALLY_APPROVED".equals(req.getStatus()) && leftoverRefund.compareTo(java.math.BigDecimal.ZERO) > 0) {
+        } else if (remainingDue.compareTo(java.math.BigDecimal.ZERO) > 0) {
+            req.setPaymentStatus("ADDITIONAL_PAYMENT_DUE");
+        } else if (leftoverRefund.compareTo(java.math.BigDecimal.ZERO) > 0) {
             req.setPaymentStatus("PARTIALLY_SETTLED_REFUNDED");
         } else {
             req.setPaymentStatus("PAID_SETTLED");
@@ -784,11 +831,33 @@ public class RequisitionProcessingService {
         req.setUpdatedAt(LocalDateTime.now());
         StockRequisition saved = requisitionRepository.save(req);
 
+
         SupplierProfile sp = supplierProfileRepository.findById(req.getSupplierId()).orElse(null);
         enrichRequisition(saved, sp);
         saved.setItems(items);
         saved.setTotalRequestedCases(totalRequested);
         saved.setTotalApprovedCases(totalApproved);
+
+        if (leftoverRefund.compareTo(java.math.BigDecimal.ZERO) > 0) {
+            try {
+                SupplierTransaction refTx = new SupplierTransaction(
+                        "TXN-" + System.currentTimeMillis() + "-" + (100 + new Random().nextInt(900)),
+                        saved.getSupplierId(),
+                        saved.getId(),
+                        null,
+                        saved.getRequisitionCode(),
+                        "SHORTFALL_REFUND",
+                        "CREDIT",
+                        leftoverRefund,
+                        saved.getPaymentMethod(),
+                        "Automated shortfall refund for requisition " + saved.getRequisitionCode() + " (" + (totalRequested - totalApproved) + " cases unfulfilled)",
+                        "COMPLETED"
+                );
+                supplierTransactionRepository.save(refTx);
+            } catch (Exception ex) {
+                System.err.println("[Transaction Error] Shortfall refund transaction record failed: " + ex.getMessage());
+            }
+        }
 
         // Real-time Notification for Supplier with leftover refund disclosure
         try {
@@ -800,9 +869,12 @@ public class RequisitionProcessingService {
             String refundPart = leftoverRefund.compareTo(java.math.BigDecimal.ZERO) > 0
                     ? " Leftover amount of ৳" + leftoverRefund.setScale(2, java.math.RoundingMode.HALF_UP) + " has been returned/refunded to your " + (saved.getPaymentMethod() != null ? saved.getPaymentMethod().replace('_', ' ') : "payment") + " account."
                     : "";
+            String duePart = remainingDue.compareTo(java.math.BigDecimal.ZERO) > 0
+                    ? " Additional stock was allocated! An additional balance due of ৳" + remainingDue.setScale(2, java.math.RoundingMode.HALF_UP) + " is pending on your invoice. Please complete the remaining payment."
+                    : "";
 
             String msg = "Superadmin has processed requisition " + saved.getRequisitionCode() +
-                    ". Decision: " + statusBadge + " (" + totalApproved + "/" + totalRequested + " cases permitted)." + refundPart + remarksPart;
+                    ". Decision: " + statusBadge + " (" + totalApproved + "/" + totalRequested + " cases permitted)." + refundPart + duePart + remarksPart;
 
             AppNotification supplierNotification = new AppNotification(
                     "SUPPLIER",
@@ -821,6 +893,81 @@ public class RequisitionProcessingService {
         return saved;
     }
 
+    @Transactional
+    public StockRequisition settleDuePayment(Long requisitionId, String paymentMethod, String paymentRef) {
+        StockRequisition req = requisitionRepository.findById(requisitionId)
+                .orElseThrow(() -> new RuntimeException("Requisition not found with id: " + requisitionId));
+
+        if (req.getDueAmount() == null || req.getDueAmount().compareTo(java.math.BigDecimal.ZERO) <= 0) {
+            throw new RuntimeException("No remaining balance due for requisition: " + req.getRequisitionCode());
+        }
+
+        java.math.BigDecimal settledDue = req.getDueAmount();
+        req.setTotalAmount(req.getFulfilledAmount());
+        req.setDueAmount(java.math.BigDecimal.ZERO);
+        req.setPaymentStatus("PAID_SETTLED");
+        if (paymentMethod != null && !paymentMethod.trim().isEmpty()) {
+            req.setPaymentMethod(paymentMethod);
+        }
+        if (paymentRef != null && !paymentRef.trim().isEmpty()) {
+            req.setPaymentReference(paymentRef);
+        }
+        req.setUpdatedAt(LocalDateTime.now());
+        StockRequisition saved = requisitionRepository.save(req);
+
+        try {
+            SupplierTransaction dueTx = new SupplierTransaction(
+                    "TXN-" + System.currentTimeMillis() + "-" + (100 + new Random().nextInt(900)),
+                    saved.getSupplierId(),
+                    saved.getId(),
+                    null,
+                    saved.getRequisitionCode(),
+                    "DUE_SETTLEMENT",
+                    "DEBIT",
+                    settledDue,
+                    paymentMethod != null ? paymentMethod : saved.getPaymentMethod(),
+                    "Additional balance due payment settled for requisition " + saved.getRequisitionCode(),
+                    "COMPLETED"
+            );
+            supplierTransactionRepository.save(dueTx);
+        } catch (Exception ex) {
+            System.err.println("[Transaction Error] Due settlement transaction record failed: " + ex.getMessage());
+        }
+
+
+
+        try {
+            SupplierProfile sp = supplierProfileRepository.findById(saved.getSupplierId()).orElse(null);
+            Long supplierUserId = sp != null ? sp.getUserId() : null;
+
+            AppNotification supplierNotif = new AppNotification(
+                    "SUPPLIER",
+                    supplierUserId,
+                    "Payment Settled: " + saved.getRequisitionCode(),
+                    "Your remaining balance payment of ৳" + settledDue.setScale(2, java.math.RoundingMode.HALF_UP) + " has been successfully settled for requisition " + saved.getRequisitionCode() + ".",
+                    "PAID_SETTLED",
+                    saved.getRequisitionCode(),
+                    saved.getId()
+            );
+            notificationRepository.save(supplierNotif);
+
+            AppNotification superadminNotif = new AppNotification(
+                    "SUPERADMIN",
+                    null,
+                    "Requisition Due Balance Paid: " + saved.getRequisitionCode(),
+                    "Supplier " + (sp != null ? sp.getBusinessName() : "N/A") + " has paid the additional balance due of ৳" + settledDue.setScale(2, java.math.RoundingMode.HALF_UP) + " for requisition " + saved.getRequisitionCode() + ".",
+                    "PAID_SETTLED",
+                    saved.getRequisitionCode(),
+                    saved.getId()
+            );
+            notificationRepository.save(superadminNotif);
+        } catch (Exception ex) {
+            System.err.println("[Notification Error] Settlement notification failed: " + ex.getMessage());
+        }
+
+        return saved;
+    }
+
     private void allocateDistrictStock(Long districtId, Long productId, int qty) {
         var invOpt = districtInventoryRepository.findByDistrictIdAndProductId(districtId, productId);
         DistrictInventory di;
@@ -833,10 +980,26 @@ public class RequisitionProcessingService {
         districtInventoryRepository.save(di);
     }
 
+    private void reduceDistrictStock(Long districtId, Long productId, int qty) {
+        districtInventoryRepository.findByDistrictIdAndProductId(districtId, productId).ifPresent(di -> {
+            int newStock = Math.max(0, di.getCurrentStock() - qty);
+            di.setCurrentStock(newStock);
+            districtInventoryRepository.save(di);
+        });
+    }
+
     private void deductCentralStock(Long productId, int qty) {
         centralInventoryRepository.findByProductId(productId).ifPresent(ci -> {
             int newAvailable = Math.max(0, ci.getAvailableStock() - qty);
             ci.setAvailableStock(newAvailable);
+            ci.setUpdatedAt(LocalDateTime.now());
+            centralInventoryRepository.save(ci);
+        });
+    }
+
+    private void restoreCentralStock(Long productId, int qty) {
+        centralInventoryRepository.findByProductId(productId).ifPresent(ci -> {
+            ci.setAvailableStock(ci.getAvailableStock() + qty);
             ci.setUpdatedAt(LocalDateTime.now());
             centralInventoryRepository.save(ci);
         });
@@ -990,4 +1153,446 @@ public class RequisitionProcessingService {
             }
         }
     }
+
+    // ==========================================
+    // STOCK RETURN & REFUND / EXCHANGE WORKFLOWS
+    // ==========================================
+
+    @Transactional
+    public StockReturnRequest createReturnRequest(Long userId, CreateReturnRequestDTO dto) {
+        if (dto.getRequisitionId() == null) {
+            throw new IllegalArgumentException("Requisition ID is required for return request.");
+        }
+        StockRequisition req = requisitionRepository.findById(dto.getRequisitionId())
+                .orElseThrow(() -> new IllegalArgumentException("Requisition not found with ID: " + dto.getRequisitionId()));
+
+        if (!"APPROVED".equalsIgnoreCase(req.getStatus()) && !"PARTIALLY_APPROVED".equalsIgnoreCase(req.getStatus())) {
+            throw new IllegalStateException("Only approved or partially approved requisitions can be returned.");
+        }
+
+        SupplierProfile profile = getSupplierProfile(userId);
+
+        if (dto.getItems() == null || dto.getItems().isEmpty()) {
+            throw new IllegalArgumentException("At least one product item must be specified for return.");
+        }
+
+        if (dto.getReasonCategory() == null || dto.getReasonCategory().trim().isEmpty()) {
+            throw new IllegalArgumentException("A valid return reason category is required by return policy.");
+        }
+        if (dto.getReasonDetails() == null || dto.getReasonDetails().trim().isEmpty()) {
+            throw new IllegalArgumentException("Detailed explanation for return is required.");
+        }
+
+        String year = String.valueOf(LocalDateTime.now().getYear());
+        int randomCode = 1000 + new Random().nextInt(9000);
+        String returnCode = "RET-" + year + "-" + randomCode;
+        while (stockReturnRequestRepository.findByReturnCode(returnCode).isPresent()) {
+            randomCode = 1000 + new Random().nextInt(9000);
+            returnCode = "RET-" + year + "-" + randomCode;
+        }
+
+        StockReturnRequest returnReq = new StockReturnRequest();
+        returnReq.setReturnCode(returnCode);
+        returnReq.setRequisitionId(req.getId());
+        returnReq.setRequisitionCode(req.getRequisitionCode());
+        returnReq.setSupplierId(profile.getId());
+        returnReq.setDistrictId(req.getDistrictId());
+        returnReq.setReturnType(dto.getReturnType() != null ? dto.getReturnType().toUpperCase() : "REFUND_CASH");
+        returnReq.setStatus("PENDING_REVIEW");
+        returnReq.setReasonCategory(dto.getReasonCategory().trim());
+        returnReq.setReasonDetails(dto.getReasonDetails().trim());
+
+        List<StockRequisitionItem> reqItems = requisitionItemRepository.findByRequisitionId(req.getId());
+        Map<Long, StockRequisitionItem> reqItemMap = new HashMap<>();
+        for (StockRequisitionItem ri : reqItems) {
+            reqItemMap.put(ri.getProductId(), ri);
+        }
+
+        int totalReturnedCases = 0;
+        int totalKeptCases = 0;
+        java.math.BigDecimal subtotalReturn = java.math.BigDecimal.ZERO;
+
+        List<StockReturnItem> itemsToSave = new ArrayList<>();
+
+        for (CreateReturnRequestDTO.ItemReturnDetail itemDetail : dto.getItems()) {
+            Long prodId = itemDetail.getProductId();
+            int returnedQty = itemDetail.getReturnedQuantity() != null ? Math.max(0, itemDetail.getReturnedQuantity()) : 0;
+            int keptQty = itemDetail.getKeptQuantity() != null ? Math.max(0, itemDetail.getKeptQuantity()) : 0;
+
+            if (returnedQty == 0 && keptQty == 0) continue;
+
+            Product product = productRepository.findById(prodId).orElse(null);
+            java.math.BigDecimal unitPrice = (product != null && product.getBasePrice() != null)
+                    ? product.getBasePrice()
+                    : java.math.BigDecimal.valueOf(48.0);
+
+            int receivedQty = returnedQty + keptQty;
+            StockRequisitionItem originalItem = reqItemMap.get(prodId);
+            if (originalItem != null && originalItem.getApprovedQuantity() != null) {
+                receivedQty = originalItem.getApprovedQuantity();
+            }
+
+            java.math.BigDecimal lineTotal = unitPrice.multiply(java.math.BigDecimal.valueOf(returnedQty));
+            subtotalReturn = subtotalReturn.add(lineTotal);
+            totalReturnedCases += returnedQty;
+            totalKeptCases += keptQty;
+
+            StockReturnItem returnItem = new StockReturnItem();
+            returnItem.setProductId(prodId);
+            returnItem.setReceivedQuantity(receivedQty);
+            returnItem.setKeptQuantity(keptQty);
+            returnItem.setReturnedQuantity(returnedQty);
+            returnItem.setUnitPrice(unitPrice);
+            returnItem.setLineTotal(lineTotal);
+            itemsToSave.add(returnItem);
+        }
+
+        if (totalReturnedCases == 0) {
+            throw new IllegalArgumentException("Returned quantity must be greater than 0 cases.");
+        }
+
+        // Apply 5% wholesale distribution VAT to refund calculation
+        java.math.BigDecimal totalRefundWithVat = subtotalReturn.multiply(java.math.BigDecimal.valueOf(1.05))
+                .setScale(2, java.math.RoundingMode.HALF_UP);
+
+        returnReq.setReturnedQuantity(totalReturnedCases);
+        returnReq.setKeptQuantity(totalKeptCases);
+        returnReq.setRefundAmount(totalRefundWithVat);
+
+        if ("EXCHANGE_PRODUCT".equalsIgnoreCase(returnReq.getReturnType())) {
+            returnReq.setReplacementProductId(dto.getReplacementProductId());
+            returnReq.setReplacementQuantity(dto.getReplacementQuantity() != null ? dto.getReplacementQuantity() : totalReturnedCases);
+            if (dto.getReplacementProductId() != null) {
+                productRepository.findById(dto.getReplacementProductId()).ifPresent(p -> {
+                    returnReq.setReplacementProductName(p.getBrand() + " " + p.getFlavorVariant() + " (" + p.getSizeVolume() + ")");
+                });
+            }
+        }
+
+        returnReq.setCreatedAt(LocalDateTime.now());
+        returnReq.setUpdatedAt(LocalDateTime.now());
+        StockReturnRequest savedReturn = stockReturnRequestRepository.save(returnReq);
+
+        for (StockReturnItem item : itemsToSave) {
+            item.setReturnRequestId(savedReturn.getId());
+        }
+        stockReturnItemRepository.saveAll(itemsToSave);
+
+        savedReturn.setItems(itemsToSave);
+        enrichReturnRequest(savedReturn);
+
+        // Notify Superadmin
+        try {
+            String modeStr = "REFUND_CASH".equalsIgnoreCase(savedReturn.getReturnType()) ? "Cash Refund" : "Product Replacement/Exchange";
+            String msg = "Supplier " + profile.getBusinessName() + " has filed a return request (" + savedReturn.getReturnCode() +
+                    ") for Requisition " + req.getRequisitionCode() + ". " + totalReturnedCases + " cases returned (" + modeStr + "). Reason: " +
+                    savedReturn.getReasonCategory() + " - " + savedReturn.getReasonDetails();
+
+            AppNotification notif = new AppNotification(
+                    "SUPERADMIN",
+                    null,
+                    "New Stock Return Request: " + savedReturn.getReturnCode(),
+                    msg,
+                    "RETURN_REQUEST",
+                    savedReturn.getReturnCode(),
+                    savedReturn.getId()
+            );
+            notificationRepository.save(notif);
+        } catch (Exception ex) {
+            System.err.println("[Notification Error] Return request superadmin notification failed: " + ex.getMessage());
+        }
+
+        return savedReturn;
+    }
+
+    @Transactional
+    public StockReturnRequest processReturnDecision(Long returnId, ReturnReviewDTO reviewDto) {
+        StockReturnRequest returnReq = stockReturnRequestRepository.findById(returnId)
+                .orElseThrow(() -> new IllegalArgumentException("Return request not found with ID: " + returnId));
+
+        if (!"PENDING_REVIEW".equalsIgnoreCase(returnReq.getStatus())) {
+            throw new IllegalStateException("Return request has already been processed with status: " + returnReq.getStatus());
+        }
+
+        String decision = (reviewDto.getDecision() != null) ? reviewDto.getDecision().toUpperCase() : "APPROVE";
+        returnReq.setAdminRemarks(reviewDto.getAdminRemarks());
+        returnReq.setUpdatedAt(LocalDateTime.now());
+
+        SupplierProfile profile = supplierProfileRepository.findById(returnReq.getSupplierId()).orElse(null);
+        Long supplierUserId = profile != null ? profile.getUserId() : null;
+
+        List<StockReturnItem> items = stockReturnItemRepository.findByReturnRequestId(returnReq.getId());
+
+        if ("APPROVE".equalsIgnoreCase(decision)) {
+            returnReq.setStatus("APPROVED");
+
+            // 1. Return stock back from supplier's district inventory to central inventory
+            for (StockReturnItem item : items) {
+                if (item.getReturnedQuantity() != null && item.getReturnedQuantity() > 0) {
+                    reduceDistrictStock(returnReq.getDistrictId(), item.getProductId(), item.getReturnedQuantity());
+                    restoreCentralStock(item.getProductId(), item.getReturnedQuantity());
+                }
+            }
+
+            // 2. Handle refund or exchange
+            if ("REFUND_CASH".equalsIgnoreCase(returnReq.getReturnType())) {
+                // Record CREDIT transaction for refund
+                SupplierTransaction tx = new SupplierTransaction(
+                        "TXN-" + System.currentTimeMillis() + "-" + (100 + new Random().nextInt(900)),
+                        returnReq.getSupplierId(),
+                        returnReq.getRequisitionId(),
+                        returnReq.getId(),
+                        returnReq.getReturnCode(),
+                        "STOCK_RETURN_REFUND",
+                        "CREDIT",
+                        returnReq.getRefundAmount(),
+                        profile != null ? profile.getDefaultPaymentMethod() : "CORPORATE_BANK_TRANSFER",
+                        "Policy-approved cash refund for returned stock on " + returnReq.getReturnCode() + " (" + returnReq.getReturnedQuantity() + " cases).",
+                        "COMPLETED"
+                );
+                supplierTransactionRepository.save(tx);
+
+// Requisition refund metrics preserved; return refund tracked in StockReturnRequest and SupplierTransaction
+
+            } else if ("EXCHANGE_PRODUCT".equalsIgnoreCase(returnReq.getReturnType())) {
+                // Exchange: allocate replacement product to supplier district and deduct from central
+                if (returnReq.getReplacementProductId() != null && returnReq.getReplacementQuantity() != null && returnReq.getReplacementQuantity() > 0) {
+                    deductCentralStock(returnReq.getReplacementProductId(), returnReq.getReplacementQuantity());
+                    allocateDistrictStock(returnReq.getDistrictId(), returnReq.getReplacementProductId(), returnReq.getReplacementQuantity());
+                }
+
+                SupplierTransaction tx = new SupplierTransaction(
+                        "TXN-" + System.currentTimeMillis() + "-" + (100 + new Random().nextInt(900)),
+                        returnReq.getSupplierId(),
+                        returnReq.getRequisitionId(),
+                        returnReq.getId(),
+                        returnReq.getReturnCode(),
+                        "PRODUCT_EXCHANGE",
+                        "CREDIT",
+                        returnReq.getRefundAmount(),
+                        "STOCK_EXCHANGE_VOUCHER",
+                        "Replacement exchange approved: Returned " + returnReq.getReturnedQuantity() + " cases, Dispatched " +
+                                returnReq.getReplacementQuantity() + " cases of " +
+                                (returnReq.getReplacementProductName() != null ? returnReq.getReplacementProductName() : "replacement product") + ".",
+                        "COMPLETED"
+                );
+                supplierTransactionRepository.save(tx);
+            }
+
+            // Notify Supplier of approval
+            try {
+                String refundOrExchangeMsg = "REFUND_CASH".equalsIgnoreCase(returnReq.getReturnType())
+                        ? "A cash refund of ৳" + returnReq.getRefundAmount() + " has been credited to your account."
+                        : "Replacement stock of " + returnReq.getReplacementQuantity() + " cases (" + returnReq.getReplacementProductName() + ") has been dispatched to your depot.";
+
+                String remarksPart = (reviewDto.getAdminRemarks() != null && !reviewDto.getAdminRemarks().trim().isEmpty())
+                        ? " Remarks: " + reviewDto.getAdminRemarks().trim()
+                        : "";
+
+                AppNotification notif = new AppNotification(
+                        "SUPPLIER",
+                        supplierUserId,
+                        "Stock Return Approved: " + returnReq.getReturnCode(),
+                        "Your return request for " + returnReq.getRequisitionCode() + " has been APPROVED. " + refundOrExchangeMsg + remarksPart,
+                        "RETURN_APPROVED",
+                        returnReq.getReturnCode(),
+                        returnReq.getId()
+                );
+                notificationRepository.save(notif);
+            } catch (Exception ex) {
+                System.err.println("[Notification Error] Return approval notification failed: " + ex.getMessage());
+            }
+
+        } else {
+            returnReq.setStatus("REJECTED");
+
+            // Notify Supplier of rejection
+            try {
+                String remarksPart = (reviewDto.getAdminRemarks() != null && !reviewDto.getAdminRemarks().trim().isEmpty())
+                        ? " Reason from Admin: " + reviewDto.getAdminRemarks().trim()
+                        : " Did not comply with wholesale return policy conditions.";
+
+                AppNotification notif = new AppNotification(
+                        "SUPPLIER",
+                        supplierUserId,
+                        "Stock Return Rejected: " + returnReq.getReturnCode(),
+                        "Your return request " + returnReq.getReturnCode() + " for Requisition " + returnReq.getRequisitionCode() + " was REJECTED." + remarksPart,
+                        "RETURN_REJECTED",
+                        returnReq.getReturnCode(),
+                        returnReq.getId()
+                );
+                notificationRepository.save(notif);
+            } catch (Exception ex) {
+                System.err.println("[Notification Error] Return rejection notification failed: " + ex.getMessage());
+            }
+        }
+
+        StockReturnRequest saved = stockReturnRequestRepository.save(returnReq);
+        saved.setItems(items);
+        enrichReturnRequest(saved);
+        return saved;
+    }
+
+    public List<StockReturnRequest> getSupplierReturnRequests(Long userId) {
+        SupplierProfile profile = getSupplierProfile(userId);
+        List<StockReturnRequest> list = stockReturnRequestRepository.findBySupplierIdOrderByCreatedAtDesc(profile.getId());
+        for (StockReturnRequest r : list) {
+            enrichReturnRequest(r);
+        }
+        return list;
+    }
+
+    public List<StockReturnRequest> getAllReturnRequestsForAdmin(String status) {
+        List<StockReturnRequest> list;
+        if (status != null && !status.trim().isEmpty() && !"ALL".equalsIgnoreCase(status)) {
+            list = stockReturnRequestRepository.findByStatusOrderByCreatedAtDesc(status.toUpperCase());
+        } else {
+            list = stockReturnRequestRepository.findAllByOrderByCreatedAtDesc();
+        }
+        for (StockReturnRequest r : list) {
+            enrichReturnRequest(r);
+        }
+        return list;
+    }
+
+    @Transactional
+    public SupplierFinancialSummaryDTO getSupplierFinancialSummary(Long userId) {
+        SupplierProfile profile = getSupplierProfile(userId);
+        Long supplierId = profile.getId();
+
+        // 1. Backfill legacy requisitions ONLY if NO transactions exist for them at all
+        List<StockRequisition> requisitions = requisitionRepository.findBySupplierIdOrderByCreatedAtDesc(supplierId);
+        for (StockRequisition req : requisitions) {
+            List<SupplierTransaction> existingTx = supplierTransactionRepository.findByRequisitionId(req.getId());
+            if (existingTx.isEmpty()) {
+                // Legacy requisition without any recorded transactions: backfill purchase
+                java.math.BigDecimal amount = (req.getTotalAmount() != null && req.getTotalAmount().compareTo(java.math.BigDecimal.ZERO) > 0)
+                        ? req.getTotalAmount()
+                        : java.math.BigDecimal.valueOf(1000.0);
+                SupplierTransaction tx = new SupplierTransaction(
+                        "TXN-" + req.getId() + "-PUR",
+                        supplierId,
+                        req.getId(),
+                        null,
+                        req.getRequisitionCode(),
+                        "STOCK_PURCHASE",
+                        "DEBIT",
+                        amount,
+                        req.getPaymentMethod() != null ? req.getPaymentMethod() : profile.getDefaultPaymentMethod(),
+                        "Initial stock requisition purchase for " + req.getRequisitionCode(),
+                        "COMPLETED"
+                );
+                if (req.getCreatedAt() != null) {
+                    tx.setCreatedAt(req.getCreatedAt());
+                }
+                supplierTransactionRepository.save(tx);
+
+                // Backfill shortfall refund ONLY if requisition was REJECTED or PARTIALLY_APPROVED
+                if ("REJECTED".equalsIgnoreCase(req.getStatus())) {
+                    SupplierTransaction refTx = new SupplierTransaction(
+                            "TXN-" + req.getId() + "-REF",
+                            supplierId,
+                            req.getId(),
+                            null,
+                            req.getRequisitionCode(),
+                            "SHORTFALL_REFUND",
+                            "CREDIT",
+                            amount,
+                            req.getPaymentMethod() != null ? req.getPaymentMethod() : profile.getDefaultPaymentMethod(),
+                            "Full rejection refund for requisition " + req.getRequisitionCode(),
+                            "COMPLETED"
+                    );
+                    if (req.getUpdatedAt() != null) {
+                        refTx.setCreatedAt(req.getUpdatedAt());
+                    }
+                    supplierTransactionRepository.save(refTx);
+                } else if ("PARTIALLY_APPROVED".equalsIgnoreCase(req.getStatus())) {
+                    java.math.BigDecimal shortfall = (req.getRefundAmount() != null && req.getRefundAmount().compareTo(java.math.BigDecimal.ZERO) > 0)
+                            ? req.getRefundAmount()
+                            : (req.getTotalAmount() != null && req.getFulfilledAmount() != null ? req.getTotalAmount().subtract(req.getFulfilledAmount()) : java.math.BigDecimal.ZERO);
+                    if (shortfall.compareTo(java.math.BigDecimal.ZERO) > 0) {
+                        SupplierTransaction refTx = new SupplierTransaction(
+                                "TXN-" + req.getId() + "-REF",
+                                supplierId,
+                                req.getId(),
+                                null,
+                                req.getRequisitionCode(),
+                                "SHORTFALL_REFUND",
+                                "CREDIT",
+                                shortfall,
+                                req.getPaymentMethod() != null ? req.getPaymentMethod() : profile.getDefaultPaymentMethod(),
+                                "Shortfall refund for unfulfilled stock on " + req.getRequisitionCode(),
+                                "COMPLETED"
+                        );
+                        if (req.getUpdatedAt() != null) {
+                            refTx.setCreatedAt(req.getUpdatedAt());
+                        }
+                        supplierTransactionRepository.save(refTx);
+                    }
+                }
+            }
+        }
+
+        // 2. Fetch all transactions for this supplier
+        List<SupplierTransaction> txList = supplierTransactionRepository.findBySupplierIdOrderByCreatedAtDesc(supplierId);
+
+        java.math.BigDecimal totalSpent = java.math.BigDecimal.ZERO;
+        java.math.BigDecimal totalRefunded = java.math.BigDecimal.ZERO;
+
+        for (SupplierTransaction tx : txList) {
+            if ("COMPLETED".equalsIgnoreCase(tx.getStatus())) {
+                if ("DEBIT".equalsIgnoreCase(tx.getEntryType())) {
+                    totalSpent = totalSpent.add(tx.getAmount());
+                } else if ("CREDIT".equalsIgnoreCase(tx.getEntryType())) {
+                    totalRefunded = totalRefunded.add(tx.getAmount());
+                }
+            }
+        }
+
+        java.math.BigDecimal netInvestment = totalSpent.subtract(totalRefunded);
+
+        long pendingReturnsCount = stockReturnRequestRepository.countBySupplierIdAndStatus(supplierId, "PENDING_REVIEW");
+        java.math.BigDecimal pendingReturnsVal = java.math.BigDecimal.ZERO;
+        List<StockReturnRequest> pendingReturns = stockReturnRequestRepository.findByStatusOrderByCreatedAtDesc("PENDING_REVIEW");
+        for (StockReturnRequest pr : pendingReturns) {
+            if (pr.getSupplierId().equals(supplierId) && pr.getRefundAmount() != null) {
+                pendingReturnsVal = pendingReturnsVal.add(pr.getRefundAmount());
+            }
+        }
+
+        return new SupplierFinancialSummaryDTO(
+                totalSpent,
+                totalRefunded,
+                netInvestment,
+                pendingReturnsCount,
+                pendingReturnsVal,
+                txList
+        );
+    }
+
+    private void enrichReturnRequest(StockReturnRequest r) {
+        if (r.getSupplierId() != null) {
+            supplierProfileRepository.findById(r.getSupplierId()).ifPresent(sp -> {
+                r.setSupplierName(sp.getBusinessName());
+            });
+        }
+        if (r.getDistrictId() != null) {
+            districtRepository.findById(r.getDistrictId()).ifPresent(d -> {
+                r.setDistrictName(d.getName());
+            });
+        }
+        if (r.getItems() == null || r.getItems().isEmpty()) {
+            r.setItems(stockReturnItemRepository.findByReturnRequestId(r.getId()));
+        }
+        for (StockReturnItem item : r.getItems()) {
+            productRepository.findById(item.getProductId()).ifPresent(p -> {
+                item.setBrand(p.getBrand());
+                item.setFlavorVariant(p.getFlavorVariant());
+                item.setSku(p.getSku());
+                item.setPackaging(p.getPackaging());
+                item.setSizeVolume(p.getSizeVolume());
+            });
+        }
+    }
+
 }
