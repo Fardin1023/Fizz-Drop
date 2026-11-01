@@ -16,13 +16,18 @@ import {
   Terminal,
   LogOut,
   Settings,
-  ArrowUpRight,
   Radio,
   Boxes,
   ClipboardList,
   Home,
   Package,
   Users,
+  Crown,
+  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  Menu,
+  Sparkles,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useNotifications } from '../../hooks/useNotifications';
@@ -35,6 +40,7 @@ export const SuperadminDashboard: React.FC = () => {
   const [consoleInitialQuery, setConsoleInitialQuery] = useState<string>('SELECT * FROM Outlets LIMIT 25;');
   const [isDbConfigOpen, setIsDbConfigOpen] = useState(false);
   const [dbStatus, setDbStatus] = useState<any>(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const {
     notifications,
@@ -86,6 +92,73 @@ export const SuperadminDashboard: React.FC = () => {
     setActiveTab('query');
   };
 
+  const navSections = [
+    {
+      id: 'products' as const,
+      label: 'Master Products & Catalog',
+      shortLabel: 'Master Products',
+      desc: 'Input items & central stock benchmarks',
+      icon: Package,
+      gradient: 'from-blue-600 via-indigo-600 to-cyan-600',
+      badge: 'Catalog',
+    },
+    {
+      id: 'requisitions' as const,
+      label: 'Regional Requisitions Hub',
+      shortLabel: 'Requisitions Hub',
+      desc: 'Review, approve & dispatch stock orders',
+      icon: ClipboardList,
+      gradient: 'from-indigo-600 via-purple-600 to-pink-600',
+      badge: unreadCount > 0 ? `${unreadCount} NEW` : 'Orders',
+      badgeHighlight: unreadCount > 0,
+    },
+    {
+      id: 'suppliers' as const,
+      label: 'Supplier Accounts & Allotment',
+      shortLabel: 'Supplier Accounts',
+      desc: 'Create accounts & allot coverage cities',
+      icon: Users,
+      gradient: 'from-purple-600 via-pink-600 to-rose-600',
+      badge: 'Allotment',
+    },
+    {
+      id: 'outlets' as const,
+      label: 'Franchise Outlets & Locations',
+      shortLabel: 'Franchise Outlets',
+      desc: 'Manage retail branch locations & hubs',
+      icon: Building2,
+      gradient: 'from-cyan-600 via-teal-600 to-blue-600',
+      badge: 'Retail',
+    },
+    {
+      id: 'inventory' as const,
+      label: 'Stock & Supply Distribution',
+      shortLabel: 'Stock Distribution',
+      desc: 'Outlet inventory balances & live levels',
+      icon: Boxes,
+      gradient: 'from-emerald-600 via-teal-600 to-cyan-600',
+      badge: 'Inventory',
+    },
+    {
+      id: 'tables' as const,
+      label: 'Database Entity Explorer',
+      shortLabel: 'Entity Explorer',
+      desc: 'Aiven Cloud tables, schemas & records',
+      icon: Database,
+      gradient: 'from-amber-600 via-orange-600 to-red-600',
+      badge: 'Aiven Cloud',
+    },
+    {
+      id: 'query' as const,
+      label: 'SQL Query Terminal',
+      shortLabel: 'SQL Terminal',
+      desc: 'Direct relational database execution',
+      icon: Terminal,
+      gradient: 'from-rose-600 via-red-600 to-amber-600',
+      badge: 'Engine',
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-slate-50/70 text-slate-900 flex flex-col pb-16 selection:bg-blue-500/20 selection:text-blue-900 relative">
       
@@ -106,14 +179,40 @@ export const SuperadminDashboard: React.FC = () => {
         <div className="absolute bottom-[5%] left-1/3 w-[500px] h-[400px] bg-indigo-400/10 rounded-full blur-[150px]" />
       </div>
 
-      {/* Security-Developer Executive Header (Ultra-Compact, Fixed at Top & Static) */}
-      <div className="sticky top-0 z-50 w-full bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-2xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-1.5">
-          {/* Top Row: Title, Security Pill, Storefront Access, and Quick Controls */}
+      {/* Superadmin Executive Master Banner (Catchy Purple & Indigo Authority Bar) */}
+      <div className="bg-gradient-to-r from-purple-950 via-indigo-900 to-purple-950 text-white px-4 py-2.5 text-xs border-b border-indigo-800/40 shadow-sm relative z-50">
+        <div className="max-w-7xl mx-auto w-full flex flex-col sm:flex-row items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <Crown className="w-4 h-4 text-amber-300 shrink-0 animate-pulse" />
+            <span className="font-semibold text-slate-100 truncate">
+              You are logged in as <strong className="text-amber-200">Superadmin</strong>. Master authority over catalog, Aiven Cloud database, and regional supplier allotments.
+            </span>
+          </div>
+          <Link
+            to="/admin"
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white/15 hover:bg-white/25 text-white font-bold text-xs transition-all shadow-xs shrink-0 border border-white/20 hover:border-white/30 cursor-pointer"
+            title="Open Regional Supplier Portal"
+          >
+            <span>Open Supplier Portal</span>
+            <ArrowRight className="w-3.5 h-3.5 text-amber-300" />
+          </Link>
+        </div>
+      </div>
+
+      {/* Clean Top Header (Upper navigation tabs removed) */}
+      <header className="sticky top-0 z-40 w-full bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-2xs">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
           <div className="flex items-center justify-between gap-2.5">
-            {/* Identity & Superadmin Brand with Security Pill */}
+            {/* Identity & Superadmin Brand with Sidebar Toggle */}
             <div className="flex items-center gap-2 min-w-0">
-              {/* Home / Storefront Navigation Button */}
+              <button
+                onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 hover:text-indigo-600 transition-colors cursor-pointer shrink-0"
+                title={isSidebarCollapsed ? "Expand Navigation Sidebar" : "Collapse Navigation Sidebar"}
+              >
+                {isSidebarCollapsed ? <Menu className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+              </button>
+
               <Link
                 to="/"
                 className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-semibold text-slate-700 hover:text-indigo-600 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-colors shadow-2xs shrink-0"
@@ -153,18 +252,9 @@ export const SuperadminDashboard: React.FC = () => {
                 title="Configure Database Connection"
               >
                 <span className={`w-1.5 h-1.5 rounded-full ${dbStatus?.connected ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                <span>{dbStatus?.connected ? 'DB: ONLINE' : 'CONFIG DB'}</span>
+                <span>{dbStatus?.connected ? 'AIVEN: CONNECTED' : 'CONFIG DB'}</span>
                 <Settings className="w-3 h-3 opacity-70" />
               </button>
-
-              <Link
-                to="/admin"
-                className="bg-white hover:bg-slate-50 border border-slate-200 font-semibold text-slate-700 hover:text-blue-600 px-2 py-0.5 text-[11px] rounded-md flex items-center gap-1 transition-colors shadow-2xs"
-                title="Open Supplier Product Portal"
-              >
-                <span>Supplier Portal</span>
-                <ArrowUpRight className="w-3 h-3 text-blue-600" />
-              </Link>
 
               <NotificationDropdown
                 notifications={notifications}
@@ -184,110 +274,153 @@ export const SuperadminDashboard: React.FC = () => {
               </button>
             </div>
           </div>
-
-          {/* Segmented Security-Developer Navigation Tabs */}
-          <div className="flex items-center gap-1 overflow-x-auto pt-1 mt-1 border-t border-slate-100/90 scrollbar-none">
-            <button
-              onClick={() => setActiveTab('products')}
-              className={`font-semibold flex items-center transition-colors cursor-pointer whitespace-nowrap px-2.5 py-0.5 rounded-md text-[11px] gap-1 ${
-                activeTab === 'products'
-                  ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white shadow-xs font-bold'
-                  : 'bg-white text-slate-700 hover:text-blue-700 hover:bg-blue-50/50 border border-slate-200/80'
-              }`}
-            >
-              <Package className="w-3 h-3" />
-              <span>Master Products & Input</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('requisitions')}
-              className={`font-semibold flex items-center transition-colors cursor-pointer whitespace-nowrap px-2.5 py-0.5 rounded-md text-[11px] gap-1 ${
-                activeTab === 'requisitions'
-                  ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white shadow-xs font-bold'
-                  : 'bg-white text-slate-700 hover:text-blue-700 hover:bg-blue-50/50 border border-slate-200/80'
-              }`}
-            >
-              <ClipboardList className="w-3 h-3" />
-              <span>Regional Requisitions Hub</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('suppliers')}
-              className={`font-semibold flex items-center transition-colors cursor-pointer whitespace-nowrap px-2.5 py-0.5 rounded-md text-[11px] gap-1 ${
-                activeTab === 'suppliers'
-                  ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white shadow-xs font-bold'
-                  : 'bg-white text-slate-700 hover:text-blue-700 hover:bg-blue-50/50 border border-slate-200/80'
-              }`}
-            >
-              <Users className="w-3 h-3" />
-              <span>Supplier Accounts & City Allotment</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('tables')}
-              className={`font-semibold flex items-center transition-colors cursor-pointer whitespace-nowrap px-2.5 py-0.5 rounded-md text-[11px] gap-1 ${
-                activeTab === 'tables'
-                  ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white shadow-xs font-bold'
-                  : 'bg-white text-slate-700 hover:text-blue-700 hover:bg-blue-50/50 border border-slate-200/80'
-              }`}
-            >
-              <Database className="w-3 h-3" />
-              <span>Database Entity Explorer</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('outlets')}
-              className={`font-semibold flex items-center transition-colors cursor-pointer whitespace-nowrap px-2.5 py-0.5 rounded-md text-[11px] gap-1 ${
-                activeTab === 'outlets'
-                  ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white shadow-xs font-bold'
-                  : 'bg-white text-slate-700 hover:text-blue-700 hover:bg-blue-50/50 border border-slate-200/80'
-              }`}
-            >
-              <Building2 className="w-3 h-3" />
-              <span>Franchise Outlets & Locations</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('inventory')}
-              className={`font-semibold flex items-center transition-colors cursor-pointer whitespace-nowrap px-2.5 py-0.5 rounded-md text-[11px] gap-1 ${
-                activeTab === 'inventory'
-                  ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white shadow-xs font-bold'
-                  : 'bg-white text-slate-700 hover:text-blue-700 hover:bg-blue-50/50 border border-slate-200/80'
-              }`}
-            >
-              <Boxes className="w-3 h-3" />
-              <span>Franchise Stock & Supply Distribution</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('query')}
-              className={`font-semibold flex items-center transition-colors cursor-pointer whitespace-nowrap px-2.5 py-0.5 rounded-md text-[11px] gap-1 ${
-                activeTab === 'query'
-                  ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white shadow-xs font-bold'
-                  : 'bg-white text-slate-700 hover:text-blue-700 hover:bg-blue-50/50 border border-slate-200/80'
-              }`}
-            >
-              <Terminal className="w-3 h-3" />
-              <span>SQL Query Terminal</span>
-            </button>
-          </div>
         </div>
-      </div>
+      </header>
 
-      {/* Main Content Workspace Container */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-3.5 sm:mt-4 flex-1 w-full min-w-0">
-        {activeTab === 'products' && <SuperadminProductCatalog />}
-        {activeTab === 'requisitions' && <SuperadminRequisitionsHub />}
-        {activeTab === 'suppliers' && <SuperadminSupplierManagement />}
-        {activeTab === 'tables' && (
-          <DatabaseExplorer onOpenQueryWithTable={handleOpenQueryWithTable} />
-        )}
-        {activeTab === 'outlets' && <OutletManagement />}
-        {activeTab === 'inventory' && <StockDistributionView />}
-        {activeTab === 'query' && (
-          <SqlQueryConsole initialQuery={consoleInitialQuery} />
-        )}
-      </main>
+      {/* Main Responsive Layout: Catchy Animated Left Sidebar + Dynamic Content Canvas */}
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 mt-3.5 sm:mt-4 flex-1 w-full min-w-0 flex flex-col md:flex-row items-start gap-4 lg:gap-5">
+        
+        {/* Catchy Animated Left Navigation Sidebar */}
+        <aside
+          className={`transition-all duration-300 ease-in-out shrink-0 w-full md:sticky md:top-16 z-30 ${
+            isSidebarCollapsed ? 'md:w-20' : 'md:w-64 lg:w-72'
+          }`}
+        >
+          <div className="bg-white/95 backdrop-blur-xl rounded-2xl border border-slate-200/90 shadow-sm p-2 sm:p-2.5 space-y-1.5">
+            {/* Sidebar Section Title */}
+            <div className="px-2 py-1.5 flex items-center justify-between border-b border-slate-100 mb-1">
+              {!isSidebarCollapsed ? (
+                <div className="flex items-center gap-1.5">
+                  <Sparkles className="w-3 h-3 text-indigo-600 animate-pulse" />
+                  <span className="text-[10px] font-bold font-mono tracking-wider text-slate-400 uppercase">
+                    Central Operations Matrix
+                  </span>
+                </div>
+              ) : (
+                <Sparkles className="w-3.5 h-3.5 text-indigo-600 mx-auto" />
+              )}
+              
+              <button
+                onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                className="hidden md:flex p-1 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors cursor-pointer"
+                title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+              >
+                {isSidebarCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+
+            {/* Navigation Item Buttons with Animated Hover and Active States */}
+            <div className="space-y-1">
+              {navSections.map((item) => {
+                const isActive = activeTab === item.id;
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveTab(item.id)}
+                    className={`w-full text-left rounded-xl transition-all duration-200 cursor-pointer group relative overflow-hidden flex items-center ${
+                      isSidebarCollapsed ? 'justify-center p-2.5' : 'p-2.5 gap-3'
+                    } ${
+                      isActive
+                        ? `bg-gradient-to-r ${item.gradient} text-white shadow-md shadow-indigo-500/20 font-bold scale-[1.01]`
+                        : 'bg-white hover:bg-slate-50 hover:translate-x-0.5 text-slate-700 border border-transparent hover:border-slate-200'
+                    }`}
+                    title={item.label}
+                  >
+                    {/* Active Glowing Left Pill Bar */}
+                    {isActive && (
+                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-white rounded-r-full shadow-xs" />
+                    )}
+
+                    {/* Icon Container with subtle animation */}
+                    <div
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-110 ${
+                        isActive
+                          ? 'bg-white/20 text-white shadow-xs'
+                          : 'bg-slate-100 text-slate-600 group-hover:bg-indigo-50 group-hover:text-indigo-600'
+                      }`}
+                    >
+                      <Icon className="w-4 h-4" />
+                    </div>
+
+                    {/* Text Details (Hidden when Collapsed) */}
+                    {!isSidebarCollapsed && (
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className={`text-xs font-semibold truncate ${isActive ? 'text-white' : 'text-slate-800'}`}>
+                            {item.shortLabel}
+                          </span>
+                          {item.badge && (
+                            <span
+                              className={`text-[9px] font-mono px-1.5 py-0.2 rounded-md uppercase font-bold shrink-0 ${
+                                isActive
+                                  ? 'bg-white/25 text-white'
+                                  : item.badgeHighlight
+                                  ? 'bg-rose-50 text-rose-700 border border-rose-200 animate-pulse'
+                                  : 'bg-slate-100 text-slate-500'
+                              }`}
+                            >
+                              {item.badge}
+                            </span>
+                          )}
+                        </div>
+                        <span
+                          className={`block text-[10px] truncate leading-tight mt-0.5 ${
+                            isActive ? 'text-white/80 font-normal' : 'text-slate-400 font-normal'
+                          }`}
+                        >
+                          {item.desc}
+                        </span>
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Sidebar Footer: Aiven Cloud Live Telemetry */}
+            {!isSidebarCollapsed && (
+              <div className="pt-2 mt-2 border-t border-slate-100 px-1">
+                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping shrink-0" />
+                    <div className="min-w-0">
+                      <span className="block text-[10px] font-bold text-slate-800 uppercase tracking-wider truncate">
+                        Aiven Cloud MySQL
+                      </span>
+                      <span className="block text-[9px] font-mono text-emerald-600 truncate">
+                        MySQL 8.4.11 Active
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setIsDbConfigOpen(true)}
+                    className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 transition-colors cursor-pointer"
+                    title="View Connection Details"
+                  >
+                    <Settings className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </aside>
+
+        {/* Dynamic Main Content Workspace */}
+        <main className="flex-1 min-w-0 w-full">
+          {activeTab === 'products' && <SuperadminProductCatalog />}
+          {activeTab === 'requisitions' && <SuperadminRequisitionsHub />}
+          {activeTab === 'suppliers' && <SuperadminSupplierManagement />}
+          {activeTab === 'tables' && (
+            <DatabaseExplorer onOpenQueryWithTable={handleOpenQueryWithTable} />
+          )}
+          {activeTab === 'outlets' && <OutletManagement />}
+          {activeTab === 'inventory' && <StockDistributionView />}
+          {activeTab === 'query' && (
+            <SqlQueryConsole initialQuery={consoleInitialQuery} />
+          )}
+        </main>
+      </div>
 
       {/* Database Connection Config Modal */}
       <DatabaseConfigModal
