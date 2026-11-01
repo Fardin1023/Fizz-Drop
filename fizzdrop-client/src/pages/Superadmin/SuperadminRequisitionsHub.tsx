@@ -1200,22 +1200,20 @@ export const SuperadminRequisitionsHub: React.FC = () => {
                       type="button"
                       disabled={submittingAction}
                       onClick={() => handlePromptConfirmation('APPROVE_PARTIAL')}
-                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-indigo-500/20 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                      className="px-5 py-2 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-indigo-500/20 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
                     >
                       <CheckCircle2 className="w-4 h-4 text-white" />
-                      <span>
-                        Permit {reconciliationSummary.totalAppCases} Cases & Refund ৳{reconciliationSummary.refundAmount.toLocaleString('en-US', { minimumFractionDigits: 0 })}
-                      </span>
+                      <span>Dispatch Stock</span>
                     </button>
                   ) : (
                     <button
                       type="button"
                       disabled={submittingAction}
                       onClick={() => handlePromptConfirmation('APPROVE_FULL')}
-                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-500/20 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                      className="px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-500/20 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
                     >
                       <CheckCircle2 className="w-4 h-4 text-white" />
-                      <span>Permit Full {reconciliationSummary.totalReqCases} Cases (No Refund)</span>
+                      <span>Dispatch Stock</span>
                     </button>
                   )}
                 </div>
@@ -1392,7 +1390,7 @@ export const SuperadminRequisitionsHub: React.FC = () => {
                     ? 'Committing Decision...'
                     : pendingActionType === 'REJECT'
                     ? 'Confirm & Disallow Stock'
-                    : 'Confirm & Permit Stock'}
+                    : 'Dispatch Stock'}
                 </span>
               </button>
             </div>
