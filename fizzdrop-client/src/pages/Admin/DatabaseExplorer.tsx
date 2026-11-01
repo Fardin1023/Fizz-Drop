@@ -270,113 +270,8 @@ export const DatabaseExplorer: React.FC<DatabaseExplorerProps> = ({ onOpenQueryW
       {/* Main 2-Column Responsive Layout in Cool Security-Developer Theme */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 w-full min-w-0 items-start">
         
-        {/* Left Column: Security-Developer Entity Selector (3.5 cols) */}
-        <div className="lg:col-span-4 xl:col-span-3 min-w-0 rounded-2xl bg-white border border-slate-200/90 p-3.5 shadow-sm space-y-3">
-          
-          {/* Header & Filter */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between px-1">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-blue-700 flex items-center gap-1.5 font-mono">
-                <Database className="w-3.5 h-3.5 text-blue-600" />
-                <span>Entities ({tables.length})</span>
-              </span>
-              <button
-                onClick={fetchTables}
-                className="p-1 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-blue-600 transition-colors cursor-pointer"
-                title="Refresh table list"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-blue-600' : ''}`} />
-              </button>
-            </div>
-
-            {/* Quick Entity Filter */}
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                value={sidebarFilter}
-                onChange={(e) => setSidebarFilter(e.target.value)}
-                placeholder="Filter entities..."
-                className="w-full pl-8 pr-7 py-1.5 text-xs rounded-xl bg-slate-50 border border-slate-200 focus:border-cyan-500 focus:bg-white text-slate-900 placeholder-slate-400 outline-none transition-all"
-              />
-              {sidebarFilter && (
-                <button
-                  onClick={() => setSidebarFilter('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Tables List */}
-          <div className="space-y-1 max-h-[520px] overflow-y-auto pr-0.5">
-            {loading && tables.length === 0 ? (
-              <div className="py-12 text-center text-xs text-slate-500 space-y-2">
-                <div className="w-5 h-5 border-2 border-blue-600/30 border-t-blue-600 rounded-full animate-spin mx-auto" />
-                <span className="font-mono text-[11px]">Streaming entities...</span>
-              </div>
-            ) : filteredTables.length === 0 ? (
-              <div className="py-8 text-center text-xs text-slate-500">
-                No matching entities found
-              </div>
-            ) : (
-              filteredTables.map((tbl) => {
-                const isSelected = selectedTable === tbl.name;
-                const category = TABLE_CATEGORIES[tbl.name] || 'General';
-
-                return (
-                  <button
-                    key={tbl.name}
-                    onClick={() => {
-                      setSelectedTable(tbl.name);
-                      setPage(1);
-                    }}
-                    className={`w-full group text-left px-3 py-2 rounded-xl transition-all cursor-pointer flex items-center justify-between border ${
-                      isSelected
-                        ? 'bg-blue-50/90 border-blue-300 text-blue-900 font-bold shadow-2xs'
-                        : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <div
-                        className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
-                          isSelected
-                            ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-2xs'
-                            : 'bg-slate-100 text-slate-500 group-hover:text-blue-600'
-                        }`}
-                      >
-                        <Hash className="w-3 h-3" />
-                      </div>
-                      <div className="truncate">
-                        <span className={`font-semibold text-xs truncate block ${isSelected ? 'text-blue-900' : 'text-slate-800'}`}>
-                          {tbl.name}
-                        </span>
-                        <span className="text-[10px] text-slate-400 block truncate font-medium">
-                          {category}
-                        </span>
-                      </div>
-                    </div>
-
-                    <span
-                      className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold shrink-0 ${
-                        isSelected
-                          ? 'bg-blue-200/80 text-blue-800 border border-blue-300'
-                          : 'bg-slate-100 text-slate-500'
-                      }`}
-                    >
-                      {tbl.rowCount}
-                    </span>
-                  </button>
-                );
-              })
-            )}
-          </div>
-        </div>
-
-        {/* Right Column: Clean Live Data & Schema Viewer (8.5 cols) */}
-        <div className="lg:col-span-8 xl:col-span-9 min-w-0 rounded-2xl bg-white border border-slate-200/90 overflow-hidden shadow-sm flex flex-col">
+        {/* Left / Main Workspace Column: Live Data & Schema Viewer (8.5 cols) */}
+        <div className="lg:col-span-8 xl:col-span-9 min-w-0 rounded-2xl bg-white border border-slate-200/90 overflow-hidden shadow-sm flex flex-col order-2 lg:order-1">
           
           {/* Top Bar for Selected Entity */}
           <div className="p-4 border-b border-slate-200/80 bg-slate-50/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -662,6 +557,111 @@ export const DatabaseExplorer: React.FC<DatabaseExplorerProps> = ({ onOpenQueryW
             </div>
           )}
 
+        </div>
+
+        {/* Right Column: Security-Developer Entity Selector (3.5 cols) */}
+        <div className="lg:col-span-4 xl:col-span-3 min-w-0 rounded-2xl bg-white border border-slate-200/90 p-3.5 shadow-sm space-y-3 order-1 lg:order-2">
+          
+          {/* Header & Filter */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between px-1">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-blue-700 flex items-center gap-1.5 font-mono">
+                <Database className="w-3.5 h-3.5 text-blue-600" />
+                <span>Entities ({tables.length})</span>
+              </span>
+              <button
+                onClick={fetchTables}
+                className="p-1 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-blue-600 transition-colors cursor-pointer"
+                title="Refresh table list"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-blue-600' : ''}`} />
+              </button>
+            </div>
+
+            {/* Quick Entity Filter */}
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={sidebarFilter}
+                onChange={(e) => setSidebarFilter(e.target.value)}
+                placeholder="Filter entities..."
+                className="w-full pl-8 pr-7 py-1.5 text-xs rounded-xl bg-slate-50 border border-slate-200 focus:border-cyan-500 focus:bg-white text-slate-900 placeholder-slate-400 outline-none transition-all"
+              />
+              {sidebarFilter && (
+                <button
+                  onClick={() => setSidebarFilter('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Tables List */}
+          <div className="space-y-1 max-h-[520px] overflow-y-auto pr-0.5">
+            {loading && tables.length === 0 ? (
+              <div className="py-12 text-center text-xs text-slate-500 space-y-2">
+                <div className="w-5 h-5 border-2 border-blue-600/30 border-t-blue-600 rounded-full animate-spin mx-auto" />
+                <span className="font-mono text-[11px]">Streaming entities...</span>
+              </div>
+            ) : filteredTables.length === 0 ? (
+              <div className="py-8 text-center text-xs text-slate-500">
+                No matching entities found
+              </div>
+            ) : (
+              filteredTables.map((tbl) => {
+                const isSelected = selectedTable === tbl.name;
+                const category = TABLE_CATEGORIES[tbl.name] || 'General';
+
+                return (
+                  <button
+                    key={tbl.name}
+                    onClick={() => {
+                      setSelectedTable(tbl.name);
+                      setPage(1);
+                    }}
+                    className={`w-full group text-left px-3 py-2 rounded-xl transition-all cursor-pointer flex items-center justify-between border ${
+                      isSelected
+                        ? 'bg-blue-50/90 border-blue-300 text-blue-900 font-bold shadow-2xs'
+                        : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <div
+                        className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+                          isSelected
+                            ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-2xs'
+                            : 'bg-slate-100 text-slate-500 group-hover:text-blue-600'
+                        }`}
+                      >
+                        <Hash className="w-3 h-3" />
+                      </div>
+                      <div className="truncate">
+                        <span className={`font-semibold text-xs truncate block ${isSelected ? 'text-blue-900' : 'text-slate-800'}`}>
+                          {tbl.name}
+                        </span>
+                        <span className="text-[10px] text-slate-400 block truncate font-medium">
+                          {category}
+                        </span>
+                      </div>
+                    </div>
+
+                    <span
+                      className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold shrink-0 ${
+                        isSelected
+                          ? 'bg-blue-200/80 text-blue-800 border border-blue-300'
+                          : 'bg-slate-100 text-slate-500'
+                      }`}
+                    >
+                      {tbl.rowCount}
+                    </span>
+                  </button>
+                );
+              })
+            )}
+          </div>
         </div>
       </div>
     </div>
