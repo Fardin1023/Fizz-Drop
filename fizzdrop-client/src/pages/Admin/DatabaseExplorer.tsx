@@ -20,7 +20,6 @@ import {
   X,
   Printer,
   FileSpreadsheet,
-  ExternalLink,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -29,9 +28,8 @@ import {
   downloadTableSchemaPdf,
   downloadAllTablesSchemaPdf,
   openPrintableSchemaReport,
-  ExportColumnDef,
-  TableSchemaExportData,
 } from '../../utils/schemaExporter';
+import type { ExportColumnDef, TableSchemaExportData } from '../../utils/schemaExporter';
 
 interface ColumnDef {
   name: string;

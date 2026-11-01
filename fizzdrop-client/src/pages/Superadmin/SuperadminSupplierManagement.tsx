@@ -21,7 +21,6 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import {
-  CITY_AREAS_MAP,
   getAvailableAreasForCity,
   parseAllocatedAreas,
   serializeAllocatedAreas,

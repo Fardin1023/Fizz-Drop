@@ -89,7 +89,7 @@ export function downloadTableSchemaPdf(
   };
 
   const pdfBinary = buildPdfDocument([tableData], `Table Schema Specification: ${tableName}`);
-  const blob = new Blob([pdfBinary], { type: 'application/pdf' });
+  const blob = new Blob([pdfBinary.buffer as ArrayBuffer], { type: 'application/pdf' });
   triggerBlobDownload(blob, `${tableName}_schema.pdf`);
 }
 
@@ -98,7 +98,7 @@ export function downloadTableSchemaPdf(
  */
 export function downloadAllTablesSchemaPdf(tables: TableSchemaExportData[]) {
   const pdfBinary = buildPdfDocument(tables, 'FizzDrop Database Complete Schema Specification');
-  const blob = new Blob([pdfBinary], { type: 'application/pdf' });
+  const blob = new Blob([pdfBinary.buffer as ArrayBuffer], { type: 'application/pdf' });
   triggerBlobDownload(blob, 'fizzdrop_complete_database_schema.pdf');
 }
 
