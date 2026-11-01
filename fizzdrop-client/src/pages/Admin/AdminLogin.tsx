@@ -186,21 +186,70 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onSuccess, requiredRole = 'any'
               </span>
             </button>
 
-            {/* Supplier Button */}
-            <button
-              type="button"
-              onClick={handleQuickSupplier}
-              disabled={loading}
-              className="w-full py-2.5 px-3 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-semibold flex items-center justify-between transition-all cursor-pointer"
-            >
-              <div className="flex items-center gap-2">
-                <Package className="w-3.5 h-3.5 text-indigo-500" />
-                <span>Supplier Admin (Products Only)</span>
-              </div>
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300">
-                Role 3
+            {/* Supplier Buttons for Multiple Regional Suppliers */}
+            <div className="space-y-1.5 pt-1">
+              <span className="block text-[10px] font-semibold text-slate-400 dark:text-zinc-500 uppercase tracking-wider text-left pl-1">
+                Regional Suppliers
               </span>
-            </button>
+              <button
+                type="button"
+                onClick={() => handleQuickSupplier()}
+                disabled={loading}
+                className="w-full py-2 px-3 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-semibold flex items-center justify-between transition-all cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <Package className="w-3.5 h-3.5 text-indigo-500" />
+                  <span>Central Dhaka Supplier</span>
+                </div>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300">
+                  Dhaka Div.
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  setError(null);
+                  setLoading(true);
+                  const res = await loginAsSupplier('chittagong.supplier@fizzdrop.com');
+                  setLoading(false);
+                  if (res.success && onSuccess) onSuccess();
+                  else if (!res.success) setError(res.error || 'Failed to authenticate');
+                }}
+                disabled={loading}
+                className="w-full py-2 px-3 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-semibold flex items-center justify-between transition-all cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <Package className="w-3.5 h-3.5 text-cyan-500" />
+                  <span>Bay Chittagong Supplier</span>
+                </div>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300">
+                  Chittagong Div.
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  setError(null);
+                  setLoading(true);
+                  const res = await loginAsSupplier('sylhet.supplier@fizzdrop.com');
+                  setLoading(false);
+                  if (res.success && onSuccess) onSuccess();
+                  else if (!res.success) setError(res.error || 'Failed to authenticate');
+                }}
+                disabled={loading}
+                className="w-full py-2 px-3 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-semibold flex items-center justify-between transition-all cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <Package className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>Surma Sylhet Supplier</span>
+                </div>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300">
+                  Sylhet Div.
+                </span>
+              </button>
+            </div>
           </div>
 
         </div>

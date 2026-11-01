@@ -20,6 +20,9 @@ export interface OutletItem {
   contact_phone?: string;
   status: string;
   created_date?: string;
+  district_id?: number;
+  district_name?: string;
+  division_name?: string;
 }
 
 interface OutletManagementProps {
@@ -42,8 +45,22 @@ export const OutletManagement: React.FC<OutletManagementProps> = ({ onOutletChan
   const [locationAddress, setLocationAddress] = useState('');
   const [contactPhone, setContactPhone] = useState('');
   const [status, setStatus] = useState('Active');
+  const [districtId, setDistrictId] = useState<number | ''>('');
+  const [allDistricts, setAllDistricts] = useState<{ id: number; name: string; division: string }[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  const fetchDistricts = async () => {
+    try {
+      const res = await fetch('http://localhost:8080/api/v1/districts');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) setAllDistricts(data);
+      }
+    } catch (e) {
+      // ignore
+    }
+  };
 
   const fetchOutlets = async () => {
     setLoading(true);
@@ -58,6 +75,9 @@ export const OutletManagement: React.FC<OutletManagementProps> = ({ onOutletChan
           contact_phone: o.contact_phone ?? o.contactPhone ?? '',
           status: o.status ?? 'Active',
           created_date: o.created_date ?? o.createdDate,
+          district_id: o.district_id ?? o.districtId,
+          district_name: o.district_name ?? o.districtName,
+          division_name: o.division_name ?? o.divisionName,
         }));
         setOutlets(normalized);
       }
@@ -70,6 +90,7 @@ export const OutletManagement: React.FC<OutletManagementProps> = ({ onOutletChan
 
   useEffect(() => {
     fetchOutlets();
+    fetchDistricts();
   }, []);
 
   const handleCreateOutlet = async (e: React.FormEvent) => {
@@ -101,6 +122,7 @@ export const OutletManagement: React.FC<OutletManagementProps> = ({ onOutletChan
           contact_phone: contactPhone.trim(),
           contactPhone: contactPhone.trim(),
           status,
+          district_id: districtId ? Number(districtId) : null,
         }),
       });
 
@@ -115,6 +137,7 @@ export const OutletManagement: React.FC<OutletManagementProps> = ({ onOutletChan
       setOutletName('');
       setLocationAddress('');
       setContactPhone('');
+      setDistrictId('');
       setIsModalOpen(false);
       fetchOutlets();
       if (onOutletChanged) onOutletChanged();
@@ -326,6 +349,13 @@ export const OutletManagement: React.FC<OutletManagementProps> = ({ onOutletChan
                     <MapPin className="w-3.5 h-3.5 shrink-0 text-blue-600 mt-0.5" />
                     <span className="leading-relaxed text-slate-700">{outlet.location_address}</span>
                   </div>
+                  {outlet.district_name && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="px-2 py-0.5 rounded-md bg-blue-50 border border-blue-200 text-blue-700 text-[10px] font-bold">
+                        {outlet.district_name} ({outlet.division_name || 'Division'})
+                      </span>
+                    </div>
+                  )}
                   {outlet.contact_phone && (
                     <div className="flex items-center gap-1.5">
                       <Phone className="w-3.5 h-3.5 shrink-0 text-cyan-600" />
@@ -428,17 +458,35 @@ export const OutletManagement: React.FC<OutletManagementProps> = ({ onOutletChan
 
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                    Status
+                    City / District Hub
                   </label>
                   <select
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:border-cyan-500 text-xs text-slate-900 outline-none"
+                    value={districtId}
+                    onChange={(e) => setDistrictId(e.target.value ? Number(e.target.value) : '')}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:border-cyan-500 text-xs text-slate-900 outline-none cursor-pointer"
                   >
-                    <option value="Active">Active</option>
-                    <option value="Inactive">Inactive</option>
+                    <option value="">Auto-Detect from Address</option>
+                    {allDistricts.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name} ({d.division} Div.)
+                      </option>
+                    ))}
                   </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                  Status
+                </label>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:border-cyan-500 text-xs text-slate-900 outline-none"
+                >
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
               </div>
 
               <div className="pt-2 flex items-center justify-end gap-2.5 border-t border-slate-100">

@@ -50,6 +50,11 @@ public class RequisitionController {
     }
 
     // 2. Supplier Profile API
+    @GetMapping("/suppliers")
+    public ResponseEntity<List<SupplierProfile>> getAllSuppliers() {
+        return ResponseEntity.ok(requisitionService.getAllSupplierProfiles());
+    }
+
     @GetMapping("/supplier/profile")
     public ResponseEntity<SupplierProfile> getSupplierProfile(
             @RequestHeader(value = "Authorization", required = false) String authHeader,

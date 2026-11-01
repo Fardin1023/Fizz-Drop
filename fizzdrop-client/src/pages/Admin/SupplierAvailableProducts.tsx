@@ -63,7 +63,7 @@ export const SupplierAvailableProducts: React.FC<SupplierAvailableProductsProps>
       const userId = user?.user_id || 4;
       const [prodRes, outletRes] = await Promise.all([
         fetch(`http://localhost:8080/api/products?userId=${userId}`),
-        fetch('http://localhost:8080/api/outlets'),
+        fetch(`http://localhost:8080/api/outlets?userId=${userId}`),
       ]);
 
       if (prodRes.ok) {

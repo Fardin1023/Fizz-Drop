@@ -16,7 +16,7 @@ interface AuthContextType {
   isSuperadmin: boolean;
   isLoading: boolean;
   login: (email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
-  loginAsSupplier: () => Promise<{ success: boolean; error?: string }>;
+  loginAsSupplier: (email?: string) => Promise<{ success: boolean; error?: string }>;
   loginAsSuperadmin: () => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
 }
@@ -83,8 +83,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const loginAsSupplier = async () => {
-    return login('central.supplier@fizzdrop.com', 'Password123!');
+  const loginAsSupplier = async (email = 'central.supplier@fizzdrop.com') => {
+    return login(email, 'Password123!');
   };
 
   const loginAsSuperadmin = async () => {

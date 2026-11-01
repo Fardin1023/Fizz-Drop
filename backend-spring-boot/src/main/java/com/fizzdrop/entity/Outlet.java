@@ -26,6 +26,19 @@ public class Outlet {
     @JsonAlias({"location_address", "locationAddress", "address"})
     private String locationAddress;
 
+    @Column(name = "district_id")
+    @JsonProperty("district_id")
+    @JsonAlias({"district_id", "districtId"})
+    private Long districtId;
+
+    @Transient
+    @JsonProperty("district_name")
+    private String districtName;
+
+    @Transient
+    @JsonProperty("division_name")
+    private String divisionName;
+
     @Column(name = "contact_phone", length = 50)
     @JsonProperty("contact_phone")
     @JsonAlias({"contact_phone", "contactPhone", "phone"})
@@ -89,6 +102,15 @@ public class Outlet {
 
     public String getLocationAddress() { return locationAddress; }
     public void setLocationAddress(String locationAddress) { this.locationAddress = locationAddress; }
+
+    public Long getDistrictId() { return districtId; }
+    public void setDistrictId(Long districtId) { this.districtId = districtId; }
+
+    public String getDistrictName() { return districtName; }
+    public void setDistrictName(String districtName) { this.districtName = districtName; }
+
+    public String getDivisionName() { return divisionName; }
+    public void setDivisionName(String divisionName) { this.divisionName = divisionName; }
 
     public String getContactPhone() { return contactPhone; }
     public void setContactPhone(String contactPhone) { this.contactPhone = contactPhone; }

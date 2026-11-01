@@ -71,6 +71,25 @@ public class AuthController {
         if (token.contains("superadmin")) {
             return ResponseEntity.ok(new AuthResponse(token, 99L, "superadmin@fizzdrop.com", 4L, "Superadmin", 1L));
         }
+
+        // Extract user_id from token format: "jwt-{userId}-{uuid}"
+        if (token.startsWith("jwt-")) {
+            String[] parts = token.split("-");
+            if (parts.length >= 2) {
+                try {
+                    Long uid = Long.parseLong(parts[1]);
+                    Optional<User> uOpt = userRepository.findById(uid);
+                    if (uOpt.isPresent()) {
+                        User u = uOpt.get();
+                        boolean isSuper = (u.getRoleId() != null && (u.getRoleId() == 1L || u.getRoleId() == 4L)) || u.getEmail().contains("super");
+                        Long roleId = isSuper ? 4L : 3L;
+                        String roleName = isSuper ? "Superadmin" : "Supplier";
+                        return ResponseEntity.ok(new AuthResponse(token, u.getUserId(), u.getEmail(), roleId, roleName, u.getBranchId() != null ? u.getBranchId() : 1L));
+                    }
+                } catch (NumberFormatException ignored) {}
+            }
+        }
+
         return ResponseEntity.ok(new AuthResponse(token, 4L, "central.supplier@fizzdrop.com", 3L, "Supplier", 1L));
     }
 }

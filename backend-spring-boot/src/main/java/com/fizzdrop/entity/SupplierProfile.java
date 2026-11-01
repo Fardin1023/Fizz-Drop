@@ -107,6 +107,10 @@ public class SupplierProfile {
     @JsonProperty("assigned_districts")
     private List<Map<String, Object>> assignedDistricts;
 
+    @Transient
+    @JsonProperty("user_email")
+    private String userEmail;
+
     public SupplierProfile() {
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
@@ -192,4 +196,7 @@ public class SupplierProfile {
 
     public List<Map<String, Object>> getAssignedDistricts() { return assignedDistricts; }
     public void setAssignedDistricts(List<Map<String, Object>> assignedDistricts) { this.assignedDistricts = assignedDistricts; }
+
+    public String getUserEmail() { return userEmail; }
+    public void setUserEmail(String userEmail) { this.userEmail = userEmail; }
 }

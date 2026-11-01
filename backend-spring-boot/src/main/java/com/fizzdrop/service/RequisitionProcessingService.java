@@ -24,6 +24,7 @@ public class RequisitionProcessingService {
     private final ShopInventoryRepository shopInventoryRepository;
     private final AppNotificationRepository notificationRepository;
     private final CentralInventoryRepository centralInventoryRepository;
+    private final UserRepository userRepository;
     private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     public RequisitionProcessingService(DistrictRepository districtRepository,
@@ -35,6 +36,7 @@ public class RequisitionProcessingService {
                                         ShopInventoryRepository shopInventoryRepository,
                                         AppNotificationRepository notificationRepository,
                                         CentralInventoryRepository centralInventoryRepository,
+                                        UserRepository userRepository,
                                         org.springframework.jdbc.core.JdbcTemplate jdbcTemplate) {
         this.districtRepository = districtRepository;
         this.supplierProfileRepository = supplierProfileRepository;
@@ -45,6 +47,7 @@ public class RequisitionProcessingService {
         this.shopInventoryRepository = shopInventoryRepository;
         this.notificationRepository = notificationRepository;
         this.centralInventoryRepository = centralInventoryRepository;
+        this.userRepository = userRepository;
         this.jdbcTemplate = jdbcTemplate;
     }
 
@@ -82,28 +85,44 @@ public class RequisitionProcessingService {
             districtRepository.saveAll(toSave);
         }
 
-        // 2. Auto-initialize default profile for central supplier (User ID 4)
+        // 2. Auto-initialize profiles for multiple distinct regional suppliers if not present
         District dhaka = districtRepository.findByNameIgnoreCase("Dhaka").orElse(null);
-        Long defaultDistrictId = (dhaka != null) ? dhaka.getId() : 1L;
+        Long dhakaDistId = (dhaka != null) ? dhaka.getId() : 1L;
 
+        // Ensure users exist in Users table
+        if (userRepository.findByEmail("central.supplier@fizzdrop.com").isEmpty()) {
+            userRepository.save(new User(3L, 1L, "central.supplier@fizzdrop.com", "supplier123"));
+        }
+        if (userRepository.findByEmail("chittagong.supplier@fizzdrop.com").isEmpty()) {
+            userRepository.save(new User(3L, 1L, "chittagong.supplier@fizzdrop.com", "supplier123"));
+        }
+        if (userRepository.findByEmail("sylhet.supplier@fizzdrop.com").isEmpty()) {
+            userRepository.save(new User(3L, 1L, "sylhet.supplier@fizzdrop.com", "supplier123"));
+        }
+
+        // Supplier 1: Dhaka Division Hub (User ID 4)
         if (supplierProfileRepository.findByUserId(4L).isEmpty()) {
-            SupplierProfile defaultProf = new SupplierProfile(
+            District gazipur = districtRepository.findByNameIgnoreCase("Gazipur").orElse(null);
+            District narayanganj = districtRepository.findByNameIgnoreCase("Narayanganj").orElse(null);
+            String covered = dhakaDistId + (gazipur != null ? "," + gazipur.getId() : "") + (narayanganj != null ? "," + narayanganj.getId() : "");
+
+            SupplierProfile dhakaProf = new SupplierProfile(
                     4L,
-                    "Central Beverage Logistics Hub",
-                    defaultDistrictId,
-                    "Road 11, Plot 42, Gulshan-1 Depot, Dhaka",
+                    "Dhaka Metropolitan & Central Beverage Logistics Hub",
+                    dhakaDistId,
+                    "Road 11, Plot 42, Gulshan-1 Logistics Depot, Dhaka",
                     "+8801700112233"
             );
-            defaultProf.setDivisionName("Dhaka");
-            defaultProf.setCoveredDistrictIds(String.valueOf(defaultDistrictId));
-            defaultProf.setTradeLicenseNumber("TRD-DHK-2026-9812");
-            defaultProf.setIsVerified(true);
-            defaultProf.setDefaultPaymentMethod("CORPORATE_BANK_TRANSFER");
-            defaultProf.setBankName("Dutch-Bangla Bank PLC");
-            defaultProf.setBankAccountNumber("115.120.984123-DHK");
-            defaultProf.setBankAccountName("FizzDrop Regional Logistics Depot");
-            defaultProf.setMobileBankingNumber("+8801700112233");
-            supplierProfileRepository.save(defaultProf);
+            dhakaProf.setDivisionName("Dhaka");
+            dhakaProf.setCoveredDistrictIds(covered);
+            dhakaProf.setTradeLicenseNumber("TRD-DHK-2026-9812");
+            dhakaProf.setIsVerified(true);
+            dhakaProf.setDefaultPaymentMethod("CORPORATE_BANK_TRANSFER");
+            dhakaProf.setBankName("Dutch-Bangla Bank PLC");
+            dhakaProf.setBankAccountNumber("115.120.984123-DHK");
+            dhakaProf.setBankAccountName("FizzDrop Regional Logistics Depot");
+            dhakaProf.setMobileBankingNumber("+8801700112233");
+            supplierProfileRepository.save(dhakaProf);
         } else {
             SupplierProfile p = supplierProfileRepository.findByUserId(4L).get();
             boolean needSave = false;
@@ -112,11 +131,65 @@ public class RequisitionProcessingService {
                 needSave = true;
             }
             if (p.getCoveredDistrictIds() == null || p.getCoveredDistrictIds().trim().isEmpty()) {
-                p.setCoveredDistrictIds(String.valueOf(p.getPrimaryDistrictId() != null ? p.getPrimaryDistrictId() : defaultDistrictId));
+                p.setCoveredDistrictIds(String.valueOf(p.getPrimaryDistrictId() != null ? p.getPrimaryDistrictId() : dhakaDistId));
                 needSave = true;
             }
             if (needSave) {
                 supplierProfileRepository.save(p);
+            }
+        }
+
+        // Supplier 2: Chittagong Coastal Beverage Hub (User ID 5 or lookup)
+        District ctgDist = districtRepository.findByNameIgnoreCase("Chittagong").orElse(null);
+        District coxDist = districtRepository.findByNameIgnoreCase("Cox's Bazar").orElse(null);
+        District comillaDist = districtRepository.findByNameIgnoreCase("Comilla").orElse(null);
+        if (ctgDist != null) {
+            Optional<User> ctgUserOpt = userRepository.findByEmail("chittagong.supplier@fizzdrop.com");
+            Long ctgUserId = ctgUserOpt.map(User::getUserId).orElse(5L);
+            if (supplierProfileRepository.findByUserId(ctgUserId).isEmpty()) {
+                String ctgCovered = ctgDist.getId() + (coxDist != null ? "," + coxDist.getId() : "") + (comillaDist != null ? "," + comillaDist.getId() : "");
+                SupplierProfile ctgProf = new SupplierProfile(
+                        ctgUserId,
+                        "Bay Beverage Logistics & Ports Depot",
+                        ctgDist.getId(),
+                        "Agrabad Commercial Area, Depot Block 4, Chittagong",
+                        "+8801811223344"
+                );
+                ctgProf.setDivisionName("Chittagong");
+                ctgProf.setCoveredDistrictIds(ctgCovered);
+                ctgProf.setTradeLicenseNumber("TRD-CTG-2026-4410");
+                ctgProf.setIsVerified(true);
+                ctgProf.setDefaultPaymentMethod("CORPORATE_BANK_TRANSFER");
+                ctgProf.setBankName("Eastern Bank PLC");
+                ctgProf.setBankAccountNumber("201.554.887192-CTG");
+                ctgProf.setBankAccountName("Bay Beverage Distribution Depot");
+                ctgProf.setMobileBankingNumber("+8801811223344");
+                supplierProfileRepository.save(ctgProf);
+            }
+        }
+
+        // Supplier 3: Surma Valley Beverage Hub (User ID 6 or lookup)
+        District sylDist = districtRepository.findByNameIgnoreCase("Sylhet").orElse(null);
+        District moulviDist = districtRepository.findByNameIgnoreCase("Moulvibazar").orElse(null);
+        if (sylDist != null) {
+            Optional<User> sylUserOpt = userRepository.findByEmail("sylhet.supplier@fizzdrop.com");
+            Long sylUserId = sylUserOpt.map(User::getUserId).orElse(6L);
+            if (supplierProfileRepository.findByUserId(sylUserId).isEmpty()) {
+                String sylCovered = sylDist.getId() + (moulviDist != null ? "," + moulviDist.getId() : "");
+                SupplierProfile sylProf = new SupplierProfile(
+                        sylUserId,
+                        "Surma Valley Beverage Supply Hub",
+                        sylDist.getId(),
+                        "Subidbazar Road, Ward 3 Depot, Sylhet",
+                        "+8801733445566"
+                );
+                sylProf.setDivisionName("Sylhet");
+                sylProf.setCoveredDistrictIds(sylCovered);
+                sylProf.setTradeLicenseNumber("TRD-SYL-2026-2209");
+                sylProf.setIsVerified(true);
+                sylProf.setDefaultPaymentMethod("BKASH_MERCHANT");
+                sylProf.setMobileBankingNumber("+8801733445566");
+                supplierProfileRepository.save(sylProf);
             }
         }
 
@@ -190,6 +263,14 @@ public class RequisitionProcessingService {
 
     public List<District> getAllDistricts() {
         return districtRepository.findAllByOrderByDivisionAscNameAsc();
+    }
+
+    public List<SupplierProfile> getAllSupplierProfiles() {
+        List<SupplierProfile> all = supplierProfileRepository.findAll();
+        for (SupplierProfile sp : all) {
+            enrichProfile(sp);
+        }
+        return all;
     }
 
     public SupplierProfile getSupplierProfile(Long userId) {
@@ -631,6 +712,12 @@ public class RequisitionProcessingService {
 
         profile.setCoveredDistrictIdsList(idList);
         profile.setAssignedDistricts(assignedDistricts);
+
+        if (profile.getUserId() != null) {
+            userRepository.findById(profile.getUserId()).ifPresent(u -> {
+                profile.setUserEmail(u.getEmail());
+            });
+        }
     }
 
     private void enrichRequisition(StockRequisition req, SupplierProfile sp) {
