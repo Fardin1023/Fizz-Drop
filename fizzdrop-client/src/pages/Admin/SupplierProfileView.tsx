@@ -12,6 +12,7 @@ import {
   Info,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { parseAllocatedAreas } from '../../constants/cityAreas';
 
 export interface SupplierProfileData {
   id: number;
@@ -25,6 +26,7 @@ export interface SupplierProfileData {
   covered_district_ids?: string;
   covered_district_ids_list?: number[];
   assigned_districts?: Array<{ id: number; name: string; division: string }>;
+  allocated_areas?: string;
   depot_address: string;
   phone_number: string;
   default_payment_method?: string;
@@ -179,31 +181,52 @@ export const SupplierProfileView: React.FC = () => {
             </div>
 
             <div>
-              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block mb-1.5">
-                Allotted Franchise Outlet Cities ({assignedCities.length || 1})
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block mb-2">
+                Allotted Franchise Outlet Cities & Authorized Municipal Areas ({assignedCities.length || 1})
               </span>
-              <div className="flex flex-wrap gap-1.5">
-                {assignedCities.length > 0 ? (
-                  assignedCities.map((c) => (
-                    <span
-                      key={c.id}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold border ${
-                        c.id === profile.primary_district_id
-                          ? 'bg-indigo-600 text-white border-indigo-700 shadow-2xs'
-                          : 'bg-slate-50 text-slate-700 border-slate-200'
-                      }`}
-                    >
-                      {c.name} {c.id === profile.primary_district_id && '★'}
-                    </span>
-                  ))
-                ) : (
-                  <span className="px-2.5 py-1 rounded-lg text-xs bg-slate-50 text-slate-700 border border-slate-200">
-                    {profile.district_name || 'Allotted District'}
-                  </span>
-                )}
+              <div className="space-y-2.5">
+                {(assignedCities.length > 0 ? assignedCities : [{ id: profile.primary_district_id, name: profile.district_name || 'Dhaka', division: profile.division_name || 'Dhaka' }]).map((c) => {
+                  const parsedAreas = parseAllocatedAreas(profile.allocated_areas);
+                  const cityAreas = parsedAreas[c.name] || [];
+                  return (
+                    <div key={c.id} className="p-3 rounded-xl bg-slate-50 border border-slate-200/90 space-y-1.5 shadow-2xs">
+                      <div className="flex items-center justify-between">
+                        <span
+                          className={`px-2 py-0.5 rounded-md text-xs font-bold border ${
+                            c.id === profile.primary_district_id
+                              ? 'bg-indigo-600 text-white border-indigo-700 shadow-2xs'
+                              : 'bg-white text-slate-800 border-slate-200'
+                          }`}
+                        >
+                          {c.name} {c.id === profile.primary_district_id && '★ Primary Hub'}
+                        </span>
+                        <span className="text-[11px] font-medium text-slate-500">
+                          {cityAreas.length > 0 ? `${cityAreas.length} authorized zones` : 'All municipal zones'}
+                        </span>
+                      </div>
+
+                      <div className="flex flex-wrap gap-1.5 pt-0.5">
+                        {cityAreas.length > 0 ? (
+                          cityAreas.map((area, idx) => (
+                            <span
+                              key={idx}
+                              className="px-2 py-0.5 rounded-md bg-white border border-indigo-200 text-indigo-800 text-[11px] font-medium shadow-2xs"
+                            >
+                              {area}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-xs text-slate-500 italic">
+                            Authorized for all municipal zones in {c.name}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-              <p className="text-[11px] text-slate-500 mt-2">
-                • You are authorized to supply stock exclusively to franchise outlets situated within these allotted cities.
+              <p className="text-[11px] text-slate-500 mt-2.5">
+                • You are authorized to supply stock exclusively to franchise outlets situated within these allotted cities and municipal areas.
               </p>
             </div>
           </div>

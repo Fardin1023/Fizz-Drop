@@ -94,6 +94,12 @@ public class SupplierProfile {
     @JsonAlias({"covered_district_ids", "coveredDistrictIds"})
     private String coveredDistrictIds;
 
+    @Lob
+    @Column(name = "allocated_areas", columnDefinition = "TEXT")
+    @JsonProperty("allocated_areas")
+    @JsonAlias({"allocated_areas", "allocatedAreas"})
+    private String allocatedAreas;
+
     // Transient helper fields for API JSON serialization
     @Transient
     @JsonProperty("district_name")
@@ -190,6 +196,9 @@ public class SupplierProfile {
 
     public String getCoveredDistrictIds() { return coveredDistrictIds; }
     public void setCoveredDistrictIds(String coveredDistrictIds) { this.coveredDistrictIds = coveredDistrictIds; }
+
+    public String getAllocatedAreas() { return allocatedAreas; }
+    public void setAllocatedAreas(String allocatedAreas) { this.allocatedAreas = allocatedAreas; }
 
     public List<Long> getCoveredDistrictIdsList() { return coveredDistrictIdsList; }
     public void setCoveredDistrictIdsList(List<Long> coveredDistrictIdsList) { this.coveredDistrictIdsList = coveredDistrictIdsList; }

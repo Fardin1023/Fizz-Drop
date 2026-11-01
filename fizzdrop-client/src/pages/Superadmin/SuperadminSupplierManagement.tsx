@@ -20,6 +20,12 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import {
+  CITY_AREAS_MAP,
+  getAvailableAreasForCity,
+  parseAllocatedAreas,
+  serializeAllocatedAreas,
+} from '../../constants/cityAreas';
 
 export interface DistrictItem {
   id: number;
@@ -39,6 +45,7 @@ export interface SupplierRecord {
   covered_district_ids?: string;
   covered_district_ids_list?: number[];
   assigned_districts?: Array<{ id: number; name: string; division: string }>;
+  allocated_areas?: string;
   depot_address: string;
   phone_number: string;
   default_payment_method?: string;
@@ -90,6 +97,42 @@ export const SuperadminSupplierManagement: React.FC = () => {
   const [mobileBankingNumber, setMobileBankingNumber] = useState('');
   const [isVerified, setIsVerified] = useState(true);
 
+  // Allocated municipal & neighborhood areas state
+  const [allocatedAreasMap, setAllocatedAreasMap] = useState<Record<string, string[]>>({});
+  const [newAreaInput, setNewAreaInput] = useState<Record<string, string>>({});
+
+  const toggleAreaForCity = (cityName: string, area: string) => {
+    setAllocatedAreasMap((prev) => {
+      const current = prev[cityName] || [];
+      const updated = current.includes(area)
+        ? current.filter((a) => a !== area)
+        : [...current, area];
+      return { ...prev, [cityName]: updated };
+    });
+  };
+
+  const toggleAllAreasForCity = (cityName: string, allAreas: string[]) => {
+    setAllocatedAreasMap((prev) => {
+      const current = prev[cityName] || [];
+      const isAllSelected = allAreas.length > 0 && allAreas.every((a) => current.includes(a));
+      return {
+        ...prev,
+        [cityName]: isAllSelected ? [] : [...allAreas],
+      };
+    });
+  };
+
+  const handleAddCustomArea = (cityName: string) => {
+    const custom = (newAreaInput[cityName] || '').trim();
+    if (!custom) return;
+    setAllocatedAreasMap((prev) => {
+      const current = prev[cityName] || [];
+      if (current.includes(custom)) return prev;
+      return { ...prev, [cityName]: [...current, custom] };
+    });
+    setNewAreaInput((prev) => ({ ...prev, [cityName]: '' }));
+  };
+
   // Status feedback
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -137,12 +180,18 @@ export const SuperadminSupplierManagement: React.FC = () => {
   const handleDivisionChange = (newDiv: string) => {
     setSelectedDivision(newDiv);
     const citiesInDiv = groupedDistricts[newDiv] || [];
-    const firstCityId = citiesInDiv.length > 0 ? citiesInDiv[0].id : 1;
+    const firstCity = citiesInDiv.length > 0 ? citiesInDiv[0] : null;
+    const firstCityId = firstCity ? firstCity.id : 1;
     setCoveredDistrictIds([firstCityId]);
     setPrimaryDistrictId(firstCityId);
+    if (firstCity) {
+      setAllocatedAreasMap({
+        [firstCity.name]: getAvailableAreasForCity(firstCity.name).slice(0, 5),
+      });
+    }
   };
 
-  const toggleDistrict = (districtId: number) => {
+  const toggleDistrict = (districtId: number, cityName?: string) => {
     setCoveredDistrictIds((prev) => {
       if (prev.includes(districtId)) {
         if (prev.length === 1) {
@@ -155,7 +204,19 @@ export const SuperadminSupplierManagement: React.FC = () => {
         }
         return next;
       } else {
-        return [...prev, districtId];
+        const next = [...prev, districtId];
+        if (cityName) {
+          setAllocatedAreasMap((amap) => {
+            if (!amap[cityName] || amap[cityName].length === 0) {
+              return {
+                ...amap,
+                [cityName]: getAvailableAreasForCity(cityName).slice(0, 5),
+              };
+            }
+            return amap;
+          });
+        }
+        return next;
       }
     });
   };
@@ -163,6 +224,15 @@ export const SuperadminSupplierManagement: React.FC = () => {
   const handleSelectAllInDivision = () => {
     const allIds = currentCitiesInDivision.map((d) => d.id);
     setCoveredDistrictIds(allIds);
+    setAllocatedAreasMap((prev) => {
+      const nextMap = { ...prev };
+      for (const c of currentCitiesInDivision) {
+        if (!nextMap[c.name] || nextMap[c.name].length === 0) {
+          nextMap[c.name] = getAvailableAreasForCity(c.name).slice(0, 4);
+        }
+      }
+      return nextMap;
+    });
   };
 
   const handleOpenCreateModal = () => {
@@ -178,9 +248,14 @@ export const SuperadminSupplierManagement: React.FC = () => {
     setSelectedDivision('Dhaka');
     
     const dhakaCities = groupedDistricts['Dhaka'] || [];
-    const firstDhakaId = dhakaCities.length > 0 ? dhakaCities[0].id : 1;
+    const firstDhaka = dhakaCities.length > 0 ? dhakaCities[0] : null;
+    const firstDhakaId = firstDhaka ? firstDhaka.id : 1;
     setCoveredDistrictIds([firstDhakaId]);
     setPrimaryDistrictId(firstDhakaId);
+    setAllocatedAreasMap({
+      'Dhaka': ['Gulshan', 'Banani', 'Uttara', 'Dhanmondi', 'Mirpur'],
+    });
+    setNewAreaInput({});
     setDefaultPaymentMethod('CORPORATE_BANK_TRANSFER');
     setBankName('Dutch-Bangla Bank PLC');
     setBankAccountNumber('');
@@ -212,6 +287,8 @@ export const SuperadminSupplierManagement: React.FC = () => {
     
     setCoveredDistrictIds(covered);
     setPrimaryDistrictId(s.primary_district_id || covered[0]);
+    setAllocatedAreasMap(parseAllocatedAreas(s.allocated_areas));
+    setNewAreaInput({});
     setDefaultPaymentMethod(s.default_payment_method || 'CORPORATE_BANK_TRANSFER');
     setBankName(s.bank_name || 'Dutch-Bangla Bank PLC');
     setBankAccountNumber(s.bank_account_number || '');
@@ -252,6 +329,7 @@ export const SuperadminSupplierManagement: React.FC = () => {
         email: email.trim().toLowerCase(),
         division_name: selectedDivision,
         covered_district_ids: coveredDistrictIds,
+        allocated_areas: serializeAllocatedAreas(allocatedAreasMap),
         primary_district_id: primaryDistrictId,
         depot_address: depotAddress.trim(),
         phone_number: phoneNumber.trim(),
@@ -512,35 +590,54 @@ export const SuperadminSupplierManagement: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Allotted Cities by Superadmin */}
-                  <div className="mb-3.5 p-2.5 rounded-xl bg-slate-50 border border-slate-100">
-                    <div className="flex items-center justify-between text-[11px] font-semibold text-slate-700 mb-1.5">
+                  {/* Allotted Cities & Municipal Areas by Superadmin */}
+                  <div className="mb-3.5 p-2.5 rounded-xl bg-slate-50 border border-slate-100 space-y-2">
+                    <div className="flex items-center justify-between text-[11px] font-semibold text-slate-700">
                       <span className="flex items-center gap-1">
                         <MapPin className="w-3 h-3 text-rose-500" />
-                        Allotted Cities ({assignedCities.length || s.covered_district_ids_list?.length || 1})
+                        Allotted Cities & Areas ({assignedCities.length || s.covered_district_ids_list?.length || 1})
                       </span>
                       <span className="text-[10px] font-mono text-slate-400">Hub: {s.district_name || 'Dhaka'}</span>
                     </div>
 
-                    <div className="flex flex-wrap gap-1">
-                      {assignedCities.length > 0 ? (
-                        assignedCities.map((c) => (
-                          <span
-                            key={c.id}
-                            className={`px-2 py-0.5 rounded-md text-[10px] font-semibold border ${
-                              c.id === s.primary_district_id
-                                ? 'bg-indigo-600 text-white border-indigo-700 font-bold'
-                                : 'bg-white text-slate-700 border-slate-200'
-                            }`}
-                          >
-                            {c.name} {c.id === s.primary_district_id && '★'}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="px-2 py-0.5 rounded-md text-[10px] bg-white text-slate-700 border border-slate-200">
-                          {s.district_name || 'Primary District'}
-                        </span>
-                      )}
+                    <div className="space-y-1.5">
+                      {(assignedCities.length > 0 ? assignedCities : [{ id: s.primary_district_id, name: s.district_name || 'Dhaka', division: s.division_name || 'Dhaka' }]).map((c) => {
+                        const parsedAreas = parseAllocatedAreas(s.allocated_areas);
+                        const cityAreas = parsedAreas[c.name] || [];
+                        return (
+                          <div key={c.id} className="p-2 rounded-lg bg-white border border-slate-200/90 shadow-2xs">
+                            <div className="flex items-center justify-between gap-1 mb-1">
+                              <span
+                                className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+                                  c.id === s.primary_district_id
+                                    ? 'bg-indigo-600 text-white border-indigo-700'
+                                    : 'bg-slate-100 text-slate-800 border-slate-200'
+                                }`}
+                              >
+                                {c.name} {c.id === s.primary_district_id && '★'}
+                              </span>
+                              <span className="text-[9px] text-slate-400 font-medium">
+                                {cityAreas.length > 0 ? `${cityAreas.length} zones` : 'All municipal areas'}
+                              </span>
+                            </div>
+
+                            <div className="flex flex-wrap gap-1">
+                              {cityAreas.length > 0 ? (
+                                cityAreas.map((area, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-100 text-[9px] font-medium"
+                                  >
+                                    {area}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-[9px] text-slate-400 italic">Entire municipal district</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -789,7 +886,7 @@ export const SuperadminSupplierManagement: React.FC = () => {
                         <button
                           type="button"
                           key={c.id}
-                          onClick={() => toggleDistrict(c.id)}
+                          onClick={() => toggleDistrict(c.id, c.name)}
                           className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-xs transition-colors cursor-pointer text-left ${
                             isChecked
                               ? 'bg-indigo-50 border-indigo-400 text-indigo-900 font-semibold'
@@ -822,6 +919,100 @@ export const SuperadminSupplierManagement: React.FC = () => {
                         </option>
                       ))}
                   </select>
+                </div>
+
+                {/* Specific Municipal / Neighborhood Area Allotment for Selected Cities */}
+                <div className="pt-2 border-t border-slate-200/80 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-800">
+                        Specific Municipal & Neighborhood Area Allotment
+                      </label>
+                      <span className="text-[10px] text-slate-500">
+                        Specify the exact operating zones and commercial hubs for each allotted city
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    {districts
+                      .filter((d) => coveredDistrictIds.includes(d.id))
+                      .map((c) => {
+                        const cityName = c.name;
+                        const availableAreas = getAvailableAreasForCity(cityName);
+                        const selectedForCity = allocatedAreasMap[cityName] || [];
+                        const isAllSelected = availableAreas.length > 0 && availableAreas.every((a) => selectedForCity.includes(a));
+
+                        return (
+                          <div key={c.id} className="p-3 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-2">
+                            <div className="flex items-center justify-between flex-wrap gap-2">
+                              <div className="flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-indigo-600" />
+                                <span className="text-xs font-bold text-slate-900">{cityName} City</span>
+                                <span className="text-[10px] px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 font-semibold border border-indigo-100">
+                                  {selectedForCity.length} areas allocated
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 text-[10px]">
+                                <button
+                                  type="button"
+                                  onClick={() => toggleAllAreasForCity(cityName, availableAreas)}
+                                  className="text-indigo-600 hover:text-indigo-800 font-semibold cursor-pointer underline"
+                                >
+                                  {isAllSelected ? 'Deselect All' : 'Select All Areas'}
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Predefined area chips */}
+                            <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-1.5 bg-slate-50/80 rounded-lg border border-slate-100">
+                              {availableAreas.map((area) => {
+                                const isAreaSelected = selectedForCity.includes(area);
+                                return (
+                                  <button
+                                    type="button"
+                                    key={area}
+                                    onClick={() => toggleAreaForCity(cityName, area)}
+                                    className={`px-2 py-1 rounded-md text-[11px] font-medium transition-all cursor-pointer flex items-center gap-1 ${
+                                      isAreaSelected
+                                        ? 'bg-indigo-600 text-white shadow-2xs font-semibold'
+                                        : 'bg-white text-slate-700 border border-slate-200 hover:border-indigo-300 hover:text-indigo-600'
+                                    }`}
+                                  >
+                                    <span>{area}</span>
+                                    {isAreaSelected && <Check className="w-3 h-3 text-white shrink-0" />}
+                                  </button>
+                                );
+                              })}
+                            </div>
+
+                            {/* Custom Area entry for custom local zones */}
+                            <div className="flex items-center gap-1.5 pt-1">
+                              <input
+                                type="text"
+                                placeholder={`Add custom area/zone in ${cityName}...`}
+                                value={newAreaInput[cityName] || ''}
+                                onChange={(e) => setNewAreaInput({ ...newAreaInput, [cityName]: e.target.value })}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleAddCustomArea(cityName);
+                                  }
+                                }}
+                                className="flex-1 px-2.5 py-1 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleAddCustomArea(cityName)}
+                                className="px-3 py-1 text-xs font-semibold bg-slate-800 text-white hover:bg-slate-900 rounded-lg cursor-pointer shrink-0"
+                              >
+                                + Add Zone
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
                 </div>
               </div>
 

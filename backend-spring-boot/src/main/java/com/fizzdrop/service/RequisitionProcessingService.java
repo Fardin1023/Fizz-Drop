@@ -122,6 +122,7 @@ public class RequisitionProcessingService {
             dhakaProf.setBankAccountNumber("115.120.984123-DHK");
             dhakaProf.setBankAccountName("FizzDrop Regional Logistics Depot");
             dhakaProf.setMobileBankingNumber("+8801700112233");
+            dhakaProf.setAllocatedAreas("{\"Dhaka\":[\"Gulshan\",\"Banani\",\"Uttara\",\"Dhanmondi\",\"Mirpur\"],\"Gazipur\":[\"Tongi\",\"Joydebpur\"],\"Narayanganj\":[\"Chashara\",\"Siddhirganj\"]}");
             supplierProfileRepository.save(dhakaProf);
         } else {
             SupplierProfile p = supplierProfileRepository.findByUserId(4L).get();
@@ -132,6 +133,10 @@ public class RequisitionProcessingService {
             }
             if (p.getCoveredDistrictIds() == null || p.getCoveredDistrictIds().trim().isEmpty()) {
                 p.setCoveredDistrictIds(String.valueOf(p.getPrimaryDistrictId() != null ? p.getPrimaryDistrictId() : dhakaDistId));
+                needSave = true;
+            }
+            if (p.getAllocatedAreas() == null || p.getAllocatedAreas().trim().isEmpty()) {
+                p.setAllocatedAreas("{\"Dhaka\":[\"Gulshan\",\"Banani\",\"Uttara\",\"Dhanmondi\",\"Mirpur\"],\"Gazipur\":[\"Tongi\",\"Joydebpur\"],\"Narayanganj\":[\"Chashara\",\"Siddhirganj\"]}");
                 needSave = true;
             }
             if (needSave) {
@@ -164,7 +169,15 @@ public class RequisitionProcessingService {
                 ctgProf.setBankAccountNumber("201.554.887192-CTG");
                 ctgProf.setBankAccountName("Bay Beverage Distribution Depot");
                 ctgProf.setMobileBankingNumber("+8801811223344");
+                ctgProf.setAllocatedAreas("{\"Chittagong\":[\"Agrabad\",\"GEC Circle\",\"Panchlaish\",\"Halishahar\"],\"Cox's Bazar\":[\"Kolatoli\",\"Laboni Point\"]}");
                 supplierProfileRepository.save(ctgProf);
+            } else {
+                supplierProfileRepository.findByUserId(ctgUserId).ifPresent(p -> {
+                    if (p.getAllocatedAreas() == null || p.getAllocatedAreas().trim().isEmpty()) {
+                        p.setAllocatedAreas("{\"Chittagong\":[\"Agrabad\",\"GEC Circle\",\"Panchlaish\",\"Halishahar\"],\"Cox's Bazar\":[\"Kolatoli\",\"Laboni Point\"]}");
+                        supplierProfileRepository.save(p);
+                    }
+                });
             }
         }
 
@@ -189,7 +202,15 @@ public class RequisitionProcessingService {
                 sylProf.setIsVerified(true);
                 sylProf.setDefaultPaymentMethod("BKASH_MERCHANT");
                 sylProf.setMobileBankingNumber("+8801733445566");
+                sylProf.setAllocatedAreas("{\"Sylhet\":[\"Zindabazar\",\"Amberkhana\",\"Shibganj\",\"Shahjalal Uposhohor\"]}");
                 supplierProfileRepository.save(sylProf);
+            } else {
+                supplierProfileRepository.findByUserId(sylUserId).ifPresent(p -> {
+                    if (p.getAllocatedAreas() == null || p.getAllocatedAreas().trim().isEmpty()) {
+                        p.setAllocatedAreas("{\"Sylhet\":[\"Zindabazar\",\"Amberkhana\",\"Shibganj\",\"Shahjalal Uposhohor\"]}");
+                        supplierProfileRepository.save(p);
+                    }
+                });
             }
         }
 
@@ -371,6 +392,9 @@ public class RequisitionProcessingService {
         if (dto.getIsVerified() != null) {
             profile.setIsVerified(dto.getIsVerified());
         }
+        if (dto.getAllocatedAreas() != null) {
+            profile.setAllocatedAreas(dto.getAllocatedAreas().trim());
+        }
 
         if (profile.getUserId() != null) {
             userRepository.findById(profile.getUserId()).ifPresent(u -> {
@@ -442,6 +466,9 @@ public class RequisitionProcessingService {
         profile.setBankAccountNumber(dto.getBankAccountNumber());
         profile.setBankAccountName(dto.getBankAccountName());
         profile.setMobileBankingNumber(dto.getMobileBankingNumber());
+        if (dto.getAllocatedAreas() != null) {
+            profile.setAllocatedAreas(dto.getAllocatedAreas().trim());
+        }
 
         String targetDivision = dto.getDivisionName();
         List<Long> coveredIds = dto.getCoveredDistrictIds();

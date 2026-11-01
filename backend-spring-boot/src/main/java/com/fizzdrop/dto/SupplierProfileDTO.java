@@ -18,6 +18,10 @@ public class SupplierProfileDTO {
     @JsonAlias({"covered_district_ids", "coveredDistrictIds"})
     private List<Long> coveredDistrictIds;
 
+    @JsonProperty("allocated_areas")
+    @JsonAlias({"allocated_areas", "allocatedAreas"})
+    private String allocatedAreas;
+
     @JsonProperty("business_name")
     @JsonAlias({"business_name", "businessName"})
     private String businessName;
@@ -78,6 +82,9 @@ public class SupplierProfileDTO {
 
     public List<Long> getCoveredDistrictIds() { return coveredDistrictIds; }
     public void setCoveredDistrictIds(List<Long> coveredDistrictIds) { this.coveredDistrictIds = coveredDistrictIds; }
+
+    public String getAllocatedAreas() { return allocatedAreas; }
+    public void setAllocatedAreas(String allocatedAreas) { this.allocatedAreas = allocatedAreas; }
 
     public String getBusinessName() { return businessName; }
     public void setBusinessName(String businessName) { this.businessName = businessName; }
