@@ -26,16 +26,44 @@ public class DatabaseConfig {
     @Bean
     @Primary
     public DataSource dataSource() {
-        System.out.println("[DatabaseConfig] Testing connection to MySQL at: " + mysqlUrl);
+        String effectiveUrl = mysqlUrl;
+        String effectiveUser = username;
+        String effectivePass = password;
+
+        // Auto-detect & convert Aiven service URI (e.g. mysql://user:pass@host:port/dbname?ssl-mode=REQUIRED)
+        if (effectiveUrl != null && effectiveUrl.startsWith("mysql://")) {
+            try {
+                java.net.URI uri = java.net.URI.create(effectiveUrl);
+                String userInfo = uri.getUserInfo();
+                if (userInfo != null && userInfo.contains(":")) {
+                    String[] userParts = userInfo.split(":", 2);
+                    if (effectiveUser == null || effectiveUser.equals("root") || effectiveUser.isEmpty()) {
+                        effectiveUser = java.net.URLDecoder.decode(userParts[0], java.nio.charset.StandardCharsets.UTF_8);
+                    }
+                    if (effectivePass == null || effectivePass.isEmpty()) {
+                        effectivePass = java.net.URLDecoder.decode(userParts[1], java.nio.charset.StandardCharsets.UTF_8);
+                    }
+                }
+                String dbPath = uri.getPath() != null && uri.getPath().length() > 1 ? uri.getPath().substring(1) : "defaultdb";
+                int port = uri.getPort() != -1 ? uri.getPort() : 3306;
+                effectiveUrl = "jdbc:mysql://" + uri.getHost() + ":" + port + "/" + dbPath 
+                        + "?sslMode=REQUIRED&useSSL=true&allowPublicKeyRetrieval=true&serverTimezone=UTC";
+                System.out.println("[DatabaseConfig] Converted Aiven URI to Cloud JDBC URL: " + uri.getHost() + ":" + port + "/" + dbPath);
+            } catch (Exception ex) {
+                System.err.println("[DatabaseConfig] Error parsing Aiven mysql:// URI: " + ex.getMessage());
+            }
+        }
+
+        System.out.println("[DatabaseConfig] Testing connection to MySQL at: " + effectiveUrl);
         boolean mysqlAvailable = false;
 
         try {
-            // Attempt short-timeout probe connection to MySQL
-            DriverManager.setLoginTimeout(2);
-            try (Connection conn = DriverManager.getConnection(mysqlUrl, username, password)) {
-                if (conn.isValid(2)) {
+            // Cloud timeout for TLS/SSL handshake (up to 8 seconds)
+            DriverManager.setLoginTimeout(8);
+            try (Connection conn = DriverManager.getConnection(effectiveUrl, effectiveUser, effectivePass)) {
+                if (conn.isValid(5)) {
                     mysqlAvailable = true;
-                    System.out.println("[DatabaseConfig] Successfully connected to live MySQL instance!");
+                    System.out.println("[DatabaseConfig] Successfully connected to live MySQL instance (" + effectiveUrl + ")!");
                 }
             }
         } catch (Exception e) {
@@ -45,11 +73,13 @@ public class DatabaseConfig {
 
         HikariConfig config = new HikariConfig();
         if (mysqlAvailable) {
-            config.setJdbcUrl(mysqlUrl);
-            config.setUsername(username);
-            config.setPassword(password);
+            config.setJdbcUrl(effectiveUrl);
+            config.setUsername(effectiveUser);
+            config.setPassword(effectivePass);
             config.setDriverClassName("com.mysql.cj.jdbc.Driver");
             config.setMaximumPoolSize(10);
+            config.setConnectionTimeout(15000);
+            config.setIdleTimeout(600000);
         } else {
             // Persistent file-backed relational database in MySQL mode
             config.setJdbcUrl("jdbc:h2:file:./data/fizzdrop_db;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1");
