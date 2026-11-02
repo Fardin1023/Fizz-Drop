@@ -245,13 +245,8 @@ public class RequisitionProcessingService {
             }
         }
 
-        // 4. Remove all product stock from retail outlets since products will be provided by suppliers
-        try {
-            jdbcTemplate.execute("UPDATE shop_inventory SET stock_quantity = 0");
-            System.out.println("[Database Init] Outlet product stocks cleared to 0 (to be supplied by suppliers).");
-        } catch (Exception ex) {
-            System.err.println("[Database Init] Failed to reset outlet stocks: " + ex.getMessage());
-        }
+        // 4. Preserve existing outlet and shop inventory stocks across restarts
+        System.out.println("[Database Init] Outlet product stocks preserved across restarts.");
 
         // 5. Maintain Superadmin fixed stock for every category of products for supplying to suppliers
         try {
