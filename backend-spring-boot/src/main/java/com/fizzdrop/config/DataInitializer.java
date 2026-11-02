@@ -32,18 +32,7 @@ public class DataInitializer {
                 System.out.println("[DataInitializer] Default Superadmin registered: superadmin@fizzdrop.com / admin123");
             }
 
-            // Clean up any legacy seed product data completely from DB (Superadmin inputs products)
-            try {
-                jdbcTemplate.execute("DELETE FROM stock_requisition_items");
-                jdbcTemplate.execute("DELETE FROM stock_requisitions");
-                jdbcTemplate.execute("DELETE FROM central_inventory");
-                jdbcTemplate.execute("DELETE FROM district_inventory");
-                jdbcTemplate.execute("DELETE FROM Shop_Inventory");
-                jdbcTemplate.execute("DELETE FROM Products");
-                System.out.println("[DataInitializer] Seed product records wiped. Database is clean for Superadmin product input.");
-            } catch (Exception ex) {
-                System.err.println("[DataInitializer] Note on product cleanup: " + ex.getMessage());
-            }
+            // Product persistence is preserved for Superadmin product input
         };
     }
 }
