@@ -74,6 +74,10 @@ export interface SupplierRecord {
   bin_document?: string;
   bin_doc_name?: string;
   bin_doc_type?: string;
+  tds_vds_document?: string;
+  tds_vds_doc_name?: string;
+  tds_vds_doc_type?: string;
+  tds_vds_number?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -134,6 +138,11 @@ export const SuperadminSupplierManagement: React.FC = () => {
   const [binDoc, setBinDoc] = useState<string | null>(null);
   const [binDocName, setBinDocName] = useState<string | null>(null);
   const [binDocType, setBinDocType] = useState<string | null>(null);
+
+  const [tdsVdsDoc, setTdsVdsDoc] = useState<string | null>(null);
+  const [tdsVdsDocName, setTdsVdsDocName] = useState<string | null>(null);
+  const [tdsVdsDocType, setTdsVdsDocType] = useState<string | null>(null);
+  const [tdsVdsNumber, setTdsVdsNumber] = useState('');
 
   // Document Viewer Preview Modal
   const [viewerModal, setViewerModal] = useState<{
@@ -348,6 +357,10 @@ export const SuperadminSupplierManagement: React.FC = () => {
     setBinDoc(null);
     setBinDocName(null);
     setBinDocType(null);
+    setTdsVdsDoc(null);
+    setTdsVdsDocName(null);
+    setTdsVdsDocType(null);
+    setTdsVdsNumber('');
     setErrorMsg(null);
     setSuccessMsg(null);
     setIsModalOpen(true);
@@ -394,6 +407,10 @@ export const SuperadminSupplierManagement: React.FC = () => {
     setBinDoc(s.bin_document || null);
     setBinDocName(s.bin_doc_name || null);
     setBinDocType(s.bin_doc_type || null);
+    setTdsVdsDoc(s.tds_vds_document || null);
+    setTdsVdsDocName(s.tds_vds_doc_name || null);
+    setTdsVdsDocType(s.tds_vds_doc_type || null);
+    setTdsVdsNumber(s.tds_vds_number || '');
     setErrorMsg(null);
     setSuccessMsg(null);
     setIsModalOpen(true);
@@ -452,6 +469,10 @@ export const SuperadminSupplierManagement: React.FC = () => {
         bin_document: binDoc,
         bin_doc_name: binDocName,
         bin_doc_type: binDocType,
+        tds_vds_document: tdsVdsDoc,
+        tds_vds_doc_name: tdsVdsDocName,
+        tds_vds_doc_type: tdsVdsDocType,
+        tds_vds_number: tdsVdsNumber.trim(),
       };
 
       if (password.trim()) {
@@ -784,7 +805,7 @@ export const SuperadminSupplierManagement: React.FC = () => {
                     {/* Attached Compliance Documents Badges */}
                     <div className="pt-2 border-t border-slate-100">
                       <span className="text-[10px] font-semibold text-slate-400 block mb-1">
-                        Documents ({[s.application_document, s.trade_license_document, s.tin_document, s.bin_document].filter(Boolean).length}/4 Verified):
+                        Documents ({[s.application_document, s.trade_license_document, s.tin_document, s.bin_document, s.tds_vds_document].filter(Boolean).length}/5 Verified):
                       </span>
                       <div className="flex flex-wrap gap-1">
                         {s.application_document ? (
@@ -876,6 +897,29 @@ export const SuperadminSupplierManagement: React.FC = () => {
                         ) : (
                           <span className="px-1.5 py-0.5 rounded text-[9px] text-slate-400 bg-slate-100 border border-slate-200">
                             No BIN
+                          </span>
+                        )}
+
+                        {s.tds_vds_document ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setViewerModal({
+                                isOpen: true,
+                                title: 'TDS/VDS Document',
+                                fileName: s.tds_vds_doc_name,
+                                fileType: s.tds_vds_doc_type,
+                                fileData: s.tds_vds_document,
+                              })
+                            }
+                            className="px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 flex items-center gap-1 cursor-pointer transition-colors"
+                          >
+                            <FileText className="w-2.5 h-2.5 text-blue-600" />
+                            <span>TDS/VDS</span>
+                          </button>
+                        ) : (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] text-slate-400 bg-slate-100 border border-slate-200">
+                            No TDS/VDS
                           </span>
                         )}
                       </div>
@@ -1570,6 +1614,66 @@ export const SuperadminSupplierManagement: React.FC = () => {
                             setBinDoc(null);
                             setBinDocName(null);
                             setBinDocType(null);
+                          }}
+                          className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer shrink-0"
+                          title="Remove document"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* TDS/VDS Attachment */}
+                <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-red-600">
+                      TDS/VDS
+                    </label>
+                    {tdsVdsDoc && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                        <Check className="w-2.5 h-2.5" />
+                        Attached ({getDocCategory(tdsVdsDocType, tdsVdsDocName, tdsVdsDoc)})
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                    <input
+                      type="file"
+                      accept="image/*,.pdf,application/pdf,.xlsx,.xls,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+                      onChange={(e) =>
+                        handleDocFileSelection(e, setTdsVdsDoc, setTdsVdsDocName, setTdsVdsDocType)
+                      }
+                      className="text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 cursor-pointer w-full sm:w-auto"
+                    />
+                    {tdsVdsDoc && (
+                      <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
+                        <span className="text-[11px] text-slate-600 truncate max-w-[150px] font-mono" title={tdsVdsDocName || ''}>
+                          {tdsVdsDocName || 'TDS/VDS Document'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setViewerModal({
+                              isOpen: true,
+                              title: 'TDS/VDS Compliance Document',
+                              fileName: tdsVdsDocName,
+                              fileType: tdsVdsDocType,
+                              fileData: tdsVdsDoc,
+                            })
+                          }
+                          className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold flex items-center gap-1 cursor-pointer shrink-0"
+                        >
+                          <Eye className="w-3 h-3" />
+                          <span>View</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTdsVdsDoc(null);
+                            setTdsVdsDocName(null);
+                            setTdsVdsDocType(null);
                           }}
                           className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer shrink-0"
                           title="Remove document"

@@ -55,6 +55,10 @@ export interface SupplierProfileData {
   bin_document?: string;
   bin_doc_name?: string;
   bin_doc_type?: string;
+  tds_vds_document?: string;
+  tds_vds_doc_name?: string;
+  tds_vds_doc_type?: string;
+  tds_vds_number?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -411,7 +415,7 @@ export const SupplierProfileView: React.FC = () => {
           </div>
 
           {/* 4 Document Dossier Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3.5">
             {/* 1. Application */}
             {(() => {
               const doc = profile.application_document;
@@ -649,6 +653,73 @@ export const SupplierProfileView: React.FC = () => {
                           setViewerModal({
                             isOpen: true,
                             title: 'BIN Certificate Document',
+                            fileName: name,
+                            fileType: type,
+                            fileData: doc,
+                          })
+                        }
+                        className="flex-1 py-1 px-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-semibold flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                      >
+                        <Eye className="w-3 h-3" />
+                        <span>View</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const a = document.createElement('a');
+                          a.href = doc;
+                          a.download = name;
+                          a.click();
+                        }}
+                        className="py-1 px-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-[11px] font-semibold flex items-center justify-center cursor-pointer transition-colors"
+                        title="Download file"
+                      >
+                        <Download className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-[10px] text-slate-400 italic">Provisioned by Superadmin</div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* 5. TDS/VDS */}
+            {(() => {
+              const doc = profile.tds_vds_document;
+              const name = profile.tds_vds_doc_name || 'TDS_VDS_Compliance_Filing';
+              const type = profile.tds_vds_doc_type;
+              const cat = getDocCategory(type, name, doc);
+              return (
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/90 flex flex-col justify-between space-y-3">
+                  <div>
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <span className="text-xs font-bold text-red-600 uppercase tracking-wide">
+                        TDS/VDS
+                      </span>
+                      {doc ? (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-emerald-100 text-emerald-800">
+                          {cat}
+                        </span>
+                      ) : (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-slate-200 text-slate-500">
+                          Not Provided
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-600 font-mono truncate" title={name}>
+                      {doc ? name : 'TDS/VDS documents not yet uploaded.'}
+                    </p>
+                  </div>
+
+                  {doc ? (
+                    <div className="flex items-center gap-1.5 pt-1">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setViewerModal({
+                            isOpen: true,
+                            title: 'TDS/VDS Compliance Document',
                             fileName: name,
                             fileType: type,
                             fileData: doc,

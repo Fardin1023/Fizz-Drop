@@ -126,6 +126,22 @@ public class SupplierProfileDTO {
     @JsonAlias({"bin_doc_type", "binDocType"})
     private String binDocType;
 
+    @JsonProperty("tds_vds_document")
+    @JsonAlias({"tds_vds_document", "tdsVdsDocument"})
+    private String tdsVdsDocument;
+
+    @JsonProperty("tds_vds_doc_name")
+    @JsonAlias({"tds_vds_doc_name", "tdsVdsDocName"})
+    private String tdsVdsDocName;
+
+    @JsonProperty("tds_vds_doc_type")
+    @JsonAlias({"tds_vds_doc_type", "tdsVdsDocType"})
+    private String tdsVdsDocType;
+
+    @JsonProperty("tds_vds_number")
+    @JsonAlias({"tds_vds_number", "tdsVdsNumber"})
+    private String tdsVdsNumber;
+
     public Long getPrimaryDistrictId() { return primaryDistrictId; }
     public void setPrimaryDistrictId(Long primaryDistrictId) { this.primaryDistrictId = primaryDistrictId; }
 
@@ -215,4 +231,16 @@ public class SupplierProfileDTO {
 
     public String getBinDocType() { return binDocType; }
     public void setBinDocType(String binDocType) { this.binDocType = binDocType; }
+
+    public String getTdsVdsDocument() { return tdsVdsDocument; }
+    public void setTdsVdsDocument(String tdsVdsDocument) { this.tdsVdsDocument = tdsVdsDocument; }
+
+    public String getTdsVdsDocName() { return tdsVdsDocName; }
+    public void setTdsVdsDocName(String tdsVdsDocName) { this.tdsVdsDocName = tdsVdsDocName; }
+
+    public String getTdsVdsDocType() { return tdsVdsDocType; }
+    public void setTdsVdsDocType(String tdsVdsDocType) { this.tdsVdsDocType = tdsVdsDocType; }
+
+    public String getTdsVdsNumber() { return tdsVdsNumber; }
+    public void setTdsVdsNumber(String tdsVdsNumber) { this.tdsVdsNumber = tdsVdsNumber; }
 }

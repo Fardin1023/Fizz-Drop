@@ -433,6 +433,14 @@ public class RequisitionProcessingService {
             profile.setBinDocName(dto.getBinDocName());
             profile.setBinDocType(dto.getBinDocType());
         }
+        if (dto.getTdsVdsDocument() != null) {
+            profile.setTdsVdsDocument(dto.getTdsVdsDocument());
+            profile.setTdsVdsDocName(dto.getTdsVdsDocName());
+            profile.setTdsVdsDocType(dto.getTdsVdsDocType());
+        }
+        if (dto.getTdsVdsNumber() != null) {
+            profile.setTdsVdsNumber(dto.getTdsVdsNumber().trim());
+        }
 
 
         if (profile.getUserId() != null) {
@@ -530,6 +538,14 @@ public class RequisitionProcessingService {
             profile.setBinDocument(dto.getBinDocument());
             profile.setBinDocName(dto.getBinDocName());
             profile.setBinDocType(dto.getBinDocType());
+        }
+        if (dto.getTdsVdsDocument() != null) {
+            profile.setTdsVdsDocument(dto.getTdsVdsDocument());
+            profile.setTdsVdsDocName(dto.getTdsVdsDocName());
+            profile.setTdsVdsDocType(dto.getTdsVdsDocType());
+        }
+        if (dto.getTdsVdsNumber() != null) {
+            profile.setTdsVdsNumber(dto.getTdsVdsNumber().trim());
         }
 
 
