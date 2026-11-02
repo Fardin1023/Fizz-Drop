@@ -26,14 +26,14 @@ const Navigation: React.FC<NavigationProps> = ({
   return (
     <header className="sticky top-0 z-50 w-full bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md border-b border-zinc-200/60 dark:border-zinc-800/60">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-20 items-center justify-between gap-4">
+        <div className="flex h-20 sm:h-24 items-center justify-between gap-4">
           
           {/* Brand Logo */}
-          <Link to="/" className="flex items-center group transition-transform duration-200 hover:scale-105" title="FizzDrop Beverage Co.">
+          <Link to="/" className="flex items-center group transition-transform duration-200 hover:scale-105 shrink-0" title="FizzDrop Beverage Co.">
             <img
               src={fizzdropLogo}
               alt="FizzDrop Beverage Co."
-              className="h-14 w-14 sm:h-16 sm:w-16 object-contain rounded-2xl shadow-sm bg-white border border-slate-200/80 p-1 group-hover:shadow-md transition-all"
+              className="h-16 sm:h-20 w-auto max-w-[140px] object-contain rounded-xl shadow-xs bg-white border border-slate-200/90 p-1 group-hover:shadow-md transition-all"
             />
           </Link>
 
