@@ -33,7 +33,7 @@ const Navigation: React.FC<NavigationProps> = ({
             <img
               src={fizzdropLogo}
               alt="FizzDrop Beverage Co."
-              className="h-16 sm:h-20 w-auto max-w-[140px] object-contain rounded-xl shadow-xs bg-white border border-slate-200/90 p-1 group-hover:shadow-md transition-all"
+              className="h-16 sm:h-20 w-auto max-w-[220px] sm:max-w-[280px] object-contain rounded-2xl shadow-xs bg-white border border-slate-200/90 p-1.5 group-hover:shadow-md transition-all"
             />
           </Link>
 
