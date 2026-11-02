@@ -280,6 +280,14 @@ public class RequisitionProcessingService {
     public static int getFixedCategoryStock(String category) {
         if (category == null) return 1000;
         return switch (category.trim()) {
+            case "Pepsi" -> 1500;
+            case "7UP", "7up", "7Up" -> 1500;
+            case "Mountain Dew" -> 1200;
+            case "Mirinda" -> 1200;
+            case "Slice" -> 1000;
+            case "Sting" -> 1000;
+            case "Aquafina" -> 2000;
+            case "Merchandise" -> 200;
             case "Carbonated Soft Drink" -> 1500;
             case "Energy Drink" -> 1200;
             case "Fruit Juice" -> 1000;

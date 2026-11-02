@@ -8,6 +8,12 @@ import mirindaImg from '../../assets/img/mirinda.PNG';
 import sliceImg from '../../assets/img/slice.PNG';
 import aquafinaImg from '../../assets/img/aquafina.PNG';
 import heroImg from '../../assets/img/hero-image.png';
+import {
+  JACKET_PRESET_SVG,
+  HELMET_PRESET_SVG,
+  BIKE_PRESET_SVG,
+  TSHIRT_PRESET_SVG,
+} from '../../assets/merchandisePresets';
 
 export interface ProductItem {
   id: number;
@@ -30,14 +36,18 @@ interface NewArrivalsProps {
   onAddToWishlist?: (product: ProductItem) => void;
 }
 
-const getBrandFallback = (brand: string): string => {
-  const b = (brand || '').toLowerCase();
-  if (b.includes('pepsi')) return pepsiImg;
-  if (b.includes('7up') || b.includes('seven')) return sevenUpImg;
-  if (b.includes('dew') || b.includes('mountain')) return dewImg;
-  if (b.includes('mirinda')) return mirindaImg;
-  if (b.includes('slice')) return sliceImg;
-  if (b.includes('aquafina') || b.includes('water')) return aquafinaImg;
+const getBrandFallback = (brand: string, category?: string, name?: string): string => {
+  const combined = ((brand || '') + ' ' + (category || '') + ' ' + (name || '')).toLowerCase();
+  if (combined.includes('jacket')) return JACKET_PRESET_SVG;
+  if (combined.includes('helmet')) return HELMET_PRESET_SVG;
+  if (combined.includes('bike')) return BIKE_PRESET_SVG;
+  if (combined.includes('tshirt') || combined.includes('t-shirt') || combined.includes('shirt')) return TSHIRT_PRESET_SVG;
+  if (combined.includes('pepsi')) return pepsiImg;
+  if (combined.includes('7up') || combined.includes('seven')) return sevenUpImg;
+  if (combined.includes('dew') || combined.includes('mountain')) return dewImg;
+  if (combined.includes('mirinda')) return mirindaImg;
+  if (combined.includes('slice')) return sliceImg;
+  if (combined.includes('aquafina') || combined.includes('water')) return aquafinaImg;
   return heroImg;
 };
 
@@ -85,8 +95,8 @@ const NewArrivals: React.FC<NewArrivalsProps> = ({
             volume: p.volume || p.size_volume || p.sizeVolume || '250ml',
             price: parsedPrice,
             base_price: parsedPrice,
-            imageUrl: img && img.trim().length > 10 ? img : getBrandFallback(brandName),
-            image_url: img && img.trim().length > 10 ? img : getBrandFallback(brandName),
+            imageUrl: img && img.trim().length > 10 ? img : getBrandFallback(brandName, p.category, fullName),
+            image_url: img && img.trim().length > 10 ? img : getBrandFallback(brandName, p.category, fullName),
             isNew: p.isNew ?? true,
             stockQuantity: finalStock,
           };

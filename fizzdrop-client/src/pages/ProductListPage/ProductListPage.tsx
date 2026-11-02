@@ -11,6 +11,7 @@ import {
   ArrowUpDown,
   PackageX,
   PlusCircle,
+  Layers,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import ProductDetailModal, { type BeverageProduct } from '../../components/Modals/ProductDetailModal';
@@ -20,32 +21,54 @@ import dewImg from '../../assets/img/mountain dew.PNG';
 import mirindaImg from '../../assets/img/mirinda.PNG';
 import sliceImg from '../../assets/img/slice.PNG';
 import aquafinaImg from '../../assets/img/aquafina.PNG';
+import {
+  JACKET_PRESET_SVG,
+  HELMET_PRESET_SVG,
+  BIKE_PRESET_SVG,
+  TSHIRT_PRESET_SVG,
+} from '../../assets/merchandisePresets';
 
 interface ProductListPageProps {
   branchId?: number | string;
   onAddToCart?: (product?: any) => void;
 }
 
-const BRANDS = ['All Brands', 'Pepsi', 'Mountain Dew', '7Up', 'Mirinda', 'Slice', 'Aquafina', 'FizzDrop'];
-const CATEGORIES = ['All Categories', 'Sparkling Soda', 'Energy Drink', 'Fruit Juice', 'Purified Water'];
+const CATEGORIES = [
+  'All Categories',
+  'Pepsi',
+  'Mirinda',
+  'Slice',
+  '7Up',
+  'Mountain Dew',
+  'Sting',
+  'Aquafina',
+  'Merchandise',
+];
 
-// Fallback images matching brand for live products that don't have custom images
-const getBrandImage = (brand: string): string => {
-  const b = (brand || '').toLowerCase();
-  if (b.includes('pepsi')) return pepsiImg;
-  if (b.includes('7up') || b.includes('seven')) return sevenUpImg;
-  if (b.includes('dew') || b.includes('mountain')) return dewImg;
-  if (b.includes('mirinda')) return mirindaImg;
-  if (b.includes('slice')) return sliceImg;
-  if (b.includes('aquafina') || b.includes('water')) return aquafinaImg;
+const DRINK_FORMATS = ['All Formats', 'Can', 'Bottle', 'Glass Bottle', 'PET Bottle'];
+const MERCHANDISE_ITEMS = ['All Items', 'Jackets', 'Helmets', 'Bike', 'T-Shirt'];
+
+// Fallback images matching brand and merchandise items
+const getBrandImage = (brand: string, category?: string, flavor?: string): string => {
+  const combined = ((brand || '') + ' ' + (category || '') + ' ' + (flavor || '')).toLowerCase();
+  if (combined.includes('jacket')) return JACKET_PRESET_SVG;
+  if (combined.includes('helmet')) return HELMET_PRESET_SVG;
+  if (combined.includes('bike')) return BIKE_PRESET_SVG;
+  if (combined.includes('tshirt') || combined.includes('t-shirt') || combined.includes('shirt')) return TSHIRT_PRESET_SVG;
+  if (combined.includes('pepsi')) return pepsiImg;
+  if (combined.includes('7up') || combined.includes('seven')) return sevenUpImg;
+  if (combined.includes('dew') || combined.includes('mountain')) return dewImg;
+  if (combined.includes('mirinda')) return mirindaImg;
+  if (combined.includes('slice')) return sliceImg;
+  if (combined.includes('aquafina') || combined.includes('water')) return aquafinaImg;
   return pepsiImg;
 };
 
 const ProductListPage: React.FC<ProductListPageProps> = ({ branchId, onAddToCart }) => {
   const [products, setProducts] = useState<BeverageProduct[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [selectedBrand, setSelectedBrand] = useState<string>('All Brands');
   const [selectedCategory, setSelectedCategory] = useState<string>('All Categories');
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string>('All Formats');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortBy, setSortBy] = useState<'featured' | 'price-asc' | 'price-desc' | 'stock'>('featured');
   const [branchName, setBranchName] = useState<string>('All Outlets & Hubs');
@@ -140,17 +163,36 @@ const ProductListPage: React.FC<ProductListPageProps> = ({ branchId, onAddToCart
   const filteredProducts = useMemo(() => {
     return products
       .filter((p) => {
-        // Brand filter
-        if (selectedBrand !== 'All Brands' && p.brand.toLowerCase() !== selectedBrand.toLowerCase()) {
-          return false;
+        // Category filter (Pepsi, Mirinda, Slice, 7Up, Mountain Dew, Sting, Aquafina, Merchandise)
+        if (selectedCategory !== 'All Categories') {
+          const pCat = (p.category || '').toLowerCase();
+          const pBrand = (p.brand || '').toLowerCase();
+          const target = selectedCategory.toLowerCase();
+
+          if (target === 'merchandise') {
+            if (pCat !== 'merchandise' && !pBrand.includes('merchandise')) return false;
+          } else {
+            if (pCat !== target && pBrand !== target && !pCat.includes(target) && !pBrand.includes(target)) {
+              return false;
+            }
+          }
         }
-        // Category filter
-        if (
-          selectedCategory !== 'All Categories' &&
-          (p.category || '').toLowerCase() !== selectedCategory.toLowerCase()
-        ) {
-          return false;
+
+        // Subcategory filter (Under drinks: Can, Bottle, Glass Bottle; Under merchandise: Jackets, Helmets, Bike, T-Shirt)
+        if (selectedCategory === 'Merchandise') {
+          if (selectedSubcategory !== 'All Items') {
+            const term = selectedSubcategory.toLowerCase();
+            const combined = ((p.flavor_variant || '') + ' ' + (p.packaging || '') + ' ' + (p.sku || '') + ' ' + (p.brand || '')).toLowerCase();
+            if (!combined.includes(term)) return false;
+          }
+        } else {
+          if (selectedSubcategory !== 'All Formats') {
+            const term = selectedSubcategory.toLowerCase();
+            const pPkg = (p.packaging || '').toLowerCase();
+            if (!pPkg.includes(term)) return false;
+          }
         }
+
         // Search query
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase();
@@ -158,6 +200,8 @@ const ProductListPage: React.FC<ProductListPageProps> = ({ branchId, onAddToCart
             p.brand.toLowerCase().includes(q) ||
             p.flavor_variant.toLowerCase().includes(q) ||
             (p.category || '').toLowerCase().includes(q) ||
+            (p.packaging || '').toLowerCase().includes(q) ||
+            (p.size_volume || '').toLowerCase().includes(q) ||
             (p.sku || '').toLowerCase().includes(q);
           if (!match) return false;
         }
@@ -173,7 +217,7 @@ const ProductListPage: React.FC<ProductListPageProps> = ({ branchId, onAddToCart
         }
         return b.product_id - a.product_id;
       });
-  }, [products, selectedBrand, selectedCategory, searchQuery, sortBy]);
+  }, [products, selectedCategory, selectedSubcategory, searchQuery, sortBy]);
 
   return (
     <div className="min-h-screen bg-slate-50/60 text-zinc-900 flex flex-col pb-24 selection:bg-blue-500/20">
@@ -300,47 +344,57 @@ const ProductListPage: React.FC<ProductListPageProps> = ({ branchId, onAddToCart
             </div>
           </div>
 
-          {/* Brand Filter Tabs */}
+          {/* Primary Category Filter Tabs */}
           <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1 shrink-0 mr-1">
-              <Filter className="w-3 h-3 text-blue-600" /> Brands:
+              <Layers className="w-3.5 h-3.5 text-blue-600" /> Categories:
             </span>
-            {BRANDS.map((brand) => {
-              const isSelected = selectedBrand === brand;
+            {CATEGORIES.map((category) => {
+              const isSelected = selectedCategory === category;
+              const isMerch = category === 'Merchandise';
               return (
                 <button
-                  key={brand}
-                  onClick={() => setSelectedBrand(brand)}
-                  className={`px-3.5 py-1.5 rounded-xl font-bold text-xs transition-all cursor-pointer whitespace-nowrap ${
+                  key={category}
+                  onClick={() => {
+                    setSelectedCategory(category);
+                    setSelectedSubcategory(category === 'Merchandise' ? 'All Items' : 'All Formats');
+                  }}
+                  className={`px-3.5 py-1.5 rounded-xl font-bold text-xs transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
                     isSelected
-                      ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white shadow-md shadow-blue-500/25'
+                      ? isMerch
+                        ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 text-white shadow-md shadow-purple-500/25'
+                        : 'bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white shadow-md shadow-blue-500/25'
                       : 'bg-slate-100/90 text-slate-700 hover:bg-blue-50 hover:text-blue-700 border border-transparent hover:border-blue-200'
                   }`}
                 >
-                  {brand}
+                  {isMerch && <ShoppingBag className="w-3.5 h-3.5 inline" />}
+                  {category}
                 </button>
               );
             })}
           </div>
 
-          {/* Category Filter Chips */}
+          {/* Subcategory / Packaging Format Filter Chips */}
           <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs border-t border-slate-100 pt-2.5">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 shrink-0 mr-1">
-              Category:
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 shrink-0 mr-1 flex items-center gap-1">
+              <Filter className="w-3 h-3 text-cyan-600" />
+              {selectedCategory === 'Merchandise' ? 'Merchandise Type:' : 'Format / Packaging:'}
             </span>
-            {CATEGORIES.map((category) => {
-              const isSelected = selectedCategory === category;
+            {(selectedCategory === 'Merchandise' ? MERCHANDISE_ITEMS : DRINK_FORMATS).map((item) => {
+              const isSelected = selectedSubcategory === item;
               return (
                 <button
-                  key={category}
-                  onClick={() => setSelectedCategory(category)}
+                  key={item}
+                  onClick={() => setSelectedSubcategory(item)}
                   className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
                     isSelected
-                      ? 'bg-cyan-600 text-white shadow-sm shadow-cyan-500/20'
+                      ? selectedCategory === 'Merchandise'
+                        ? 'bg-purple-600 text-white shadow-sm shadow-purple-500/20'
+                        : 'bg-cyan-600 text-white shadow-sm shadow-cyan-500/20'
                       : 'bg-slate-100/70 text-slate-600 hover:bg-slate-200/70'
                   }`}
                 >
-                  {category}
+                  {item}
                 </button>
               );
             })}
@@ -353,10 +407,10 @@ const ProductListPage: React.FC<ProductListPageProps> = ({ branchId, onAddToCart
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="font-oswald text-2xl font-bold uppercase tracking-tight text-zinc-900">
-              {selectedBrand === 'All Brands' ? 'All Beverages' : `${selectedBrand} Selection`}
+              {selectedCategory === 'All Categories' ? 'All Catalog Drops' : `${selectedCategory} Collection`}
             </h2>
             <p className="text-xs text-zinc-500">
-              Showing {filteredProducts.length} live drops available for checkout or branch pickup
+              Showing {filteredProducts.length} live products available for checkout or branch pickup
             </p>
           </div>
 
@@ -418,8 +472,8 @@ const ProductListPage: React.FC<ProductListPageProps> = ({ branchId, onAddToCart
             </p>
             <button
               onClick={() => {
-                setSelectedBrand('All Brands');
                 setSelectedCategory('All Categories');
+                setSelectedSubcategory('All Formats');
                 setSearchQuery('');
               }}
               className="mt-4 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-500 shadow-md shadow-blue-500/20 transition-colors cursor-pointer"
@@ -431,11 +485,12 @@ const ProductListPage: React.FC<ProductListPageProps> = ({ branchId, onAddToCart
           /* Products Grid: Cool & Catchy White Card Aesthetics matching Homepage */
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {filteredProducts.map((product) => {
-              const displayImg = product.image_url || getBrandImage(product.brand);
+              const displayImg = product.image_url || getBrandImage(product.brand, product.category, product.flavor_variant);
               const isWish = wishlist.includes(product.product_id);
               const stock = product.branch_stock ?? product.total_stock ?? 0;
               const isOutOfStock = stock <= 0;
               const inStockOutlets = (product.available_outlets || []).filter((ao: any) => (ao.stock_quantity ?? 0) > 0);
+              const isMerch = (product.category || '').toLowerCase() === 'merchandise';
 
               return (
                 <div
@@ -444,8 +499,12 @@ const ProductListPage: React.FC<ProductListPageProps> = ({ branchId, onAddToCart
                 >
                   {/* Top Badges & Wishlist Button */}
                   <div className="flex items-center justify-between z-10">
-                    <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
-                      {product.brand}
+                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
+                      isMerch
+                        ? 'bg-purple-50 text-purple-700 border-purple-200'
+                        : 'bg-blue-50 text-blue-700 border-blue-100'
+                    }`}>
+                      {isMerch ? `Merchandise • ${product.brand}` : product.brand}
                     </span>
 
                     {/* Wishlist Heart on Card */}
@@ -472,7 +531,7 @@ const ProductListPage: React.FC<ProductListPageProps> = ({ branchId, onAddToCart
                       alt={`${product.brand} ${product.flavor_variant}`}
                       className="max-h-full max-w-full object-contain filter drop-shadow-md group-hover:scale-110 group-hover:-translate-y-1 transition-all duration-300"
                       onError={(e) => {
-                        (e.target as HTMLImageElement).src = getBrandImage(product.brand);
+                        (e.target as HTMLImageElement).src = getBrandImage(product.brand, product.category, product.flavor_variant);
                       }}
                     />
 

@@ -18,6 +18,12 @@ import dewImg from '../../assets/img/mountain dew.PNG';
 import mirindaImg from '../../assets/img/mirinda.PNG';
 import sliceImg from '../../assets/img/slice.PNG';
 import aquafinaImg from '../../assets/img/aquafina.PNG';
+import {
+  JACKET_PRESET_SVG,
+  HELMET_PRESET_SVG,
+  BIKE_PRESET_SVG,
+  TSHIRT_PRESET_SVG,
+} from '../../assets/merchandisePresets';
 
 export interface AvailableOutlet {
   outlet_id: number;
@@ -56,20 +62,32 @@ interface ProductDetailModalProps {
 }
 
 // Brand helper images
-const getFallbackImage = (brand: string): string => {
-  const b = (brand || '').toLowerCase();
-  if (b.includes('pepsi')) return pepsiImg;
-  if (b.includes('7up') || b.includes('seven')) return sevenUpImg;
-  if (b.includes('dew') || b.includes('mountain')) return dewImg;
-  if (b.includes('mirinda')) return mirindaImg;
-  if (b.includes('slice')) return sliceImg;
-  if (b.includes('aquafina') || b.includes('water')) return aquafinaImg;
+const getFallbackImage = (brand: string, category?: string, flavor?: string): string => {
+  const combined = ((brand || '') + ' ' + (category || '') + ' ' + (flavor || '')).toLowerCase();
+  if (combined.includes('jacket')) return JACKET_PRESET_SVG;
+  if (combined.includes('helmet')) return HELMET_PRESET_SVG;
+  if (combined.includes('bike')) return BIKE_PRESET_SVG;
+  if (combined.includes('tshirt') || combined.includes('t-shirt') || combined.includes('shirt')) return TSHIRT_PRESET_SVG;
+  if (combined.includes('pepsi')) return pepsiImg;
+  if (combined.includes('7up') || combined.includes('seven')) return sevenUpImg;
+  if (combined.includes('dew') || combined.includes('mountain')) return dewImg;
+  if (combined.includes('mirinda')) return mirindaImg;
+  if (combined.includes('slice')) return sliceImg;
+  if (combined.includes('aquafina') || combined.includes('water')) return aquafinaImg;
   return pepsiImg;
 };
 
 // Brand styling accents
-const getBrandTheme = (brand: string) => {
-  const b = (brand || '').toLowerCase();
+const getBrandTheme = (brand: string, category?: string) => {
+  const b = ((brand || '') + ' ' + (category || '')).toLowerCase();
+  if (b.includes('merchandise') || b.includes('jacket') || b.includes('helmet') || b.includes('bike') || b.includes('tshirt')) {
+    return {
+      gradient: 'from-purple-600 via-indigo-600 to-pink-500',
+      badge: 'bg-purple-50 text-purple-700 border-purple-200',
+      glow: 'shadow-purple-500/20',
+      tag: 'Official Merchandise & Gear',
+    };
+  }
   if (b.includes('pepsi')) {
     return {
       gradient: 'from-blue-600 via-indigo-600 to-cyan-500',
@@ -154,8 +172,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   if (!isOpen || !product) return null;
 
-  const brandTheme = getBrandTheme(product.brand);
-  const displayImage = product.image_url || getFallbackImage(product.brand);
+  const brandTheme = getBrandTheme(product.brand, product.category);
+  const displayImage = product.image_url || getFallbackImage(product.brand, product.category, product.flavor_variant);
   
   // Resolve outlet list
   const allOutlets = (product.available_outlets && product.available_outlets.length > 0)
@@ -234,7 +252,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 alt={`${product.brand} ${product.flavor_variant}`}
                 className="max-h-full max-w-full object-contain filter drop-shadow-[0_12px_16px_rgba(0,0,0,0.18)] group-hover:scale-108 transition-transform duration-300"
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = getFallbackImage(product.brand);
+                  (e.target as HTMLImageElement).src = getFallbackImage(product.brand, product.category, product.flavor_variant);
                 }}
               />
 
