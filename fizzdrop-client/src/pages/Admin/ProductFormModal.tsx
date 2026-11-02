@@ -7,8 +7,6 @@ import {
   ImageIcon,
   Calendar,
   Layers,
-  Shield,
-  ShoppingBag,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -19,14 +17,6 @@ import dewImg from '../../assets/img/mountain dew.PNG';
 import mirindaImg from '../../assets/img/mirinda.PNG';
 import sliceImg from '../../assets/img/slice.PNG';
 import aquafinaImg from '../../assets/img/aquafina.PNG';
-
-// Built-in merchandise vector cutouts
-import {
-  JACKET_PRESET_SVG,
-  HELMET_PRESET_SVG,
-  BIKE_PRESET_SVG,
-  TSHIRT_PRESET_SVG,
-} from '../../assets/merchandisePresets';
 
 interface Branch {
   branch_id: number;
@@ -52,31 +42,11 @@ const DRINK_CATEGORIES = [
 
 const CATEGORIES = [
   ...DRINK_CATEGORIES,
-  'Merchandise',
   'Custom',
 ];
 
 const DRINK_PACKAGINGS = ['Can', 'Bottle', 'Glass Bottle', 'PET Bottle'];
 const DRINK_VOLUMES = ['250ml', '400ml', '500ml', '600ml', '1L', '1.5L', '2L'];
-
-const MERCHANDISE_TYPES = ['Jackets', 'Helmets', 'Bike', 'T-Shirt', 'Custom Merchandise'];
-const MERCHANDISE_PACKAGINGS = ['Boxed Packaging', 'Polybag', 'Hanger', 'Assembled Unit', 'Crated Box'];
-
-const APPAREL_SIZES = ['S', 'M', 'L', 'XL', 'XXL', 'Universal / Free Size'];
-const HELMET_SIZES = ['M (57-58cm)', 'L (59-60cm)', 'XL (61-62cm)', 'Standard'];
-const BIKE_SPECS = ['150cc Sport', '250cc Racing', 'Commuter Standard', 'Electric Edition', 'Single-Speed'];
-
-const CO_BRANDS = [
-  'Pepsi',
-  'Mountain Dew',
-  '7up',
-  'Mirinda',
-  'Slice',
-  'Sting',
-  'Aquafina',
-  'FizzDrop Official',
-  'Custom',
-];
 
 const PRESET_IMAGES = [
   { name: 'Pepsi', src: pepsiImg, group: 'Drinks' },
@@ -85,10 +55,6 @@ const PRESET_IMAGES = [
   { name: 'Mirinda', src: mirindaImg, group: 'Drinks' },
   { name: 'Slice', src: sliceImg, group: 'Drinks' },
   { name: 'Aquafina', src: aquafinaImg, group: 'Drinks' },
-  { name: 'Jackets', src: JACKET_PRESET_SVG, group: 'Merchandise' },
-  { name: 'Helmets', src: HELMET_PRESET_SVG, group: 'Merchandise' },
-  { name: 'Bike', src: BIKE_PRESET_SVG, group: 'Merchandise' },
-  { name: 'T-Shirt', src: TSHIRT_PRESET_SVG, group: 'Merchandise' },
 ];
 
 export const ProductFormModal: React.FC<ProductFormModalProps> = ({
@@ -100,7 +66,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [category, setCategory] = useState('Pepsi');
-  const [merchandiseType, setMerchandiseType] = useState('Jackets');
   const [brand, setBrand] = useState('Pepsi');
   const [customBrand, setCustomBrand] = useState('');
   const [flavorVariant, setFlavorVariant] = useState('');
@@ -110,11 +75,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [sku, setSku] = useState('');
   const [centralStock, setCentralStock] = useState<string>('1500');
 
-  const isMerchandise = category === 'Merchandise';
-
   const defaultExpiry = () => {
     const d = new Date();
-    d.setFullYear(d.getFullYear() + (isMerchandise ? 5 : 1));
+    d.setFullYear(d.getFullYear() + 1);
     return d.toISOString().split('T')[0];
   };
 
@@ -131,23 +94,12 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   // Whenever category changes, adjust defaults cleanly
   const handleCategoryChange = (newCat: string) => {
     setCategory(newCat);
-    if (newCat === 'Merchandise') {
-      setBrand('Pepsi');
-      setMerchandiseType('Jackets');
-      setPackaging('Boxed Packaging');
-      setSizeVolume('L');
-      setCentralStock('200');
-      setImageUrl(JACKET_PRESET_SVG);
-      setFlavorVariant('Biker Leather Edition');
-      const d = new Date();
-      d.setFullYear(d.getFullYear() + 5);
-      setExpiryDate(d.toISOString().split('T')[0]);
-    } else if (newCat !== 'Custom') {
+    if (newCat !== 'Custom') {
       setBrand(newCat);
       setPackaging('Can');
       setSizeVolume('250ml');
       setCentralStock('1500');
-      setFlavorVariant('Zero Sugar');
+      setFlavorVariant('Regular');
       const match = PRESET_IMAGES.find((p) => p.name.toLowerCase() === newCat.toLowerCase());
       if (match) setImageUrl(match.src);
       const d = new Date();
@@ -156,48 +108,15 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     }
   };
 
-  // Handle merchandise type changes
-  const handleMerchandiseTypeChange = (type: string) => {
-    setMerchandiseType(type);
-    if (type === 'Jackets') {
-      setImageUrl(JACKET_PRESET_SVG);
-      setPackaging('Boxed Packaging');
-      setSizeVolume('L');
-      setFlavorVariant('Biker Leather Edition');
-    } else if (type === 'Helmets') {
-      setImageUrl(HELMET_PRESET_SVG);
-      setPackaging('Boxed Packaging');
-      setSizeVolume('Standard');
-      setFlavorVariant('Aero Full-Face Racing');
-    } else if (type === 'Bike') {
-      setImageUrl(BIKE_PRESET_SVG);
-      setPackaging('Assembled Unit');
-      setSizeVolume('150cc Sport');
-      setFlavorVariant('Nitro Sport Edition');
-    } else if (type === 'T-Shirt') {
-      setImageUrl(TSHIRT_PRESET_SVG);
-      setPackaging('Polybag');
-      setSizeVolume('L');
-      setFlavorVariant('Crewneck Graphic Print');
-    }
-  };
-
   // Auto-generate SKU
   useEffect(() => {
     if (!effectiveBrand || !flavorVariant) return;
-    if (isMerchandise) {
-      const typeCode = merchandiseType.substring(0, 3).toUpperCase();
-      const brandCode = effectiveBrand.substring(0, 3).toUpperCase().replace(/\s+/g, '');
-      const sizeCode = sizeVolume.replace(/[^a-zA-Z0-9]/g, '').substring(0, 3).toUpperCase();
-      setSku(`MER-${typeCode || 'ITM'}-${brandCode || 'BRD'}-${sizeCode || 'STD'}`);
-    } else {
-      const brandCode = effectiveBrand.substring(0, 3).toUpperCase().replace(/\s+/g, '');
-      const flavorCode = flavorVariant.substring(0, 3).toUpperCase().replace(/\s+/g, '');
-      const pkgCode = packaging.substring(0, 3).toUpperCase();
-      const volCode = sizeVolume.replace(/[^0-9]/g, '');
-      setSku(`${brandCode || 'BEV'}-${flavorCode || 'VAR'}-${pkgCode}-${volCode || '500'}`);
-    }
-  }, [category, merchandiseType, effectiveBrand, flavorVariant, packaging, sizeVolume]);
+    const brandCode = effectiveBrand.substring(0, 3).toUpperCase().replace(/\s+/g, '');
+    const flavorCode = flavorVariant.substring(0, 3).toUpperCase().replace(/\s+/g, '');
+    const pkgCode = packaging.substring(0, 3).toUpperCase();
+    const volCode = sizeVolume.replace(/[^0-9]/g, '');
+    setSku(`${brandCode || 'BEV'}-${flavorCode || 'VAR'}-${pkgCode}-${volCode || '500'}`);
+  }, [category, effectiveBrand, flavorVariant, packaging, sizeVolume]);
 
   if (!isOpen) return null;
 
@@ -259,7 +178,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           expiryDate: expiryDate,
           image_url: imageUrl || null,
           imageUrl: imageUrl || null,
-          central_stock: parseInt(centralStock, 10) || (isMerchandise ? 200 : 1500),
+          central_stock: parseInt(centralStock, 10) || 1500,
           total_stock: 0,
         }),
       });
@@ -289,21 +208,15 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         {/* Modal Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-950/40">
           <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-              isMerchandise
-                ? 'bg-purple-600/10 text-purple-600 dark:text-purple-400'
-                : 'bg-indigo-600/10 text-indigo-600 dark:text-indigo-400'
-            }`}>
-              {isMerchandise ? <ShoppingBag className="w-5 h-5" /> : <PlusCircle className="w-5 h-5" />}
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-indigo-600/10 text-indigo-600 dark:text-indigo-400">
+              <PlusCircle className="w-5 h-5" />
             </div>
             <div>
               <h3 className="font-oswald text-xl font-bold uppercase tracking-wide text-zinc-900 dark:text-zinc-50">
                 Input Product Details
               </h3>
               <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                {isMerchandise
-                  ? 'Register official merchandise (Jackets, Helmets, Bike, T-Shirt) into master database'
-                  : 'Register beverage item under brand categories (Pepsi, Mirinda, Slice, etc.) with packaging options'}
+                Register beverage item under brand categories (Pepsi, Mirinda, Slice, etc.) with packaging options
               </p>
             </div>
           </div>
@@ -336,16 +249,12 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 <Layers className="w-4 h-4 text-blue-600" />
                 Select Product Category *
               </label>
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                isMerchandise
-                  ? 'bg-purple-100 text-purple-700 border border-purple-200'
-                  : 'bg-blue-100 text-blue-700 border border-blue-200'
-              }`}>
-                {isMerchandise ? 'Merchandise Mode' : 'Drink Category'}
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider bg-blue-100 text-blue-700 border border-blue-200">
+                Drink Category
               </span>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-2 pt-1">
+            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-4 gap-2 pt-1">
               {CATEGORIES.map((cat) => {
                 const isSelected = category === cat;
                 return (
@@ -355,9 +264,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     onClick={() => handleCategoryChange(cat)}
                     className={`px-3 py-2 rounded-xl text-xs font-bold transition-all border text-center ${
                       isSelected
-                        ? cat === 'Merchandise'
-                          ? 'bg-purple-600 text-white border-purple-600 shadow-md shadow-purple-500/25'
-                          : 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/25'
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/25'
                         : 'bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 border-slate-200 dark:border-zinc-700 hover:border-blue-400'
                     }`}
                   >
@@ -368,127 +275,62 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             </div>
           </div>
 
-          {/* Section: Category Specific Subcategories */}
-          {isMerchandise ? (
-            /* Merchandise Subcategory Block */
-            <div className="p-4 rounded-2xl bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-900/50 space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-purple-900 dark:text-purple-300 flex items-center gap-1.5">
-                  <Shield className="w-4 h-4 text-purple-600" />
-                  Merchandise Item Category (Jackets, Helmets, Bike, T-Shirt) *
-                </span>
-                <span className="text-[10px] font-semibold text-purple-600">Official Gear</span>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {MERCHANDISE_TYPES.map((type) => {
-                  const isSelected = merchandiseType === type;
-                  return (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => handleMerchandiseTypeChange(type)}
-                      className={`px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all border text-center cursor-pointer ${
-                        isSelected
-                          ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white border-transparent shadow-md shadow-purple-500/25'
-                          : 'bg-white dark:bg-zinc-800 text-purple-900 dark:text-zinc-200 border-purple-200 dark:border-zinc-700 hover:bg-purple-100/50'
-                      }`}
-                    >
-                      {type}
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1.5">
-                    Co-Brand / Official Crest *
-                  </label>
-                  <select
-                    value={brand}
-                    onChange={(e) => setBrand(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-purple-500/40"
-                  >
-                    {CO_BRANDS.map((b) => (
-                      <option key={b} value={b}>{b}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1.5">
-                    Design / Edition / Model *
-                  </label>
-                  <input
-                    type="text"
-                    value={flavorVariant}
-                    onChange={(e) => setFlavorVariant(e.target.value)}
-                    placeholder="e.g. Biker Leather Edition, Aero Full-Face, 150cc Sport"
-                    required
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-purple-500/40"
-                  />
-                </div>
-              </div>
-            </div>
-          ) : (
-            /* Drink Brand & Flavor Block */
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1.5">
-                  Brand Name *
-                </label>
-                <select
-                  value={brand}
-                  onChange={(e) => setBrand(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
-                >
-                  {DRINK_CATEGORIES.map((b) => (
-                    <option key={b} value={b}>{b}</option>
-                  ))}
-                  <option value="Coca-Cola">Coca-Cola</option>
-                  <option value="Sprite">Sprite</option>
-                  <option value="Custom">Custom Brand</option>
-                </select>
-                {brand === 'Custom' && (
-                  <input
-                    type="text"
-                    value={customBrand}
-                    onChange={(e) => setCustomBrand(e.target.value)}
-                    placeholder="Enter custom brand"
-                    className="w-full mt-2 px-3.5 py-2 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm"
-                  />
-                )}
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1.5">
-                  Flavor / Variant *
-                </label>
+          {/* Drink Brand & Flavor Block */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1.5">
+                Brand Name *
+              </label>
+              <select
+                value={brand}
+                onChange={(e) => setBrand(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+              >
+                {DRINK_CATEGORIES.map((b) => (
+                  <option key={b} value={b}>{b}</option>
+                ))}
+                <option value="Coca-Cola">Coca-Cola</option>
+                <option value="Sprite">Sprite</option>
+                <option value="Custom">Custom Brand</option>
+              </select>
+              {brand === 'Custom' && (
                 <input
                   type="text"
-                  value={flavorVariant}
-                  onChange={(e) => setFlavorVariant(e.target.value)}
-                  placeholder="e.g. Regular Cola, Zero Sugar, Citrus Blast, Mango"
-                  required
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                  value={customBrand}
+                  onChange={(e) => setCustomBrand(e.target.value)}
+                  placeholder="Enter custom brand"
+                  className="w-full mt-2 px-3.5 py-2 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm"
                 />
-              </div>
+              )}
             </div>
-          )}
+
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1.5">
+                Flavor / Variant *
+              </label>
+              <input
+                type="text"
+                value={flavorVariant}
+                onChange={(e) => setFlavorVariant(e.target.value)}
+                placeholder="e.g. Regular Cola, Zero Sugar, Citrus Blast, Mango"
+                required
+                className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+              />
+            </div>
+          </div>
 
           {/* Packaging & Size/Volume (Subcategory Specifications) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1.5">
-                {isMerchandise ? 'Merchandise Packaging / Presentation' : 'Drink Packaging Format (Can, Bottle, Glass Bottle) *'}
+                Drink Packaging Format (Can, Bottle, Glass Bottle) *
               </label>
               <select
                 value={packaging}
                 onChange={(e) => setPackaging(e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
               >
-                {(isMerchandise ? MERCHANDISE_PACKAGINGS : DRINK_PACKAGINGS).map((p) => (
+                {DRINK_PACKAGINGS.map((p) => (
                   <option key={p} value={p}>{p}</option>
                 ))}
               </select>
@@ -496,24 +338,16 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1.5">
-                {isMerchandise ? 'Size / Specification' : 'Drink Size / Volume'}
+                Drink Size / Volume
               </label>
               <select
                 value={sizeVolume}
                 onChange={(e) => setSizeVolume(e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
               >
-                {isMerchandise ? (
-                  merchandiseType === 'Bike' ? (
-                    BIKE_SPECS.map((v) => <option key={v} value={v}>{v}</option>)
-                  ) : merchandiseType === 'Helmets' ? (
-                    HELMET_SIZES.map((v) => <option key={v} value={v}>{v}</option>)
-                  ) : (
-                    APPAREL_SIZES.map((v) => <option key={v} value={v}>{v}</option>)
-                  )
-                ) : (
-                  DRINK_VOLUMES.map((v) => <option key={v} value={v}>{v}</option>)
-                )}
+                {DRINK_VOLUMES.map((v) => (
+                  <option key={v} value={v}>{v}</option>
+                ))}
               </select>
             </div>
           </div>
@@ -533,7 +367,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   value={basePrice}
                   onChange={(e) => setBasePrice(e.target.value)}
                   required
-                  placeholder={isMerchandise ? '1500.00' : '45.00'}
+                  placeholder="45.00"
                   className="w-full pl-8 pr-4 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
                 />
               </div>
@@ -547,18 +381,11 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    if (isMerchandise) {
-                      const typeCode = merchandiseType.substring(0, 3).toUpperCase();
-                      const brandCode = effectiveBrand.substring(0, 3).toUpperCase().replace(/\s+/g, '');
-                      const sizeCode = sizeVolume.replace(/[^a-zA-Z0-9]/g, '').substring(0, 3).toUpperCase();
-                      setSku(`MER-${typeCode || 'ITM'}-${brandCode || 'BRD'}-${sizeCode || 'STD'}`);
-                    } else {
-                      const brandCode = effectiveBrand.substring(0, 3).toUpperCase().replace(/\s+/g, '');
-                      const flavorCode = flavorVariant.substring(0, 3).toUpperCase().replace(/\s+/g, '');
-                      const pkgCode = packaging.substring(0, 3).toUpperCase();
-                      const volCode = sizeVolume.replace(/[^0-9]/g, '');
-                      setSku(`${brandCode || 'BEV'}-${flavorCode || 'VAR'}-${pkgCode}-${volCode || '500'}`);
-                    }
+                    const brandCode = effectiveBrand.substring(0, 3).toUpperCase().replace(/\s+/g, '');
+                    const flavorCode = flavorVariant.substring(0, 3).toUpperCase().replace(/\s+/g, '');
+                    const pkgCode = packaging.substring(0, 3).toUpperCase();
+                    const volCode = sizeVolume.replace(/[^0-9]/g, '');
+                    setSku(`${brandCode || 'BEV'}-${flavorCode || 'VAR'}-${pkgCode}-${volCode || '500'}`);
                   }}
                   className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 font-semibold"
                 >
@@ -571,7 +398,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 value={sku}
                 onChange={(e) => setSku(e.target.value.toUpperCase())}
                 required
-                placeholder={isMerchandise ? 'MER-JAC-PEP-L' : 'PEP-ZER-CAN-250'}
+                placeholder="PEP-ZER-CAN-250"
                 className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm font-mono text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
               />
             </div>
@@ -585,17 +412,17 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 Superadmin Central Stock Pool (Units for Regional Logistics) *
               </span>
               <span className="text-[10px] font-mono text-indigo-600 font-bold bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded border border-indigo-200 dark:border-indigo-800">
-                Default Benchmark: {isMerchandise ? '200 units' : '1,500 cases'}
+                Default Benchmark: 1,500 cases
               </span>
             </label>
             <input
               type="number"
               min="0"
-              step={isMerchandise ? '10' : '50'}
+              step="50"
               value={centralStock}
               onChange={(e) => setCentralStock(e.target.value)}
               required
-              placeholder={isMerchandise ? '200' : '1500'}
+              placeholder="1500"
               className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm font-mono text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
             />
             <p className="text-[10px] text-zinc-400 mt-1">
@@ -603,11 +430,11 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             </p>
           </div>
 
-          {/* Expiry Date / Quality Guarantee */}
+          {/* Expiry Date */}
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1.5 flex items-center gap-1.5">
               <Calendar className="w-3.5 h-3.5 text-blue-600" />
-              {isMerchandise ? 'Quality Assurance / Warranty Date' : 'Product Expiry Date (`expiry_date`) *'}
+              Product Expiry Date (`expiry_date`) *
             </label>
             <input
               type="date"
@@ -617,9 +444,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm font-mono text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
             />
             <p className="text-[10px] text-zinc-400 mt-1">
-              {isMerchandise
-                ? 'Official durable merchandise items default to a 5-year quality warranty date.'
-                : 'Perishable beverage products require accurate expiry dates for retail compliance.'}
+              Perishable beverage products require accurate expiry dates for retail compliance.
             </p>
           </div>
 
@@ -663,7 +488,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
             {imageMode === 'presets' && (
               <div className="space-y-3">
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
                   {PRESET_IMAGES.map((preset) => (
                     <button
                       key={preset.name}
@@ -742,13 +567,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             <button
               type="submit"
               disabled={submitting}
-              className={`px-6 py-2.5 rounded-xl text-white text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer ${
-                isMerchandise
-                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-purple-500/25'
-                  : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-blue-500/25'
-              }`}
+              className="px-6 py-2.5 rounded-xl text-white text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-blue-500/25"
             >
-              {submitting ? 'Registering...' : isMerchandise ? 'Register Merchandise Item' : 'Register Product in Database'}
+              {submitting ? 'Registering...' : 'Register Product in Database'}
             </button>
           </div>
         </form>
