@@ -10,9 +10,16 @@ import {
   Lock,
   RefreshCw,
   Info,
+  FileText,
+  Eye,
+  Download,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { parseAllocatedAreas } from '../../constants/cityAreas';
+import {
+  DocumentViewerModal,
+  getDocCategory,
+} from '../../components/Modals/DocumentViewerModal';
 
 export interface SupplierProfileData {
   id: number;
@@ -35,6 +42,19 @@ export interface SupplierProfileData {
   bank_account_name?: string;
   mobile_banking_number?: string;
   is_verified: boolean;
+  vat_registration_no?: string;
+  application_document?: string;
+  application_doc_name?: string;
+  application_doc_type?: string;
+  trade_license_document?: string;
+  trade_license_doc_name?: string;
+  trade_license_doc_type?: string;
+  tin_document?: string;
+  tin_doc_name?: string;
+  tin_doc_type?: string;
+  bin_document?: string;
+  bin_doc_name?: string;
+  bin_doc_type?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -44,6 +64,18 @@ export const SupplierProfileView: React.FC = () => {
   const [profile, setProfile] = useState<SupplierProfileData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Document viewer modal state
+  const [viewerModal, setViewerModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    fileName?: string | null;
+    fileType?: string | null;
+    fileData?: string | null;
+  }>({
+    isOpen: false,
+    title: '',
+  });
 
   const fetchProfile = async () => {
     setLoading(true);
@@ -353,7 +385,313 @@ export const SupplierProfileView: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Card 4: Statutory Registration & Compliance Documents (VAT, Application, Trade License, TIN, BIN) */}
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-2xs space-y-4 md:col-span-2">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3 flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-rose-50 text-red-600 flex items-center justify-center shrink-0">
+                <FileText className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-xs font-bold font-oswald text-slate-900 uppercase tracking-wider">
+                  Statutory Registration & Verification Documents
+                </h3>
+                <span className="text-[10px] text-slate-500">Official business compliance, tax identification & verified filings</span>
+              </div>
+            </div>
+
+            {/* VAT Registration Display */}
+            <div className="flex items-center gap-2 bg-red-50/70 border border-red-100 px-3 py-1.5 rounded-xl">
+              <span className="text-xs font-bold text-red-600 uppercase tracking-wide">VAT Registration No:</span>
+              <span className="text-xs font-mono font-bold text-slate-900">
+                {profile.vat_registration_no || 'e.g. 0031889xx-0xx9 (Pending)'}
+              </span>
+            </div>
+          </div>
+
+          {/* 4 Document Dossier Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            {/* 1. Application */}
+            {(() => {
+              const doc = profile.application_document;
+              const name = profile.application_doc_name || 'Supplier_Application_Filing';
+              const type = profile.application_doc_type;
+              const cat = getDocCategory(type, name, doc);
+              return (
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/90 flex flex-col justify-between space-y-3">
+                  <div>
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <span className="text-xs font-bold text-red-600 uppercase tracking-wide">
+                        Application
+                      </span>
+                      {doc ? (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-emerald-100 text-emerald-800">
+                          {cat}
+                        </span>
+                      ) : (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-slate-200 text-slate-500">
+                          Not Provided
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-600 font-mono truncate" title={name}>
+                      {doc ? name : 'Application form not yet uploaded.'}
+                    </p>
+                  </div>
+
+                  {doc ? (
+                    <div className="flex items-center gap-1.5 pt-1">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setViewerModal({
+                            isOpen: true,
+                            title: 'Application Document',
+                            fileName: name,
+                            fileType: type,
+                            fileData: doc,
+                          })
+                        }
+                        className="flex-1 py-1 px-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-semibold flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                      >
+                        <Eye className="w-3 h-3" />
+                        <span>View</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const a = document.createElement('a');
+                          a.href = doc;
+                          a.download = name;
+                          a.click();
+                        }}
+                        className="py-1 px-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-[11px] font-semibold flex items-center justify-center cursor-pointer transition-colors"
+                        title="Download file"
+                      >
+                        <Download className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-[10px] text-slate-400 italic">Provisioned by Superadmin</div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* 2. Trade License */}
+            {(() => {
+              const doc = profile.trade_license_document;
+              const name = profile.trade_license_doc_name || 'Trade_License_Document';
+              const type = profile.trade_license_doc_type;
+              const cat = getDocCategory(type, name, doc);
+              return (
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/90 flex flex-col justify-between space-y-3">
+                  <div>
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <span className="text-xs font-bold text-red-600 uppercase tracking-wide">
+                        Trade License
+                      </span>
+                      {doc ? (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-emerald-100 text-emerald-800">
+                          {cat}
+                        </span>
+                      ) : (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-slate-200 text-slate-500">
+                          Not Provided
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-600 font-mono truncate" title={name}>
+                      {doc ? name : 'License attachment not yet uploaded.'}
+                    </p>
+                  </div>
+
+                  {doc ? (
+                    <div className="flex items-center gap-1.5 pt-1">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setViewerModal({
+                            isOpen: true,
+                            title: 'Trade License Document',
+                            fileName: name,
+                            fileType: type,
+                            fileData: doc,
+                          })
+                        }
+                        className="flex-1 py-1 px-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-semibold flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                      >
+                        <Eye className="w-3 h-3" />
+                        <span>View</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const a = document.createElement('a');
+                          a.href = doc;
+                          a.download = name;
+                          a.click();
+                        }}
+                        className="py-1 px-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-[11px] font-semibold flex items-center justify-center cursor-pointer transition-colors"
+                        title="Download file"
+                      >
+                        <Download className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-[10px] text-slate-400 italic">Provisioned by Superadmin</div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* 3. TIN */}
+            {(() => {
+              const doc = profile.tin_document;
+              const name = profile.tin_doc_name || 'TIN_Certificate';
+              const type = profile.tin_doc_type;
+              const cat = getDocCategory(type, name, doc);
+              return (
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/90 flex flex-col justify-between space-y-3">
+                  <div>
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <span className="text-xs font-bold text-red-600 uppercase tracking-wide">
+                        TIN
+                      </span>
+                      {doc ? (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-emerald-100 text-emerald-800">
+                          {cat}
+                        </span>
+                      ) : (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-slate-200 text-slate-500">
+                          Not Provided
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-600 font-mono truncate" title={name}>
+                      {doc ? name : 'Tax Identification not yet uploaded.'}
+                    </p>
+                  </div>
+
+                  {doc ? (
+                    <div className="flex items-center gap-1.5 pt-1">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setViewerModal({
+                            isOpen: true,
+                            title: 'TIN Certificate Document',
+                            fileName: name,
+                            fileType: type,
+                            fileData: doc,
+                          })
+                        }
+                        className="flex-1 py-1 px-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-semibold flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                      >
+                        <Eye className="w-3 h-3" />
+                        <span>View</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const a = document.createElement('a');
+                          a.href = doc;
+                          a.download = name;
+                          a.click();
+                        }}
+                        className="py-1 px-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-[11px] font-semibold flex items-center justify-center cursor-pointer transition-colors"
+                        title="Download file"
+                      >
+                        <Download className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-[10px] text-slate-400 italic">Provisioned by Superadmin</div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* 4. BIN */}
+            {(() => {
+              const doc = profile.bin_document;
+              const name = profile.bin_doc_name || 'BIN_Certificate';
+              const type = profile.bin_doc_type;
+              const cat = getDocCategory(type, name, doc);
+              return (
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/90 flex flex-col justify-between space-y-3">
+                  <div>
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <span className="text-xs font-bold text-red-600 uppercase tracking-wide">
+                        BIN
+                      </span>
+                      {doc ? (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-emerald-100 text-emerald-800">
+                          {cat}
+                        </span>
+                      ) : (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-slate-200 text-slate-500">
+                          Not Provided
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-600 font-mono truncate" title={name}>
+                      {doc ? name : 'Business Identification not yet uploaded.'}
+                    </p>
+                  </div>
+
+                  {doc ? (
+                    <div className="flex items-center gap-1.5 pt-1">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setViewerModal({
+                            isOpen: true,
+                            title: 'BIN Certificate Document',
+                            fileName: name,
+                            fileType: type,
+                            fileData: doc,
+                          })
+                        }
+                        className="flex-1 py-1 px-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-semibold flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                      >
+                        <Eye className="w-3 h-3" />
+                        <span>View</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const a = document.createElement('a');
+                          a.href = doc;
+                          a.download = name;
+                          a.click();
+                        }}
+                        className="py-1 px-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-[11px] font-semibold flex items-center justify-center cursor-pointer transition-colors"
+                        title="Download file"
+                      >
+                        <Download className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-[10px] text-slate-400 italic">Provisioned by Superadmin</div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        </div>
       </div>
+
+      {/* Document Viewer Modal */}
+      <DocumentViewerModal
+        isOpen={viewerModal.isOpen}
+        onClose={() => setViewerModal({ isOpen: false, title: '' })}
+        title={viewerModal.title}
+        fileName={viewerModal.fileName}
+        fileType={viewerModal.fileType}
+        fileData={viewerModal.fileData}
+      />
     </div>
   );
 };

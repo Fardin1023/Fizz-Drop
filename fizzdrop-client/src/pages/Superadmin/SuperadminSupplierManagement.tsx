@@ -18,8 +18,16 @@ import {
   Mail,
   KeyRound,
   RefreshCw,
+  FileText,
+  FileSpreadsheet,
+  Eye,
+  FileCheck2,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import {
+  DocumentViewerModal,
+  getDocCategory,
+} from '../../components/Modals/DocumentViewerModal';
 import {
   getAvailableAreasForCity,
   parseAllocatedAreas,
@@ -53,6 +61,19 @@ export interface SupplierRecord {
   bank_account_name?: string;
   mobile_banking_number?: string;
   is_verified: boolean;
+  vat_registration_no?: string;
+  application_document?: string;
+  application_doc_name?: string;
+  application_doc_type?: string;
+  trade_license_document?: string;
+  trade_license_doc_name?: string;
+  trade_license_doc_type?: string;
+  tin_document?: string;
+  tin_doc_name?: string;
+  tin_doc_type?: string;
+  bin_document?: string;
+  bin_doc_name?: string;
+  bin_doc_type?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -95,6 +116,59 @@ export const SuperadminSupplierManagement: React.FC = () => {
   const [bankAccountName, setBankAccountName] = useState('');
   const [mobileBankingNumber, setMobileBankingNumber] = useState('');
   const [isVerified, setIsVerified] = useState(true);
+
+  // Compliance & Registration Documents State (VAT, Application, Trade License, TIN, BIN)
+  const [vatRegistrationNo, setVatRegistrationNo] = useState('');
+  const [applicationDoc, setApplicationDoc] = useState<string | null>(null);
+  const [applicationDocName, setApplicationDocName] = useState<string | null>(null);
+  const [applicationDocType, setApplicationDocType] = useState<string | null>(null);
+
+  const [tradeLicenseDoc, setTradeLicenseDoc] = useState<string | null>(null);
+  const [tradeLicenseDocName, setTradeLicenseDocName] = useState<string | null>(null);
+  const [tradeLicenseDocType, setTradeLicenseDocType] = useState<string | null>(null);
+
+  const [tinDoc, setTinDoc] = useState<string | null>(null);
+  const [tinDocName, setTinDocName] = useState<string | null>(null);
+  const [tinDocType, setTinDocType] = useState<string | null>(null);
+
+  const [binDoc, setBinDoc] = useState<string | null>(null);
+  const [binDocName, setBinDocName] = useState<string | null>(null);
+  const [binDocType, setBinDocType] = useState<string | null>(null);
+
+  // Document Viewer Preview Modal
+  const [viewerModal, setViewerModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    fileName?: string | null;
+    fileType?: string | null;
+    fileData?: string | null;
+  }>({
+    isOpen: false,
+    title: '',
+  });
+
+  const handleDocFileSelection = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    setDoc: (d: string | null) => void,
+    setName: (n: string | null) => void,
+    setType: (t: string | null) => void
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 20 * 1024 * 1024) {
+      alert('File size exceeds 20MB limit. Please upload a smaller attachment.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setDoc(reader.result as string);
+      setName(file.name);
+      setType(file.type || 'application/octet-stream');
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Allocated municipal & neighborhood areas state
   const [allocatedAreasMap, setAllocatedAreasMap] = useState<Record<string, string[]>>({});
@@ -261,6 +335,19 @@ export const SuperadminSupplierManagement: React.FC = () => {
     setBankAccountName('');
     setMobileBankingNumber('');
     setIsVerified(true);
+    setVatRegistrationNo('');
+    setApplicationDoc(null);
+    setApplicationDocName(null);
+    setApplicationDocType(null);
+    setTradeLicenseDoc(null);
+    setTradeLicenseDocName(null);
+    setTradeLicenseDocType(null);
+    setTinDoc(null);
+    setTinDocName(null);
+    setTinDocType(null);
+    setBinDoc(null);
+    setBinDocName(null);
+    setBinDocType(null);
     setErrorMsg(null);
     setSuccessMsg(null);
     setIsModalOpen(true);
@@ -294,6 +381,19 @@ export const SuperadminSupplierManagement: React.FC = () => {
     setBankAccountName(s.bank_account_name || s.business_name || '');
     setMobileBankingNumber(s.mobile_banking_number || s.phone_number || '');
     setIsVerified(s.is_verified ?? true);
+    setVatRegistrationNo(s.vat_registration_no || '');
+    setApplicationDoc(s.application_document || null);
+    setApplicationDocName(s.application_doc_name || null);
+    setApplicationDocType(s.application_doc_type || null);
+    setTradeLicenseDoc(s.trade_license_document || null);
+    setTradeLicenseDocName(s.trade_license_doc_name || null);
+    setTradeLicenseDocType(s.trade_license_doc_type || null);
+    setTinDoc(s.tin_document || null);
+    setTinDocName(s.tin_doc_name || null);
+    setTinDocType(s.tin_doc_type || null);
+    setBinDoc(s.bin_document || null);
+    setBinDocName(s.bin_doc_name || null);
+    setBinDocType(s.bin_doc_type || null);
     setErrorMsg(null);
     setSuccessMsg(null);
     setIsModalOpen(true);
@@ -339,6 +439,19 @@ export const SuperadminSupplierManagement: React.FC = () => {
         bank_account_name: bankAccountName.trim(),
         mobile_banking_number: mobileBankingNumber.trim(),
         is_verified: isVerified,
+        vat_registration_no: vatRegistrationNo.trim(),
+        application_document: applicationDoc,
+        application_doc_name: applicationDocName,
+        application_doc_type: applicationDocType,
+        trade_license_document: tradeLicenseDoc,
+        trade_license_doc_name: tradeLicenseDocName,
+        trade_license_doc_type: tradeLicenseDocType,
+        tin_document: tinDoc,
+        tin_doc_name: tinDocName,
+        tin_doc_type: tinDocType,
+        bin_document: binDoc,
+        bin_doc_name: binDocName,
+        bin_doc_type: binDocType,
       };
 
       if (password.trim()) {
@@ -646,6 +759,12 @@ export const SuperadminSupplierManagement: React.FC = () => {
                       <span className="font-semibold text-slate-500 shrink-0">License:</span>
                       <span className="font-mono text-slate-800 truncate">{s.trade_license_number || 'N/A'}</span>
                     </div>
+                    {s.vat_registration_no && (
+                      <div className="flex items-center gap-1.5 truncate">
+                        <span className="font-bold text-red-600 shrink-0">VAT:</span>
+                        <span className="font-mono text-slate-800 truncate">{s.vat_registration_no}</span>
+                      </div>
+                    )}
                     <div className="flex items-center gap-1.5 truncate">
                       <Phone className="w-3 h-3 text-slate-400 shrink-0" />
                       <span className="font-mono text-slate-800">{s.phone_number || 'N/A'}</span>
@@ -661,6 +780,106 @@ export const SuperadminSupplierManagement: React.FC = () => {
                         {s.bank_name} {s.bank_account_number ? `(${s.bank_account_number})` : ''}
                       </div>
                     )}
+
+                    {/* Attached Compliance Documents Badges */}
+                    <div className="pt-2 border-t border-slate-100">
+                      <span className="text-[10px] font-semibold text-slate-400 block mb-1">
+                        Documents ({[s.application_document, s.trade_license_document, s.tin_document, s.bin_document].filter(Boolean).length}/4 Verified):
+                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        {s.application_document ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setViewerModal({
+                                isOpen: true,
+                                title: 'Application Document',
+                                fileName: s.application_doc_name,
+                                fileType: s.application_doc_type,
+                                fileData: s.application_document,
+                              })
+                            }
+                            className="px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 flex items-center gap-1 cursor-pointer transition-colors"
+                          >
+                            <FileText className="w-2.5 h-2.5" />
+                            <span>Application</span>
+                          </button>
+                        ) : (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] text-slate-400 bg-slate-100 border border-slate-200">
+                            No App
+                          </span>
+                        )}
+
+                        {s.trade_license_document ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setViewerModal({
+                                isOpen: true,
+                                title: 'Trade License Document',
+                                fileName: s.trade_license_doc_name,
+                                fileType: s.trade_license_doc_type,
+                                fileData: s.trade_license_document,
+                              })
+                            }
+                            className="px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 flex items-center gap-1 cursor-pointer transition-colors"
+                          >
+                            <FileCheck2 className="w-2.5 h-2.5" />
+                            <span>Trade Lic</span>
+                          </button>
+                        ) : (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] text-slate-400 bg-slate-100 border border-slate-200">
+                            No Lic
+                          </span>
+                        )}
+
+                        {s.tin_document ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setViewerModal({
+                                isOpen: true,
+                                title: 'TIN Certificate',
+                                fileName: s.tin_doc_name,
+                                fileType: s.tin_doc_type,
+                                fileData: s.tin_document,
+                              })
+                            }
+                            className="px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 flex items-center gap-1 cursor-pointer transition-colors"
+                          >
+                            <FileSpreadsheet className="w-2.5 h-2.5 text-emerald-600" />
+                            <span>TIN</span>
+                          </button>
+                        ) : (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] text-slate-400 bg-slate-100 border border-slate-200">
+                            No TIN
+                          </span>
+                        )}
+
+                        {s.bin_document ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setViewerModal({
+                                isOpen: true,
+                                title: 'BIN Certificate',
+                                fileName: s.bin_doc_name,
+                                fileType: s.bin_doc_type,
+                                fileData: s.bin_document,
+                              })
+                            }
+                            className="px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 flex items-center gap-1 cursor-pointer transition-colors"
+                          >
+                            <FileText className="w-2.5 h-2.5 text-rose-600" />
+                            <span>BIN</span>
+                          </button>
+                        ) : (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] text-slate-400 bg-slate-100 border border-slate-200">
+                            No BIN
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -1098,6 +1317,271 @@ export const SuperadminSupplierManagement: React.FC = () => {
                 )}
               </div>
 
+              {/* Section 5: Statutory Registration & Compliance Documents */}
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-red-600" />
+                    5. Statutory Registration & Verification Documents
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-medium">Image, PDF, Excel sheets</span>
+                </div>
+
+                {/* VAT Registration No */}
+                <div>
+                  <label className="block text-xs font-bold text-red-600 mb-1">
+                    VAT Registration No
+                  </label>
+                  <input
+                    type="text"
+                    value={vatRegistrationNo}
+                    onChange={(e) => setVatRegistrationNo(e.target.value)}
+                    placeholder="e.g. 0031889xx-0xx9"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs bg-white font-mono focus:ring-2 focus:ring-red-500 focus:outline-none"
+                  />
+                </div>
+
+                {/* Application Attachment */}
+                <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-red-600">
+                      Application
+                    </label>
+                    {applicationDoc && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                        <Check className="w-2.5 h-2.5" />
+                        Attached ({getDocCategory(applicationDocType, applicationDocName, applicationDoc)})
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                    <input
+                      type="file"
+                      accept="image/*,.pdf,application/pdf,.xlsx,.xls,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+                      onChange={(e) =>
+                        handleDocFileSelection(e, setApplicationDoc, setApplicationDocName, setApplicationDocType)
+                      }
+                      className="text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 cursor-pointer w-full sm:w-auto"
+                    />
+                    {applicationDoc && (
+                      <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
+                        <span className="text-[11px] text-slate-600 truncate max-w-[150px] font-mono" title={applicationDocName || ''}>
+                          {applicationDocName || 'Application Document'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setViewerModal({
+                              isOpen: true,
+                              title: 'Application Document',
+                              fileName: applicationDocName,
+                              fileType: applicationDocType,
+                              fileData: applicationDoc,
+                            })
+                          }
+                          className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold flex items-center gap-1 cursor-pointer shrink-0"
+                        >
+                          <Eye className="w-3 h-3" />
+                          <span>View</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setApplicationDoc(null);
+                            setApplicationDocName(null);
+                            setApplicationDocType(null);
+                          }}
+                          className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer shrink-0"
+                          title="Remove document"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Trade License Attachment */}
+                <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-red-600">
+                      Trade License
+                    </label>
+                    {tradeLicenseDoc && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                        <Check className="w-2.5 h-2.5" />
+                        Attached ({getDocCategory(tradeLicenseDocType, tradeLicenseDocName, tradeLicenseDoc)})
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                    <input
+                      type="file"
+                      accept="image/*,.pdf,application/pdf,.xlsx,.xls,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+                      onChange={(e) =>
+                        handleDocFileSelection(e, setTradeLicenseDoc, setTradeLicenseDocName, setTradeLicenseDocType)
+                      }
+                      className="text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 cursor-pointer w-full sm:w-auto"
+                    />
+                    {tradeLicenseDoc && (
+                      <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
+                        <span className="text-[11px] text-slate-600 truncate max-w-[150px] font-mono" title={tradeLicenseDocName || ''}>
+                          {tradeLicenseDocName || 'Trade License'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setViewerModal({
+                              isOpen: true,
+                              title: 'Trade License Document',
+                              fileName: tradeLicenseDocName,
+                              fileType: tradeLicenseDocType,
+                              fileData: tradeLicenseDoc,
+                            })
+                          }
+                          className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold flex items-center gap-1 cursor-pointer shrink-0"
+                        >
+                          <Eye className="w-3 h-3" />
+                          <span>View</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTradeLicenseDoc(null);
+                            setTradeLicenseDocName(null);
+                            setTradeLicenseDocType(null);
+                          }}
+                          className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer shrink-0"
+                          title="Remove document"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* TIN Attachment */}
+                <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-red-600">
+                      TIN
+                    </label>
+                    {tinDoc && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                        <Check className="w-2.5 h-2.5" />
+                        Attached ({getDocCategory(tinDocType, tinDocName, tinDoc)})
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                    <input
+                      type="file"
+                      accept="image/*,.pdf,application/pdf,.xlsx,.xls,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+                      onChange={(e) =>
+                        handleDocFileSelection(e, setTinDoc, setTinDocName, setTinDocType)
+                      }
+                      className="text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 cursor-pointer w-full sm:w-auto"
+                    />
+                    {tinDoc && (
+                      <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
+                        <span className="text-[11px] text-slate-600 truncate max-w-[150px] font-mono" title={tinDocName || ''}>
+                          {tinDocName || 'TIN Certificate'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setViewerModal({
+                              isOpen: true,
+                              title: 'TIN Certificate Document',
+                              fileName: tinDocName,
+                              fileType: tinDocType,
+                              fileData: tinDoc,
+                            })
+                          }
+                          className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold flex items-center gap-1 cursor-pointer shrink-0"
+                        >
+                          <Eye className="w-3 h-3" />
+                          <span>View</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTinDoc(null);
+                            setTinDocName(null);
+                            setTinDocType(null);
+                          }}
+                          className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer shrink-0"
+                          title="Remove document"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* BIN Attachment */}
+                <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-red-600">
+                      BIN
+                    </label>
+                    {binDoc && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                        <Check className="w-2.5 h-2.5" />
+                        Attached ({getDocCategory(binDocType, binDocName, binDoc)})
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                    <input
+                      type="file"
+                      accept="image/*,.pdf,application/pdf,.xlsx,.xls,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+                      onChange={(e) =>
+                        handleDocFileSelection(e, setBinDoc, setBinDocName, setBinDocType)
+                      }
+                      className="text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 cursor-pointer w-full sm:w-auto"
+                    />
+                    {binDoc && (
+                      <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
+                        <span className="text-[11px] text-slate-600 truncate max-w-[150px] font-mono" title={binDocName || ''}>
+                          {binDocName || 'BIN Certificate'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setViewerModal({
+                              isOpen: true,
+                              title: 'BIN Certificate Document',
+                              fileName: binDocName,
+                              fileType: binDocType,
+                              fileData: binDoc,
+                            })
+                          }
+                          className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold flex items-center gap-1 cursor-pointer shrink-0"
+                        >
+                          <Eye className="w-3 h-3" />
+                          <span>View</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setBinDoc(null);
+                            setBinDocName(null);
+                            setBinDocType(null);
+                          }}
+                          className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer shrink-0"
+                          title="Remove document"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               {/* Submit Buttons */}
               <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-2.5">
                 <button
@@ -1120,6 +1604,15 @@ export const SuperadminSupplierManagement: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Document Preview & Download Modal */}
+      <DocumentViewerModal
+        isOpen={viewerModal.isOpen}
+        onClose={() => setViewerModal({ isOpen: false, title: '' })}
+        title={viewerModal.title}
+        fileName={viewerModal.fileName}
+        fileType={viewerModal.fileType}
+        fileData={viewerModal.fileData}
+      />
     </div>
   );
 };

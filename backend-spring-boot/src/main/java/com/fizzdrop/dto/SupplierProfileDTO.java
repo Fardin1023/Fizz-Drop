@@ -74,6 +74,58 @@ public class SupplierProfileDTO {
     @JsonAlias({"user_id", "userId"})
     private Long userId;
 
+    @JsonProperty("vat_registration_no")
+    @JsonAlias({"vat_registration_no", "vatRegistrationNo"})
+    private String vatRegistrationNo;
+
+    @JsonProperty("application_document")
+    @JsonAlias({"application_document", "applicationDocument"})
+    private String applicationDocument;
+
+    @JsonProperty("application_doc_name")
+    @JsonAlias({"application_doc_name", "applicationDocName"})
+    private String applicationDocName;
+
+    @JsonProperty("application_doc_type")
+    @JsonAlias({"application_doc_type", "applicationDocType"})
+    private String applicationDocType;
+
+    @JsonProperty("trade_license_document")
+    @JsonAlias({"trade_license_document", "tradeLicenseDocument"})
+    private String tradeLicenseDocument;
+
+    @JsonProperty("trade_license_doc_name")
+    @JsonAlias({"trade_license_doc_name", "tradeLicenseDocName"})
+    private String tradeLicenseDocName;
+
+    @JsonProperty("trade_license_doc_type")
+    @JsonAlias({"trade_license_doc_type", "tradeLicenseDocType"})
+    private String tradeLicenseDocType;
+
+    @JsonProperty("tin_document")
+    @JsonAlias({"tin_document", "tinDocument"})
+    private String tinDocument;
+
+    @JsonProperty("tin_doc_name")
+    @JsonAlias({"tin_doc_name", "tinDocName"})
+    private String tinDocName;
+
+    @JsonProperty("tin_doc_type")
+    @JsonAlias({"tin_doc_type", "tinDocType"})
+    private String tinDocType;
+
+    @JsonProperty("bin_document")
+    @JsonAlias({"bin_document", "binDocument"})
+    private String binDocument;
+
+    @JsonProperty("bin_doc_name")
+    @JsonAlias({"bin_doc_name", "binDocName"})
+    private String binDocName;
+
+    @JsonProperty("bin_doc_type")
+    @JsonAlias({"bin_doc_type", "binDocType"})
+    private String binDocType;
+
     public Long getPrimaryDistrictId() { return primaryDistrictId; }
     public void setPrimaryDistrictId(Long primaryDistrictId) { this.primaryDistrictId = primaryDistrictId; }
 
@@ -124,4 +176,43 @@ public class SupplierProfileDTO {
 
     public Long getUserId() { return userId; }
     public void setUserId(Long userId) { this.userId = userId; }
+
+    public String getVatRegistrationNo() { return vatRegistrationNo; }
+    public void setVatRegistrationNo(String vatRegistrationNo) { this.vatRegistrationNo = vatRegistrationNo; }
+
+    public String getApplicationDocument() { return applicationDocument; }
+    public void setApplicationDocument(String applicationDocument) { this.applicationDocument = applicationDocument; }
+
+    public String getApplicationDocName() { return applicationDocName; }
+    public void setApplicationDocName(String applicationDocName) { this.applicationDocName = applicationDocName; }
+
+    public String getApplicationDocType() { return applicationDocType; }
+    public void setApplicationDocType(String applicationDocType) { this.applicationDocType = applicationDocType; }
+
+    public String getTradeLicenseDocument() { return tradeLicenseDocument; }
+    public void setTradeLicenseDocument(String tradeLicenseDocument) { this.tradeLicenseDocument = tradeLicenseDocument; }
+
+    public String getTradeLicenseDocName() { return tradeLicenseDocName; }
+    public void setTradeLicenseDocName(String tradeLicenseDocName) { this.tradeLicenseDocName = tradeLicenseDocName; }
+
+    public String getTradeLicenseDocType() { return tradeLicenseDocType; }
+    public void setTradeLicenseDocType(String tradeLicenseDocType) { this.tradeLicenseDocType = tradeLicenseDocType; }
+
+    public String getTinDocument() { return tinDocument; }
+    public void setTinDocument(String tinDocument) { this.tinDocument = tinDocument; }
+
+    public String getTinDocName() { return tinDocName; }
+    public void setTinDocName(String tinDocName) { this.tinDocName = tinDocName; }
+
+    public String getTinDocType() { return tinDocType; }
+    public void setTinDocType(String tinDocType) { this.tinDocType = tinDocType; }
+
+    public String getBinDocument() { return binDocument; }
+    public void setBinDocument(String binDocument) { this.binDocument = binDocument; }
+
+    public String getBinDocName() { return binDocName; }
+    public void setBinDocName(String binDocName) { this.binDocName = binDocName; }
+
+    public String getBinDocType() { return binDocType; }
+    public void setBinDocType(String binDocType) { this.binDocType = binDocType; }
 }

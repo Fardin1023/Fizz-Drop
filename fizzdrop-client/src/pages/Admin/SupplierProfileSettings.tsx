@@ -13,8 +13,14 @@ import {
   CreditCard,
   Check,
   Layers,
+  Eye,
+  Download,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import {
+  DocumentViewerModal,
+  getDocCategory,
+} from '../../components/Modals/DocumentViewerModal';
 
 export interface DistrictItem {
   id: number;
@@ -41,6 +47,19 @@ export interface SupplierProfileData {
   bank_account_name?: string;
   mobile_banking_number?: string;
   is_verified: boolean;
+  vat_registration_no?: string;
+  application_document?: string;
+  application_doc_name?: string;
+  application_doc_type?: string;
+  trade_license_document?: string;
+  trade_license_doc_name?: string;
+  trade_license_doc_type?: string;
+  tin_document?: string;
+  tin_doc_name?: string;
+  tin_doc_type?: string;
+  bin_document?: string;
+  bin_doc_name?: string;
+  bin_doc_type?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -71,6 +90,58 @@ export const SupplierProfileSettings: React.FC<SupplierProfileSettingsProps> = (
   const [bankAccountNumber, setBankAccountNumber] = useState('');
   const [bankAccountName, setBankAccountName] = useState('');
   const [mobileBankingNumber, setMobileBankingNumber] = useState('');
+
+  // Compliance Documents & VAT Registration states
+  const [vatRegistrationNo, setVatRegistrationNo] = useState('');
+  const [applicationDoc, setApplicationDoc] = useState<string | null>(null);
+  const [applicationDocName, setApplicationDocName] = useState<string | null>(null);
+  const [applicationDocType, setApplicationDocType] = useState<string | null>(null);
+
+  const [tradeLicenseDoc, setTradeLicenseDoc] = useState<string | null>(null);
+  const [tradeLicenseDocName, setTradeLicenseDocName] = useState<string | null>(null);
+  const [tradeLicenseDocType, setTradeLicenseDocType] = useState<string | null>(null);
+
+  const [tinDoc, setTinDoc] = useState<string | null>(null);
+  const [tinDocName, setTinDocName] = useState<string | null>(null);
+  const [tinDocType, setTinDocType] = useState<string | null>(null);
+
+  const [binDoc, setBinDoc] = useState<string | null>(null);
+  const [binDocName, setBinDocName] = useState<string | null>(null);
+  const [binDocType, setBinDocType] = useState<string | null>(null);
+
+  const [viewerModal, setViewerModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    fileName?: string | null;
+    fileType?: string | null;
+    fileData?: string | null;
+  }>({
+    isOpen: false,
+    title: '',
+  });
+
+  const handleDocFileSelection = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    setDoc: (d: string | null) => void,
+    setName: (n: string | null) => void,
+    setType: (t: string | null) => void
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 20 * 1024 * 1024) {
+      alert('File size exceeds 20MB limit. Please upload a smaller attachment.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setDoc(reader.result as string);
+      setName(file.name);
+      setType(file.type || 'application/octet-stream');
+    };
+    reader.readAsDataURL(file);
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -110,6 +181,19 @@ export const SupplierProfileSettings: React.FC<SupplierProfileSettingsProps> = (
         setBankAccountNumber(profData.bank_account_number || '');
         setBankAccountName(profData.bank_account_name || '');
         setMobileBankingNumber(profData.mobile_banking_number || '');
+        setVatRegistrationNo(profData.vat_registration_no || '');
+        setApplicationDoc(profData.application_document || null);
+        setApplicationDocName(profData.application_doc_name || null);
+        setApplicationDocType(profData.application_doc_type || null);
+        setTradeLicenseDoc(profData.trade_license_document || null);
+        setTradeLicenseDocName(profData.trade_license_doc_name || null);
+        setTradeLicenseDocType(profData.trade_license_doc_type || null);
+        setTinDoc(profData.tin_document || null);
+        setTinDocName(profData.tin_doc_name || null);
+        setTinDocType(profData.tin_doc_type || null);
+        setBinDoc(profData.bin_document || null);
+        setBinDocName(profData.bin_doc_name || null);
+        setBinDocType(profData.bin_doc_type || null);
       }
     } catch (err: any) {
       console.error('Error loading supplier profile:', err);
@@ -210,6 +294,19 @@ export const SupplierProfileSettings: React.FC<SupplierProfileSettingsProps> = (
           bank_account_number: bankAccountNumber,
           bank_account_name: bankAccountName,
           mobile_banking_number: mobileBankingNumber,
+          vat_registration_no: vatRegistrationNo,
+          application_document: applicationDoc,
+          application_doc_name: applicationDocName,
+          application_doc_type: applicationDocType,
+          trade_license_document: tradeLicenseDoc,
+          trade_license_doc_name: tradeLicenseDocName,
+          trade_license_doc_type: tradeLicenseDocType,
+          tin_document: tinDoc,
+          tin_doc_name: tinDocName,
+          tin_doc_type: tinDocType,
+          bin_document: binDoc,
+          bin_doc_name: binDocName,
+          bin_doc_type: binDocType,
         }),
       });
 
@@ -668,6 +765,279 @@ export const SupplierProfileSettings: React.FC<SupplierProfileSettingsProps> = (
               </div>
             </div>
           </div>
+
+          {/* Dedicated Section: Statutory Registration & Compliance Documents (VAT, Application, Trade License, TIN, BIN) */}
+          <div className="md:col-span-2 p-5 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-red-600" />
+                <div>
+                  <h3 className="font-oswald text-sm font-bold uppercase tracking-tight text-slate-900">
+                    Statutory Registration & Verification Documents
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Compliance attachments (Image, PDF, Excel sheets) verified with Superadmin
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {/* VAT Registration No */}
+              <div>
+                <label className="block text-xs font-bold text-red-600 mb-1">
+                  VAT Registration No
+                </label>
+                <input
+                  type="text"
+                  value={vatRegistrationNo}
+                  onChange={(e) => setVatRegistrationNo(e.target.value)}
+                  placeholder="e.g. 0031889xx-0xx9"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-zinc-900 focus:outline-none focus:ring-2 focus:ring-red-500/30"
+                />
+              </div>
+
+              {/* Application Attachment */}
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-red-600">
+                    Application
+                  </label>
+                  {applicationDoc && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-emerald-100 text-emerald-800">
+                      {getDocCategory(applicationDocType, applicationDocName, applicationDoc)} Attached
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                  <input
+                    type="file"
+                    accept="image/*,.pdf,application/pdf,.xlsx,.xls,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+                    onChange={(e) =>
+                      handleDocFileSelection(e, setApplicationDoc, setApplicationDocName, setApplicationDocType)
+                    }
+                    className="text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-200 file:text-slate-800 hover:file:bg-slate-300 cursor-pointer w-full sm:w-auto"
+                  />
+                  {applicationDoc && (
+                    <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
+                      <span className="text-[11px] text-slate-600 truncate max-w-[160px] font-mono" title={applicationDocName || ''}>
+                        {applicationDocName || 'Application Document'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setViewerModal({
+                            isOpen: true,
+                            title: 'Application Document',
+                            fileName: applicationDocName,
+                            fileType: applicationDocType,
+                            fileData: applicationDoc,
+                          })
+                        }
+                        className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>View</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const a = document.createElement('a');
+                          a.href = applicationDoc;
+                          a.download = applicationDocName || 'Application_Document';
+                          a.click();
+                        }}
+                        className="p-1 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 cursor-pointer"
+                        title="Download"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Trade License Attachment */}
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-red-600">
+                    Trade License
+                  </label>
+                  {tradeLicenseDoc && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-emerald-100 text-emerald-800">
+                      {getDocCategory(tradeLicenseDocType, tradeLicenseDocName, tradeLicenseDoc)} Attached
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                  <input
+                    type="file"
+                    accept="image/*,.pdf,application/pdf,.xlsx,.xls,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+                    onChange={(e) =>
+                      handleDocFileSelection(e, setTradeLicenseDoc, setTradeLicenseDocName, setTradeLicenseDocType)
+                    }
+                    className="text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-200 file:text-slate-800 hover:file:bg-slate-300 cursor-pointer w-full sm:w-auto"
+                  />
+                  {tradeLicenseDoc && (
+                    <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
+                      <span className="text-[11px] text-slate-600 truncate max-w-[160px] font-mono" title={tradeLicenseDocName || ''}>
+                        {tradeLicenseDocName || 'Trade License'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setViewerModal({
+                            isOpen: true,
+                            title: 'Trade License Document',
+                            fileName: tradeLicenseDocName,
+                            fileType: tradeLicenseDocType,
+                            fileData: tradeLicenseDoc,
+                          })
+                        }
+                        className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>View</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const a = document.createElement('a');
+                          a.href = tradeLicenseDoc;
+                          a.download = tradeLicenseDocName || 'Trade_License';
+                          a.click();
+                        }}
+                        className="p-1 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 cursor-pointer"
+                        title="Download"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* TIN Attachment */}
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-red-600">
+                    TIN
+                  </label>
+                  {tinDoc && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-emerald-100 text-emerald-800">
+                      {getDocCategory(tinDocType, tinDocName, tinDoc)} Attached
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                  <input
+                    type="file"
+                    accept="image/*,.pdf,application/pdf,.xlsx,.xls,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+                    onChange={(e) =>
+                      handleDocFileSelection(e, setTinDoc, setTinDocName, setTinDocType)
+                    }
+                    className="text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-200 file:text-slate-800 hover:file:bg-slate-300 cursor-pointer w-full sm:w-auto"
+                  />
+                  {tinDoc && (
+                    <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
+                      <span className="text-[11px] text-slate-600 truncate max-w-[160px] font-mono" title={tinDocName || ''}>
+                        {tinDocName || 'TIN Certificate'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setViewerModal({
+                            isOpen: true,
+                            title: 'TIN Certificate Document',
+                            fileName: tinDocName,
+                            fileType: tinDocType,
+                            fileData: tinDoc,
+                          })
+                        }
+                        className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>View</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const a = document.createElement('a');
+                          a.href = tinDoc;
+                          a.download = tinDocName || 'TIN_Certificate';
+                          a.click();
+                        }}
+                        className="p-1 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 cursor-pointer"
+                        title="Download"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* BIN Attachment */}
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-red-600">
+                    BIN
+                  </label>
+                  {binDoc && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-emerald-100 text-emerald-800">
+                      {getDocCategory(binDocType, binDocName, binDoc)} Attached
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                  <input
+                    type="file"
+                    accept="image/*,.pdf,application/pdf,.xlsx,.xls,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+                    onChange={(e) =>
+                      handleDocFileSelection(e, setBinDoc, setBinDocName, setBinDocType)
+                    }
+                    className="text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-200 file:text-slate-800 hover:file:bg-slate-300 cursor-pointer w-full sm:w-auto"
+                  />
+                  {binDoc && (
+                    <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
+                      <span className="text-[11px] text-slate-600 truncate max-w-[160px] font-mono" title={binDocName || ''}>
+                        {binDocName || 'BIN Certificate'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setViewerModal({
+                            isOpen: true,
+                            title: 'BIN Certificate Document',
+                            fileName: binDocName,
+                            fileType: binDocType,
+                            fileData: binDoc,
+                          })
+                        }
+                        className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>View</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const a = document.createElement('a');
+                          a.href = binDoc;
+                          a.download = binDocName || 'BIN_Certificate';
+                          a.click();
+                        }}
+                        className="p-1 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 cursor-pointer"
+                        title="Download"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
         </div>
 
@@ -696,6 +1066,16 @@ export const SupplierProfileSettings: React.FC<SupplierProfileSettingsProps> = (
           </button>
         </div>
       </form>
+
+      {/* Document Viewer Modal */}
+      <DocumentViewerModal
+        isOpen={viewerModal.isOpen}
+        onClose={() => setViewerModal({ isOpen: false, title: '' })}
+        title={viewerModal.title}
+        fileName={viewerModal.fileName}
+        fileType={viewerModal.fileType}
+        fileData={viewerModal.fileData}
+      />
     </div>
   );
 };

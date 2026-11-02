@@ -100,6 +100,75 @@ public class SupplierProfile {
     @JsonAlias({"allocated_areas", "allocatedAreas"})
     private String allocatedAreas;
 
+    @Column(name = "vat_registration_no", length = 100)
+    @JsonProperty("vat_registration_no")
+    @JsonAlias({"vat_registration_no", "vatRegistrationNo"})
+    private String vatRegistrationNo;
+
+    @Lob
+    @Column(name = "application_document", columnDefinition = "LONGTEXT")
+    @JsonProperty("application_document")
+    @JsonAlias({"application_document", "applicationDocument"})
+    private String applicationDocument;
+
+    @Column(name = "application_doc_name", length = 255)
+    @JsonProperty("application_doc_name")
+    @JsonAlias({"application_doc_name", "applicationDocName"})
+    private String applicationDocName;
+
+    @Column(name = "application_doc_type", length = 100)
+    @JsonProperty("application_doc_type")
+    @JsonAlias({"application_doc_type", "applicationDocType"})
+    private String applicationDocType;
+
+    @Lob
+    @Column(name = "trade_license_document", columnDefinition = "LONGTEXT")
+    @JsonProperty("trade_license_document")
+    @JsonAlias({"trade_license_document", "tradeLicenseDocument"})
+    private String tradeLicenseDocument;
+
+    @Column(name = "trade_license_doc_name", length = 255)
+    @JsonProperty("trade_license_doc_name")
+    @JsonAlias({"trade_license_doc_name", "tradeLicenseDocName"})
+    private String tradeLicenseDocName;
+
+    @Column(name = "trade_license_doc_type", length = 100)
+    @JsonProperty("trade_license_doc_type")
+    @JsonAlias({"trade_license_doc_type", "tradeLicenseDocType"})
+    private String tradeLicenseDocType;
+
+    @Lob
+    @Column(name = "tin_document", columnDefinition = "LONGTEXT")
+    @JsonProperty("tin_document")
+    @JsonAlias({"tin_document", "tinDocument"})
+    private String tinDocument;
+
+    @Column(name = "tin_doc_name", length = 255)
+    @JsonProperty("tin_doc_name")
+    @JsonAlias({"tin_doc_name", "tinDocName"})
+    private String tinDocName;
+
+    @Column(name = "tin_doc_type", length = 100)
+    @JsonProperty("tin_doc_type")
+    @JsonAlias({"tin_doc_type", "tinDocType"})
+    private String tinDocType;
+
+    @Lob
+    @Column(name = "bin_document", columnDefinition = "LONGTEXT")
+    @JsonProperty("bin_document")
+    @JsonAlias({"bin_document", "binDocument"})
+    private String binDocument;
+
+    @Column(name = "bin_doc_name", length = 255)
+    @JsonProperty("bin_doc_name")
+    @JsonAlias({"bin_doc_name", "binDocName"})
+    private String binDocName;
+
+    @Column(name = "bin_doc_type", length = 100)
+    @JsonProperty("bin_doc_type")
+    @JsonAlias({"bin_doc_type", "binDocType"})
+    private String binDocType;
+
     // Transient helper fields for API JSON serialization
     @Transient
     @JsonProperty("district_name")
@@ -208,4 +277,43 @@ public class SupplierProfile {
 
     public String getUserEmail() { return userEmail; }
     public void setUserEmail(String userEmail) { this.userEmail = userEmail; }
+
+    public String getVatRegistrationNo() { return vatRegistrationNo; }
+    public void setVatRegistrationNo(String vatRegistrationNo) { this.vatRegistrationNo = vatRegistrationNo; }
+
+    public String getApplicationDocument() { return applicationDocument; }
+    public void setApplicationDocument(String applicationDocument) { this.applicationDocument = applicationDocument; }
+
+    public String getApplicationDocName() { return applicationDocName; }
+    public void setApplicationDocName(String applicationDocName) { this.applicationDocName = applicationDocName; }
+
+    public String getApplicationDocType() { return applicationDocType; }
+    public void setApplicationDocType(String applicationDocType) { this.applicationDocType = applicationDocType; }
+
+    public String getTradeLicenseDocument() { return tradeLicenseDocument; }
+    public void setTradeLicenseDocument(String tradeLicenseDocument) { this.tradeLicenseDocument = tradeLicenseDocument; }
+
+    public String getTradeLicenseDocName() { return tradeLicenseDocName; }
+    public void setTradeLicenseDocName(String tradeLicenseDocName) { this.tradeLicenseDocName = tradeLicenseDocName; }
+
+    public String getTradeLicenseDocType() { return tradeLicenseDocType; }
+    public void setTradeLicenseDocType(String tradeLicenseDocType) { this.tradeLicenseDocType = tradeLicenseDocType; }
+
+    public String getTinDocument() { return tinDocument; }
+    public void setTinDocument(String tinDocument) { this.tinDocument = tinDocument; }
+
+    public String getTinDocName() { return tinDocName; }
+    public void setTinDocName(String tinDocName) { this.tinDocName = tinDocName; }
+
+    public String getTinDocType() { return tinDocType; }
+    public void setTinDocType(String tinDocType) { this.tinDocType = tinDocType; }
+
+    public String getBinDocument() { return binDocument; }
+    public void setBinDocument(String binDocument) { this.binDocument = binDocument; }
+
+    public String getBinDocName() { return binDocName; }
+    public void setBinDocName(String binDocName) { this.binDocName = binDocName; }
+
+    public String getBinDocType() { return binDocType; }
+    public void setBinDocType(String binDocType) { this.binDocType = binDocType; }
 }

@@ -407,6 +407,30 @@ public class RequisitionProcessingService {
         if (dto.getAllocatedAreas() != null) {
             profile.setAllocatedAreas(dto.getAllocatedAreas().trim());
         }
+        if (dto.getVatRegistrationNo() != null) {
+            profile.setVatRegistrationNo(dto.getVatRegistrationNo().trim());
+        }
+        if (dto.getApplicationDocument() != null) {
+            profile.setApplicationDocument(dto.getApplicationDocument());
+            profile.setApplicationDocName(dto.getApplicationDocName());
+            profile.setApplicationDocType(dto.getApplicationDocType());
+        }
+        if (dto.getTradeLicenseDocument() != null) {
+            profile.setTradeLicenseDocument(dto.getTradeLicenseDocument());
+            profile.setTradeLicenseDocName(dto.getTradeLicenseDocName());
+            profile.setTradeLicenseDocType(dto.getTradeLicenseDocType());
+        }
+        if (dto.getTinDocument() != null) {
+            profile.setTinDocument(dto.getTinDocument());
+            profile.setTinDocName(dto.getTinDocName());
+            profile.setTinDocType(dto.getTinDocType());
+        }
+        if (dto.getBinDocument() != null) {
+            profile.setBinDocument(dto.getBinDocument());
+            profile.setBinDocName(dto.getBinDocName());
+            profile.setBinDocType(dto.getBinDocType());
+        }
+
 
         if (profile.getUserId() != null) {
             userRepository.findById(profile.getUserId()).ifPresent(u -> {
@@ -481,6 +505,30 @@ public class RequisitionProcessingService {
         if (dto.getAllocatedAreas() != null) {
             profile.setAllocatedAreas(dto.getAllocatedAreas().trim());
         }
+        if (dto.getVatRegistrationNo() != null) {
+            profile.setVatRegistrationNo(dto.getVatRegistrationNo().trim());
+        }
+        if (dto.getApplicationDocument() != null) {
+            profile.setApplicationDocument(dto.getApplicationDocument());
+            profile.setApplicationDocName(dto.getApplicationDocName());
+            profile.setApplicationDocType(dto.getApplicationDocType());
+        }
+        if (dto.getTradeLicenseDocument() != null) {
+            profile.setTradeLicenseDocument(dto.getTradeLicenseDocument());
+            profile.setTradeLicenseDocName(dto.getTradeLicenseDocName());
+            profile.setTradeLicenseDocType(dto.getTradeLicenseDocType());
+        }
+        if (dto.getTinDocument() != null) {
+            profile.setTinDocument(dto.getTinDocument());
+            profile.setTinDocName(dto.getTinDocName());
+            profile.setTinDocType(dto.getTinDocType());
+        }
+        if (dto.getBinDocument() != null) {
+            profile.setBinDocument(dto.getBinDocument());
+            profile.setBinDocName(dto.getBinDocName());
+            profile.setBinDocType(dto.getBinDocType());
+        }
+
 
         String targetDivision = dto.getDivisionName();
         List<Long> coveredIds = dto.getCoveredDistrictIds();
