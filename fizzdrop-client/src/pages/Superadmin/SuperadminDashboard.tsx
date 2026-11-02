@@ -8,6 +8,7 @@ import { DatabaseConfigModal } from '../Admin/DatabaseConfigModal';
 import { StockDistributionView } from '../Admin/StockDistributionView';
 import { SuperadminRequisitionsHub } from './SuperadminRequisitionsHub';
 import { SuperadminProductCatalog } from './SuperadminProductCatalog';
+import { SuperadminMerchandiseCatalog } from './SuperadminMerchandiseCatalog';
 import { SuperadminSupplierManagement } from './SuperadminSupplierManagement';
 import {
   ShieldCheck,
@@ -36,7 +37,7 @@ import { NotificationPopup } from '../../components/Notifications/NotificationPo
 
 export const SuperadminDashboard: React.FC = () => {
   const { user, isSuperadmin, isAuthenticated, logout, isLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<'products' | 'requisitions' | 'suppliers' | 'tables' | 'outlets' | 'inventory' | 'query'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'merchandise' | 'requisitions' | 'suppliers' | 'tables' | 'outlets' | 'inventory' | 'query'>('products');
   const [consoleInitialQuery, setConsoleInitialQuery] = useState<string>('SELECT * FROM Outlets LIMIT 25;');
   const [isDbConfigOpen, setIsDbConfigOpen] = useState(false);
   const [dbStatus, setDbStatus] = useState<any>(null);
@@ -103,6 +104,15 @@ export const SuperadminDashboard: React.FC = () => {
       icon: Package,
       gradient: 'from-blue-600 via-indigo-600 to-cyan-600',
       badge: 'Catalog',
+    },
+    {
+      id: 'merchandise' as const,
+      label: 'Official Merchandise Hub',
+      shortLabel: 'Merchandise Hub',
+      desc: 'Jackets, helmets, bikes & apparel',
+      icon: Sparkles,
+      gradient: 'from-amber-500 via-rose-500 to-indigo-600',
+      badge: 'Lifestyle',
     },
     {
       id: 'requisitions' as const,
@@ -413,6 +423,7 @@ export const SuperadminDashboard: React.FC = () => {
         {/* Dynamic Main Content Workspace */}
         <main className="flex-1 min-w-0 w-full">
           {activeTab === 'products' && <SuperadminProductCatalog />}
+          {activeTab === 'merchandise' && <SuperadminMerchandiseCatalog />}
           {activeTab === 'requisitions' && <SuperadminRequisitionsHub />}
           {activeTab === 'suppliers' && <SuperadminSupplierManagement />}
           {activeTab === 'tables' && (

@@ -88,7 +88,7 @@ const ProductListPage: React.FC<ProductListPageProps> = ({ branchId, onAddToCart
     }
   });
 
-  // Fetch live products from backend API (ZERO seed data fallback)
+  // Fetch live products & merchandise from backend APIs (ZERO seed data fallback)
   const fetchProducts = async () => {
     setLoading(true);
     try {
@@ -96,15 +96,50 @@ const ProductListPage: React.FC<ProductListPageProps> = ({ branchId, onAddToCart
         ? `http://localhost:8080/api/products?branchId=${branchId}`
         : 'http://localhost:8080/api/products';
 
-      const res = await fetch(endpoint);
-      if (res.ok) {
-        const data = await res.json();
-        setProducts(Array.isArray(data) ? data : []);
-      } else {
-        setProducts([]);
+      const [resProd, resMerch] = await Promise.all([
+        fetch(endpoint).catch(() => null),
+        fetch('http://localhost:8080/api/merchandise').catch(() => null),
+      ]);
+
+      let combined: BeverageProduct[] = [];
+
+      if (resProd && resProd.ok) {
+        const prodData = await resProd.json();
+        if (Array.isArray(prodData)) {
+          combined = combined.concat(prodData);
+        }
       }
+
+      if (resMerch && resMerch.ok) {
+        const merchData = await resMerch.json();
+        if (Array.isArray(merchData)) {
+          const mappedMerch: BeverageProduct[] = merchData.map((m: any) => {
+            const rawId = m.merchandise_id || m.merchandiseId || m.id || 1;
+            const price = m.price ?? m.base_price ?? 0;
+            const stock = m.stock_quantity ?? m.stockQuantity ?? 0;
+            return {
+              product_id: 100000 + Number(rawId),
+              brand: m.brand,
+              flavor_variant: m.name,
+              packaging: m.packaging || 'Boxed Packaging',
+              size_volume: m.size_spec || m.sizeSpec || 'Universal',
+              sku: m.sku,
+              base_price: typeof price === 'number' ? price : parseFloat(price) || 0,
+              category: 'Merchandise',
+              expiry_date: m.warranty_period || m.warrantyPeriod || '5-Year Quality Guarantee',
+              image_url: m.image_url || m.imageUrl || '',
+              total_stock: stock,
+              branch_stock: stock,
+              central_stock: stock,
+            };
+          });
+          combined = combined.concat(mappedMerch);
+        }
+      }
+
+      setProducts(combined);
     } catch (err) {
-      console.error('Failed to fetch beverages from backend:', err);
+      console.error('Failed to fetch catalog from backend:', err);
       setProducts([]);
     } finally {
       setLoading(false);
