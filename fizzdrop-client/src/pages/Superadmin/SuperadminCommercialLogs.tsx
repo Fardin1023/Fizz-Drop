@@ -23,7 +23,10 @@ import {
   SlidersHorizontal,
   Info,
   X,
-  FileSpreadsheet
+  FileSpreadsheet,
+  MapPin,
+  Store,
+  Tag
 } from 'lucide-react';
 
 interface CommercialSummary {
@@ -116,19 +119,34 @@ interface RequisitionRow {
   dispatched_at: string;
 }
 
+interface OutletItemUnderSupplier {
+  outlet_id: number;
+  outlet_name: string;
+  city: string;
+  location_address?: string;
+  supplier_id?: number;
+  supplier_name?: string;
+}
+
 interface SupplierOption {
   supplier_id: number;
-  supplier_name: string;
-  outlet_count: number;
-  outlet_ids: number[];
+  supplier_name?: string;
+  business_name?: string;
+  division_name?: string;
+  phone_number?: string;
+  outlet_count?: number;
+  outlets_count?: number;
+  outlets?: OutletItemUnderSupplier[];
 }
 
 interface OutletOption {
   outlet_id: number;
   outlet_name: string;
   city: string;
-  supplier_id: number;
-  supplier_name: string;
+  branch_name?: string;
+  location_address?: string;
+  supplier_id?: number;
+  supplier_name?: string;
 }
 
 interface ProductOption {
@@ -169,6 +187,17 @@ export const SuperadminCommercialLogs: React.FC = () => {
 
   // Selected row for audit details modal
   const [inspectedItem, setInspectedItem] = useState<{ type: string; data: any } | null>(null);
+
+  // Helpers to get supplier name and outlet count
+  const getSupplierDisplayName = (s: SupplierOption | undefined | null): string => {
+    if (!s) return 'Unknown Supplier';
+    return s.supplier_name || s.business_name || `Supplier Hub #${s.supplier_id}`;
+  };
+
+  const getSupplierOutletCount = (s: SupplierOption | undefined | null): number => {
+    if (!s) return 0;
+    return s.outlets?.length ?? s.outlets_count ?? s.outlet_count ?? 0;
+  };
 
   // Fetch Commercial Logs Telemetry from Backend API
   const fetchCommercialLogs = async () => {
@@ -247,24 +276,40 @@ export const SuperadminCommercialLogs: React.FC = () => {
     setSearchQuery('');
   };
 
+  // Currently active selected Supplier and Outlet objects
+  const activeSupplier = useMemo(() => {
+    if (selectedSupplierId === 'ALL') return null;
+    return suppliers.find((s) => String(s.supplier_id) === String(selectedSupplierId)) || null;
+  }, [suppliers, selectedSupplierId]);
+
+  const activeOutlet = useMemo(() => {
+    if (selectedOutletId === 'ALL') return null;
+    return outlets.find((o) => String(o.outlet_id) === String(selectedOutletId)) || null;
+  }, [outlets, selectedOutletId]);
+
   // Cascading Outlets: If a supplier is selected, only show outlets belonging to that supplier
   const availableOutlets = useMemo(() => {
     if (selectedSupplierId === 'ALL') {
       return outlets;
     }
     const supIdNum = Number(selectedSupplierId);
-    return outlets.filter((o) => o.supplier_id === supIdNum);
-  }, [outlets, selectedSupplierId]);
+    if (activeSupplier?.outlets && activeSupplier.outlets.length > 0) {
+      return activeSupplier.outlets;
+    }
+    return outlets.filter((o) => Number(o.supplier_id) === supIdNum);
+  }, [selectedSupplierId, activeSupplier, outlets]);
 
-  // When selected supplier changes, verify if currently selected outlet is still valid
+  // When selected supplier changes, check if currently selected outlet is still valid
   const handleSupplierChange = (newSupId: string) => {
     setSelectedSupplierId(newSupId);
     if (newSupId !== 'ALL') {
       const supIdNum = Number(newSupId);
-      const outletStillValid = outlets.some(
-        (o) => o.supplier_id === supIdNum && String(o.outlet_id) === selectedOutletId
+      const targetSup = suppliers.find((s) => String(s.supplier_id) === newSupId);
+      const underOutletIds = new Set(
+        targetSup?.outlets?.map((o) => String(o.outlet_id)) ||
+        outlets.filter((o) => Number(o.supplier_id) === supIdNum).map((o) => String(o.outlet_id))
       );
-      if (!outletStillValid) {
+      if (!underOutletIds.has(selectedOutletId)) {
         setSelectedOutletId('ALL');
       }
     }
@@ -533,7 +578,7 @@ export const SuperadminCommercialLogs: React.FC = () => {
         </div>
       </div>
 
-      {/* Advanced Filter Toolbar (Supplier -> Cascading Outlets -> Product -> Date Range) */}
+      {/* Advanced Filter Toolbar (Supplier -> Cascading Outlets Under Supplier -> Product -> Date Range) */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
           <div className="flex items-center gap-2">
@@ -580,18 +625,22 @@ export const SuperadminCommercialLogs: React.FC = () => {
             <select
               value={selectedSupplierId}
               onChange={(e) => handleSupplierChange(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all cursor-pointer"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all cursor-pointer"
             >
-              <option value="ALL">All Regional Suppliers ({suppliers.length})</option>
-              {suppliers.map((s) => (
-                <option key={s.supplier_id} value={String(s.supplier_id)}>
-                  {s.supplier_name} ({s.outlet_count} outlets)
-                </option>
-              ))}
+              <option value="ALL">🏢 All Regional Suppliers ({suppliers.length})</option>
+              {suppliers.map((s) => {
+                const sName = getSupplierDisplayName(s);
+                const count = getSupplierOutletCount(s);
+                return (
+                  <option key={s.supplier_id} value={String(s.supplier_id)}>
+                    {sName} ({count} {count === 1 ? 'outlet' : 'outlets'})
+                  </option>
+                );
+              })}
             </select>
           </div>
 
-          {/* 2. Cascading Outlet Selector */}
+          {/* 2. Cascading Outlet Selector (Showing outlets under selected supplier) */}
           <div>
             <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
               <Building2 className="w-3.5 h-3.5 text-teal-500" />
@@ -600,18 +649,37 @@ export const SuperadminCommercialLogs: React.FC = () => {
             <select
               value={selectedOutletId}
               onChange={(e) => setSelectedOutletId(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all cursor-pointer"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all cursor-pointer"
             >
               <option value="ALL">
                 {selectedSupplierId === 'ALL'
-                  ? `All Outlets Network (${outlets.length})`
-                  : `All Outlets Under This Supplier (${availableOutlets.length})`}
+                  ? `🏪 All Franchise Outlets (${outlets.length})`
+                  : `🏪 All Outlets Under ${getSupplierDisplayName(activeSupplier)} (${availableOutlets.length})`}
               </option>
-              {availableOutlets.map((o) => (
-                <option key={o.outlet_id} value={String(o.outlet_id)}>
-                  {o.outlet_name} ({o.city})
-                </option>
-              ))}
+              {selectedSupplierId === 'ALL' ? (
+                suppliers.map((s) => {
+                  const sName = getSupplierDisplayName(s);
+                  const sOutlets = (s.outlets && s.outlets.length > 0)
+                    ? s.outlets
+                    : outlets.filter((o) => Number(o.supplier_id) === Number(s.supplier_id));
+                  if (sOutlets.length === 0) return null;
+                  return (
+                    <optgroup key={s.supplier_id} label={`Supplier: ${sName} (${sOutlets.length})`}>
+                      {sOutlets.map((o) => (
+                        <option key={o.outlet_id} value={String(o.outlet_id)}>
+                          {o.outlet_name} — {o.city}
+                        </option>
+                      ))}
+                    </optgroup>
+                  );
+                })
+              ) : (
+                availableOutlets.map((o) => (
+                  <option key={o.outlet_id} value={String(o.outlet_id)}>
+                    {o.outlet_name} — {o.city}
+                  </option>
+                ))
+              )}
             </select>
           </div>
 
@@ -624,7 +692,7 @@ export const SuperadminCommercialLogs: React.FC = () => {
             <select
               value={selectedProductId}
               onChange={(e) => setSelectedProductId(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
             >
               <option value="ALL">All Products in Catalog ({products.length})</option>
               {products.map((p) => (
@@ -666,6 +734,53 @@ export const SuperadminCommercialLogs: React.FC = () => {
           </div>
         </div>
 
+        {/* Active Filter Scope & Overview Banner */}
+        {(selectedSupplierId !== 'ALL' || selectedOutletId !== 'ALL' || selectedProductId !== 'ALL' || searchQuery.trim() !== '') && (
+          <div className="p-3.5 bg-gradient-to-r from-indigo-50/90 via-teal-50/70 to-emerald-50/90 rounded-xl border border-indigo-200/80 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <div className="flex items-center gap-1.5 font-bold text-slate-800">
+                <Filter className="w-4 h-4 text-indigo-600" />
+                <span>Active Filter Scope:</span>
+              </div>
+              {activeSupplier && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-100 text-indigo-900 font-semibold text-[11px] border border-indigo-200 shadow-2xs">
+                  <Users className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Supplier: <strong>{getSupplierDisplayName(activeSupplier)}</strong></span>
+                </span>
+              )}
+              {activeOutlet && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-100 text-teal-900 font-semibold text-[11px] border border-teal-200 shadow-2xs">
+                  <Building2 className="w-3.5 h-3.5 text-teal-600" />
+                  <span>Outlet: <strong>{activeOutlet.outlet_name}</strong> ({activeOutlet.city})</span>
+                </span>
+              )}
+              {selectedProductId !== 'ALL' && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-100 text-blue-900 font-semibold text-[11px] border border-blue-200 shadow-2xs">
+                  <Package className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Product: <strong>{products.find(p => String(p.product_id) === selectedProductId)?.brand}</strong></span>
+                </span>
+              )}
+              {searchQuery.trim() !== '' && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-200 text-slate-800 font-mono text-[11px]">
+                  Keyword: "{searchQuery}"
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] text-slate-600 font-medium">
+                Tracking <strong>{filteredLedger.length}</strong> product stock/price matrix records
+              </span>
+              <button
+                onClick={handleResetFilters}
+                className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-100/60 transition-colors cursor-pointer border border-rose-200"
+              >
+                Clear Filters
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Secondary Filter Row: Search & Reset */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
           <div className="relative w-full sm:max-w-md">
@@ -689,15 +804,9 @@ export const SuperadminCommercialLogs: React.FC = () => {
 
           <div className="flex items-center gap-2 self-end sm:self-auto">
             <span className="text-[11px] text-slate-400">
-              Active Scope: <strong className="text-slate-700">{selectedSupplierId === 'ALL' ? 'All Suppliers' : 'Filtered Supplier'}</strong> ·{' '}
-              <strong className="text-slate-700">{selectedOutletId === 'ALL' ? 'All Outlets' : 'Specific Outlet'}</strong>
+              Active Scope: <strong className="text-slate-700">{selectedSupplierId === 'ALL' ? 'All Suppliers' : getSupplierDisplayName(activeSupplier)}</strong> ·{' '}
+              <strong className="text-slate-700">{selectedOutletId === 'ALL' ? 'All Outlets' : (activeOutlet?.outlet_name || 'Specific Outlet')}</strong>
             </span>
-            <button
-              onClick={handleResetFilters}
-              className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200/60 transition-colors cursor-pointer"
-            >
-              Reset Filters
-            </button>
           </div>
         </div>
       </div>

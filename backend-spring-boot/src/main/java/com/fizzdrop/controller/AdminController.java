@@ -135,6 +135,7 @@ public class AdminController {
         for (SupplierProfile sp : allSuppliers) {
             Map<String, Object> sMap = new HashMap<>();
             sMap.put("supplier_id", sp.getId());
+            sMap.put("supplier_name", sp.getBusinessName());
             sMap.put("business_name", sp.getBusinessName());
             sMap.put("division_name", sp.getDivisionName());
             sMap.put("phone_number", sp.getPhoneNumber());
@@ -147,12 +148,34 @@ public class AdminController {
                     oSummary.put("outlet_name", o.getOutletName());
                     oSummary.put("location_address", o.getLocationAddress());
                     oSummary.put("city", o.getCity());
+                    oSummary.put("supplier_id", sp.getId());
+                    oSummary.put("supplier_name", sp.getBusinessName());
                     underOutlets.add(oSummary);
                 }
             }
             sMap.put("outlets", underOutlets);
             sMap.put("outlets_count", underOutlets.size());
+            sMap.put("outlet_count", underOutlets.size());
             supplierList.add(sMap);
+        }
+
+        // Build enriched outlets list with mapped supplier info
+        List<Map<String, Object>> enrichedOutlets = new ArrayList<>();
+        for (Outlet o : allOutlets) {
+            Map<String, Object> oMap = new HashMap<>();
+            oMap.put("outlet_id", o.getOutletId());
+            oMap.put("outlet_name", o.getOutletName());
+            oMap.put("franchise_name", o.getFranchiseName());
+            oMap.put("branch_name", o.getBranchName());
+            oMap.put("location_address", o.getLocationAddress());
+            oMap.put("city", o.getCity());
+            oMap.put("area", o.getArea());
+            oMap.put("district_id", o.getDistrictId());
+            oMap.put("contact_phone", o.getContactPhone());
+            oMap.put("status", o.getStatus());
+            oMap.put("supplier_id", outletToSupplierMap.get(o.getOutletId()));
+            oMap.put("supplier_name", outletToSupplierNameMap.get(o.getOutletId()));
+            enrichedOutlets.add(oMap);
         }
 
         // Filter targeted outlets
@@ -412,7 +435,7 @@ public class AdminController {
         Map<String, Object> response = new HashMap<>();
         response.put("summary", summary);
         response.put("suppliers", supplierList);
-        response.put("outlets", allOutlets);
+        response.put("outlets", enrichedOutlets);
         response.put("products", allProducts);
         response.put("outlet_product_ledger", outletProductLedger);
         response.put("outlet_sales_logs", outletSalesLogs);
