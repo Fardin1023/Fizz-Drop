@@ -32,6 +32,10 @@ public class SupplyRequest {
     @JsonAlias({"district_id", "districtId"})
     private Long districtId;
 
+    @JsonProperty("requisition_id")
+    @JsonAlias({"requisition_id", "requisitionId"})
+    private Long requisitionId;
+
     public SupplyRequest() {}
 
     public SupplyRequest(Long outletId, Long productId, Integer quantity, String mode) {
@@ -61,4 +65,7 @@ public class SupplyRequest {
 
     public Long getDistrictId() { return districtId; }
     public void setDistrictId(Long districtId) { this.districtId = districtId; }
+
+    public Long getRequisitionId() { return requisitionId; }
+    public void setRequisitionId(Long requisitionId) { this.requisitionId = requisitionId; }
 }

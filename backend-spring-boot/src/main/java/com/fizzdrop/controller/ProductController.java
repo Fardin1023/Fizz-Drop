@@ -20,6 +20,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.*;
 
 @RestController
@@ -188,6 +189,18 @@ public class ProductController {
     @PostMapping
     public ResponseEntity<?> createProduct(@RequestBody Product product) {
         try {
+            if (product.getBasePrice() == null && product.getSupplierPrice() != null) {
+                product.setBasePrice(product.getSupplierPrice());
+            }
+            if (product.getSupplierPrice() == null && product.getBasePrice() != null) {
+                product.setSupplierPrice(product.getBasePrice());
+            }
+            if (product.getOutletPrice() == null && product.getSupplierPrice() != null) {
+                product.setOutletPrice(product.getSupplierPrice().multiply(BigDecimal.valueOf(1.15)).setScale(2, java.math.RoundingMode.HALF_UP));
+            }
+            if (product.getRetailPrice() == null && product.getOutletPrice() != null) {
+                product.setRetailPrice(product.getOutletPrice().multiply(BigDecimal.valueOf(1.15)).setScale(2, java.math.RoundingMode.HALF_UP));
+            }
             Product saved = productRepository.save(product);
             List<Outlet> outlets = outletRepository.findAll();
 
@@ -242,6 +255,9 @@ public class ProductController {
             if (productUpdates.getSizeVolume() != null) existing.setSizeVolume(productUpdates.getSizeVolume());
             if (productUpdates.getSku() != null) existing.setSku(productUpdates.getSku());
             if (productUpdates.getBasePrice() != null) existing.setBasePrice(productUpdates.getBasePrice());
+            if (productUpdates.getSupplierPrice() != null) existing.setSupplierPrice(productUpdates.getSupplierPrice());
+            if (productUpdates.getOutletPrice() != null) existing.setOutletPrice(productUpdates.getOutletPrice());
+            if (productUpdates.getRetailPrice() != null) existing.setRetailPrice(productUpdates.getRetailPrice());
             if (productUpdates.getCategory() != null) existing.setCategory(productUpdates.getCategory());
             if (productUpdates.getImageUrl() != null) existing.setImageUrl(productUpdates.getImageUrl());
             if (productUpdates.getExpiryDate() != null) existing.setExpiryDate(productUpdates.getExpiryDate());

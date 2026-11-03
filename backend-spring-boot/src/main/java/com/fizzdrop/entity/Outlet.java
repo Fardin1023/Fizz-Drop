@@ -6,7 +6,7 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "Outlets")
+@Table(name = "outlets")
 public class Outlet {
 
     @Id
@@ -21,10 +21,30 @@ public class Outlet {
     @JsonAlias({"outlet_name", "outletName"})
     private String outletName;
 
+    @Column(name = "franchise_name", length = 100)
+    @JsonProperty("franchise_name")
+    @JsonAlias({"franchise_name", "franchiseName", "franchise"})
+    private String franchiseName;
+
+    @Column(name = "branch_name", length = 100)
+    @JsonProperty("branch_name")
+    @JsonAlias({"branch_name", "branchName", "branch"})
+    private String branchName;
+
     @Column(name = "location_address", nullable = false, length = 255)
     @JsonProperty("location_address")
     @JsonAlias({"location_address", "locationAddress", "address"})
     private String locationAddress;
+
+    @Column(name = "city", length = 100)
+    @JsonProperty("city")
+    @JsonAlias({"city"})
+    private String city;
+
+    @Column(name = "area", length = 255)
+    @JsonProperty("area")
+    @JsonAlias({"area", "areas"})
+    private String area;
 
     @Column(name = "district_id")
     @JsonProperty("district_id")
@@ -82,6 +102,12 @@ public class Outlet {
         this.status = status != null ? status : "Active";
     }
 
+    public Outlet(String outletName, String locationAddress, String contactPhone, String status, String city, String area) {
+        this(outletName, locationAddress, contactPhone, status);
+        this.city = city;
+        this.area = area;
+    }
+
     @PrePersist
     protected void onCreate() {
         if (createdDate == null) createdDate = LocalDateTime.now();
@@ -100,8 +126,20 @@ public class Outlet {
     public String getOutletName() { return outletName; }
     public void setOutletName(String outletName) { this.outletName = outletName; }
 
+    public String getFranchiseName() { return franchiseName; }
+    public void setFranchiseName(String franchiseName) { this.franchiseName = franchiseName; }
+
+    public String getBranchName() { return branchName; }
+    public void setBranchName(String branchName) { this.branchName = branchName; }
+
     public String getLocationAddress() { return locationAddress; }
     public void setLocationAddress(String locationAddress) { this.locationAddress = locationAddress; }
+
+    public String getCity() { return city; }
+    public void setCity(String city) { this.city = city; }
+
+    public String getArea() { return area; }
+    public void setArea(String area) { this.area = area; }
 
     public Long getDistrictId() { return districtId; }
     public void setDistrictId(Long districtId) { this.districtId = districtId; }

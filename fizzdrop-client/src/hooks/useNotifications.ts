@@ -3,7 +3,7 @@ import type { AppNotification, RealtimeEventPayload } from '../types/notificatio
 import { playNotificationChime } from '../utils/sound';
 
 export const useNotifications = (
-  role: 'SUPERADMIN' | 'SUPPLIER',
+  role: 'SUPERADMIN' | 'SUPPLIER' | 'OUTLET',
   userId?: number,
   enabled: boolean = true
 ) => {
@@ -162,7 +162,15 @@ export const useNotifications = (
 
         // If message is directed to our role
         if (payload.recipientRole === role) {
-          if (!payload.recipientUserId || !userId || payload.recipientUserId === userId) {
+          const matchesTarget =
+            !payload.recipientUserId ||
+            !userId ||
+            payload.recipientUserId === userId ||
+            payload.recipientUserId === userId + 1000 ||
+            payload.recipientUserId === userId - 1000 ||
+            payload.referenceId === userId;
+
+          if (matchesTarget) {
             // Immediate fetch from backend
             fetchNotifications();
 

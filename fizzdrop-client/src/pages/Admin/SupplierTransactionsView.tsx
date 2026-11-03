@@ -51,6 +51,8 @@ export const SupplierTransactionsView: React.FC = () => {
     total_spent: 0,
     total_refunded: 0,
     net_investment: 0,
+    total_revenue: 0,
+    total_wholesale_profit: 0,
     pending_returns_count: 0,
     pending_returns_value: 0,
     transactions: [],
@@ -81,6 +83,8 @@ export const SupplierTransactionsView: React.FC = () => {
           total_spent: Number(dataTx.total_spent || 0),
           total_refunded: Number(dataTx.total_refunded || 0),
           net_investment: Number(dataTx.net_investment || 0),
+          total_revenue: Number(dataTx.total_revenue || 0),
+          total_wholesale_profit: Number(dataTx.total_wholesale_profit || 0),
           pending_returns_count: Number(dataTx.pending_returns_count || 0),
           pending_returns_value: Number(dataTx.pending_returns_value || 0),
           transactions: Array.isArray(dataTx.transactions) ? dataTx.transactions : [],
@@ -136,6 +140,8 @@ export const SupplierTransactionsView: React.FC = () => {
 
   const getTypeBadge = (type: string) => {
     switch (type) {
+      case 'OUTLET_SALE':
+        return <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">Wholesale Sale (Outlet)</span>;
       case 'STOCK_PURCHASE':
         return <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">Stock Purchase</span>;
       case 'SHORTFALL_REFUND':
@@ -353,7 +359,8 @@ export const SupplierTransactionsView: React.FC = () => {
                 className="px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 focus:ring-2 focus:ring-emerald-500 cursor-pointer"
               >
                 <option value="ALL">All Types</option>
-                <option value="STOCK_PURCHASE">Stock Purchases</option>
+                <option value="OUTLET_SALE">Wholesale Sales to Outlets (Tier 2)</option>
+                <option value="STOCK_PURCHASE">Stock Purchases from Superadmin (Tier 1)</option>
                 <option value="SHORTFALL_REFUND">Shortfall Refunds</option>
                 <option value="STOCK_RETURN_REFUND">Return Cash Refunds</option>
                 <option value="PRODUCT_EXCHANGE">Product Exchanges</option>

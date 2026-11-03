@@ -652,15 +652,22 @@ public class RequisitionProcessingService {
                 totalCases += ir.getRequestedQuantity();
 
                 Product p = productRepository.findById(ir.getProductId()).orElse(null);
-                if (p != null && p.getBasePrice() != null) {
-                    totalAmount = totalAmount.add(p.getBasePrice().multiply(java.math.BigDecimal.valueOf(ir.getRequestedQuantity())));
+                if (p != null) {
+                    java.math.BigDecimal rate = p.getSupplierPrice() != null ? p.getSupplierPrice() : p.getBasePrice();
+                    if (rate != null) {
+                        totalAmount = totalAmount.add(rate.multiply(java.math.BigDecimal.valueOf(ir.getRequestedQuantity())));
+                    }
                 }
             }
         }
 
         requisitionItemRepository.saveAll(items);
 
-        savedReq.setTotalAmount(totalAmount);
+        // Include 5% wholesale distribution VAT so totalAmount reflects final billing & matches invoice
+        java.math.BigDecimal vatMultiplier = java.math.BigDecimal.valueOf(1.05);
+        java.math.BigDecimal totalWithVat = totalAmount.multiply(vatMultiplier).setScale(2, java.math.RoundingMode.HALF_UP);
+
+        savedReq.setTotalAmount(totalWithVat);
         requisitionRepository.save(savedReq);
 
         savedReq.setItems(items);
@@ -851,7 +858,9 @@ public class RequisitionProcessingService {
 
         for (StockRequisitionItem item : items) {
             Product p = productRepository.findById(item.getProductId()).orElse(null);
-            java.math.BigDecimal price = (p != null && p.getBasePrice() != null) ? p.getBasePrice() : java.math.BigDecimal.valueOf(48.0);
+            java.math.BigDecimal price = (p != null && p.getSupplierPrice() != null)
+                    ? p.getSupplierPrice()
+                    : (p != null && p.getBasePrice() != null ? p.getBasePrice() : java.math.BigDecimal.valueOf(48.0));
             int reqQty = item.getRequestedQuantity() != null ? item.getRequestedQuantity() : 0;
             int appQty = item.getApprovedQuantity() != null ? item.getApprovedQuantity() : 0;
 
@@ -861,23 +870,39 @@ public class RequisitionProcessingService {
 
         java.math.BigDecimal vatMultiplier = java.math.BigDecimal.valueOf(1.05); // 5% wholesale distribution VAT
         java.math.BigDecimal originalTotalWithVat = originalSubtotal.multiply(vatMultiplier).setScale(2, java.math.RoundingMode.HALF_UP);
-        java.math.BigDecimal fulfilledTotalWithVat = fulfilledSubtotal.multiply(vatMultiplier).setScale(2, java.math.RoundingMode.HALF_UP);
 
         java.math.BigDecimal initialPaid = (req.getTotalAmount() != null && req.getTotalAmount().compareTo(java.math.BigDecimal.ZERO) > 0)
                 ? req.getTotalAmount()
                 : originalTotalWithVat;
-        req.setTotalAmount(initialPaid);
-        req.setFulfilledAmount(fulfilledTotalWithVat);
 
+        // If the initial totalAmount was recorded without VAT (raw subtotal), normalize it to originalTotalWithVat
+        if (initialPaid.compareTo(originalSubtotal.setScale(2, java.math.RoundingMode.HALF_UP)) == 0) {
+            initialPaid = originalTotalWithVat;
+        }
+
+        java.math.BigDecimal fulfilledTotalWithVat;
         java.math.BigDecimal leftoverRefund = java.math.BigDecimal.ZERO;
         java.math.BigDecimal remainingDue = java.math.BigDecimal.ZERO;
 
-        if (fulfilledTotalWithVat.compareTo(initialPaid) < 0) {
-            leftoverRefund = initialPaid.subtract(fulfilledTotalWithVat);
-        } else if (fulfilledTotalWithVat.compareTo(initialPaid) > 0) {
-            remainingDue = fulfilledTotalWithVat.subtract(initialPaid);
+        if (totalApproved == totalRequested) {
+            // Exact fulfillment: delivered value matches initial authorized billing exactly. No additional fee!
+            fulfilledTotalWithVat = initialPaid;
+            leftoverRefund = java.math.BigDecimal.ZERO;
+            remainingDue = java.math.BigDecimal.ZERO;
+        } else if (totalApproved < totalRequested) {
+            fulfilledTotalWithVat = fulfilledSubtotal.multiply(vatMultiplier).setScale(2, java.math.RoundingMode.HALF_UP);
+            if (fulfilledTotalWithVat.compareTo(initialPaid) < 0) {
+                leftoverRefund = initialPaid.subtract(fulfilledTotalWithVat).max(java.math.BigDecimal.ZERO);
+            }
+        } else {
+            fulfilledTotalWithVat = fulfilledSubtotal.multiply(vatMultiplier).setScale(2, java.math.RoundingMode.HALF_UP);
+            if (fulfilledTotalWithVat.compareTo(initialPaid) > 0) {
+                remainingDue = fulfilledTotalWithVat.subtract(initialPaid);
+            }
         }
 
+        req.setTotalAmount(initialPaid);
+        req.setFulfilledAmount(fulfilledTotalWithVat);
         req.setRefundAmount(leftoverRefund);
         req.setDueAmount(remainingDue);
 
@@ -1163,9 +1188,10 @@ public class RequisitionProcessingService {
                 i.setPackaging(p.getPackaging());
                 i.setSizeVolume(p.getSizeVolume());
                 i.setSku(p.getSku());
-                i.setBasePrice(p.getBasePrice());
+                java.math.BigDecimal supplierRate = p.getSupplierPrice() != null ? p.getSupplierPrice() : p.getBasePrice();
+                i.setBasePrice(supplierRate);
 
-                java.math.BigDecimal price = p.getBasePrice() != null ? p.getBasePrice() : java.math.BigDecimal.valueOf(48.0);
+                java.math.BigDecimal price = supplierRate != null ? supplierRate : java.math.BigDecimal.valueOf(48.0);
                 originalSubtotal = originalSubtotal.add(price.multiply(java.math.BigDecimal.valueOf(rQty)));
                 fulfilledSubtotal = fulfilledSubtotal.add(price.multiply(java.math.BigDecimal.valueOf(aQty)));
             }
@@ -1605,16 +1631,35 @@ public class RequisitionProcessingService {
 
         java.math.BigDecimal totalSpent = java.math.BigDecimal.ZERO;
         java.math.BigDecimal totalRefunded = java.math.BigDecimal.ZERO;
+        java.math.BigDecimal totalRevenue = java.math.BigDecimal.ZERO;
+        java.math.BigDecimal totalWholesaleProfit = java.math.BigDecimal.ZERO;
 
         for (SupplierTransaction tx : txList) {
             if ("COMPLETED".equalsIgnoreCase(tx.getStatus())) {
                 if ("DEBIT".equalsIgnoreCase(tx.getEntryType())) {
                     totalSpent = totalSpent.add(tx.getAmount());
                 } else if ("CREDIT".equalsIgnoreCase(tx.getEntryType())) {
-                    totalRefunded = totalRefunded.add(tx.getAmount());
+                    if ("OUTLET_SALE".equalsIgnoreCase(tx.getType())) {
+                        totalRevenue = totalRevenue.add(tx.getAmount());
+                    } else {
+                        totalRefunded = totalRefunded.add(tx.getAmount());
+                    }
                 }
             }
         }
+
+        try {
+            Double p = jdbcTemplate.queryForObject(
+                "SELECT COALESCE(SUM((r.unit_price - COALESCE(p.supplier_price, p.base_price, 0)) * r.quantity), 0) " +
+                "FROM outlet_requisitions r " +
+                "JOIN products p ON r.product_id = p.product_id " +
+                "WHERE r.status = 'DISPATCHED'",
+                Double.class
+            );
+            if (p != null) {
+                totalWholesaleProfit = java.math.BigDecimal.valueOf(p).setScale(2, java.math.RoundingMode.HALF_UP);
+            }
+        } catch (Exception ignored) {}
 
         java.math.BigDecimal netInvestment = totalSpent.subtract(totalRefunded);
 
@@ -1631,6 +1676,8 @@ public class RequisitionProcessingService {
                 totalSpent,
                 totalRefunded,
                 netInvestment,
+                totalRevenue,
+                totalWholesaleProfit,
                 pendingReturnsCount,
                 pendingReturnsVal,
                 txList

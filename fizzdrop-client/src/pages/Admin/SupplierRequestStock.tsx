@@ -42,6 +42,9 @@ interface ProductCatalogItem {
   size_volume: string;
   sku: string;
   base_price: number | string;
+  supplier_price?: number | string;
+  outlet_price?: number | string;
+  retail_price?: number | string;
   category: string;
   expiry_date?: string;
   image_url?: string;
@@ -162,7 +165,7 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
   const totalCasesRequested = selectedEntries.reduce((sum, e) => sum + e.quantity, 0);
 
   const subtotal = selectedEntries.reduce(
-    (sum, e) => sum + (Number(e.product!.base_price || 48) * e.quantity),
+    (sum, e) => sum + (Number(e.product!.supplier_price || e.product!.base_price || 48) * e.quantity),
     0
   );
   const vatAmount = subtotal * 0.05;
@@ -415,12 +418,22 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
                       </h3>
 
                       <div className="flex items-center justify-between text-xs mt-1">
-                        <span className="font-oswald font-bold text-blue-700">
-                          ৳{Number(p.base_price || 0).toFixed(2)}
-                        </span>
-                        <span className="text-[10px] font-mono text-slate-400">
-                          {p.packaging} • {p.size_volume}
-                        </span>
+                        <div>
+                          <span className="font-oswald font-bold text-blue-700">
+                            ৳{Number(p.supplier_price || p.base_price || 0).toFixed(2)}
+                          </span>
+                          <span className="text-[9px] font-mono text-slate-500 block">
+                            Buy Rate (Tier 1)
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-oswald font-bold text-indigo-700">
+                            ৳{Number(p.outlet_price || (Number(p.base_price || 0) * 1.15)).toFixed(2)}
+                          </span>
+                          <span className="text-[9px] font-mono text-emerald-600 block">
+                            Sell Rate (Tier 2)
+                          </span>
+                        </div>
                       </div>
 
                       {/* Stock Telemetry Badges */}

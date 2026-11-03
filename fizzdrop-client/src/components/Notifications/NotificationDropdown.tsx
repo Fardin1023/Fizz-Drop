@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   XCircle,
   Truck,
+  PackageCheck,
   CheckCheck,
   Clock,
   Sparkles,
@@ -145,7 +146,8 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
               </div>
             ) : (
               notifications.map((n) => {
-                const isApproved = n.type === 'APPROVED';
+                const isDirectDispatch = n.type === 'DIRECT_DISPATCH' || n.type === 'DIRECT_SUPPLY';
+            const isApproved = n.type === 'APPROVED';
                 const isPartial = n.type === 'PARTIALLY_APPROVED';
                 const isRejected = n.type === 'REJECTED';
                 const isNewReq = n.type === 'NEW_REQUISITION';
@@ -167,7 +169,9 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
                     {/* Icon */}
                     <div
                       className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
-                        isApproved
+                        isDirectDispatch
+                          ? 'bg-purple-100 text-purple-700 border border-purple-200'
+                          : isApproved
                           ? 'bg-emerald-100 text-emerald-700'
                           : isRejected
                           ? 'bg-rose-100 text-rose-700'
@@ -178,7 +182,9 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
                           : 'bg-slate-100 text-slate-700'
                       }`}
                     >
-                      {isApproved ? (
+                      {isDirectDispatch ? (
+                        <PackageCheck className="w-4 h-4 text-purple-600" />
+                      ) : isApproved ? (
                         <CheckCircle2 className="w-4 h-4" />
                       ) : isRejected ? (
                         <XCircle className="w-4 h-4" />

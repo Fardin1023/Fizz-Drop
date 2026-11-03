@@ -13,6 +13,7 @@ import {
   FileText,
   Eye,
   Download,
+  Warehouse,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { parseAllocatedAreas } from '../../constants/cityAreas';
@@ -63,7 +64,11 @@ export interface SupplierProfileData {
   updated_at?: string;
 }
 
-export const SupplierProfileView: React.FC = () => {
+interface SupplierProfileViewProps {
+  onViewAllocatedOutlets?: () => void;
+}
+
+export const SupplierProfileView: React.FC<SupplierProfileViewProps> = ({ onViewAllocatedOutlets }) => {
   const { token, user } = useAuth();
   const [profile, setProfile] = useState<SupplierProfileData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -263,6 +268,21 @@ export const SupplierProfileView: React.FC = () => {
               </div>
               <p className="text-[11px] text-slate-500 mt-2.5">
                 • You are authorized to supply stock exclusively to franchise outlets situated within these allotted cities and municipal areas.
+              {onViewAllocatedOutlets && (
+                <span className="mt-3 pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 block">
+                  <span className="text-[11px] font-semibold text-slate-600">
+                    Explore active franchise outlets stationed in your territory:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={onViewAllocatedOutlets}
+                    className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1.5 self-start sm:self-auto"
+                  >
+                    <Warehouse className="w-3.5 h-3.5" />
+                    <span>View Allocated Outlets</span>
+                  </button>
+                </span>
+              )}
               </p>
             </div>
           </div>

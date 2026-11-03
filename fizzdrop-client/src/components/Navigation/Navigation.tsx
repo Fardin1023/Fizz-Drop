@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, ShoppingBag, Heart, MapPin, ChevronDown, Menu, X, ShieldCheck, Crown } from 'lucide-react';
-import fizzdropLogo from '../../assets/img/fizzdrop-logo.png';
+import { Search, ShoppingBag, Heart, MapPin, ChevronDown, Menu, X, ShieldCheck, Crown, Store } from 'lucide-react';
+import fizzdropLogo from '../../assets/img/fizzdrop-logo.jpg';
 
 export interface Outlet {
   branchId: number | string;
@@ -33,7 +33,7 @@ const Navigation: React.FC<NavigationProps> = ({
             <img
               src={fizzdropLogo}
               alt="FizzDrop Beverage Co."
-              className="h-16 sm:h-20 w-auto max-w-[220px] sm:max-w-[280px] object-contain rounded-2xl shadow-xs bg-white border border-slate-200/90 p-1.5 group-hover:shadow-md transition-all"
+              className="h-16 sm:h-20 w-auto max-w-[220px] sm:max-w-[280px] object-contain rounded-2xl bg-white shadow-xs border border-slate-200/60 group-hover:shadow-md transition-all"
             />
           </Link>
 
@@ -59,6 +59,15 @@ const Navigation: React.FC<NavigationProps> = ({
             >
               <ShieldCheck className="w-3.5 h-3.5" />
               <span>Supplier Portal</span>
+            </Link>
+
+            {/* Outlet Portal Link (Store POS & Stock) */}
+            <Link
+              to="/outlet"
+              className="px-2.5 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200/70 dark:border-emerald-800/70 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-xs"
+            >
+              <Store className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Outlet Portal</span>
             </Link>
 
             {/* Superadmin HUD Link (Outlets & Database) */}
@@ -188,6 +197,13 @@ const Navigation: React.FC<NavigationProps> = ({
             className="block text-sm font-medium text-zinc-800 dark:text-zinc-200 py-1"
           >
             Shop All Catalog
+          </Link>
+          <Link
+            to="/outlet"
+            onClick={() => setMobileMenuOpen(false)}
+            className="block text-sm font-bold text-emerald-600 dark:text-emerald-400 py-1"
+          >
+            🏪 Outlet Portal (Store POS & Stock)
           </Link>
           <Link
             to="/admin"

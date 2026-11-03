@@ -293,7 +293,7 @@ export const SuperadminRequisitionsHub: React.FC = () => {
     activeReconciliation.items.forEach((it) => {
       const isAllowed = allowStockOptions[it.id] ?? true;
       const appQty = isAllowed ? (approvedQuantities[it.id] ?? it.requested_quantity) : 0;
-      const price = Number(it.base_price || 48.0);
+      const price = Number(it.supplier_price || it.base_price || 0);
       totalReqCases += (it.requested_quantity || 0);
       totalAppCases += appQty;
       originalSubtotal += (it.requested_quantity || 0) * price;
@@ -301,10 +301,35 @@ export const SuperadminRequisitionsHub: React.FC = () => {
     });
 
     const vatMultiplier = 1.05;
-    const originalTotal = Number(activeReconciliation.total_amount || (originalSubtotal * vatMultiplier));
-    const fulfilledTotal = fulfilledSubtotal * vatMultiplier;
-    const refundAmount = Math.max(0, originalTotal - fulfilledTotal);
-    const dueAmount = Math.max(0, fulfilledTotal - originalTotal);
+    const originalTotalWithVat = Number((originalSubtotal * vatMultiplier).toFixed(2));
+    const recordedTotal = Number(activeReconciliation.total_amount || 0);
+
+    // Billed original total: prioritize recorded authorized total
+    const originalTotal = (recordedTotal > 0) ? recordedTotal : originalTotalWithVat;
+
+    let fulfilledTotal = originalTotal;
+    let refundAmount = 0;
+    let dueAmount = 0;
+
+    if (totalAppCases === totalReqCases) {
+      // Exact full fulfillment: delivered amount matches authorized billed amount. No extra fee!
+      fulfilledTotal = originalTotal;
+      refundAmount = 0;
+      dueAmount = 0;
+    } else if (totalAppCases < totalReqCases) {
+      // Shortfall / partial approval: calculate proportional delivery and leftover refund
+      const fraction = totalReqCases > 0 ? (totalAppCases / totalReqCases) : 0;
+      fulfilledTotal = Number((originalTotal * fraction).toFixed(2));
+      refundAmount = Math.max(0, Number((originalTotal - fulfilledTotal).toFixed(2)));
+      dueAmount = 0;
+    } else {
+      // Extra stock approved over requested: calculate extra balance due strictly for extra cases
+      const extraCases = totalAppCases - totalReqCases;
+      const unitRate = totalReqCases > 0 ? (originalTotal / totalReqCases) : (originalSubtotal * vatMultiplier / (totalReqCases || 1));
+      dueAmount = Math.max(0, Number((extraCases * unitRate).toFixed(2)));
+      fulfilledTotal = Number((originalTotal + dueAmount).toFixed(2));
+      refundAmount = 0;
+    }
 
     return { totalReqCases, totalAppCases, originalTotal, fulfilledTotal, refundAmount, dueAmount };
   }, [activeReconciliation, approvedQuantities, allowStockOptions]);

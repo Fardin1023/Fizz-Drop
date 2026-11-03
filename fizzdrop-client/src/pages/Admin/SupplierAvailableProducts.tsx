@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { SupplyStockModal, type OutletOption } from './SupplyStockModal';
+import { ZeroStockAlertModal, type ZeroStockAlertData } from '../../components/Alerts/ZeroStockAlertModal';
 
 interface AvailableProduct {
   product_id: number;
@@ -56,6 +57,10 @@ export const SupplierAvailableProducts: React.FC<SupplierAvailableProductsProps>
   // Supply Stock to Outlet Modal state
   const [isSupplyModalOpen, setIsSupplyModalOpen] = useState<boolean>(false);
   const [targetProduct, setTargetProduct] = useState<number | null>(null);
+
+  // Animated Zero-Stock Alert Modal state
+  const [isZeroStockAlertOpen, setIsZeroStockAlertOpen] = useState<boolean>(false);
+  const [zeroStockAlertData, setZeroStockAlertData] = useState<ZeroStockAlertData | null>(null);
 
   const fetchAvailableProducts = async () => {
     setLoading(true);
@@ -404,10 +409,23 @@ export const SupplierAvailableProducts: React.FC<SupplierAvailableProductsProps>
                       </td>
 
                       <td className="py-3 px-4">
-                        <span className="font-mono font-bold text-zinc-900 text-xs">
-                          ৳{Number(p.base_price).toFixed(2)}
-                        </span>
-                        <span className="text-[9px] text-slate-400 block font-mono">per case/unit</span>
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] uppercase font-bold text-slate-400">Buy:</span>
+                            <span className="font-mono font-bold text-zinc-900 text-xs">
+                              ৳{Number((p as any).supplier_price || p.base_price).toFixed(2)}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] uppercase font-bold text-indigo-500">Sell:</span>
+                            <span className="font-mono font-bold text-indigo-700 text-xs">
+                              ৳{Number((p as any).outlet_price || (Number(p.base_price) * 1.15)).toFixed(2)}
+                            </span>
+                          </div>
+                          <span className="text-[9px] font-mono font-bold text-emerald-600 block">
+                            +৳{(Number((p as any).outlet_price || (Number(p.base_price) * 1.15)) - Number((p as any).supplier_price || p.base_price)).toFixed(2)} margin
+                          </span>
+                        </div>
                       </td>
 
                       {/* Your Depot Stock (Supplier Holding) */}
@@ -486,6 +504,16 @@ export const SupplierAvailableProducts: React.FC<SupplierAvailableProductsProps>
                           <button
                             type="button"
                             onClick={() => {
+                              if (!hasSupplierStock) {
+                                setZeroStockAlertData({
+                                  productName: `${p.brand} ${p.flavor_variant}`,
+                                  productId: p.product_id,
+                                  category: p.category,
+                                  sku: p.sku,
+                                });
+                                setIsZeroStockAlertOpen(true);
+                                return;
+                              }
                               setTargetProduct(p.product_id);
                               setIsSupplyModalOpen(true);
                             }}
@@ -522,10 +550,19 @@ export const SupplierAvailableProducts: React.FC<SupplierAvailableProductsProps>
         isOpen={isSupplyModalOpen}
         onClose={() => setIsSupplyModalOpen(false)}
         onSupplied={fetchAvailableProducts}
+        onRequestStock={onRequestStock}
         products={products as any}
         outlets={outlets}
         initialProductId={targetProduct}
         userId={user?.user_id || 4}
+      />
+
+      {/* Immediate Animated Zero-Stock Alert Modal */}
+      <ZeroStockAlertModal
+        isOpen={isZeroStockAlertOpen}
+        onClose={() => setIsZeroStockAlertOpen(false)}
+        onRequestStock={onRequestStock}
+        data={zeroStockAlertData}
       />
     </div>
   );

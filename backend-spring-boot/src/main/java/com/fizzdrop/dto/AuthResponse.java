@@ -21,6 +21,9 @@ public class AuthResponse {
     @JsonProperty("branch_id")
     private Long branchId;
 
+    @JsonProperty("outlet")
+    private com.fizzdrop.entity.Outlet outlet;
+
     public AuthResponse() {}
 
     public AuthResponse(String token, Long userId, String email, Long roleId, String roleName, Long branchId) {
@@ -32,6 +35,14 @@ public class AuthResponse {
         this.role = roleName;
         this.branchId = branchId;
     }
+
+    public AuthResponse(String token, Long userId, String email, Long roleId, String roleName, Long branchId, com.fizzdrop.entity.Outlet outlet) {
+        this(token, userId, email, roleId, roleName, branchId);
+        this.outlet = outlet;
+    }
+
+    public com.fizzdrop.entity.Outlet getOutlet() { return outlet; }
+    public void setOutlet(com.fizzdrop.entity.Outlet outlet) { this.outlet = outlet; }
 
     public String getToken() { return token; }
     public void setToken(String token) { this.token = token; }

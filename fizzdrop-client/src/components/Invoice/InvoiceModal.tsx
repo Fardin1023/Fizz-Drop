@@ -105,22 +105,32 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ invoice, isOpen, onC
   });
 
   const originalVat = originalSubtotal * 0.05;
-  const originalGrandTotal = Number(invoice.total_amount || (originalSubtotal + originalVat));
+  const originalWithVat = Number((originalSubtotal + originalVat).toFixed(2));
+  const recordedTotal = Number(invoice.total_amount || 0);
+  const originalGrandTotal = (recordedTotal > 0 && Math.abs(recordedTotal - originalSubtotal) > 0.05)
+    ? recordedTotal
+    : originalWithVat;
 
   const fulfilledVat = fulfilledSubtotal * 0.05;
-  const fulfilledGrandTotal = Number(invoice.fulfilled_amount !== undefined ? invoice.fulfilled_amount : (fulfilledSubtotal + fulfilledVat));
+  const fulfilledGrandTotal = Number(invoice.fulfilled_amount !== undefined ? invoice.fulfilled_amount : Number((fulfilledSubtotal + fulfilledVat).toFixed(2)));
 
-  const refundAmount = Number(
-    invoice.refund_amount !== undefined
-      ? invoice.refund_amount
-      : Math.max(0, originalGrandTotal - fulfilledGrandTotal)
-  );
+  const totalReqCases = items.reduce((s, it) => s + (Number(it.requested_quantity) || 0), 0);
+  const totalAppCases = items.reduce((s, it) => s + (it.approved_quantity !== undefined ? Number(it.approved_quantity) : (isPreview ? Number(it.requested_quantity || 0) : Number(it.approved_quantity || 0))), 0);
 
-  const dueAmount = Number(
-    invoice.due_amount !== undefined
-      ? invoice.due_amount
-      : Math.max(0, fulfilledGrandTotal - originalGrandTotal)
-  );
+  let refundAmount = 0;
+  let dueAmount = 0;
+
+  if (invoice.due_amount !== undefined && Number(invoice.due_amount) > 0 && totalAppCases > totalReqCases) {
+    dueAmount = Number(invoice.due_amount);
+  } else if (totalAppCases > totalReqCases && fulfilledGrandTotal > originalGrandTotal) {
+    dueAmount = Math.max(0, Number((fulfilledGrandTotal - originalGrandTotal).toFixed(2)));
+  }
+
+  if (invoice.refund_amount !== undefined && Number(invoice.refund_amount) > 0) {
+    refundAmount = Number(invoice.refund_amount);
+  } else if (totalAppCases < totalReqCases && originalGrandTotal > fulfilledGrandTotal) {
+    refundAmount = Math.max(0, Number((originalGrandTotal - fulfilledGrandTotal).toFixed(2)));
+  }
 
   const handlePayRemainingDue = async () => {
     if (!invoice.id) return;

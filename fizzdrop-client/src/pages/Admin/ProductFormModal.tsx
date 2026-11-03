@@ -7,6 +7,7 @@ import {
   ImageIcon,
   Calendar,
   Layers,
+  Coins,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -72,7 +73,21 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [packaging, setPackaging] = useState('Can');
   const [sizeVolume, setSizeVolume] = useState('250ml');
   const [basePrice, setBasePrice] = useState<string>('');
+  const [supplierPrice, setSupplierPrice] = useState<string>('');
+  const [outletPrice, setOutletPrice] = useState<string>('');
+  const [retailPrice, setRetailPrice] = useState<string>('');
   const [sku, setSku] = useState('');
+
+  const handleBasePriceChange = (val: string) => {
+    setBasePrice(val);
+    const num = parseFloat(val);
+    if (!isNaN(num) && num > 0) {
+      setSupplierPrice(val);
+      const outP = (num * 1.15).toFixed(2);
+      setOutletPrice(outP);
+      setRetailPrice((parseFloat(outP) * 1.15).toFixed(2));
+    }
+  };
   const [centralStock, setCentralStock] = useState<string>('1500');
 
   const defaultExpiry = () => {
@@ -173,6 +188,12 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           sku,
           base_price: priceNum,
           basePrice: priceNum,
+          supplier_price: parseFloat(supplierPrice) || priceNum,
+          supplierPrice: parseFloat(supplierPrice) || priceNum,
+          outlet_price: parseFloat(outletPrice) || Number((priceNum * 1.15).toFixed(2)),
+          outletPrice: parseFloat(outletPrice) || Number((priceNum * 1.15).toFixed(2)),
+          retail_price: parseFloat(retailPrice) || Number((priceNum * 1.32).toFixed(2)),
+          retailPrice: parseFloat(retailPrice) || Number((priceNum * 1.32).toFixed(2)),
           category,
           expiry_date: expiryDate,
           expiryDate: expiryDate,
@@ -352,32 +373,102 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             </div>
           </div>
 
-          {/* Price & SKU */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1.5">
-                Base Price (BDT ৳) *
-              </label>
-              <div className="relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-sm">৳</span>
-                <input
-                  type="number"
-                  step="0.50"
-                  min="1"
-                  value={basePrice}
-                  onChange={(e) => setBasePrice(e.target.value)}
-                  required
-                  placeholder="45.00"
-                  className="w-full pl-8 pr-4 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
-                />
-              </div>
+          {/* 3-Tier Multi-Echelon Transaction Pricing */}
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-50/70 via-indigo-50/50 to-purple-50/50 dark:bg-zinc-800/40 border border-blue-200 dark:border-zinc-700 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-indigo-950 dark:text-indigo-300 flex items-center gap-1.5">
+                <Coins className="w-4 h-4 text-indigo-600" />
+                3-Tier Multi-Level Pricing Structure (Superadmin ➔ Supplier ➔ Outlet ➔ Customer)
+              </span>
+              <span className="text-[10px] font-mono font-bold text-indigo-600 bg-white dark:bg-zinc-900 px-2 py-0.5 rounded-full border border-indigo-200 shadow-xs">
+                Auto-Margin Derivation
+              </span>
             </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
-                  SKU *
-                </label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Tier 1: Superadmin -> Supplier */}
+              <div className="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-blue-100 dark:border-zinc-800 shadow-xs">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 block mb-1">
+                  Tier 1: Supplier Buy Rate
+                </span>
+                <span className="text-[9px] text-zinc-400 block mb-1.5">Supplier purchase from Superadmin</span>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-xs">৳</span>
+                  <input
+                    type="number"
+                    step="0.50"
+                    min="1"
+                    value={basePrice}
+                    onChange={(e) => handleBasePriceChange(e.target.value)}
+                    required
+                    placeholder="30.00"
+                    className="w-full pl-7 pr-3 py-2 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-bold font-mono text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                  />
+                </div>
+              </div>
+
+              {/* Tier 2: Supplier -> Outlet */}
+              <div className="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-indigo-100 dark:border-zinc-800 shadow-xs">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 block">
+                    Tier 2: Outlet Rate
+                  </span>
+                  {parseFloat(outletPrice) > parseFloat(basePrice) && (
+                    <span className="text-[9px] font-mono font-bold text-emerald-600">
+                      +৳{(parseFloat(outletPrice) - parseFloat(basePrice)).toFixed(2)} / unit
+                    </span>
+                  )}
+                </div>
+                <span className="text-[9px] text-zinc-400 block mb-1.5">Wholesale sell to franchise outlets</span>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-xs">৳</span>
+                  <input
+                    type="number"
+                    step="0.50"
+                    min="1"
+                    value={outletPrice}
+                    onChange={(e) => setOutletPrice(e.target.value)}
+                    placeholder="35.00"
+                    className="w-full pl-7 pr-3 py-2 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-bold font-mono text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                  />
+                </div>
+              </div>
+
+              {/* Tier 3: Outlet -> Retail Customer */}
+              <div className="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-purple-100 dark:border-zinc-800 shadow-xs">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700 block">
+                    Tier 3: Retail MRP
+                  </span>
+                  {parseFloat(retailPrice) > parseFloat(outletPrice) && (
+                    <span className="text-[9px] font-mono font-bold text-emerald-600">
+                      +৳{(parseFloat(retailPrice) - parseFloat(outletPrice)).toFixed(2)} / unit
+                    </span>
+                  )}
+                </div>
+                <span className="text-[9px] text-zinc-400 block mb-1.5">End-customer counter price</span>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-xs">৳</span>
+                  <input
+                    type="number"
+                    step="0.50"
+                    min="1"
+                    value={retailPrice}
+                    onChange={(e) => setRetailPrice(e.target.value)}
+                    placeholder="40.00"
+                    className="w-full pl-7 pr-3 py-2 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-bold font-mono text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-purple-500/40"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* SKU */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
+                SKU *
+              </label>
                 <button
                   type="button"
                   onClick={() => {
@@ -401,7 +492,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 placeholder="PEP-ZER-CAN-250"
                 className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm font-mono text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
               />
-            </div>
           </div>
 
           {/* Superadmin Central Fixed Stock Pool */}

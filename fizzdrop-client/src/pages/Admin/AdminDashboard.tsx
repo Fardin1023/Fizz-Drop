@@ -6,6 +6,8 @@ import { SupplierRequestStock } from './SupplierRequestStock';
 import { SupplierRequisitionHistory } from './SupplierRequisitionHistory';
 import { SupplierProfileView } from './SupplierProfileView';
 import { SupplierTransactionsView } from './SupplierTransactionsView';
+import { SupplierAllocatedOutlets } from './SupplierAllocatedOutlets';
+import { SupplierOutletRequisitions } from './SupplierOutletRequisitions';
 import {
   Package,
   LogOut,
@@ -18,6 +20,8 @@ import {
   Sparkles,
   ShieldCheck,
   Receipt,
+  Warehouse,
+  Store,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useNotifications } from '../../hooks/useNotifications';
@@ -26,7 +30,7 @@ import { NotificationPopup } from '../../components/Notifications/NotificationPo
 
 export const AdminDashboard: React.FC = () => {
   const { user, isSupplier, isSuperadmin, isAuthenticated, logout, isLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<'catalog' | 'request' | 'history' | 'profile' | 'transactions'>('catalog');
+  const [activeTab, setActiveTab] = useState<'catalog' | 'outlet-requests' | 'request' | 'history' | 'outlets' | 'profile' | 'transactions'>('catalog');
   const [selectedProductId, setSelectedProductId] = useState<number | undefined>(undefined);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
@@ -65,6 +69,16 @@ export const AdminDashboard: React.FC = () => {
       badge: 'Catalog',
     },
     {
+      id: 'outlet-requests' as const,
+      label: 'Outlet Stock Requisitions',
+      shortLabel: 'Outlet Orders',
+      desc: 'Branch restock orders & depot dispatches',
+      icon: Store,
+      gradient: 'from-emerald-600 via-teal-600 to-cyan-600',
+      badge: 'Outlet Orders',
+      badgeHighlight: notifications.some((n) => n.type === 'NEW_REQUISITION' && !n.is_read),
+    },
+    {
       id: 'request' as const,
       label: 'Request Stock Requisition',
       shortLabel: 'Request Stock',
@@ -82,6 +96,15 @@ export const AdminDashboard: React.FC = () => {
       gradient: 'from-cyan-600 via-teal-600 to-blue-600',
       badge: unreadCount > 0 ? `${unreadCount} NEW` : 'Tracking',
       badgeHighlight: unreadCount > 0,
+    },
+    {
+      id: 'outlets' as const,
+      label: 'Allocated Franchise Outlets',
+      shortLabel: 'Allocated Outlets',
+      desc: 'Physical hubs within your assigned zones',
+      icon: Warehouse,
+      gradient: 'from-amber-600 via-orange-600 to-red-600',
+      badge: 'Territory',
     },
     {
       id: 'profile' as const,
@@ -309,6 +332,15 @@ export const AdminDashboard: React.FC = () => {
               }}
             />
           )}
+          {activeTab === 'outlet-requests' && (
+            <SupplierOutletRequisitions
+              userId={user?.user_id || 4}
+              onRequestRestockFromSuperadmin={(prodId) => {
+                setSelectedProductId(prodId);
+                setActiveTab('request');
+              }}
+            />
+          )}
           {activeTab === 'request' && (
             <SupplierRequestStock
               initialProductId={selectedProductId}
@@ -322,7 +354,17 @@ export const AdminDashboard: React.FC = () => {
           {activeTab === 'history' && (
             <SupplierRequisitionHistory onNewRequisitionClick={() => setActiveTab('request')} />
           )}
-          {activeTab === 'profile' && <SupplierProfileView />}
+          {activeTab === 'outlets' && (
+            <SupplierAllocatedOutlets
+              onNavigateToCatalog={() => setActiveTab('catalog')}
+              onRequestStock={(prodId) => {
+                setSelectedProductId(prodId);
+                setActiveTab('request');
+              }}
+            />
+
+          )}
+          {activeTab === 'profile' && <SupplierProfileView onViewAllocatedOutlets={() => setActiveTab('outlets')} />}
           {activeTab === 'transactions' && <SupplierTransactionsView />}
         </main>
       </div>

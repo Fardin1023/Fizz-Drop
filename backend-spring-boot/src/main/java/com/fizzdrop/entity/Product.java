@@ -8,7 +8,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "Products")
+@Table(name = "products")
 public class Product {
 
     @Id
@@ -44,6 +44,21 @@ public class Product {
     @JsonProperty("base_price")
     @JsonAlias({"base_price", "basePrice"})
     private BigDecimal basePrice;
+
+    @Column(name = "supplier_price", precision = 10, scale = 2)
+    @JsonProperty("supplier_price")
+    @JsonAlias({"supplier_price", "supplierPrice"})
+    private BigDecimal supplierPrice;
+
+    @Column(name = "outlet_price", precision = 10, scale = 2)
+    @JsonProperty("outlet_price")
+    @JsonAlias({"outlet_price", "outletPrice"})
+    private BigDecimal outletPrice;
+
+    @Column(name = "retail_price", precision = 10, scale = 2)
+    @JsonProperty("retail_price")
+    @JsonAlias({"retail_price", "retailPrice"})
+    private BigDecimal retailPrice;
 
     @Column(name = "category", nullable = false, length = 50)
     @JsonProperty("category")
@@ -165,6 +180,31 @@ public class Product {
 
     public BigDecimal getBasePrice() { return basePrice; }
     public void setBasePrice(BigDecimal basePrice) { this.basePrice = basePrice; }
+
+    public BigDecimal getSupplierPrice() {
+        return supplierPrice != null ? supplierPrice : basePrice;
+    }
+    public void setSupplierPrice(BigDecimal supplierPrice) {
+        this.supplierPrice = supplierPrice;
+    }
+
+    public BigDecimal getOutletPrice() {
+        if (outletPrice != null) return outletPrice;
+        BigDecimal base = getSupplierPrice();
+        return base != null ? base.multiply(BigDecimal.valueOf(1.15)).setScale(2, java.math.RoundingMode.HALF_UP) : null;
+    }
+    public void setOutletPrice(BigDecimal outletPrice) {
+        this.outletPrice = outletPrice;
+    }
+
+    public BigDecimal getRetailPrice() {
+        if (retailPrice != null) return retailPrice;
+        BigDecimal out = getOutletPrice();
+        return out != null ? out.multiply(BigDecimal.valueOf(1.15)).setScale(2, java.math.RoundingMode.HALF_UP) : (basePrice != null ? basePrice.multiply(BigDecimal.valueOf(1.30)).setScale(2, java.math.RoundingMode.HALF_UP) : null);
+    }
+    public void setRetailPrice(BigDecimal retailPrice) {
+        this.retailPrice = retailPrice;
+    }
 
     public String getCategory() { return category; }
     public void setCategory(String category) { this.category = category; }

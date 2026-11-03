@@ -16,6 +16,12 @@ public class SupplierFinancialSummaryDTO {
     @JsonProperty("net_investment")
     private BigDecimal netInvestment = BigDecimal.ZERO;
 
+    @JsonProperty("total_revenue")
+    private BigDecimal totalRevenue = BigDecimal.ZERO;
+
+    @JsonProperty("total_wholesale_profit")
+    private BigDecimal totalWholesaleProfit = BigDecimal.ZERO;
+
     @JsonProperty("pending_returns_count")
     private long pendingReturnsCount = 0;
 
@@ -36,6 +42,17 @@ public class SupplierFinancialSummaryDTO {
         this.transactions = transactions;
     }
 
+    public SupplierFinancialSummaryDTO(BigDecimal totalSpent, BigDecimal totalRefunded, BigDecimal netInvestment, BigDecimal totalRevenue, BigDecimal totalWholesaleProfit, long pendingReturnsCount, BigDecimal pendingReturnsValue, List<SupplierTransaction> transactions) {
+        this.totalSpent = totalSpent;
+        this.totalRefunded = totalRefunded;
+        this.netInvestment = netInvestment;
+        this.totalRevenue = totalRevenue;
+        this.totalWholesaleProfit = totalWholesaleProfit;
+        this.pendingReturnsCount = pendingReturnsCount;
+        this.pendingReturnsValue = pendingReturnsValue;
+        this.transactions = transactions;
+    }
+
     public BigDecimal getTotalSpent() { return totalSpent; }
     public void setTotalSpent(BigDecimal totalSpent) { this.totalSpent = totalSpent; }
 
@@ -44,6 +61,12 @@ public class SupplierFinancialSummaryDTO {
 
     public BigDecimal getNetInvestment() { return netInvestment; }
     public void setNetInvestment(BigDecimal netInvestment) { this.netInvestment = netInvestment; }
+
+    public BigDecimal getTotalRevenue() { return totalRevenue; }
+    public void setTotalRevenue(BigDecimal totalRevenue) { this.totalRevenue = totalRevenue; }
+
+    public BigDecimal getTotalWholesaleProfit() { return totalWholesaleProfit; }
+    public void setTotalWholesaleProfit(BigDecimal totalWholesaleProfit) { this.totalWholesaleProfit = totalWholesaleProfit; }
 
     public long getPendingReturnsCount() { return pendingReturnsCount; }
     public void setPendingReturnsCount(long pendingReturnsCount) { this.pendingReturnsCount = pendingReturnsCount; }

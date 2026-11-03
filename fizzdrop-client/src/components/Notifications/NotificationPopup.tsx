@@ -8,12 +8,14 @@ import {
   ExternalLink,
   X,
   Sparkles,
+  PackageCheck,
 } from 'lucide-react';
 import type { AppNotification } from '../../types/notification';
 
 interface NotificationPopupProps {
   notification: AppNotification | null;
-  onDismiss: () => void;
+  onDismiss?: () => void;
+  onClose?: () => void;
   onAction?: (notification: AppNotification) => void;
   autoDismissMs?: number;
 }
@@ -21,9 +23,11 @@ interface NotificationPopupProps {
 export const NotificationPopup: React.FC<NotificationPopupProps> = ({
   notification,
   onDismiss,
+  onClose,
   onAction,
   autoDismissMs = 8000,
 }) => {
+  const handleClose = onDismiss || onClose || (() => {});
   const [progress, setProgress] = useState(100);
   const [isPaused, setIsPaused] = useState(false);
 
@@ -40,7 +44,7 @@ export const NotificationPopup: React.FC<NotificationPopupProps> = ({
 
       if (remaining <= 0) {
         clearInterval(interval);
-        onDismiss();
+        handleClose();
       }
     }, 50);
 
@@ -50,6 +54,7 @@ export const NotificationPopup: React.FC<NotificationPopupProps> = ({
   if (!notification) return null;
 
   const isSuperadminRecipient = notification.recipient_role === 'SUPERADMIN';
+  const isDirectDispatch = notification.type === 'DIRECT_DISPATCH' || notification.type === 'DIRECT_SUPPLY';
   const isApproved = notification.type === 'APPROVED';
   const isPartial = notification.type === 'PARTIALLY_APPROVED';
   const isRejected = notification.type === 'REJECTED';
@@ -93,7 +98,9 @@ export const NotificationPopup: React.FC<NotificationPopupProps> = ({
           <div className="flex items-center gap-2.5">
             <div
               className={`w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 shadow-sm ${
-                isApproved
+                isDirectDispatch
+                  ? 'bg-purple-50 text-purple-600 border border-purple-200'
+                  : isApproved
                   ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
                   : isRejected
                   ? 'bg-rose-50 text-rose-600 border border-rose-200'
@@ -102,7 +109,9 @@ export const NotificationPopup: React.FC<NotificationPopupProps> = ({
                   : 'bg-blue-50 text-blue-600 border border-blue-200'
               }`}
             >
-              {isApproved ? (
+              {isDirectDispatch ? (
+                <PackageCheck className="w-5 h-5 text-purple-600" />
+              ) : isApproved ? (
                 <CheckCircle2 className="w-5 h-5 text-emerald-600" />
               ) : isRejected ? (
                 <XCircle className="w-5 h-5 text-rose-600" />
@@ -119,7 +128,9 @@ export const NotificationPopup: React.FC<NotificationPopupProps> = ({
               <div className="flex items-center gap-1.5 flex-wrap">
                 <span
                   className={`px-2 py-0.5 rounded-full text-[9px] font-mono font-bold tracking-wider uppercase inline-flex items-center gap-1 ${
-                    isApproved
+                    isDirectDispatch
+                      ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                      : isApproved
                       ? 'bg-emerald-100 text-emerald-800'
                       : isRejected
                       ? 'bg-rose-100 text-rose-800'
@@ -129,7 +140,9 @@ export const NotificationPopup: React.FC<NotificationPopupProps> = ({
                   }`}
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-current animate-ping" />
-                  {isApproved
+                  {isDirectDispatch
+                    ? 'DIRECT SHIPMENT (UNREQUESTED)'
+                    : isApproved
                     ? 'STOCK PERMITTED'
                     : isRejected
                     ? 'STOCK DISALLOWED'
@@ -150,7 +163,7 @@ export const NotificationPopup: React.FC<NotificationPopupProps> = ({
 
           <button
             type="button"
-            onClick={onDismiss}
+            onClick={handleClose}
             className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
             title="Dismiss notification"
           >
@@ -180,7 +193,7 @@ export const NotificationPopup: React.FC<NotificationPopupProps> = ({
             type="button"
             onClick={() => {
               if (onAction) onAction(notification);
-              onDismiss();
+              handleClose();
             }}
             className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-blue-500/20 hover:opacity-95 active:scale-95 transition-all cursor-pointer"
           >

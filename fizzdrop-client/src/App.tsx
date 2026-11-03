@@ -5,6 +5,8 @@ import HomePage from './pages/HomePage';
 import ProductListPage from './pages/ProductListPage/ProductListPage';
 import AdminDashboard from './pages/Admin/AdminDashboard';
 import SuperadminDashboard from './pages/Superadmin/SuperadminDashboard';
+import { OutletDashboard } from './pages/Outlet/OutletDashboard';
+import { OutletAuth } from './pages/Outlet/OutletAuth';
 import { AuthProvider } from './context/AuthContext';
 
 function App() {
@@ -13,9 +15,11 @@ function App() {
   const [outlets, setOutlets] = useState<{ branchId: string | number; branchName: string }[]>([]);
   const location = useLocation();
 
-  // Hide the customer navigation bar on Admin and Superadmin portals
+  // Hide the customer navigation bar on Admin, Superadmin and Outlet portals
   const isAdminOrSuperadmin =
-    location.pathname.startsWith('/admin') || location.pathname.startsWith('/superadmin');
+    location.pathname.startsWith('/admin') ||
+    location.pathname.startsWith('/superadmin') ||
+    location.pathname.startsWith('/outlet');
 
   useEffect(() => {
     const fetchOutlets = async () => {
@@ -100,6 +104,18 @@ function App() {
             <Route
               path="/superadmin/*"
               element={<SuperadminDashboard />}
+            />
+            <Route
+              path="/outlet"
+              element={<OutletDashboard />}
+            />
+            <Route
+              path="/outlet/login"
+              element={<OutletAuth />}
+            />
+            <Route
+              path="/outlet/*"
+              element={<OutletDashboard />}
             />
           </Routes>
         </main>
