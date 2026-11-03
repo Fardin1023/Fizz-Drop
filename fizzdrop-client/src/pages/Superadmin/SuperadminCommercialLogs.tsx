@@ -71,52 +71,67 @@ interface OutletProductLedgerRow {
 }
 
 interface SupplierTxnRow {
-  transaction_id: number;
-  supplier_id: number;
-  supplier_name: string;
-  transaction_type: string;
-  reference_code: string;
-  amount: number;
-  quantity: number;
-  unit_price: number;
-  profit_amount: number;
-  balance_after: number;
-  transaction_date: string;
-  description: string;
+  transaction_id?: number;
+  id?: number;
+  supplier_id?: number;
+  supplier_name?: string;
+  transaction_type?: string;
+  type?: string;
+  reference_code?: string;
+  amount?: number;
+  quantity?: number;
+  unit_price?: number;
+  profit_amount?: number;
+  supplier_profit_earned?: number;
+  balance_after?: number;
+  transaction_date?: string;
+  created_at?: string;
+  description?: string;
 }
 
 interface OutletSalesReceiptRow {
-  sale_id: number;
-  order_code: string;
-  outlet_id: number;
-  outlet_name: string;
-  product_id: number;
-  brand: string;
-  flavor_variant: string;
-  customer_note: string;
-  quantity: number;
-  unit_price: number;
-  total_amount: number;
-  estimated_outlet_profit: number;
-  sale_date: string;
+  sale_id?: number;
+  id?: number;
+  order_code?: string;
+  sale_code?: string;
+  outlet_id?: number;
+  outlet_name?: string;
+  product_id?: number;
+  product_name?: string;
+  brand?: string;
+  flavor_variant?: string;
+  customer_note?: string;
+  customer_notes?: string;
+  quantity?: number;
+  unit_price?: number;
+  total_amount?: number;
+  estimated_outlet_profit?: number;
+  outlet_margin_earned?: number;
+  sale_date?: string;
+  payment_method?: string;
 }
 
 interface RequisitionRow {
-  requisition_id: number;
-  requisition_code: string;
-  outlet_id: number;
-  outlet_name: string;
-  supplier_id: number;
-  supplier_name: string;
-  product_id: number;
-  brand: string;
-  flavor_variant: string;
-  requested_quantity: number;
-  urgency: string;
-  remarks: string;
-  status: string;
-  created_at: string;
-  dispatched_at: string;
+  requisition_id?: number;
+  id?: number;
+  requisition_code?: string;
+  outlet_id?: number;
+  outlet_name?: string;
+  supplier_id?: number;
+  supplier_name?: string;
+  product_id?: number;
+  product_name?: string;
+  brand?: string;
+  flavor_variant?: string;
+  requested_quantity?: number;
+  quantity?: number;
+  urgency?: string;
+  remarks?: string;
+  outlet_remarks?: string;
+  status?: string;
+  created_at?: string;
+  created_date?: string;
+  dispatched_at?: string;
 }
 
 interface OutletItemUnderSupplier {
@@ -158,6 +173,13 @@ interface ProductOption {
   outlet_price: number;
   supplier_price: number;
 }
+
+// Robust currency and number formatting helper that never throws on undefined/null
+export const formatMoney = (val: any): string => {
+  if (val === null || val === undefined) return '0.00';
+  const num = typeof val === 'number' ? val : parseFloat(String(val));
+  return isNaN(num) ? '0.00' : num.toFixed(2);
+};
 
 export const SuperadminCommercialLogs: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
@@ -336,11 +358,15 @@ export const SuperadminCommercialLogs: React.FC = () => {
     return supplierTxns.filter((txn) => {
       if (searchQuery.trim() === '') return true;
       const query = searchQuery.toLowerCase();
+      const name = (txn.supplier_name || '').toLowerCase();
+      const ref = (txn.reference_code || '').toLowerCase();
+      const desc = (txn.description || '').toLowerCase();
+      const type = (txn.transaction_type || txn.type || '').toLowerCase();
       return (
-        txn.supplier_name.toLowerCase().includes(query) ||
-        (txn.reference_code && txn.reference_code.toLowerCase().includes(query)) ||
-        (txn.description && txn.description.toLowerCase().includes(query)) ||
-        txn.transaction_type.toLowerCase().includes(query)
+        name.includes(query) ||
+        ref.includes(query) ||
+        desc.includes(query) ||
+        type.includes(query)
       );
     });
   }, [supplierTxns, searchQuery]);
@@ -350,12 +376,15 @@ export const SuperadminCommercialLogs: React.FC = () => {
     return salesLogs.filter((sale) => {
       if (searchQuery.trim() === '') return true;
       const query = searchQuery.toLowerCase();
+      const code = (sale.sale_code || sale.order_code || '').toLowerCase();
+      const outlet = (sale.outlet_name || '').toLowerCase();
+      const prod = (sale.product_name || sale.brand || '').toLowerCase();
+      const note = (sale.customer_notes || sale.customer_note || '').toLowerCase();
       return (
-        sale.order_code.toLowerCase().includes(query) ||
-        sale.outlet_name.toLowerCase().includes(query) ||
-        sale.brand.toLowerCase().includes(query) ||
-        sale.flavor_variant.toLowerCase().includes(query) ||
-        (sale.customer_note && sale.customer_note.toLowerCase().includes(query))
+        code.includes(query) ||
+        outlet.includes(query) ||
+        prod.includes(query) ||
+        note.includes(query)
       );
     });
   }, [salesLogs, searchQuery]);
@@ -365,12 +394,17 @@ export const SuperadminCommercialLogs: React.FC = () => {
     return requisitions.filter((req) => {
       if (searchQuery.trim() === '') return true;
       const query = searchQuery.toLowerCase();
+      const code = (req.requisition_code || '').toLowerCase();
+      const outlet = (req.outlet_name || '').toLowerCase();
+      const sup = (req.supplier_name || '').toLowerCase();
+      const brand = (req.brand || req.product_name || '').toLowerCase();
+      const status = (req.status || '').toLowerCase();
       return (
-        req.requisition_code.toLowerCase().includes(query) ||
-        req.outlet_name.toLowerCase().includes(query) ||
-        req.supplier_name.toLowerCase().includes(query) ||
-        req.brand.toLowerCase().includes(query) ||
-        req.status.toLowerCase().includes(query)
+        code.includes(query) ||
+        outlet.includes(query) ||
+        sup.includes(query) ||
+        brand.includes(query) ||
+        status.includes(query)
       );
     });
   }, [requisitions, searchQuery]);
@@ -412,16 +446,16 @@ export const SuperadminCommercialLogs: React.FC = () => {
           r.flavor_variant,
           r.sku,
           `${r.packaging} ${r.size_volume}`,
-          r.supplier_buy_rate.toFixed(2),
-          r.outlet_wholesale_rate.toFixed(2),
-          r.retail_customer_mrp.toFixed(2),
-          r.supplier_unit_profit.toFixed(2),
-          r.outlet_unit_margin.toFixed(2),
-          `${r.outlet_margin_percent.toFixed(1)}%`,
+          formatMoney(r.supplier_buy_rate),
+          formatMoney(r.outlet_wholesale_rate),
+          formatMoney(r.retail_customer_mrp),
+          formatMoney(r.supplier_unit_profit),
+          formatMoney(r.outlet_unit_margin),
+          `${formatMoney(r.outlet_margin_percent)}%`,
           r.current_shelf_stock,
           r.units_sold,
-          r.revenue_generated.toFixed(2),
-          r.outlet_profit_earned.toFixed(2),
+          formatMoney(r.revenue_generated),
+          formatMoney(r.outlet_profit_earned),
         ];
         csvContent += row.map((cell) => `"${cell}"`).join(',') + '\n';
       });
@@ -430,15 +464,38 @@ export const SuperadminCommercialLogs: React.FC = () => {
       const headers = ['Txn ID', 'Supplier Name', 'Type', 'Reference Code', 'Amount (BDT)', 'Quantity', 'Profit (BDT)', 'Balance After (BDT)', 'Date', 'Description'];
       csvContent += headers.map((h) => `"${h}"`).join(',') + '\n';
       filteredSupplierTxns.forEach((t) => {
-        const row = [t.transaction_id, t.supplier_name, t.transaction_type, t.reference_code, t.amount, t.quantity, t.profit_amount, t.balance_after, t.transaction_date, t.description];
+        const row = [
+          t.transaction_id ?? t.id ?? '',
+          t.supplier_name ?? '',
+          t.transaction_type ?? t.type ?? '',
+          t.reference_code ?? '',
+          formatMoney(t.amount),
+          t.quantity ?? '',
+          formatMoney(t.profit_amount ?? t.supplier_profit_earned),
+          formatMoney(t.balance_after),
+          t.transaction_date ?? t.created_at ?? '',
+          t.description ?? '',
+        ];
         csvContent += row.map((cell) => `"${cell}"`).join(',') + '\n';
       });
       downloadFile(csvContent, `fizzdrop-supplier-transactions-${timestamp}.csv`);
     } else if (activeSubTab === 'outlet_sales') {
-      const headers = ['Sale ID', 'Order Code', 'Outlet Name', 'Brand', 'Variant', 'Qty', 'Unit Price', 'Total Amount', 'Outlet Profit', 'Sale Date', 'Customer Note'];
+      const headers = ['Sale ID', 'Order Code', 'Outlet Name', 'Brand / Product', 'Variant', 'Qty', 'Unit Price', 'Total Amount', 'Outlet Profit', 'Sale Date', 'Customer Note'];
       csvContent += headers.map((h) => `"${h}"`).join(',') + '\n';
       filteredSalesLogs.forEach((s) => {
-        const row = [s.sale_id, s.order_code, s.outlet_name, s.brand, s.flavor_variant, s.quantity, s.unit_price, s.total_amount, s.estimated_outlet_profit, s.sale_date, s.customer_note];
+        const row = [
+          s.sale_id ?? s.id ?? '',
+          s.sale_code ?? s.order_code ?? '',
+          s.outlet_name ?? '',
+          s.product_name ?? `${s.brand || ''} ${s.flavor_variant || ''}`.trim(),
+          s.flavor_variant ?? '',
+          s.quantity ?? 1,
+          formatMoney(s.unit_price),
+          formatMoney(s.total_amount),
+          formatMoney(s.estimated_outlet_profit ?? s.outlet_margin_earned),
+          s.sale_date ?? '',
+          s.customer_notes ?? s.customer_note ?? '',
+        ];
         csvContent += row.map((cell) => `"${cell}"`).join(',') + '\n';
       });
       downloadFile(csvContent, `fizzdrop-outlet-sales-${timestamp}.csv`);
@@ -446,7 +503,18 @@ export const SuperadminCommercialLogs: React.FC = () => {
       const headers = ['Req Code', 'Outlet Name', 'Supplier Name', 'Brand', 'Variant', 'Qty', 'Urgency', 'Status', 'Requested At', 'Dispatched At'];
       csvContent += headers.map((h) => `"${h}"`).join(',') + '\n';
       filteredRequisitions.forEach((req) => {
-        const row = [req.requisition_code, req.outlet_name, req.supplier_name, req.brand, req.flavor_variant, req.requested_quantity, req.urgency, req.status, req.created_at, req.dispatched_at];
+        const row = [
+          req.requisition_code ?? '',
+          req.outlet_name ?? '',
+          req.supplier_name ?? '',
+          req.brand ?? req.product_name ?? '',
+          req.flavor_variant ?? '',
+          req.requested_quantity ?? req.quantity ?? '',
+          req.urgency ?? '',
+          req.status ?? '',
+          req.created_at ?? req.created_date ?? '',
+          req.dispatched_at ?? '',
+        ];
         csvContent += row.map((cell) => `"${cell}"`).join(',') + '\n';
       });
       downloadFile(csvContent, `fizzdrop-requisitions-${timestamp}.csv`);
@@ -970,31 +1038,31 @@ export const SuperadminCommercialLogs: React.FC = () => {
 
                       {/* Tier 1: Supplier Buy Rate */}
                       <td className="py-3 px-3 text-right font-mono font-medium text-slate-600">
-                        ৳{row.supplier_buy_rate.toFixed(2)}
+                        ৳{formatMoney(row.supplier_buy_rate)}
                       </td>
 
                       {/* Tier 2: Outlet Wholesale Rate */}
                       <td className="py-3 px-3 text-right font-mono font-bold text-indigo-700 bg-indigo-50/20">
-                        ৳{row.outlet_wholesale_rate.toFixed(2)}
+                        ৳{formatMoney(row.outlet_wholesale_rate)}
                       </td>
 
                       {/* Tier 3: Retail Customer MRP */}
                       <td className="py-3 px-3 text-right font-mono font-bold text-slate-900">
-                        ৳{row.retail_customer_mrp.toFixed(2)}
+                        ৳{formatMoney(row.retail_customer_mrp)}
                       </td>
 
                       {/* Supplier Unit Profit */}
                       <td className="py-3 px-3 text-right font-mono text-indigo-600 font-semibold">
-                        +৳{row.supplier_unit_profit.toFixed(2)}
+                        +৳{formatMoney(row.supplier_unit_profit)}
                       </td>
 
                       {/* Outlet Unit Margin */}
                       <td className="py-3 px-3 text-right">
                         <div className="font-mono font-bold text-emerald-600">
-                          +৳{row.outlet_unit_margin.toFixed(2)}
+                          +৳{formatMoney(row.outlet_unit_margin)}
                         </div>
                         <div className="text-[9px] text-emerald-700 font-semibold">
-                          ({row.outlet_margin_percent.toFixed(1)}%)
+                          ({formatMoney(row.outlet_margin_percent)}%)
                         </div>
                       </td>
 
@@ -1020,13 +1088,13 @@ export const SuperadminCommercialLogs: React.FC = () => {
 
                       {/* Revenue Generated */}
                       <td className="py-3 px-3 text-right font-mono font-bold text-slate-800">
-                        ৳{row.revenue_generated.toFixed(2)}
+                        ৳{formatMoney(row.revenue_generated)}
                       </td>
 
                       {/* Total Outlet Profit Earned */}
                       <td className="py-3 px-4 text-right">
                         <span className="font-mono font-black text-emerald-600 bg-emerald-50/80 px-2 py-1 rounded-lg border border-emerald-100">
-                          ৳{row.outlet_profit_earned.toFixed(2)}
+                          ৳{formatMoney(row.outlet_profit_earned)}
                         </span>
                       </td>
                     </tr>
@@ -1059,35 +1127,35 @@ export const SuperadminCommercialLogs: React.FC = () => {
                     </td>
                   </tr>
                 ) : (
-                  filteredSupplierTxns.map((t) => (
+                  filteredSupplierTxns.map((t, idx) => (
                     <tr
-                      key={t.transaction_id}
+                      key={t.transaction_id || t.id || idx}
                       className="hover:bg-indigo-50/30 transition-colors group cursor-pointer"
                       onClick={() => setInspectedItem({ type: 'supplier_txn', data: t })}
                     >
                       <td className="py-3 px-4">
                         <div className="font-mono font-bold text-slate-900">
-                          #{t.transaction_id}
+                          #{t.transaction_id || t.id || '—'}
                         </div>
                         <div className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
                           <Clock className="w-3 h-3" />
-                          <span>{t.transaction_date ? new Date(t.transaction_date).toLocaleString() : 'N/A'}</span>
+                          <span>{t.transaction_date || t.created_at ? new Date(t.transaction_date || t.created_at!).toLocaleString() : 'N/A'}</span>
                         </div>
                       </td>
                       <td className="py-3 px-4 font-semibold text-slate-800">
-                        {t.supplier_name}
+                        {t.supplier_name || 'Regional Supplier'}
                       </td>
                       <td className="py-3 px-3">
                         <span
                           className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                            t.transaction_type.includes('DISPATCH') || t.transaction_type.includes('DELIVERY')
+                            (t.transaction_type || t.type || '').includes('DISPATCH') || (t.transaction_type || t.type || '').includes('DELIVERY')
                               ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                              : t.transaction_type.includes('PURCHASE')
+                              : (t.transaction_type || t.type || '').includes('PURCHASE')
                               ? 'bg-amber-50 text-amber-700 border border-amber-200'
                               : 'bg-slate-100 text-slate-700'
                           }`}
                         >
-                          {t.transaction_type}
+                          {t.transaction_type || t.type || 'COMMERCIAL'}
                         </span>
                       </td>
                       <td className="py-3 px-3 font-mono font-medium text-slate-600">
@@ -1097,13 +1165,13 @@ export const SuperadminCommercialLogs: React.FC = () => {
                         {t.quantity ? `${t.quantity} units` : '—'}
                       </td>
                       <td className="py-3 px-3 text-right font-mono font-bold text-slate-900">
-                        ৳{t.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        ৳{formatMoney(t.amount)}
                       </td>
                       <td className="py-3 px-3 text-right font-mono font-black text-emerald-600">
-                        +৳{t.profit_amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        +৳{formatMoney(t.profit_amount ?? t.supplier_profit_earned)}
                       </td>
                       <td className="py-3 px-4 text-right font-mono font-semibold text-slate-600">
-                        ৳{t.balance_after.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        ৳{formatMoney(t.balance_after)}
                       </td>
                     </tr>
                   ))
@@ -1135,46 +1203,46 @@ export const SuperadminCommercialLogs: React.FC = () => {
                     </td>
                   </tr>
                 ) : (
-                  filteredSalesLogs.map((sale) => (
+                  filteredSalesLogs.map((sale, idx) => (
                     <tr
-                      key={sale.sale_id}
+                      key={sale.sale_id || sale.id || idx}
                       className="hover:bg-indigo-50/30 transition-colors group cursor-pointer"
                       onClick={() => setInspectedItem({ type: 'sale', data: sale })}
                     >
                       <td className="py-3 px-4">
                         <div className="font-mono font-bold text-indigo-700">
-                          {sale.order_code}
+                          {sale.sale_code || sale.order_code || `SL-${sale.id || sale.sale_id || 'TXN'}`}
                         </div>
                         <div className="text-[10px] text-slate-400">
-                          Sale #{sale.sale_id}
+                          Sale #{sale.id || sale.sale_id || '—'}
                         </div>
                       </td>
                       <td className="py-3 px-4 font-semibold text-slate-900 flex items-center gap-1.5">
                         <Building2 className="w-3.5 h-3.5 text-teal-600 shrink-0" />
-                        <span>{sale.outlet_name}</span>
+                        <span>{sale.outlet_name || 'Outlet Branch'}</span>
                       </td>
                       <td className="py-3 px-4">
                         <span className="font-bold text-slate-800">
-                          {sale.brand} {sale.flavor_variant}
+                          {sale.product_name || `${sale.brand || ''} ${sale.flavor_variant || ''}`.trim() || 'Beverage Product'}
                         </span>
-                        {sale.customer_note && (
+                        {(sale.customer_notes || sale.customer_note) && (
                           <span className="block text-[10px] text-slate-400 truncate max-w-[200px]">
-                            Note: {sale.customer_note}
+                            Note: {sale.customer_notes || sale.customer_note}
                           </span>
                         )}
                       </td>
                       <td className="py-3 px-3 text-center font-mono font-bold text-slate-800">
-                        {sale.quantity}
+                        {sale.quantity ?? 1}
                       </td>
                       <td className="py-3 px-3 text-right font-mono text-slate-600">
-                        ৳{sale.unit_price.toFixed(2)}
+                        ৳{formatMoney(sale.unit_price)}
                       </td>
                       <td className="py-3 px-3 text-right font-mono font-bold text-slate-900">
-                        ৳{sale.total_amount.toFixed(2)}
+                        ৳{formatMoney(sale.total_amount)}
                       </td>
                       <td className="py-3 px-4 text-right">
                         <span className="font-mono font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100">
-                          +৳{sale.estimated_outlet_profit.toFixed(2)}
+                          +৳{formatMoney(sale.estimated_outlet_profit ?? sale.outlet_margin_earned)}
                         </span>
                       </td>
                       <td className="py-3 px-4 font-mono text-slate-500 text-[11px]">
@@ -1210,26 +1278,26 @@ export const SuperadminCommercialLogs: React.FC = () => {
                     </td>
                   </tr>
                 ) : (
-                  filteredRequisitions.map((req) => (
+                  filteredRequisitions.map((req, idx) => (
                     <tr
-                      key={req.requisition_id}
+                      key={req.requisition_id || req.id || idx}
                       className="hover:bg-indigo-50/30 transition-colors group cursor-pointer"
                       onClick={() => setInspectedItem({ type: 'requisition', data: req })}
                     >
                       <td className="py-3 px-4 font-mono font-bold text-slate-900">
-                        {req.requisition_code}
+                        {req.requisition_code || `REQ-${req.id || idx}`}
                       </td>
                       <td className="py-3 px-4 font-semibold text-slate-800">
-                        {req.outlet_name}
+                        {req.outlet_name || 'Outlet Branch'}
                       </td>
                       <td className="py-3 px-4 text-slate-600">
                         {req.supplier_name || 'Pending Hub Allotment'}
                       </td>
                       <td className="py-3 px-4 font-bold text-slate-800">
-                        {req.brand} {req.flavor_variant}
+                        {req.brand || req.product_name || 'Beverage Product'} {req.flavor_variant || ''}
                       </td>
                       <td className="py-3 px-3 text-center font-mono font-bold text-indigo-700">
-                        {req.requested_quantity} cases
+                        {req.requested_quantity ?? req.quantity ?? 0} cases
                       </td>
                       <td className="py-3 px-3 text-center">
                         <span
@@ -1241,7 +1309,7 @@ export const SuperadminCommercialLogs: React.FC = () => {
                               : 'bg-slate-100 text-slate-700'
                           }`}
                         >
-                          {req.urgency}
+                          {req.urgency || 'STANDARD'}
                         </span>
                       </td>
                       <td className="py-3 px-3 text-center">
@@ -1254,11 +1322,11 @@ export const SuperadminCommercialLogs: React.FC = () => {
                               : 'bg-amber-50 text-amber-700 border border-amber-200'
                           }`}
                         >
-                          {req.status}
+                          {req.status || 'PENDING'}
                         </span>
                       </td>
                       <td className="py-3 px-4 font-mono text-slate-500 text-[11px]">
-                        {req.created_at ? new Date(req.created_at).toLocaleDateString() : 'N/A'}
+                        {req.created_at || req.created_date ? new Date(req.created_at || req.created_date!).toLocaleDateString() : 'N/A'}
                       </td>
                     </tr>
                   ))
@@ -1294,8 +1362,8 @@ export const SuperadminCommercialLogs: React.FC = () => {
                   <span className="font-mono text-slate-400 capitalize">{key.replace(/_/g, ' ')}:</span>
                   <span className="font-semibold text-slate-900 text-right max-w-[260px] truncate">
                     {typeof val === 'number'
-                      ? key.includes('rate') || key.includes('price') || key.includes('amount') || key.includes('revenue') || key.includes('profit') || key.includes('margin')
-                        ? `৳${val.toFixed(2)}`
+                      ? key.includes('rate') || key.includes('price') || key.includes('amount') || key.includes('revenue') || key.includes('profit') || key.includes('margin') || key.includes('cost')
+                        ? `৳${formatMoney(val)}`
                         : val.toString()
                       : String(val ?? 'N/A')}
                   </span>

@@ -318,8 +318,12 @@ public class AdminController {
 
                 double cost = outPrice * qty;
                 double margin = Math.max(0.0, total - cost);
+                saleMap.put("sale_id", rs.get("id"));
+                saleMap.put("order_code", rs.get("sale_code"));
+                saleMap.put("customer_note", rs.get("customer_notes"));
                 saleMap.put("outlet_cost_total", cost);
                 saleMap.put("outlet_margin_earned", margin);
+                saleMap.put("estimated_outlet_profit", margin);
                 outletSalesLogs.add(saleMap);
             }
         } catch (Exception ignored) {}
@@ -372,6 +376,11 @@ public class AdminController {
                     grandSupplierProfit += profit;
                     tMap.put("supplier_profit_earned", profit);
                 }
+                tMap.put("transaction_id", rt.get("id"));
+                tMap.put("transaction_type", rt.get("type"));
+                tMap.put("transaction_date", rt.get("created_at"));
+                tMap.put("profit_amount", tMap.getOrDefault("supplier_profit_earned", 0.0));
+                tMap.put("balance_after", rt.getOrDefault("balance_after", 0.0));
                 supplierTxnLogs.add(tMap);
             }
         } catch (Exception ignored) {}
