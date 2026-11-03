@@ -80,12 +80,59 @@ export const OutletDashboard: React.FC = () => {
     clearOldNotifications,
   } = useNotifications('OUTLET', Number(effectiveOutletId));
 
+  // Customer order alert banner state
+  const [customerOrderAlert, setCustomerOrderAlert] = useState<any | null>(null);
+
   // Auto-refresh shelf stock and delivery tracker when a dispatch notification arrives
   useEffect(() => {
     if (popupNotification && popupNotification.recipient_role === 'OUTLET') {
       fetchDashboardData(outlet?.outlet_id || effectiveOutletId);
     }
   }, [popupNotification, effectiveOutletId]);
+
+  // Real-time listener for Customer Purchases from Customer UI via BroadcastChannel & LocalStorage
+  useEffect(() => {
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel('fizzdrop_realtime_events');
+      channel.onmessage = (event) => {
+        if (event.data?.type === 'CUSTOMER_PURCHASE') {
+          const currentId = Number(outlet?.outlet_id || effectiveOutletId);
+          if (Number(event.data.outlet_id) === currentId) {
+            setCustomerOrderAlert(event.data);
+            fetchDashboardData(currentId);
+          }
+        }
+      };
+    } catch (ignored) {}
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'fizzdrop_last_sale_event') {
+        const currentId = Number(outlet?.outlet_id || effectiveOutletId);
+        fetchDashboardData(currentId);
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+
+    // Guaranteed polling every 8 seconds to keep KPI and shelf stock accurate
+    const pollInterval = setInterval(() => {
+      fetchDashboardData(outlet?.outlet_id || effectiveOutletId);
+    }, 8000);
+
+    return () => {
+      if (channel) channel.close();
+      window.removeEventListener('storage', handleStorage);
+      clearInterval(pollInterval);
+    };
+  }, [outlet?.outlet_id, effectiveOutletId]);
+
+  // Auto-dismiss customer order alert banner after 10s
+  useEffect(() => {
+    if (customerOrderAlert) {
+      const timer = setTimeout(() => setCustomerOrderAlert(null), 10000);
+      return () => clearTimeout(timer);
+    }
+  }, [customerOrderAlert]);
 
   // Filters for Shelf Inventory Tab
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -579,6 +626,49 @@ export const OutletDashboard: React.FC = () => {
 
           {/* MAIN TAB CONTENT */}
           <main className="flex-1 min-w-0 space-y-6">
+            {/* REAL-TIME LIVE CUSTOMER ORDER NOTIFICATION BANNER */}
+            {customerOrderAlert && (
+              <div className="p-4 rounded-3xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white shadow-xl shadow-emerald-900/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-fade-in border border-emerald-400/30">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shrink-0">
+                    <Sparkles className="w-5 h-5 text-yellow-300 animate-spin" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-black text-sm uppercase tracking-wide">
+                        ⚡ New Customer Order Received!
+                      </span>
+                      <span className="text-[10px] font-mono bg-white/20 px-2 py-0.5 rounded-full font-bold">
+                        {customerOrderAlert.sale_code || 'PROCESSED'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-emerald-100 mt-0.5">
+                      Customer bought <strong className="text-white">{customerOrderAlert.quantity}x {customerOrderAlert.product_name}</strong> for{' '}
+                      <strong className="text-yellow-300">৳{Number(customerOrderAlert.total_amount).toFixed(2)}</strong> via{' '}
+                      <span className="underline">{customerOrderAlert.payment_method}</span>. Shelf inventory &amp; Today's Revenue updated automatically!
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('ledger')}
+                    className="px-3 py-1.5 rounded-xl bg-white text-emerald-800 text-xs font-bold hover:bg-emerald-50 transition-colors shadow-xs cursor-pointer"
+                  >
+                    View in Ledger →
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCustomerOrderAlert(null)}
+                    className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+                    title="Dismiss alert"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
             {/* TAB 1: LIVE SHELF INVENTORY */}
             {activeTab === 'inventory' && (
               <div className="space-y-5 animate-fade-in">

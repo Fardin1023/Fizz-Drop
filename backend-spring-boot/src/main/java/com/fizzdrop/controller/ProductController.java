@@ -271,6 +271,24 @@ public class ProductController {
                 });
             }
 
+            if (productUpdates.getCentralStock() != null) {
+                centralInventoryRepository.findByProductId(existing.getProductId()).ifPresentOrElse(
+                    ci -> {
+                        ci.setAvailableStock(productUpdates.getCentralStock());
+                        ci.setUpdatedAt(java.time.LocalDateTime.now());
+                        centralInventoryRepository.save(ci);
+                    },
+                    () -> {
+                        centralInventoryRepository.save(new CentralInventory(
+                            existing.getProductId(),
+                            existing.getCategory() != null ? existing.getCategory() : "Beverage",
+                            productUpdates.getCentralStock(),
+                            0
+                        ));
+                    }
+                );
+            }
+
             return ResponseEntity.ok(updated);
         }).orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(null));

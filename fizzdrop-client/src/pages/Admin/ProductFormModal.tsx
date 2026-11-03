@@ -8,6 +8,9 @@ import {
   Calendar,
   Layers,
   Coins,
+  Edit3,
+  CheckCircle2,
+  RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -28,6 +31,7 @@ interface ProductFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   onProductCreated: () => void;
+  productToEdit?: any | null;
   branches?: Branch[];
 }
 
@@ -62,9 +66,18 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   isOpen,
   onClose,
   onProductCreated,
+  productToEdit,
 }) => {
   const { token } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const isEditing = Boolean(productToEdit && (productToEdit.product_id || productToEdit.productId));
+
+  const defaultExpiry = () => {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() + 1);
+    return d.toISOString().split('T')[0];
+  };
 
   const [category, setCategory] = useState('Pepsi');
   const [brand, setBrand] = useState('Pepsi');
@@ -77,25 +90,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [outletPrice, setOutletPrice] = useState<string>('');
   const [retailPrice, setRetailPrice] = useState<string>('');
   const [sku, setSku] = useState('');
-
-  const handleBasePriceChange = (val: string) => {
-    setBasePrice(val);
-    const num = parseFloat(val);
-    if (!isNaN(num) && num > 0) {
-      setSupplierPrice(val);
-      const outP = (num * 1.15).toFixed(2);
-      setOutletPrice(outP);
-      setRetailPrice((parseFloat(outP) * 1.15).toFixed(2));
-    }
-  };
   const [centralStock, setCentralStock] = useState<string>('1500');
-
-  const defaultExpiry = () => {
-    const d = new Date();
-    d.setFullYear(d.getFullYear() + 1);
-    return d.toISOString().split('T')[0];
-  };
-
   const [expiryDate, setExpiryDate] = useState<string>(defaultExpiry());
   const [imageUrl, setImageUrl] = useState<string>('');
   const [imageMode, setImageMode] = useState<'presets' | 'upload' | 'url'>('presets');
@@ -104,34 +99,118 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  // Initialize form state when opening or when productToEdit changes
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (productToEdit) {
+      const cat = productToEdit.category || 'Pepsi';
+      setCategory(cat);
+      setBrand(productToEdit.brand || cat);
+      setCustomBrand(productToEdit.brand || '');
+      setFlavorVariant(productToEdit.flavor_variant || productToEdit.flavorVariant || '');
+      setPackaging(productToEdit.packaging || 'Can');
+      setSizeVolume(productToEdit.size_volume || productToEdit.sizeVolume || '250ml');
+      setSku(productToEdit.sku || '');
+
+      const base = productToEdit.base_price ?? productToEdit.basePrice ?? '';
+      setBasePrice(String(base));
+
+      const supp = productToEdit.supplier_price ?? productToEdit.supplierPrice ?? base;
+      setSupplierPrice(String(supp));
+
+      const out = productToEdit.outlet_price ?? productToEdit.outletPrice ?? (base ? (Number(base) * 1.15).toFixed(2) : '');
+      setOutletPrice(String(out));
+
+      const ret = productToEdit.retail_price ?? productToEdit.retailPrice ?? (out ? (Number(out) * 1.15).toFixed(2) : '');
+      setRetailPrice(String(ret));
+
+      setCentralStock(String(productToEdit.central_stock ?? productToEdit.centralStock ?? 1500));
+      setExpiryDate(productToEdit.expiry_date ?? productToEdit.expiryDate ?? defaultExpiry());
+      setImageUrl(productToEdit.image_url ?? productToEdit.imageUrl ?? '');
+      setImageMode('presets');
+      setError(null);
+      setSuccessMsg(null);
+    } else {
+      // New product default state
+      setCategory('Pepsi');
+      setBrand('Pepsi');
+      setCustomBrand('');
+      setFlavorVariant('Regular');
+      setPackaging('Can');
+      setSizeVolume('250ml');
+      setBasePrice('30');
+      setSupplierPrice('30');
+      setOutletPrice('34.50');
+      setRetailPrice('39.68');
+      setCentralStock('1500');
+      setExpiryDate(defaultExpiry());
+      setImageUrl(pepsiImg);
+      setImageMode('presets');
+      setError(null);
+      setSuccessMsg(null);
+    }
+  }, [isOpen, productToEdit]);
+
   const effectiveBrand = brand === 'Custom' ? customBrand || 'Brand' : brand;
 
-  // Whenever category changes, adjust defaults cleanly
+  // When base price changes, auto-calculate initial rates if not in edit mode
+  const handleBasePriceChange = (val: string) => {
+    setBasePrice(val);
+    setSupplierPrice(val);
+    const num = parseFloat(val);
+    if (!isNaN(num) && num > 0) {
+      if (!isEditing || !outletPrice) {
+        const outP = (num * 1.15).toFixed(2);
+        setOutletPrice(outP);
+        setRetailPrice((parseFloat(outP) * 1.15).toFixed(2));
+      }
+    }
+  };
+
+  // Auto-derives outlet and retail rates based on custom percentage margins
+  const handleRecalculateMargins = () => {
+    const num = parseFloat(basePrice);
+    if (!isNaN(num) && num > 0) {
+      setSupplierPrice(basePrice);
+      const outP = (num * 1.15).toFixed(2);
+      setOutletPrice(outP);
+      setRetailPrice((parseFloat(outP) * 1.15).toFixed(2));
+    }
+  };
+
+  // When category changes in Create mode, adjust presets cleanly
   const handleCategoryChange = (newCat: string) => {
     setCategory(newCat);
     if (newCat !== 'Custom') {
       setBrand(newCat);
-      setPackaging('Can');
-      setSizeVolume('250ml');
-      setCentralStock('1500');
-      setFlavorVariant('Regular');
-      const match = PRESET_IMAGES.find((p) => p.name.toLowerCase() === newCat.toLowerCase());
-      if (match) setImageUrl(match.src);
-      const d = new Date();
-      d.setFullYear(d.getFullYear() + 1);
-      setExpiryDate(d.toISOString().split('T')[0]);
+      if (!isEditing) {
+        setPackaging('Can');
+        setSizeVolume('250ml');
+        setCentralStock('1500');
+        setFlavorVariant('Regular');
+        const match = PRESET_IMAGES.find((p) => p.name.toLowerCase() === newCat.toLowerCase());
+        if (match) setImageUrl(match.src);
+        setExpiryDate(defaultExpiry());
+      }
     }
   };
 
-  // Auto-generate SKU
-  useEffect(() => {
-    if (!effectiveBrand || !flavorVariant) return;
+  // Helper to re-generate standard SKU token
+  const handleGenerateSku = () => {
     const brandCode = effectiveBrand.substring(0, 3).toUpperCase().replace(/\s+/g, '');
     const flavorCode = flavorVariant.substring(0, 3).toUpperCase().replace(/\s+/g, '');
     const pkgCode = packaging.substring(0, 3).toUpperCase();
     const volCode = sizeVolume.replace(/[^0-9]/g, '');
     setSku(`${brandCode || 'BEV'}-${flavorCode || 'VAR'}-${pkgCode}-${volCode || '500'}`);
-  }, [category, effectiveBrand, flavorVariant, packaging, sizeVolume]);
+  };
+
+  // Auto-generate SKU only for new products (avoid overwriting custom SKU in edit mode)
+  useEffect(() => {
+    if (isEditing) return;
+    if (!effectiveBrand || !flavorVariant) return;
+    handleGenerateSku();
+  }, [category, effectiveBrand, flavorVariant, packaging, sizeVolume, isEditing]);
 
   if (!isOpen) return null;
 
@@ -165,52 +244,65 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     }
     const priceNum = parseFloat(basePrice);
     if (isNaN(priceNum) || priceNum <= 0) {
-      setError('Base price must be a valid positive number.');
+      setError('Base price (Supplier Buy Rate) must be a valid positive number.');
       return;
     }
 
     setSubmitting(true);
 
     try {
-      const response = await fetch('http://localhost:8080/api/products', {
-        method: 'POST',
+      const prodId = productToEdit?.product_id ?? productToEdit?.productId;
+      const endpoint = isEditing
+        ? `http://localhost:8080/api/products/${prodId}`
+        : 'http://localhost:8080/api/products';
+      const method = isEditing ? 'PUT' : 'POST';
+
+      const payload = {
+        brand: effectiveBrand,
+        flavor_variant: flavorVariant,
+        flavorVariant,
+        packaging,
+        size_volume: sizeVolume,
+        sizeVolume,
+        sku,
+        base_price: priceNum,
+        basePrice: priceNum,
+        supplier_price: parseFloat(supplierPrice) || priceNum,
+        supplierPrice: parseFloat(supplierPrice) || priceNum,
+        outlet_price: parseFloat(outletPrice) || Number((priceNum * 1.15).toFixed(2)),
+        outletPrice: parseFloat(outletPrice) || Number((priceNum * 1.15).toFixed(2)),
+        retail_price: parseFloat(retailPrice) || Number((priceNum * 1.32).toFixed(2)),
+        retailPrice: parseFloat(retailPrice) || Number((priceNum * 1.32).toFixed(2)),
+        category,
+        expiry_date: expiryDate,
+        expiryDate: expiryDate,
+        image_url: imageUrl || null,
+        imageUrl: imageUrl || null,
+        central_stock: parseInt(centralStock, 10) || 1500,
+        centralStock: parseInt(centralStock, 10) || 1500,
+      };
+
+      const response = await fetch(endpoint, {
+        method,
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          brand: effectiveBrand,
-          flavor_variant: flavorVariant,
-          flavorVariant,
-          packaging,
-          size_volume: sizeVolume,
-          sizeVolume,
-          sku,
-          base_price: priceNum,
-          basePrice: priceNum,
-          supplier_price: parseFloat(supplierPrice) || priceNum,
-          supplierPrice: parseFloat(supplierPrice) || priceNum,
-          outlet_price: parseFloat(outletPrice) || Number((priceNum * 1.15).toFixed(2)),
-          outletPrice: parseFloat(outletPrice) || Number((priceNum * 1.15).toFixed(2)),
-          retail_price: parseFloat(retailPrice) || Number((priceNum * 1.32).toFixed(2)),
-          retailPrice: parseFloat(retailPrice) || Number((priceNum * 1.32).toFixed(2)),
-          category,
-          expiry_date: expiryDate,
-          expiryDate: expiryDate,
-          image_url: imageUrl || null,
-          imageUrl: imageUrl || null,
-          central_stock: parseInt(centralStock, 10) || 1500,
-          total_stock: 0,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to create product in database.');
+        throw new Error(data.error || data.message || `Failed to ${isEditing ? 'update' : 'create'} product.`);
       }
 
-      setSuccessMsg('Product registered successfully in database!');
+      setSuccessMsg(
+        isEditing
+          ? 'Product specifications & pricing updated successfully in database!'
+          : 'Product registered successfully in database!'
+      );
+
       setTimeout(() => {
         onProductCreated();
         onClose();
@@ -225,106 +317,103 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 overflow-y-auto bg-black/60 backdrop-blur-md animate-fade-in">
       <div className="relative w-full max-w-4xl bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
-        
         {/* Modal Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-950/40">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-indigo-600/10 text-indigo-600 dark:text-indigo-400">
-              <PlusCircle className="w-5 h-5" />
+            <div
+              className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                isEditing
+                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300'
+                  : 'bg-indigo-600/10 text-indigo-600 dark:text-indigo-400'
+              }`}
+            >
+              {isEditing ? <Edit3 className="w-5 h-5" /> : <PlusCircle className="w-5 h-5" />}
             </div>
             <div>
-              <h3 className="font-oswald text-xl font-bold uppercase tracking-wide text-zinc-900 dark:text-zinc-50">
-                Input Product Details
-              </h3>
+              <div className="flex items-center gap-2">
+                <h3 className="font-oswald text-xl font-bold uppercase tracking-wide text-zinc-900 dark:text-zinc-50">
+                  {isEditing ? 'Edit Product Specifications & Pricing' : 'Input Product Details'}
+                </h3>
+                {isEditing && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 uppercase">
+                    ID #{productToEdit?.product_id || productToEdit?.productId}
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                Register beverage item under brand categories (Pepsi, Mirinda, Slice, etc.) with packaging options
+                {isEditing
+                  ? `Modify commercial pricing, central depot stock, SKU & specs for "${effectiveBrand} ${flavorVariant}"`
+                  : 'Register beverage item under brand categories with multi-tier pricing and central stock'}
               </p>
             </div>
           </div>
+
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            className="p-2 rounded-xl text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-6 flex-1">
+        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-6">
           {error && (
-            <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 text-rose-700 dark:text-rose-400 text-xs flex items-center gap-2">
+            <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2">
               <span className="font-bold">Error:</span> {error}
             </div>
           )}
 
           {successMsg && (
-            <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60 text-emerald-700 dark:text-emerald-400 text-xs flex items-center gap-2">
-              <span className="font-bold">Success:</span> {successMsg}
+            <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-300 text-xs flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <span>{successMsg}</span>
             </div>
           )}
 
-          {/* Primary Category Selector Header */}
-          <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-50 to-blue-50/40 dark:from-zinc-800/40 dark:to-zinc-800/20 border border-slate-200 dark:border-zinc-700/60 space-y-2">
+          {/* 1. Category & Brand Selection */}
+          <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                <Layers className="w-4 h-4 text-blue-600" />
-                Select Product Category *
+              <label className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+                <Layers className="w-4 h-4 text-indigo-600" />
+                Category & Brand
               </label>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider bg-blue-100 text-blue-700 border border-blue-200">
-                Drink Category
-              </span>
+              <span className="text-[10px] text-zinc-400">Select standard brand or define custom</span>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-4 gap-2 pt-1">
-              {CATEGORIES.map((cat) => {
-                const isSelected = category === cat;
-                return (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() => handleCategoryChange(cat)}
-                    className={`px-3 py-2 rounded-xl text-xs font-bold transition-all border text-center ${
-                      isSelected
-                        ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/25'
-                        : 'bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 border-slate-200 dark:border-zinc-700 hover:border-blue-400'
-                    }`}
-                  >
-                    {cat}
-                  </button>
-                );
-              })}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {CATEGORIES.map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => handleCategoryChange(cat)}
+                  className={`py-2 px-3 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+                    category === cat
+                      ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                      : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-zinc-700'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
             </div>
-          </div>
 
-          {/* Drink Brand & Flavor Block */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1.5">
-                Brand Name *
-              </label>
-              <select
-                value={brand}
-                onChange={(e) => setBrand(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
-              >
-                {DRINK_CATEGORIES.map((b) => (
-                  <option key={b} value={b}>{b}</option>
-                ))}
-                <option value="Coca-Cola">Coca-Cola</option>
-                <option value="Sprite">Sprite</option>
-                <option value="Custom">Custom Brand</option>
-              </select>
-              {brand === 'Custom' && (
+            {category === 'Custom' && (
+              <div className="mt-2">
                 <input
                   type="text"
+                  placeholder="Enter custom brand name..."
                   value={customBrand}
                   onChange={(e) => setCustomBrand(e.target.value)}
-                  placeholder="Enter custom brand"
-                  className="w-full mt-2 px-3.5 py-2 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                  required
                 />
-              )}
-            </div>
+              </div>
+            )}
+          </div>
 
+          {/* 2. Flavor Variant, Packaging, Size */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1.5">
                 Flavor / Variant *
@@ -333,18 +422,15 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 type="text"
                 value={flavorVariant}
                 onChange={(e) => setFlavorVariant(e.target.value)}
-                placeholder="e.g. Regular Cola, Zero Sugar, Citrus Blast, Mango"
+                placeholder="e.g. Regular, Zero, Diet, Black"
                 required
                 className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
               />
             </div>
-          </div>
 
-          {/* Packaging & Size/Volume (Subcategory Specifications) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1.5">
-                Drink Packaging Format (Can, Bottle, Glass Bottle) *
+                Packaging Format
               </label>
               <select
                 value={packaging}
@@ -373,16 +459,22 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             </div>
           </div>
 
-          {/* 3-Tier Multi-Echelon Transaction Pricing */}
+          {/* 3. 3-Tier Multi-Echelon Transaction Pricing */}
           <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-50/70 via-indigo-50/50 to-purple-50/50 dark:bg-zinc-800/40 border border-blue-200 dark:border-zinc-700 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-indigo-950 dark:text-indigo-300 flex items-center gap-1.5">
                 <Coins className="w-4 h-4 text-indigo-600" />
                 3-Tier Multi-Level Pricing Structure (Superadmin ➔ Supplier ➔ Outlet ➔ Customer)
               </span>
-              <span className="text-[10px] font-mono font-bold text-indigo-600 bg-white dark:bg-zinc-900 px-2 py-0.5 rounded-full border border-indigo-200 shadow-xs">
-                Auto-Margin Derivation
-              </span>
+              <button
+                type="button"
+                onClick={handleRecalculateMargins}
+                className="text-[10px] font-mono font-bold text-indigo-600 bg-white dark:bg-zinc-900 px-2 py-0.5 rounded-full border border-indigo-200 shadow-xs flex items-center gap-1 hover:bg-indigo-50 cursor-pointer"
+                title="Auto-calculate 15% wholesale margin and 15% retail margin based on Buy Rate"
+              >
+                <RefreshCw className="w-2.5 h-2.5" />
+                <span>Auto-Calculate Margins</span>
+              </button>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -391,12 +483,12 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 block mb-1">
                   Tier 1: Supplier Buy Rate
                 </span>
-                <span className="text-[9px] text-zinc-400 block mb-1.5">Supplier purchase from Superadmin</span>
+                <span className="text-[9px] text-zinc-400 block mb-1.5">Rate charged to Regional Suppliers</span>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-xs">৳</span>
                   <input
                     type="number"
-                    step="0.50"
+                    step="0.25"
                     min="1"
                     value={basePrice}
                     onChange={(e) => handleBasePriceChange(e.target.value)}
@@ -419,12 +511,12 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     </span>
                   )}
                 </div>
-                <span className="text-[9px] text-zinc-400 block mb-1.5">Wholesale sell to franchise outlets</span>
+                <span className="text-[9px] text-zinc-400 block mb-1.5">Wholesale sell rate to franchise outlets</span>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-xs">৳</span>
                   <input
                     type="number"
-                    step="0.50"
+                    step="0.25"
                     min="1"
                     value={outletPrice}
                     onChange={(e) => setOutletPrice(e.target.value)}
@@ -451,7 +543,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-xs">৳</span>
                   <input
                     type="number"
-                    step="0.50"
+                    step="0.25"
                     min="1"
                     value={retailPrice}
                     onChange={(e) => setRetailPrice(e.target.value)}
@@ -463,143 +555,110 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             </div>
           </div>
 
-          {/* SKU */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
-                SKU *
-              </label>
+          {/* 4. SKU & Central Stock Pool */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
+                  SKU Code *
+                </label>
                 <button
                   type="button"
-                  onClick={() => {
-                    const brandCode = effectiveBrand.substring(0, 3).toUpperCase().replace(/\s+/g, '');
-                    const flavorCode = flavorVariant.substring(0, 3).toUpperCase().replace(/\s+/g, '');
-                    const pkgCode = packaging.substring(0, 3).toUpperCase();
-                    const volCode = sizeVolume.replace(/[^0-9]/g, '');
-                    setSku(`${brandCode || 'BEV'}-${flavorCode || 'VAR'}-${pkgCode}-${volCode || '500'}`);
-                  }}
-                  className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 font-semibold"
+                  onClick={handleGenerateSku}
+                  className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer flex items-center gap-1"
                 >
-                  <Sparkles className="w-3 h-3" />
-                  Auto-Generate
+                  <RefreshCw className="w-2.5 h-2.5" />
+                  <span>Regenerate SKU</span>
                 </button>
               </div>
               <input
                 type="text"
                 value={sku}
-                onChange={(e) => setSku(e.target.value.toUpperCase())}
+                onChange={(e) => setSku(e.target.value)}
+                placeholder="e.g. PEP-REG-CAN-250"
                 required
-                placeholder="PEP-ZER-CAN-250"
-                className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm font-mono text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm font-mono font-bold text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
               />
-          </div>
+            </div>
 
-          {/* Superadmin Central Fixed Stock Pool */}
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1.5 flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <Package className="w-3.5 h-3.5 text-indigo-600" />
-                Superadmin Central Stock Pool (Units for Regional Logistics) *
-              </span>
-              <span className="text-[10px] font-mono text-indigo-600 font-bold bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded border border-indigo-200 dark:border-indigo-800">
-                Default Benchmark: 1,500 cases
-              </span>
-            </label>
-            <input
-              type="number"
-              min="0"
-              step="50"
-              value={centralStock}
-              onChange={(e) => setCentralStock(e.target.value)}
-              required
-              placeholder="1500"
-              className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm font-mono text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
-            />
-            <p className="text-[10px] text-zinc-400 mt-1">
-              Stock reserved in central inventory warehouse for regional suppliers to requisition.
-            </p>
-          </div>
-
-          {/* Expiry Date */}
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1.5 flex items-center gap-1.5">
-              <Calendar className="w-3.5 h-3.5 text-blue-600" />
-              Product Expiry Date (`expiry_date`) *
-            </label>
-            <input
-              type="date"
-              value={expiryDate}
-              onChange={(e) => setExpiryDate(e.target.value)}
-              required
-              className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm font-mono text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
-            />
-            <p className="text-[10px] text-zinc-400 mt-1">
-              Perishable beverage products require accurate expiry dates for retail compliance.
-            </p>
-          </div>
-
-          {/* Product Image Input */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
-                <ImageIcon className="w-4 h-4 text-indigo-500" />
-                Product Image Artwork
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1.5">
+                Superadmin Central Stock (Cases)
               </label>
-              <div className="flex items-center p-0.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-[11px]">
-                <button
-                  type="button"
-                  onClick={() => setImageMode('presets')}
-                  className={`px-2.5 py-1 rounded-md transition-all ${
-                    imageMode === 'presets' ? 'bg-white dark:bg-zinc-900 text-indigo-600 font-bold shadow-xs' : 'text-zinc-500'
-                  }`}
-                >
-                  Presets
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setImageMode('upload')}
-                  className={`px-2.5 py-1 rounded-md transition-all ${
-                    imageMode === 'upload' ? 'bg-white dark:bg-zinc-900 text-indigo-600 font-bold shadow-xs' : 'text-zinc-500'
-                  }`}
-                >
-                  Upload File
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setImageMode('url')}
-                  className={`px-2.5 py-1 rounded-md transition-all ${
-                    imageMode === 'url' ? 'bg-white dark:bg-zinc-900 text-indigo-600 font-bold shadow-xs' : 'text-zinc-500'
-                  }`}
-                >
-                  Image URL
-                </button>
+              <input
+                type="number"
+                min="0"
+                value={centralStock}
+                onChange={(e) => setCentralStock(e.target.value)}
+                placeholder="1500"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm font-mono font-bold text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+              />
+              <span className="text-[10px] text-zinc-400 mt-1 block">
+                Total cases available in central depot for regional suppliers
+              </span>
+            </div>
+          </div>
+
+          {/* 5. Expiry Date */}
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1.5">
+              Best Before / Expiry Date
+            </label>
+            <div className="relative">
+              <Calendar className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+              <input
+                type="date"
+                value={expiryDate}
+                onChange={(e) => setExpiryDate(e.target.value)}
+                className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+              />
+            </div>
+          </div>
+
+          {/* 6. Image Selection (Presets, Upload, or URL) */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 flex items-center gap-1.5">
+                <ImageIcon className="w-4 h-4 text-indigo-600" />
+                Product Visual / Bottle Image
+              </label>
+              <div className="flex items-center gap-1">
+                {(['presets', 'upload', 'url'] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setImageMode(mode)}
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase transition-colors cursor-pointer ${
+                      imageMode === mode
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 hover:text-zinc-700'
+                    }`}
+                  >
+                    {mode}
+                  </button>
+                ))}
               </div>
             </div>
 
             {imageMode === 'presets' && (
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
-                  {PRESET_IMAGES.map((preset) => (
-                    <button
-                      key={preset.name}
-                      type="button"
-                      onClick={() => setImageUrl(preset.src)}
-                      className={`p-2.5 rounded-xl border text-center flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
-                        imageUrl === preset.src
-                          ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-950/40 ring-2 ring-indigo-500/20'
-                          : 'border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800'
-                      }`}
-                    >
-                      <img src={preset.src} alt={preset.name} className="h-12 w-auto object-contain" />
-                      <span className="text-[10px] font-semibold text-zinc-700 dark:text-zinc-300 truncate w-full">
-                        {preset.name}
-                      </span>
-                      <span className="text-[9px] text-zinc-400 font-mono">
-                        {preset.group}
-                      </span>
-                    </button>
-                  ))}
-                </div>
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                {PRESET_IMAGES.map((preset) => (
+                  <button
+                    key={preset.name}
+                    type="button"
+                    onClick={() => setImageUrl(preset.src)}
+                    className={`p-2 rounded-xl border flex flex-col items-center gap-1 transition-all cursor-pointer ${
+                      imageUrl === preset.src
+                        ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-950/60 shadow-xs'
+                        : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300'
+                    }`}
+                  >
+                    <img src={preset.src} alt={preset.name} className="h-12 object-contain" />
+                    <span className="text-[10px] font-semibold text-zinc-700 dark:text-zinc-300">
+                      {preset.name}
+                    </span>
+                  </button>
+                ))}
               </div>
             )}
 
@@ -608,28 +667,19 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 <input
                   type="file"
                   ref={fileInputRef}
-                  onChange={handleFileUpload}
                   accept="image/*"
+                  onChange={handleFileUpload}
                   className="hidden"
                 />
-                <div
+                <button
+                  type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-zinc-200 dark:border-zinc-700/80 hover:border-indigo-500 rounded-2xl p-4 text-center cursor-pointer transition-colors bg-zinc-50/50 dark:bg-zinc-800/40"
+                  className="w-full py-4 border-2 border-dashed border-zinc-200 dark:border-zinc-700 rounded-xl text-center hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                 >
-                  {imageUrl ? (
-                    <div className="flex items-center justify-center gap-3">
-                      <img src={imageUrl} alt="Preview" className="h-16 w-16 object-contain rounded-xl border p-1" />
-                      <div className="text-left text-xs">
-                        <p className="font-semibold text-emerald-600">File Loaded Successfully</p>
-                        <p className="text-[10px] text-zinc-400">Click to replace file</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-zinc-500">
-                      Click to choose an image file (PNG, JPG, SVG up to 5MB)
-                    </p>
-                  )}
-                </div>
+                  <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+                    Click to select image file from computer
+                  </span>
+                </button>
               </div>
             )}
 
@@ -650,16 +700,30 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               type="button"
               onClick={onClose}
               disabled={submitting}
-              className="px-5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-xs font-bold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              className="px-5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-xs font-bold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="px-6 py-2.5 rounded-xl text-white text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-blue-500/25"
+              className={`px-6 py-2.5 rounded-xl text-white text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer ${
+                isEditing
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-blue-500/25'
+                  : 'bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 shadow-indigo-500/25'
+              }`}
             >
-              {submitting ? 'Registering...' : 'Register Product in Database'}
+              {submitting ? (
+                <>
+                  <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>{isEditing ? 'Saving Changes...' : 'Registering...'}</span>
+                </>
+              ) : (
+                <>
+                  {isEditing ? <Edit3 className="w-3.5 h-3.5" /> : <Sparkles className="w-3.5 h-3.5" />}
+                  <span>{isEditing ? 'Save Product Changes' : 'Register Product in Database'}</span>
+                </>
+              )}
             </button>
           </div>
         </form>
@@ -667,4 +731,5 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     </div>
   );
 };
+
 export default ProductFormModal;

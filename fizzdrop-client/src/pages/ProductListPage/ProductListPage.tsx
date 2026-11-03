@@ -243,8 +243,10 @@ const ProductListPage: React.FC<ProductListPageProps> = ({ branchId, onAddToCart
         return true;
       })
       .sort((a, b) => {
-        if (sortBy === 'price-asc') return a.base_price - b.base_price;
-        if (sortBy === 'price-desc') return b.base_price - a.base_price;
+        const pA = a.retail_price ?? a.base_price ?? 0;
+        const pB = b.retail_price ?? b.base_price ?? 0;
+        if (sortBy === 'price-asc') return pA - pB;
+        if (sortBy === 'price-desc') return pB - pA;
         if (sortBy === 'stock') {
           const sA = a.branch_stock ?? a.total_stock ?? 0;
           const sB = b.branch_stock ?? b.total_stock ?? 0;
@@ -591,7 +593,7 @@ const ProductListPage: React.FC<ProductListPageProps> = ({ branchId, onAddToCart
 
                     <div className="flex items-baseline justify-between pt-1">
                       <span className="font-oswald text-2xl font-black text-blue-600">
-                        ৳{Number(product.base_price ?? (product as any).basePrice ?? 0).toFixed(2)}
+                        ৳{Number(product.retail_price ?? product.base_price ?? (product as any).basePrice ?? 0).toFixed(2)}
                       </span>
                       <span className="text-[10px] font-mono font-medium text-slate-400">
                         {product.packaging || 'Bottle'}
@@ -647,17 +649,21 @@ const ProductListPage: React.FC<ProductListPageProps> = ({ branchId, onAddToCart
         )}
       </main>
 
-      {/* 4. Small Animated Pop-Up Window for Product Details */}
+      {/* 4. Small Animated Pop-Up Window for Product Details & Direct Outlet Order */}
       <ProductDetailModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         product={selectedProduct}
+        branchId={branchId}
+        branchName={branchName}
         onAddToCart={(p, qty) => {
           if (onAddToCart) onAddToCart({ ...p, quantity: qty });
         }}
+        onOrderSuccess={(_saleResult) => {
+          fetchProducts();
+        }}
         onToggleWishlist={(p) => handleToggleWishlist(p)}
         isWishlisted={selectedProduct ? wishlist.includes(selectedProduct.product_id) : false}
-        branchName={branchName}
       />
     </div>
   );

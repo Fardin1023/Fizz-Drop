@@ -77,7 +77,7 @@ const NewArrivals: React.FC<NewArrivalsProps> = ({
         
         // Resilient normalization for Spring Boot & MySQL models
         const normalized: ProductItem[] = (Array.isArray(data) ? data : []).map((p: any) => {
-          const rawPrice = p.price ?? p.base_price ?? p.basePrice ?? 0;
+          const rawPrice = p.retail_price ?? p.retailPrice ?? p.price ?? p.base_price ?? p.basePrice ?? 0;
           const parsedPrice = typeof rawPrice === 'number' ? rawPrice : parseFloat(rawPrice) || 0;
           const brandName = p.brand || 'FizzDrop';
           const variant = p.flavor_variant || p.flavorVariant || '';

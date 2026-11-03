@@ -9,6 +9,8 @@ import {
   Layers,
   AlertCircle,
   CheckCircle2,
+  Edit3,
+  Coins,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { ProductFormModal } from '../Admin/ProductFormModal';
@@ -21,6 +23,9 @@ interface ProductRecord {
   size_volume: string;
   sku: string;
   base_price: number | string;
+  supplier_price?: number | string;
+  outlet_price?: number | string;
+  retail_price?: number | string;
   category: string;
   expiry_date?: string;
   image_url?: string;
@@ -35,6 +40,7 @@ export const SuperadminProductCatalog: React.FC = () => {
   const [search, setSearch] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [editingProduct, setEditingProduct] = useState<ProductRecord | null>(null);
   const [actionMsg, setActionMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
   const fetchCatalogAndBranches = async () => {
@@ -59,6 +65,16 @@ export const SuperadminProductCatalog: React.FC = () => {
   useEffect(() => {
     fetchCatalogAndBranches();
   }, []);
+
+  const handleOpenCreateModal = () => {
+    setEditingProduct(null);
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEditModal = (p: ProductRecord) => {
+    setEditingProduct(p);
+    setIsModalOpen(true);
+  };
 
   const handleDelete = async (id: number, name: string) => {
     if (!window.confirm(`Are you sure you want to permanently remove "${name}" from the master database?`)) {
@@ -145,21 +161,21 @@ export const SuperadminProductCatalog: React.FC = () => {
             </span>
             <span className="text-xs text-slate-400">•</span>
             <span className="text-xs font-mono font-semibold text-slate-600">
-              Superadmin Stock Provisioning
+              Superadmin Product & Pricing Control
             </span>
           </div>
           <h2 className="font-oswald text-xl sm:text-2xl font-black text-zinc-900 uppercase tracking-tight mt-1">
-            Master Products & Central Inventory
+            Master Products & Multi-Tier Pricing
           </h2>
           <p className="text-xs text-slate-500 mt-0.5 max-w-2xl">
-            Input and manage beverage product specifications, SKUs, wholesale pricing, and central depot stock. Regional suppliers request stock directly from this catalog.
+            Input, edit, and fine-tune beverage specifications, SKUs, 3-tier multi-echelon pricing (Supplier Buy Rate, Outlet Rate, Retail MRP), and central depot stock.
           </p>
         </div>
 
         {/* Primary CTA: Input Product Details */}
         <button
           type="button"
-          onClick={() => setIsModalOpen(true)}
+          onClick={handleOpenCreateModal}
           className="py-2.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold text-xs shadow-md shadow-blue-500/20 flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap active:scale-95 shrink-0"
         >
           <Plus className="w-4 h-4 text-white" />
@@ -254,7 +270,7 @@ export const SuperadminProductCatalog: React.FC = () => {
         </div>
       </div>
 
-      {/* Catalog Table & Clean Zero-Data Empty State */}
+      {/* Catalog Table */}
       <div className="rounded-3xl bg-white border border-slate-200/90 shadow-sm overflow-hidden">
         {loading && products.length === 0 ? (
           <div className="py-20 text-center text-xs text-slate-500 space-y-2">
@@ -281,7 +297,7 @@ export const SuperadminProductCatalog: React.FC = () => {
             {products.length === 0 && (
               <button
                 type="button"
-                onClick={() => setIsModalOpen(true)}
+                onClick={handleOpenCreateModal}
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold text-xs shadow-md shadow-blue-500/20 cursor-pointer active:scale-95 transition-all"
               >
                 <Plus className="w-3.5 h-3.5 text-white" />
@@ -298,7 +314,7 @@ export const SuperadminProductCatalog: React.FC = () => {
                   <th className="py-3.5 px-4">SKU Token</th>
                   <th className="py-3.5 px-4">Packaging & Size</th>
                   <th className="py-3.5 px-4">Category</th>
-                  <th className="py-3.5 px-4">Wholesale Price</th>
+                  <th className="py-3.5 px-4">3-Tier Commercial Pricing</th>
                   <th className="py-3.5 px-4 text-center">Superadmin Central Stock</th>
                   <th className="py-3.5 px-4 text-right">Actions</th>
                 </tr>
@@ -306,11 +322,15 @@ export const SuperadminProductCatalog: React.FC = () => {
               <tbody className="divide-y divide-slate-100">
                 {filteredProducts.map((p) => {
                   const centralStock = p.central_stock || p.total_stock || 0;
+                  const buyRate = Number(p.supplier_price ?? p.base_price ?? 0);
+                  const outletRate = Number(p.outlet_price ?? (buyRate * 1.15));
+                  const retailMRP = Number(p.retail_price ?? (outletRate * 1.15));
+
                   return (
                     <tr key={p.product_id} className="hover:bg-slate-50/70 transition-colors">
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
+                          <div className="w-11 h-11 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
                             {p.image_url ? (
                               <img
                                 src={p.image_url}
@@ -355,11 +375,28 @@ export const SuperadminProductCatalog: React.FC = () => {
                         </span>
                       </td>
 
+                      {/* 3-Tier Multi-Echelon Pricing Pill Breakdown */}
                       <td className="py-3 px-4">
-                        <span className="font-mono font-bold text-zinc-900 text-xs">
-                          ৳{Number(p.base_price).toFixed(2)}
-                        </span>
-                        <span className="text-[9px] text-slate-400 block font-mono">per case/unit</span>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1.5 text-[11px] font-mono">
+                            <span className="text-slate-400 w-16 uppercase text-[9px] font-bold">Buy:</span>
+                            <span className="font-bold text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-100">
+                              ৳{buyRate.toFixed(2)}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-[11px] font-mono">
+                            <span className="text-slate-400 w-16 uppercase text-[9px] font-bold">Outlet:</span>
+                            <span className="font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-100">
+                              ৳{outletRate.toFixed(2)}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-[11px] font-mono">
+                            <span className="text-slate-400 w-16 uppercase text-[9px] font-bold">Retail MRP:</span>
+                            <span className="font-bold text-purple-700 bg-purple-50 px-1.5 py-0.2 rounded border border-purple-100">
+                              ৳{retailMRP.toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
                       </td>
 
                       <td className="py-3 px-4 text-center">
@@ -371,15 +408,30 @@ export const SuperadminProductCatalog: React.FC = () => {
                         </span>
                       </td>
 
+                      {/* Actions: Edit & Delete */}
                       <td className="py-3 px-4 text-right">
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(p.product_id, `${p.brand} ${p.flavor_variant}`)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                          title="Permanently remove product from master catalog"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center justify-end gap-1">
+                          {/* EDIT PRODUCT BUTTON */}
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditModal(p)}
+                            className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 border border-transparent hover:border-blue-200 transition-colors cursor-pointer flex items-center gap-1 font-bold text-xs"
+                            title="Edit product specifications, pricing, and central stock"
+                          >
+                            <Edit3 className="w-3.5 h-3.5 text-blue-600" />
+                            <span className="hidden sm:inline">Edit</span>
+                          </button>
+
+                          {/* DELETE PRODUCT BUTTON */}
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(p.product_id, `${p.brand} ${p.flavor_variant}`)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition-colors cursor-pointer"
+                            title="Permanently remove product from master catalog"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -390,11 +442,15 @@ export const SuperadminProductCatalog: React.FC = () => {
         )}
       </div>
 
-      {/* Superadmin Product Input Modal */}
+      {/* Superadmin Product Input & Edit Modal */}
       <ProductFormModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingProduct(null);
+        }}
         onProductCreated={fetchCatalogAndBranches}
+        productToEdit={editingProduct}
       />
     </div>
   );

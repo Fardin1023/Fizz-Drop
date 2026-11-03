@@ -10,6 +10,7 @@ import { SuperadminRequisitionsHub } from './SuperadminRequisitionsHub';
 import { SuperadminProductCatalog } from './SuperadminProductCatalog';
 import { SuperadminMerchandiseCatalog } from './SuperadminMerchandiseCatalog';
 import { SuperadminSupplierManagement } from './SuperadminSupplierManagement';
+import { SuperadminCommercialLogs } from './SuperadminCommercialLogs';
 import {
   ShieldCheck,
   Building2,
@@ -29,6 +30,7 @@ import {
   ChevronRight,
   Menu,
   Sparkles,
+  TrendingUp,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useNotifications } from '../../hooks/useNotifications';
@@ -37,7 +39,7 @@ import { NotificationPopup } from '../../components/Notifications/NotificationPo
 
 export const SuperadminDashboard: React.FC = () => {
   const { user, isSuperadmin, isAuthenticated, logout, isLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<'products' | 'merchandise' | 'requisitions' | 'suppliers' | 'tables' | 'outlets' | 'inventory' | 'query'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'merchandise' | 'requisitions' | 'suppliers' | 'logs' | 'tables' | 'outlets' | 'inventory' | 'query'>('products');
   const [consoleInitialQuery, setConsoleInitialQuery] = useState<string>('SELECT * FROM Outlets LIMIT 25;');
   const [isDbConfigOpen, setIsDbConfigOpen] = useState(false);
   const [dbStatus, setDbStatus] = useState<any>(null);
@@ -132,6 +134,15 @@ export const SuperadminDashboard: React.FC = () => {
       icon: Users,
       gradient: 'from-purple-600 via-pink-600 to-rose-600',
       badge: 'Allotment',
+    },
+    {
+      id: 'logs' as const,
+      label: 'Supplier & Outlet Commercial Logs',
+      shortLabel: 'Commercial Logs',
+      desc: 'Profit, shelf stocks, prices & audit logs',
+      icon: TrendingUp,
+      gradient: 'from-teal-600 via-emerald-600 to-indigo-600',
+      badge: 'Audit Logs',
     },
     {
       id: 'outlets' as const,
@@ -426,6 +437,7 @@ export const SuperadminDashboard: React.FC = () => {
           {activeTab === 'merchandise' && <SuperadminMerchandiseCatalog />}
           {activeTab === 'requisitions' && <SuperadminRequisitionsHub />}
           {activeTab === 'suppliers' && <SuperadminSupplierManagement />}
+          {activeTab === 'logs' && <SuperadminCommercialLogs />}
           {activeTab === 'tables' && (
             <DatabaseExplorer onOpenQueryWithTable={handleOpenQueryWithTable} />
           )}

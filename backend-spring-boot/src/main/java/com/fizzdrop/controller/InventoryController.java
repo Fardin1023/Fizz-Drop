@@ -463,8 +463,20 @@ public class InventoryController {
                 saleCode, outletId, productId, prodName, qty, unitPrice, totalAmount, paymentMethod, customerNotes
             );
         } catch (Exception e) {
-            // Log fallback if DB insert error
+            System.err.println("[InventoryController] Failed to insert into outlet_sales: " + e.getMessage());
         }
+
+        // Notify Outlet in real time of new customer sale
+        try {
+            com.fizzdrop.entity.AppNotification saleNotif = new com.fizzdrop.entity.AppNotification();
+            saleNotif.setRecipientRole("OUTLET");
+            saleNotif.setTitle("New Customer Order: " + prodName);
+            saleNotif.setMessage("Customer ordered " + qty + " units of " + prodName + " for ৳" + totalAmount + " (" + paymentMethod + "). Shelf stock & revenue updated!");
+            saleNotif.setType("APPROVED");
+            saleNotif.setReferenceCode(saleCode);
+            saleNotif.setReferenceId(outletId);
+            notificationRepository.save(saleNotif);
+        } catch (Exception ignored) {}
 
         Map<String, Object> res = new HashMap<>();
         res.put("success", true);

@@ -12,6 +12,7 @@ import {
   Truck,
   Calendar,
   Store,
+  Edit3,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { ProductFormModal } from './ProductFormModal';
@@ -59,6 +60,7 @@ export const ProductManagement: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [selectedBranch, setSelectedBranch] = useState('ALL');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<any | null>(null);
   const [isSupplyModalOpen, setIsSupplyModalOpen] = useState(false);
   const [supplyTargetProd, setSupplyTargetProd] = useState<number | null>(null);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
@@ -465,6 +467,17 @@ export const ProductManagement: React.FC = () => {
                       <div className="flex items-center justify-end gap-1.5">
                         <button
                           onClick={() => {
+                            setEditingProduct(p);
+                            setIsModalOpen(true);
+                          }}
+                          className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors cursor-pointer"
+                          title="Edit product specifications and pricing"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+
+                        <button
+                          onClick={() => {
                             setSupplyTargetProd(p.product_id);
                             setIsSupplyModalOpen(true);
                           }}
@@ -498,11 +511,15 @@ export const ProductManagement: React.FC = () => {
         </div>
       </div>
 
-      {/* Add Product Modal */}
+      {/* Add / Edit Product Modal */}
       <ProductFormModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingProduct(null);
+        }}
         onProductCreated={fetchData}
+        productToEdit={editingProduct}
         branches={branches}
       />
 
