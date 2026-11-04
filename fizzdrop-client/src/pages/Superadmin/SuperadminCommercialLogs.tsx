@@ -26,7 +26,12 @@ import {
   FileSpreadsheet,
   MapPin,
   Store,
-  Tag
+  Tag,
+  Wallet,
+  CreditCard,
+  Phone,
+  ShieldCheck,
+  Warehouse
 } from 'lucide-react';
 
 interface CommercialSummary {
@@ -149,9 +154,34 @@ interface SupplierOption {
   business_name?: string;
   division_name?: string;
   phone_number?: string;
+  wallet_balance?: number;
+  depot_address?: string;
+  trade_license_number?: string;
+  bank_name?: string;
+  bank_account_number?: string;
+  bank_account_name?: string;
+  mobile_banking_number?: string;
   outlet_count?: number;
   outlets_count?: number;
   outlets?: OutletItemUnderSupplier[];
+}
+
+interface SupplierPurchasedProduct {
+  supplier_id: number;
+  product_id: number;
+  product_name: string;
+  sku: string;
+  brand: string;
+  flavor_variant?: string;
+  size_volume?: string;
+  packaging?: string;
+  unit_supplier_price: number;
+  retail_price: number;
+  total_cases_purchased: number;
+  total_purchase_spent: number;
+  orders_count: number;
+  last_purchase_date: string;
+  current_depot_stock: number;
 }
 
 interface OutletOption {
@@ -194,6 +224,7 @@ export const SuperadminCommercialLogs: React.FC = () => {
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
   const [outlets, setOutlets] = useState<OutletOption[]>([]);
   const [products, setProducts] = useState<ProductOption[]>([]);
+  const [supplierPurchasedProducts, setSupplierPurchasedProducts] = useState<SupplierPurchasedProduct[]>([]);
 
   // Navigation Sub-tab
   const [activeSubTab, setActiveSubTab] = useState<'matrix' | 'supplier_txns' | 'outlet_sales' | 'requisitions'>('matrix');
@@ -212,13 +243,19 @@ export const SuperadminCommercialLogs: React.FC = () => {
 
   // Helpers to get supplier name and outlet count
   const getSupplierDisplayName = (s: SupplierOption | undefined | null): string => {
-    if (!s) return 'Unknown Supplier';
-    return s.supplier_name || s.business_name || `Supplier Hub #${s.supplier_id}`;
+    if (!s) return 'All Regional Suppliers';
+    const name = (s.supplier_name && s.supplier_name.trim()) || (s.business_name && s.business_name.trim());
+    if (name) return name;
+    if (s.supplier_id) return `Supplier Hub #${s.supplier_id}`;
+    return 'Regional Supplier Hub';
   };
 
   const getSupplierOutletCount = (s: SupplierOption | undefined | null): number => {
     if (!s) return 0;
-    return s.outlets?.length ?? s.outlets_count ?? s.outlet_count ?? 0;
+    if (Array.isArray(s.outlets)) return s.outlets.length;
+    if (s.outlets_count !== undefined && s.outlets_count !== null) return Number(s.outlets_count);
+    if (s.outlet_count !== undefined && s.outlet_count !== null) return Number(s.outlet_count);
+    return 0;
   };
 
   // Fetch Commercial Logs Telemetry from Backend API
@@ -248,6 +285,7 @@ export const SuperadminCommercialLogs: React.FC = () => {
       setSuppliers(data.suppliers || []);
       setOutlets(data.outlets || []);
       setProducts(data.products || []);
+      setSupplierPurchasedProducts(data.supplier_purchased_products || []);
     } catch (err: any) {
       console.error('Error loading commercial logs:', err);
       setError(err.message || 'Unable to fetch commercial telemetry logs.');
@@ -878,6 +916,193 @@ export const SuperadminCommercialLogs: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* SUPPLIER COMMERCIAL PROFILE, WALLET & PURCHASED PRODUCTS OVERVIEW (When Supplier Filter is Active) */}
+      {activeSupplier && (
+        <div className="bg-white rounded-2xl border border-indigo-200/90 shadow-sm p-5 space-y-4 animate-fade-in">
+          {/* Header */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center shrink-0">
+                <Building2 className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-oswald text-lg font-bold text-slate-900 tracking-wide">
+                    {getSupplierDisplayName(activeSupplier)}
+                  </h3>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-indigo-100 text-indigo-800 border border-indigo-200">
+                    {activeSupplier.division_name || 'Regional Hub'}
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                    <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                    Verified Regional Supplier
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-2 flex-wrap">
+                  <span>Depot Address: <strong className="text-slate-700">{activeSupplier.depot_address || 'Regional Central Warehouse'}</strong></span>
+                  {activeSupplier.phone_number && (
+                    <>
+                      <span>•</span>
+                      <span>Phone: <strong className="text-slate-700">{activeSupplier.phone_number}</strong></span>
+                    </>
+                  )}
+                  {activeSupplier.trade_license_number && (
+                    <>
+                      <span>•</span>
+                      <span>Trade License: <strong className="text-slate-700">{activeSupplier.trade_license_number}</strong></span>
+                    </>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 self-start md:self-auto">
+              <button
+                onClick={() => setSelectedSupplierId('ALL')}
+                className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"
+              >
+                View All Suppliers
+              </button>
+            </div>
+          </div>
+
+          {/* Commercial Telemetry Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {/* 1. Live Wallet Balance */}
+            <div className="p-3.5 rounded-xl bg-gradient-to-br from-emerald-500/10 via-teal-500/10 to-indigo-500/10 border border-emerald-500/30">
+              <div className="flex items-center justify-between text-emerald-800 mb-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider">Commercial Wallet Balance</span>
+                <Wallet className="w-4 h-4 text-emerald-600" />
+              </div>
+              <div className="font-oswald text-2xl font-black text-emerald-700">
+                ৳ {Number(activeSupplier.wallet_balance || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <span className="text-[10px] text-emerald-800/80 font-medium block mt-0.5">
+                Available credit for central stock purchases
+              </span>
+            </div>
+
+            {/* 2. Outlets Under this Supplier */}
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+              <div className="flex items-center justify-between text-slate-600 mb-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider">Outlets Under Supplier</span>
+                <Store className="w-4 h-4 text-indigo-500" />
+              </div>
+              <div className="font-oswald text-2xl font-black text-slate-900">
+                {availableOutlets.length} <span className="text-xs font-sans font-bold text-slate-500">branches</span>
+              </div>
+              <span className="text-[10px] text-slate-500 font-medium block mt-0.5 truncate">
+                {availableOutlets.map(o => o.outlet_name).join(', ') || 'No outlets assigned'}
+              </span>
+            </div>
+
+            {/* 3. Central Stock Purchases Total */}
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+              <div className="flex items-center justify-between text-slate-600 mb-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider">Total Depot Purchases</span>
+                <Truck className="w-4 h-4 text-blue-500" />
+              </div>
+              <div className="font-oswald text-2xl font-black text-slate-900">
+                ৳ {supplierPurchasedProducts
+                  .filter(p => Number(p.supplier_id) === Number(activeSupplier.supplier_id))
+                  .reduce((sum, p) => sum + Number(p.total_purchase_spent || 0), 0)
+                  .toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <span className="text-[10px] text-slate-500 font-medium block mt-0.5">
+                Direct Superadmin purchase orders
+              </span>
+            </div>
+
+            {/* 4. Registered Settlement Accounts */}
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+              <div className="flex items-center justify-between text-slate-600 mb-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider">Bank & Settlement</span>
+                <CreditCard className="w-4 h-4 text-teal-500" />
+              </div>
+              <div className="text-xs font-bold text-slate-800 truncate">
+                {activeSupplier.bank_name || 'Corporate Wire Transfer'}
+              </div>
+              <span className="text-[10px] font-mono text-slate-500 block truncate mt-0.5">
+                Acc: {activeSupplier.bank_account_number || 'On File'} • MFS: {activeSupplier.mobile_banking_number || 'N/A'}
+              </span>
+            </div>
+          </div>
+
+          {/* Products Purchased from Superadmin Table */}
+          <div className="pt-2">
+            <div className="flex items-center justify-between mb-2.5">
+              <div className="flex items-center gap-2">
+                <Package className="w-4 h-4 text-indigo-600" />
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                  Products Purchased by {getSupplierDisplayName(activeSupplier)} from Superadmin
+                </h4>
+              </div>
+              <span className="text-[11px] text-slate-400 font-medium">
+                {supplierPurchasedProducts.filter(p => Number(p.supplier_id) === Number(activeSupplier.supplier_id)).length} SKUs purchased
+              </span>
+            </div>
+
+            {supplierPurchasedProducts.filter(p => Number(p.supplier_id) === Number(activeSupplier.supplier_id)).length === 0 ? (
+              <div className="p-6 rounded-xl bg-slate-50 border border-dashed border-slate-200 text-center text-xs text-slate-500">
+                <Boxes className="w-8 h-8 text-slate-300 mx-auto mb-1.5" />
+                No direct central inventory purchase orders found for this supplier yet.
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-slate-200">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-100/80 text-[10px] font-bold uppercase tracking-wider text-slate-600 border-b border-slate-200">
+                      <th className="py-2.5 px-3">Product Name & Variant</th>
+                      <th className="py-2.5 px-3">SKU & Pack</th>
+                      <th className="py-2.5 px-3 text-right">Supplier Buy Rate</th>
+                      <th className="py-2.5 px-3 text-right">Retail Price</th>
+                      <th className="py-2.5 px-3 text-right">Total Cases Purchased</th>
+                      <th className="py-2.5 px-3 text-right">Total Spent (৳)</th>
+                      <th className="py-2.5 px-3 text-center">Orders</th>
+                      <th className="py-2.5 px-3 text-center">Depot Stock</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {supplierPurchasedProducts
+                      .filter(p => Number(p.supplier_id) === Number(activeSupplier.supplier_id))
+                      .map((prod) => (
+                        <tr key={prod.product_id} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="py-2.5 px-3 font-bold text-slate-900">
+                            {prod.product_name}
+                          </td>
+                          <td className="py-2.5 px-3 text-[11px] text-slate-500 font-mono">
+                            {prod.sku} • {prod.size_volume || ''} {prod.packaging || ''}
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-mono font-bold text-indigo-700">
+                            ৳ {formatMoney(prod.unit_supplier_price)}
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-mono text-slate-600">
+                            ৳ {formatMoney(prod.retail_price)}
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-oswald text-sm font-bold text-slate-800">
+                            {prod.total_cases_purchased} <span className="text-[10px] font-sans font-normal text-slate-400">cases</span>
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-mono font-black text-emerald-700">
+                            ৳ {formatMoney(prod.total_purchase_spent)}
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-semibold text-slate-700">
+                            {prod.orders_count}
+                          </td>
+                          <td className="py-2.5 px-3 text-center">
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                              {prod.current_depot_stock} cases
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Navigation Sub-Tabs */}
       <div className="flex items-center gap-1.5 border-b border-slate-200 pb-0 overflow-x-auto scrollbar-none">

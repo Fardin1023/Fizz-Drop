@@ -667,6 +667,17 @@ public class RequisitionProcessingService {
         java.math.BigDecimal vatMultiplier = java.math.BigDecimal.valueOf(1.05);
         java.math.BigDecimal totalWithVat = totalAmount.multiply(vatMultiplier).setScale(2, java.math.RoundingMode.HALF_UP);
 
+        // Commercial Wallet Validation: Supplier can buy stocks based on their wallet amount
+        java.math.BigDecimal currentWallet = profile.getWalletBalance() != null ? profile.getWalletBalance() : java.math.BigDecimal.ZERO;
+        if (currentWallet.compareTo(totalWithVat) < 0) {
+            requisitionRepository.delete(savedReq);
+            throw new IllegalArgumentException("Insufficient wallet balance (৳" + currentWallet.toPlainString() + "). Requisition order requires ৳" + totalWithVat.toPlainString() + ". Please deposit funds into your supplier commercial wallet before purchasing stocks.");
+        }
+
+        // Deduct order amount directly from Supplier's Commercial Wallet
+        profile.setWalletBalance(currentWallet.subtract(totalWithVat));
+        supplierProfileRepository.save(profile);
+
         savedReq.setTotalAmount(totalWithVat);
         requisitionRepository.save(savedReq);
 
@@ -932,6 +943,11 @@ public class RequisitionProcessingService {
 
         if (leftoverRefund.compareTo(java.math.BigDecimal.ZERO) > 0) {
             try {
+                if (sp != null) {
+                    java.math.BigDecimal cur = sp.getWalletBalance() != null ? sp.getWalletBalance() : java.math.BigDecimal.ZERO;
+                    sp.setWalletBalance(cur.add(leftoverRefund));
+                    supplierProfileRepository.save(sp);
+                }
                 SupplierTransaction refTx = new SupplierTransaction(
                         "TXN-" + System.currentTimeMillis() + "-" + (100 + new Random().nextInt(900)),
                         saved.getSupplierId(),
@@ -1672,7 +1688,7 @@ public class RequisitionProcessingService {
             }
         }
 
-        return new SupplierFinancialSummaryDTO(
+        SupplierFinancialSummaryDTO finSummary = new SupplierFinancialSummaryDTO(
                 totalSpent,
                 totalRefunded,
                 netInvestment,
@@ -1682,6 +1698,11 @@ public class RequisitionProcessingService {
                 pendingReturnsVal,
                 txList
         );
+        SupplierProfile spObj = supplierProfileRepository.findById(supplierId).orElse(null);
+        if (spObj != null && spObj.getWalletBalance() != null) {
+            finSummary.setWalletBalance(spObj.getWalletBalance());
+        }
+        return finSummary;
     }
 
     private void enrichReturnRequest(StockReturnRequest r) {
@@ -1707,6 +1728,114 @@ public class RequisitionProcessingService {
                 item.setSizeVolume(p.getSizeVolume());
             });
         }
+    }
+
+    public Map<String, Object> getSupplierWalletDetails(Long userId) {
+        SupplierProfile profile = getSupplierProfile(userId);
+        List<SupplierTransaction> txList = supplierTransactionRepository.findBySupplierIdOrderByCreatedAtDesc(profile.getId());
+
+        Map<String, Object> res = new HashMap<>();
+        res.put("supplier_id", profile.getId());
+        res.put("business_name", profile.getBusinessName());
+        res.put("wallet_balance", profile.getWalletBalance() != null ? profile.getWalletBalance() : java.math.BigDecimal.ZERO);
+        res.put("bank_name", profile.getBankName());
+        res.put("bank_account_number", profile.getBankAccountNumber());
+        res.put("bank_account_name", profile.getBankAccountName());
+        res.put("mobile_banking_number", profile.getMobileBankingNumber());
+        res.put("default_payment_method", profile.getDefaultPaymentMethod());
+        res.put("depot_address", profile.getDepotAddress());
+        res.put("phone_number", profile.getPhoneNumber());
+        res.put("division_name", profile.getDivisionName());
+        res.put("transactions", txList);
+        return res;
+    }
+
+    @Transactional
+    public Map<String, Object> topupSupplierWallet(Long userId, Map<String, Object> payload) {
+        SupplierProfile profile = getSupplierProfile(userId);
+        if (payload == null || !payload.containsKey("amount")) {
+            throw new IllegalArgumentException("Deposit amount is required.");
+        }
+
+        Object amtObj = payload.get("amount");
+        java.math.BigDecimal amount;
+        try {
+            amount = new java.math.BigDecimal(amtObj.toString());
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Invalid top-up amount format.");
+        }
+
+        if (amount.compareTo(java.math.BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Top-up deposit amount must be greater than zero.");
+        }
+
+        String paymentMethod = payload.get("payment_method") != null ? payload.get("payment_method").toString().trim() : "BANK_TRANSFER";
+        String referenceCode = payload.get("reference_code") != null ? payload.get("reference_code").toString().trim() : ("DEP-" + System.currentTimeMillis());
+        String notes = payload.get("notes") != null ? payload.get("notes").toString().trim() : ("Commercial Wallet deposit via " + paymentMethod);
+
+        // Optionally update banking/MFS credentials if provided in top-up modal
+        if (payload.get("bank_name") != null && !payload.get("bank_name").toString().trim().isEmpty()) {
+            profile.setBankName(payload.get("bank_name").toString().trim());
+        }
+        if (payload.get("bank_account_number") != null && !payload.get("bank_account_number").toString().trim().isEmpty()) {
+            profile.setBankAccountNumber(payload.get("bank_account_number").toString().trim());
+        }
+        if (payload.get("bank_account_name") != null && !payload.get("bank_account_name").toString().trim().isEmpty()) {
+            profile.setBankAccountName(payload.get("bank_account_name").toString().trim());
+        }
+        if (payload.get("mobile_banking_number") != null && !payload.get("mobile_banking_number").toString().trim().isEmpty()) {
+            profile.setMobileBankingNumber(payload.get("mobile_banking_number").toString().trim());
+        }
+
+        java.math.BigDecimal currentWallet = profile.getWalletBalance() != null ? profile.getWalletBalance() : java.math.BigDecimal.ZERO;
+        java.math.BigDecimal newBalance = currentWallet.add(amount);
+        profile.setWalletBalance(newBalance);
+        supplierProfileRepository.save(profile);
+
+        SupplierTransaction tx = new SupplierTransaction(
+                "TXN-TOPUP-" + System.currentTimeMillis() + "-" + (100 + new Random().nextInt(900)),
+                profile.getId(),
+                null,
+                null,
+                referenceCode,
+                "WALLET_TOPUP",
+                "CREDIT",
+                amount,
+                paymentMethod,
+                notes,
+                "COMPLETED"
+        );
+        supplierTransactionRepository.save(tx);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("success", true);
+        result.put("message", "Wallet topped up successfully with ৳" + amount.toPlainString());
+        result.put("wallet_balance", newBalance);
+        result.put("transaction", tx);
+        return result;
+    }
+
+    @Transactional
+    public Map<String, Object> updateSupplierWalletSettings(Long userId, Map<String, String> payload) {
+        SupplierProfile profile = getSupplierProfile(userId);
+        if (payload != null) {
+            if (payload.containsKey("bank_name")) profile.setBankName(payload.get("bank_name"));
+            if (payload.containsKey("bank_account_number")) profile.setBankAccountNumber(payload.get("bank_account_number"));
+            if (payload.containsKey("bank_account_name")) profile.setBankAccountName(payload.get("bank_account_name"));
+            if (payload.containsKey("mobile_banking_number")) profile.setMobileBankingNumber(payload.get("mobile_banking_number"));
+            if (payload.containsKey("default_payment_method")) profile.setDefaultPaymentMethod(payload.get("default_payment_method"));
+            supplierProfileRepository.save(profile);
+        }
+        Map<String, Object> res = new HashMap<>();
+        res.put("success", true);
+        res.put("message", "Wallet settings updated successfully.");
+        res.put("wallet_balance", profile.getWalletBalance() != null ? profile.getWalletBalance() : java.math.BigDecimal.ZERO);
+        res.put("bank_name", profile.getBankName());
+        res.put("bank_account_number", profile.getBankAccountNumber());
+        res.put("bank_account_name", profile.getBankAccountName());
+        res.put("mobile_banking_number", profile.getMobileBankingNumber());
+        res.put("default_payment_method", profile.getDefaultPaymentMethod());
+        return res;
     }
 
 }

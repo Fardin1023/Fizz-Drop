@@ -2,6 +2,7 @@ package com.fizzdrop.dto;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.math.BigDecimal;
 import java.util.List;
 
 public class SupplierProfileDTO {
@@ -57,6 +58,10 @@ public class SupplierProfileDTO {
     @JsonProperty("mobile_banking_number")
     @JsonAlias({"mobile_banking_number", "mobileBankingNumber"})
     private String mobileBankingNumber;
+
+    @JsonProperty("wallet_balance")
+    @JsonAlias({"wallet_balance", "walletBalance"})
+    private BigDecimal walletBalance;
 
     @JsonProperty("email")
     @JsonAlias({"email", "user_email", "userEmail"})
@@ -240,6 +245,9 @@ public class SupplierProfileDTO {
 
     public String getTdsVdsDocType() { return tdsVdsDocType; }
     public void setTdsVdsDocType(String tdsVdsDocType) { this.tdsVdsDocType = tdsVdsDocType; }
+
+    public BigDecimal getWalletBalance() { return walletBalance; }
+    public void setWalletBalance(BigDecimal walletBalance) { this.walletBalance = walletBalance; }
 
     public String getTdsVdsNumber() { return tdsVdsNumber; }
     public void setTdsVdsNumber(String tdsVdsNumber) { this.tdsVdsNumber = tdsVdsNumber; }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import AdminLogin from './AdminLogin';
 import { SupplierAvailableProducts } from './SupplierAvailableProducts';
@@ -8,6 +8,7 @@ import { SupplierProfileView } from './SupplierProfileView';
 import { SupplierTransactionsView } from './SupplierTransactionsView';
 import { SupplierAllocatedOutlets } from './SupplierAllocatedOutlets';
 import { SupplierOutletRequisitions } from './SupplierOutletRequisitions';
+import { SupplierWalletModal } from './SupplierWalletModal';
 import {
   Package,
   LogOut,
@@ -22,6 +23,7 @@ import {
   Receipt,
   Warehouse,
   Store,
+  Wallet,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useNotifications } from '../../hooks/useNotifications';
@@ -33,6 +35,24 @@ export const AdminDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'catalog' | 'outlet-requests' | 'request' | 'history' | 'outlets' | 'profile' | 'transactions'>('catalog');
   const [selectedProductId, setSelectedProductId] = useState<number | undefined>(undefined);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [isWalletModalOpen, setIsWalletModalOpen] = useState<boolean>(false);
+
+  const fetchWallet = async () => {
+    try {
+      const res = await fetch(`/api/v1/supplier/wallet?userId=${user?.user_id || 4}`);
+      if (res.ok) {
+        const data = await res.json();
+        setWalletBalance(Number(data.wallet_balance || 0));
+      }
+    } catch (e) {
+      console.error('Failed to load wallet balance', e);
+    }
+  };
+
+  useEffect(() => {
+    fetchWallet();
+  }, [user]);
 
   const {
     notifications,
@@ -170,6 +190,26 @@ export const AdminDashboard: React.FC = () => {
               <span className="text-[11px] text-slate-400 font-mono hidden md:inline truncate">
                 ({user?.email})
               </span>
+
+              {/* Supplier Commercial Wallet Pill */}
+              <button
+                onClick={() => setIsWalletModalOpen(true)}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-gradient-to-r from-emerald-500/10 via-indigo-500/10 to-teal-500/10 hover:from-emerald-500/20 hover:to-indigo-500/20 border border-emerald-500/30 text-emerald-800 font-bold text-xs transition-all cursor-pointer shadow-2xs group"
+                title="Manage Commercial Wallet, Banking Accounts & Top-up"
+              >
+                <div className="w-5 h-5 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                  <Wallet className="w-3 h-3" />
+                </div>
+                <div className="flex flex-col text-left">
+                  <span className="text-[8px] uppercase tracking-wider text-slate-500 font-bold leading-none">Wallet</span>
+                  <span className="font-oswald text-xs font-black text-emerald-700 leading-tight">
+                    ৳{walletBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-sans font-bold ml-0.5 hidden sm:inline">
+                  + Top Up
+                </span>
+              </button>
 
               <NotificationDropdown
                 notifications={notifications}
@@ -368,6 +408,15 @@ export const AdminDashboard: React.FC = () => {
           {activeTab === 'transactions' && <SupplierTransactionsView />}
         </main>
       </div>
+
+      {/* Commercial Digital Wallet & Top-up Modal */}
+      <SupplierWalletModal
+        isOpen={isWalletModalOpen}
+        onClose={() => setIsWalletModalOpen(false)}
+        onWalletUpdated={(newBal) => {
+          setWalletBalance(newBal);
+        }}
+      />
     </div>
   );
 };

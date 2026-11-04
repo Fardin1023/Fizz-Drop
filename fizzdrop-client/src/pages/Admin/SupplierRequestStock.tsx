@@ -12,10 +12,12 @@ import {
   AlertCircle,
   CreditCard,
   Printer,
+  Wallet,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { broadcastRealtimeEvent } from '../../utils/broadcast';
 import { InvoiceModal, type InvoiceData } from '../../components/Invoice/InvoiceModal';
+import { SupplierWalletModal } from './SupplierWalletModal';
 import pepsiImg from '../../assets/img/pepsi.PNG';
 import sevenUpImg from '../../assets/img/7up.PNG';
 import dewImg from '../../assets/img/mountain dew.PNG';
@@ -83,6 +85,8 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
   const [isInvoiceOpen, setIsInvoiceOpen] = useState<boolean>(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [isWalletModalOpen, setIsWalletModalOpen] = useState<boolean>(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -97,6 +101,7 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
       if (profRes.ok) {
         const profData = await profRes.json();
         setProfile(profData);
+        setWalletBalance(Number(profData.wallet_balance || 0));
         if (profData.primary_district_id) {
           setDestinationDistrictId(profData.primary_district_id);
         }
@@ -178,6 +183,12 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
       return;
     }
 
+    if (grandTotal > walletBalance) {
+      setErrorMsg(`Insufficient Commercial Wallet Balance! Your available balance is ৳${walletBalance.toFixed(2)}, but this requisition order requires ৳${grandTotal.toFixed(2)}. Shortfall: ৳${(grandTotal - walletBalance).toFixed(2)}. Please top up your wallet.`);
+      setIsWalletModalOpen(true);
+      return;
+    }
+
     setSubmitting(true);
     setErrorMsg(null);
     setSuccessMsg(null);
@@ -212,6 +223,7 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
       const created = await res.json();
       setSubmittedRequisition(created);
       setSuccessMsg(`Requisition ${created.requisition_code} submitted successfully with PENDING status! Tax Invoice is available below.`);
+      setWalletBalance((prev) => Math.max(0, prev - grandTotal));
       setQuantities({});
       setRemarks('');
       setUrgency('NORMAL');
@@ -641,6 +653,53 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
               />
             </div>
 
+            {/* Commercial Wallet Telemetry Box */}
+            <div className={`p-3.5 rounded-2xl border transition-all ${
+              grandTotal > walletBalance && selectedEntries.length > 0
+                ? 'bg-rose-50/90 border-rose-300 text-rose-950'
+                : 'bg-emerald-50/70 border-emerald-200/90 text-emerald-950'
+            }`}>
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center gap-1.5">
+                  <Wallet className={`w-4 h-4 ${grandTotal > walletBalance && selectedEntries.length > 0 ? 'text-rose-600' : 'text-emerald-600'}`} />
+                  <span className="text-[11px] font-bold uppercase tracking-wider">
+                    Commercial Depot Wallet
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsWalletModalOpen(true)}
+                  className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition cursor-pointer shadow-2xs"
+                >
+                  + Top Up
+                </button>
+              </div>
+
+              <div className="flex items-baseline justify-between">
+                <span className="text-xs text-slate-600">Available Balance:</span>
+                <span className="font-oswald text-lg font-black text-slate-900">
+                  ৳ {walletBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+
+              {selectedEntries.length > 0 && (
+                <div className="mt-2 pt-2 border-t border-slate-200/80 flex items-center justify-between text-[11px]">
+                  <span className="font-medium text-slate-500">Coverage Status:</span>
+                  {grandTotal > walletBalance ? (
+                    <span className="font-bold text-rose-700 flex items-center gap-1">
+                      <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+                      Shortfall: ৳ {(grandTotal - walletBalance).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </span>
+                  ) : (
+                    <span className="font-bold text-emerald-700 flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      Funds Ready (৳ {(walletBalance - grandTotal).toLocaleString('en-US', { minimumFractionDigits: 2 })} after order)
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Live Financial Breakdown Box */}
             {selectedEntries.length > 0 && (
               <div className="p-3.5 rounded-2xl bg-indigo-50/60 border border-indigo-100 space-y-1.5 text-xs">
@@ -710,14 +769,25 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
             </div>
 
             {/* Submit Requisition CTA */}
-            <button
-              type="submit"
-              disabled={submitting || selectedEntries.length === 0}
-              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 disabled:opacity-40 text-white font-bold text-xs shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95 disabled:cursor-not-allowed"
-            >
-              <Send className="w-4 h-4" />
-              <span>{submitting ? 'Submitting to Superadmin...' : 'Commit Stock Requisition'}</span>
-            </button>
+            {grandTotal > walletBalance && selectedEntries.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => setIsWalletModalOpen(true)}
+                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-600 via-rose-600 to-indigo-700 hover:from-amber-500 hover:to-indigo-600 text-white font-bold text-xs shadow-md shadow-rose-500/20 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95"
+              >
+                <Wallet className="w-4 h-4" />
+                <span>Top Up Wallet (+৳{(grandTotal - walletBalance).toFixed(2)}) & Place Order</span>
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={submitting || selectedEntries.length === 0}
+                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 disabled:opacity-40 text-white font-bold text-xs shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95 disabled:cursor-not-allowed"
+              >
+                <Send className="w-4 h-4" />
+                <span>{submitting ? 'Submitting to Superadmin...' : 'Commit Stock Requisition'}</span>
+              </button>
+            )}
 
             {/* Immediate Download Invoice Action if just submitted */}
             {submittedRequisition && (
@@ -739,6 +809,16 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
         invoice={submittedRequisition}
         isOpen={isInvoiceOpen}
         onClose={() => setIsInvoiceOpen(false)}
+      />
+
+      {/* Commercial Wallet & Top-up Modal */}
+      <SupplierWalletModal
+        isOpen={isWalletModalOpen}
+        onClose={() => setIsWalletModalOpen(false)}
+        requiredAmount={grandTotal > walletBalance ? (grandTotal - walletBalance) : undefined}
+        onWalletUpdated={(newBal) => {
+          setWalletBalance(newBal);
+        }}
       />
     </div>
   );

@@ -226,6 +226,42 @@ public class RequisitionController {
         return ResponseEntity.ok(requisitionService.getSupplierFinancialSummary(resolvedId));
     }
 
+
+    // 7. Commercial Digital Wallet & Top-up Endpoints
+    @GetMapping("/supplier/wallet")
+    public ResponseEntity<?> getSupplierWallet(
+            @RequestHeader(value = "Authorization", required = false) String authHeader,
+            @RequestParam(value = "userId", required = false) Long userId) {
+        Long resolvedId = resolveUserId(authHeader, userId);
+        return ResponseEntity.ok(requisitionService.getSupplierWalletDetails(resolvedId));
+    }
+
+    @PostMapping("/supplier/wallet/topup")
+    public ResponseEntity<?> topupSupplierWallet(
+            @RequestHeader(value = "Authorization", required = false) String authHeader,
+            @RequestParam(value = "userId", required = false) Long userId,
+            @RequestBody Map<String, Object> payload) {
+        try {
+            Long resolvedId = resolveUserId(authHeader, userId);
+            return ResponseEntity.ok(requisitionService.topupSupplierWallet(resolvedId, payload));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));
+        }
+    }
+
+    @PutMapping("/supplier/wallet/settings")
+    public ResponseEntity<?> updateWalletSettings(
+            @RequestHeader(value = "Authorization", required = false) String authHeader,
+            @RequestParam(value = "userId", required = false) Long userId,
+            @RequestBody Map<String, String> payload) {
+        try {
+            Long resolvedId = resolveUserId(authHeader, userId);
+            return ResponseEntity.ok(requisitionService.updateSupplierWalletSettings(resolvedId, payload));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));
+        }
+    }
+
     @GetMapping("/admin/returns")
     public ResponseEntity<List<StockReturnRequest>> getAllReturnsForAdmin(
             @RequestParam(required = false) String status) {

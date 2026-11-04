@@ -139,6 +139,13 @@ public class AdminController {
             sMap.put("business_name", sp.getBusinessName());
             sMap.put("division_name", sp.getDivisionName());
             sMap.put("phone_number", sp.getPhoneNumber());
+            sMap.put("wallet_balance", sp.getWalletBalance() != null ? sp.getWalletBalance() : java.math.BigDecimal.ZERO);
+            sMap.put("depot_address", sp.getDepotAddress());
+            sMap.put("trade_license_number", sp.getTradeLicenseNumber());
+            sMap.put("bank_name", sp.getBankName());
+            sMap.put("bank_account_number", sp.getBankAccountNumber());
+            sMap.put("bank_account_name", sp.getBankAccountName());
+            sMap.put("mobile_banking_number", sp.getMobileBankingNumber());
 
             List<Map<String, Object>> underOutlets = new ArrayList<>();
             for (Outlet o : allOutlets) {
@@ -441,6 +448,37 @@ public class AdminController {
         summary.put("active_outlets_count", targetOutlets.size());
         summary.put("active_suppliers_count", supplierList.size());
 
+        // Query Products Purchased by Suppliers from Superadmin (Stock Requisitions)
+        List<Map<String, Object>> supplierPurchasedProducts = new ArrayList<>();
+        try {
+            String purchaseSql = 
+                "SELECT " +
+                "  sr.supplier_id, " +
+                "  p.product_id, " +
+                "  CONCAT(p.brand, ' ', p.flavor_variant) AS product_name, " +
+                "  p.sku, " +
+                "  p.brand, " +
+                "  p.flavor_variant, " +
+                "  p.size_volume, " +
+                "  p.packaging, " +
+                "  COALESCE(p.supplier_price, p.base_price, 0) AS unit_supplier_price, " +
+                "  COALESCE(p.retail_price, 0) AS retail_price, " +
+                "  SUM(COALESCE(sri.approved_quantity, sri.requested_quantity, 0)) AS total_cases_purchased, " +
+                "  SUM(COALESCE(sri.approved_quantity, sri.requested_quantity, 0) * COALESCE(p.supplier_price, p.base_price, 0)) AS total_purchase_spent, " +
+                "  COUNT(DISTINCT sr.id) AS orders_count, " +
+                "  MAX(sr.created_at) AS last_purchase_date, " +
+                "  COALESCE(di.current_stock, 0) AS current_depot_stock " +
+                "FROM stock_requisitions sr " +
+                "JOIN stock_requisition_items sri ON sr.id = sri.requisition_id " +
+                "JOIN products p ON sri.product_id = p.product_id " +
+                "LEFT JOIN district_inventory di ON di.product_id = p.product_id AND di.district_id = sr.district_id " +
+                "GROUP BY sr.supplier_id, p.product_id, p.sku, p.brand, p.flavor_variant, p.size_volume, p.packaging, p.supplier_price, p.base_price, p.retail_price, di.current_stock " +
+                "ORDER BY total_cases_purchased DESC";
+            supplierPurchasedProducts = jdbcTemplate.queryForList(purchaseSql);
+        } catch (Exception ex) {
+            System.err.println("[Commercial Logs] Failed to query supplier purchased products: " + ex.getMessage());
+        }
+
         Map<String, Object> response = new HashMap<>();
         response.put("summary", summary);
         response.put("suppliers", supplierList);
@@ -450,6 +488,7 @@ public class AdminController {
         response.put("outlet_sales_logs", outletSalesLogs);
         response.put("supplier_transactions", supplierTxnLogs);
         response.put("outlet_requisitions", outletRequisitionLogs);
+        response.put("supplier_purchased_products", supplierPurchasedProducts);
 
         return ResponseEntity.ok(response);
     }

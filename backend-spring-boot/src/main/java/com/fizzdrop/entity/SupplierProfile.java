@@ -3,6 +3,7 @@ package com.fizzdrop.entity;
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -70,6 +71,11 @@ public class SupplierProfile {
     @JsonProperty("mobile_banking_number")
     @JsonAlias({"mobile_banking_number", "mobileBankingNumber"})
     private String mobileBankingNumber;
+
+    @Column(name = "wallet_balance", precision = 15, scale = 2, nullable = false)
+    @JsonProperty("wallet_balance")
+    @JsonAlias({"wallet_balance", "walletBalance"})
+    private BigDecimal walletBalance = new BigDecimal("50000.00");
 
     @Column(name = "is_verified", nullable = false)
     @JsonProperty("is_verified")
@@ -346,6 +352,9 @@ public class SupplierProfile {
 
     public String getTdsVdsDocType() { return tdsVdsDocType; }
     public void setTdsVdsDocType(String tdsVdsDocType) { this.tdsVdsDocType = tdsVdsDocType; }
+
+    public BigDecimal getWalletBalance() { return walletBalance != null ? walletBalance : BigDecimal.ZERO; }
+    public void setWalletBalance(BigDecimal walletBalance) { this.walletBalance = walletBalance; }
 
     public String getTdsVdsNumber() { return tdsVdsNumber; }
     public void setTdsVdsNumber(String tdsVdsNumber) { this.tdsVdsNumber = tdsVdsNumber; }

@@ -22,6 +22,9 @@ public class SupplierFinancialSummaryDTO {
     @JsonProperty("total_wholesale_profit")
     private BigDecimal totalWholesaleProfit = BigDecimal.ZERO;
 
+    @JsonProperty("wallet_balance")
+    private BigDecimal walletBalance = BigDecimal.ZERO;
+
     @JsonProperty("pending_returns_count")
     private long pendingReturnsCount = 0;
 
@@ -67,6 +70,9 @@ public class SupplierFinancialSummaryDTO {
 
     public BigDecimal getTotalWholesaleProfit() { return totalWholesaleProfit; }
     public void setTotalWholesaleProfit(BigDecimal totalWholesaleProfit) { this.totalWholesaleProfit = totalWholesaleProfit; }
+
+    public BigDecimal getWalletBalance() { return walletBalance; }
+    public void setWalletBalance(BigDecimal walletBalance) { this.walletBalance = walletBalance; }
 
     public long getPendingReturnsCount() { return pendingReturnsCount; }
     public void setPendingReturnsCount(long pendingReturnsCount) { this.pendingReturnsCount = pendingReturnsCount; }
