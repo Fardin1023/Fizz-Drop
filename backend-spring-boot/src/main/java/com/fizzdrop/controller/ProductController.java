@@ -52,6 +52,10 @@ public class ProductController {
     }
 
     private void populateProductMetadata(Product p, Long branchId, Long userId, List<Outlet> outlets) {
+        populateProductMetadata(p, branchId, userId, null, outlets);
+    }
+
+    private void populateProductMetadata(Product p, Long branchId, Long userId, Long supplierId, List<Outlet> outlets) {
         List<Map<String, Object>> outletList = new ArrayList<>();
         int calculatedTotalStock = 0;
 
@@ -95,23 +99,38 @@ public class ProductController {
         p.setAvailableOutlets(outletList);
 
         // Supplier Depot Stock Calculation
-        Long resolvedSupplierUserId = (userId != null && userId > 0) ? userId : 4L;
+        SupplierProfile sp = null;
+        if (supplierId != null && supplierId > 0) {
+            sp = supplierProfileRepository.findById(supplierId).orElse(null);
+        }
+        if (sp == null && userId != null && userId > 0) {
+            sp = supplierProfileRepository.findByUserId(userId).orElse(null);
+        }
+        if (sp == null) {
+            // Robust fallback to primary active supplier (e.g. when superadmin views supplier portal or userId is generic)
+            List<SupplierProfile> allSuppliers = supplierProfileRepository.findAll();
+            if (!allSuppliers.isEmpty()) {
+                sp = allSuppliers.get(0);
+            }
+        }
+
         int totalSupplierDepotStock = 0;
         List<Map<String, Object>> depotBreakdown = new ArrayList<>();
 
-        var profileOpt = supplierProfileRepository.findByUserId(resolvedSupplierUserId);
-        if (profileOpt.isPresent()) {
-            SupplierProfile sp = profileOpt.get();
+        if (sp != null) {
             List<Long> districtIds = new ArrayList<>();
+            if (sp.getPrimaryDistrictId() != null) {
+                districtIds.add(sp.getPrimaryDistrictId());
+            }
             if (sp.getCoveredDistrictIds() != null && !sp.getCoveredDistrictIds().trim().isEmpty()) {
                 for (String sid : sp.getCoveredDistrictIds().split(",")) {
                     try {
-                        districtIds.add(Long.parseLong(sid.trim()));
+                        Long dId = Long.parseLong(sid.trim());
+                        if (!districtIds.contains(dId)) {
+                            districtIds.add(dId);
+                        }
                     } catch (NumberFormatException ignored) {}
                 }
-            }
-            if (districtIds.isEmpty() && sp.getPrimaryDistrictId() != null) {
-                districtIds.add(sp.getPrimaryDistrictId());
             }
 
             for (Long distId : districtIds) {
@@ -135,6 +154,7 @@ public class ProductController {
     public ResponseEntity<List<Product>> getAllProducts(
             @RequestParam(required = false) Long branchId,
             @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) Long supplierId,
             @RequestParam(required = false) String brand,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String search) {
@@ -152,7 +172,7 @@ public class ProductController {
 
         List<Outlet> outlets = outletRepository.findAll();
         for (Product p : products) {
-            populateProductMetadata(p, branchId, userId, outlets);
+            populateProductMetadata(p, branchId, userId, supplierId, outlets);
         }
 
         return ResponseEntity.ok(products);
@@ -161,20 +181,24 @@ public class ProductController {
     @GetMapping("/new-arrivals")
     public ResponseEntity<List<Product>> getNewArrivals(
             @RequestParam(required = false) Long branchId,
-            @RequestParam(required = false) Long userId) {
+            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) Long supplierId) {
         List<Product> list = productRepository.findTopNewArrivals();
         if (list.size() > 8) {
             list = list.subList(0, 8);
         }
         List<Outlet> outlets = outletRepository.findAll();
         for (Product p : list) {
-            populateProductMetadata(p, branchId, userId, outlets);
+            populateProductMetadata(p, branchId, userId, supplierId, outlets);
         }
         return ResponseEntity.ok(list);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<?> getProductById(@PathVariable Long id, @RequestParam(required = false) Long userId) {
+    public ResponseEntity<?> getProductById(
+            @PathVariable Long id,
+            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) Long supplierId) {
         Optional<Product> product = productRepository.findById(id);
         if (product.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -182,7 +206,7 @@ public class ProductController {
         }
         Product p = product.get();
         List<Outlet> outlets = outletRepository.findAll();
-        populateProductMetadata(p, null, userId, outlets);
+        populateProductMetadata(p, null, userId, supplierId, outlets);
         return ResponseEntity.ok(p);
     }
 
