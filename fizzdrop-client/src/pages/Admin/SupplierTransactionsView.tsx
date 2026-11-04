@@ -17,8 +17,10 @@ import {
   TrendingDown,
   Layers,
   Boxes,
+  Wallet,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { SupplierWalletModal } from './SupplierWalletModal';
 import {
   downloadTransactionPdf,
   downloadTransactionCsv,
@@ -50,10 +52,13 @@ export const SupplierTransactionsView: React.FC = () => {
   const { token, user } = useAuth();
 
   const [loading, setLoading] = useState<boolean>(true);
+  const [isWalletModalOpen, setIsWalletModalOpen] = useState<boolean>(false);
   const [financialSummary, setFinancialSummary] = useState<SupplierFinancialExportData>({
     total_spent: 0,
     total_refunded: 0,
     net_investment: 0,
+    wallet_balance: 0,
+    total_deposited: 0,
     total_revenue: 0,
     total_wholesale_profit: 0,
     pending_returns_count: 0,
@@ -96,6 +101,8 @@ export const SupplierTransactionsView: React.FC = () => {
           total_spent: Number(dataTx.total_spent || 0),
           total_refunded: Number(dataTx.total_refunded || 0),
           net_investment: Number(dataTx.net_investment || 0),
+          wallet_balance: Number(dataTx.wallet_balance || 0),
+          total_deposited: Number(dataTx.total_deposited || 0),
           total_revenue: Number(dataTx.total_revenue || 0),
           total_wholesale_profit: Number(dataTx.total_wholesale_profit || 0),
           pending_returns_count: Number(dataTx.pending_returns_count || 0),
@@ -167,6 +174,9 @@ export const SupplierTransactionsView: React.FC = () => {
 
   const getTypeBadge = (type: string) => {
     switch (type) {
+      case 'WALLET_TOPUP':
+      case 'WALLET_DEPOSIT':
+        return <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">Commercial Top-Up</span>;
       case 'OUTLET_SALE':
         return <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">Wholesale Sale (Outlet)</span>;
       case 'STOCK_PURCHASE':
@@ -330,7 +340,30 @@ export const SupplierTransactionsView: React.FC = () => {
       )}
 
       {/* KPI Financial Overview Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+        {/* Card 0: Commercial Wallet */}
+        <div 
+          onClick={() => setIsWalletModalOpen(true)}
+          className="p-5 rounded-3xl bg-gradient-to-br from-indigo-900 via-slate-900 to-indigo-950 text-white shadow-xs space-y-2 relative overflow-hidden cursor-pointer hover:shadow-md transition-all group"
+          title="Click to manage Commercial Digital Wallet & Top-Up"
+        >
+          <div className="flex items-center justify-between text-indigo-300">
+            <span className="text-[10px] font-bold uppercase tracking-wider">
+              Commercial Wallet
+            </span>
+            <div className="p-2 rounded-xl bg-white/10 text-indigo-300 group-hover:bg-indigo-600 group-hover:text-white transition-all">
+              <Wallet className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="font-oswald text-2xl font-black text-white">
+            {formatCurrency(financialSummary.wallet_balance || 0)}
+          </div>
+          <div className="text-[11px] text-indigo-200/80 flex items-center justify-between">
+            <span>Available credit</span>
+            <span className="underline text-[10px] text-indigo-300 font-semibold group-hover:text-white">Top-Up &rarr;</span>
+          </div>
+        </div>
+
         {/* Card 1: Total Spent */}
         <div className="p-5 rounded-3xl bg-white border border-slate-200 shadow-xs space-y-2 relative overflow-hidden">
           <div className="flex items-center justify-between text-slate-400">
@@ -635,6 +668,15 @@ export const SupplierTransactionsView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Commercial Digital Wallet & Top-Up Modal */}
+      <SupplierWalletModal
+        isOpen={isWalletModalOpen}
+        onClose={() => setIsWalletModalOpen(false)}
+        onWalletUpdated={() => {
+          fetchData();
+        }}
+      />
     </div>
   );
 };

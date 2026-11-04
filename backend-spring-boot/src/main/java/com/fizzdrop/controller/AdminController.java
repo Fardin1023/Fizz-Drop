@@ -168,7 +168,7 @@ public class AdminController {
             double spProcurementSpent = 0.0;
             try {
                 Double spSpent = jdbcTemplate.queryForObject(
-                    "SELECT COALESCE(SUM(total_amount), 0) FROM stock_requisitions WHERE supplier_id = ?",
+                    "SELECT COALESCE(SUM(total_amount - COALESCE(refund_amount, 0)), 0) FROM stock_requisitions WHERE supplier_id = ? AND status != 'REJECTED'",
                     Double.class,
                     sp.getId()
                 );
@@ -216,6 +216,17 @@ public class AdminController {
                     }
                 } catch (Exception ignored) {}
             }
+
+            try {
+                Double txRev = jdbcTemplate.queryForObject(
+                    "SELECT COALESCE(SUM(amount), 0) FROM supplier_transactions WHERE supplier_id = ? AND type = 'OUTLET_SALE' AND status = 'COMPLETED'",
+                    Double.class,
+                    sp.getId()
+                );
+                if (txRev != null && txRev > 0 && spWholesaleRevenue == 0) {
+                    spWholesaleRevenue = txRev;
+                }
+            } catch (Exception ignored) {}
 
             double spMarginPct = spWholesaleRevenue > 0 ? (spWholesaleGrossProfit / spWholesaleRevenue) * 100.0 : 0.0;
 

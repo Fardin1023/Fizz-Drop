@@ -23,6 +23,8 @@ export interface SupplierFinancialExportData {
   total_spent: number;
   total_refunded: number;
   net_investment: number;
+  wallet_balance?: number;
+  total_deposited?: number;
   total_revenue?: number;
   total_wholesale_profit?: number;
   pending_returns_count?: number;
