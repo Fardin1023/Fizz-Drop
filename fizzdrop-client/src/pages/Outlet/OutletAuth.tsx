@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import logoImg from '../../assets/img/fizzdrop-logo.png';
 import { CITY_AREAS_MAP } from '../../constants/cityAreas';
+import { AnimatedFizzdropBackdrop } from '../../components/Background/AnimatedFizzdropBackdrop';
 
 export const OutletAuth: React.FC = () => {
   const { loginAsOutlet, registerOutlet } = useAuth();
@@ -156,6 +157,9 @@ export const OutletAuth: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-slate-900 to-teal-950 text-slate-100 flex flex-col justify-between relative overflow-hidden selection:bg-emerald-500/30 selection:text-emerald-200">
+      {/* Animated Big Cyan-White FIZZDROP Ambient Background */}
+      <AnimatedFizzdropBackdrop subtitle="OFFICIAL FRANCHISE OUTLET COMMERCE" />
+
       {/* Background Animated Floating Bubbles */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full bg-emerald-500/10 blur-3xl animate-pulse" />

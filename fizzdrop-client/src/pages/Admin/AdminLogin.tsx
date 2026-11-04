@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { ShieldCheck, Crown, Lock, Mail, ArrowRight, AlertCircle, Package, Home } from 'lucide-react';
+import { AnimatedFizzdropBackdrop } from '../../components/Background/AnimatedFizzdropBackdrop';
 
 interface AdminLoginProps {
   onSuccess?: () => void;
@@ -85,6 +86,9 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onSuccess, requiredRole = 'any'
 
   return (
     <div className="min-h-[85vh] flex items-center justify-center px-4 py-12 relative overflow-hidden">
+      {/* Animated Big Cyan-White FIZZDROP Ambient Background */}
+      <AnimatedFizzdropBackdrop subtitle="CENTRAL MANAGEMENT & SUPPLIER PORTAL" />
+
       {/* Dynamic ambient background glow */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl pointer-events-none" />

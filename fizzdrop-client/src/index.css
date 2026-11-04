@@ -200,3 +200,86 @@ code {
 .animate-pulse-glow {
   animation: pulseGlow 2s infinite;
 }
+
+/* =========================================================================
+   Animated Cyan-White FIZZDROP Ambient Background Effect
+   ========================================================================= */
+
+@keyframes fizzdropFadePulse {
+  0% {
+    opacity: 0.08;
+    transform: translate(-50%, -50%) scale(0.94);
+    filter: drop-shadow(0 0 15px rgba(6, 182, 212, 0.15)) blur(3px);
+    letter-spacing: 0.16em;
+  }
+  50% {
+    opacity: 0.45;
+    transform: translate(-50%, -50%) scale(1.04);
+    filter: drop-shadow(0 0 45px rgba(6, 182, 212, 0.6)) drop-shadow(0 0 90px rgba(34, 211, 238, 0.4)) blur(0px);
+    letter-spacing: 0.22em;
+  }
+  100% {
+    opacity: 0.08;
+    transform: translate(-50%, -50%) scale(0.94);
+    filter: drop-shadow(0 0 15px rgba(6, 182, 212, 0.15)) blur(3px);
+    letter-spacing: 0.16em;
+  }
+}
+
+@keyframes fizzdropOutlinePulse {
+  0% {
+    opacity: 0.05;
+    transform: translate(-50%, -50%) scale(1.02);
+  }
+  50% {
+    opacity: 0.35;
+    transform: translate(-50%, -50%) scale(1.1);
+  }
+  100% {
+    opacity: 0.05;
+    transform: translate(-50%, -50%) scale(1.02);
+  }
+}
+
+@keyframes fizzdropShimmerBeam {
+  0% {
+    background-position: -250% center;
+  }
+  100% {
+    background-position: 250% center;
+  }
+}
+
+@keyframes fizzdropBubbleRise {
+  0% {
+    transform: translateY(110vh) scale(0.4) rotate(0deg);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.65;
+  }
+  85% {
+    opacity: 0.65;
+  }
+  100% {
+    transform: translateY(-20vh) scale(1.1) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+.animate-fizzdrop-text {
+  animation: fizzdropFadePulse 6.5s ease-in-out infinite;
+}
+
+.animate-fizzdrop-outline {
+  animation: fizzdropOutlinePulse 6.5s ease-in-out infinite;
+}
+
+.animate-fizzdrop-shimmer {
+  background-size: 250% 100%;
+  animation: fizzdropShimmerBeam 7s ease-in-out infinite;
+}
+
+.animate-fizz-bubble {
+  animation: fizzdropBubbleRise linear infinite;
+}
