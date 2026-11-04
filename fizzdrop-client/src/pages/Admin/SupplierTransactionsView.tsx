@@ -138,6 +138,12 @@ export const SupplierTransactionsView: React.FC = () => {
           if (wData.financial_pnl) {
             setPnlData(wData.financial_pnl);
           }
+          if (wData.wallet_balance !== undefined && wData.wallet_balance !== null) {
+            setFinancialSummary((prev) => ({
+              ...prev,
+              wallet_balance: Number(wData.wallet_balance),
+            }));
+          }
         } catch {
           // ignore non-json
         }
@@ -169,7 +175,9 @@ export const SupplierTransactionsView: React.FC = () => {
   });
 
   const formatCurrency = (val: number = 0) => {
-    return '৳' + Number(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const num = Number(val || 0);
+    const formatted = Math.abs(num).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return num < 0 ? `-৳${formatted}` : `৳${formatted}`;
   };
 
   const getTypeBadge = (type: string) => {

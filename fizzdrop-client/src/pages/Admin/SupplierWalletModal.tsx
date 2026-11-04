@@ -104,6 +104,45 @@ export const SupplierWalletModal: React.FC<SupplierWalletModalProps> = ({
     }
   }, [initialBalance, supplierId]);
 
+  // Helper for resilient API calls with dual endpoint fallback and HTML response guard
+  const requestJson = async (
+    endpointPath: string,
+    options: RequestInit = {}
+  ): Promise<{ ok: boolean; status: number; data: any }> => {
+    // 1. Try relative path (Vite dev proxy or same origin)
+    try {
+      const relRes = await fetch(endpointPath, options);
+      const ct = (relRes.headers.get('content-type') || '').toLowerCase();
+      const txt = await relRes.text();
+      if (ct.includes('application/json') || (!txt.trim().startsWith('<') && !txt.includes('<!doctype') && !txt.includes('<!DOCTYPE'))) {
+        try {
+          const parsed = JSON.parse(txt);
+          return { ok: relRes.ok, status: relRes.status, data: parsed };
+        } catch {}
+      }
+    } catch {}
+
+    // 2. Direct backend host fallback (http://localhost:8080)
+    const directUrl = endpointPath.startsWith('http') ? endpointPath : `http://localhost:8080${endpointPath}`;
+    const directRes = await fetch(directUrl, options);
+    const ct = (directRes.headers.get('content-type') || '').toLowerCase();
+    const txt = await directRes.text();
+
+    if (!ct.includes('application/json') && (txt.trim().startsWith('<') || txt.includes('<!doctype') || txt.includes('<!DOCTYPE'))) {
+      throw new Error(`The backend service is currently unreachable or returned an invalid response (HTTP ${directRes.status}). Please ensure the Spring Boot server is running on port 8080.`);
+    }
+
+    try {
+      const parsed = JSON.parse(txt);
+      return { ok: directRes.ok, status: directRes.status, data: parsed };
+    } catch {
+      if (!directRes.ok) {
+        throw new Error(`Request failed with status HTTP ${directRes.status}`);
+      }
+      return { ok: directRes.ok, status: directRes.status, data: {} };
+    }
+  };
+
   // Fetch live wallet details
   const fetchWallet = async () => {
     try {
@@ -117,21 +156,11 @@ export const SupplierWalletModal: React.FC<SupplierWalletModalProps> = ({
         authHeader['Authorization'] = `Bearer ${token}`;
       }
 
-      const res = await fetch(`http://localhost:8080/api/v1/supplier/wallet?${params.toString()}`, {
+      const { ok, data } = await requestJson(`/api/v1/supplier/wallet?${params.toString()}`, {
         headers: authHeader,
       });
 
-      if (!res.ok) {
-        throw new Error(`Failed to load supplier wallet details (HTTP ${res.status})`);
-      }
-      const text = await res.text();
-      let data: any = null;
-      try {
-        data = JSON.parse(text);
-      } catch {
-        return;
-      }
-      if (data && typeof data === 'object') {
+      if (ok && data && typeof data === 'object') {
         setWalletData(data);
         setBankName(data.bank_name || '');
         setBankAccountNumber(data.bank_account_number || '');
@@ -193,24 +222,14 @@ export const SupplierWalletModal: React.FC<SupplierWalletModalProps> = ({
         authHeader['Authorization'] = `Bearer ${token}`;
       }
 
-      const res = await fetch(`http://localhost:8080/api/v1/supplier/wallet/topup?${params.toString()}`, {
+      const { ok, status, data: result } = await requestJson(`/api/v1/supplier/wallet/topup?${params.toString()}`, {
         method: 'POST',
         headers: authHeader,
         body: JSON.stringify(payload),
       });
 
-      const text = await res.text();
-      let result: any = {};
-      try {
-        result = JSON.parse(text);
-      } catch {
-        if (!res.ok) {
-          throw new Error(`Deposit failed (Server HTTP ${res.status})`);
-        }
-      }
-
-      if (!res.ok) {
-        throw new Error(result.message || result.error || 'Failed to deposit funds into wallet');
+      if (!ok) {
+        throw new Error(result?.message || result?.error || `Failed to deposit funds into wallet (HTTP ${status})`);
       }
 
       setSuccessMsg(`৳${numAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} successfully added to your Commercial Wallet!`);
@@ -254,24 +273,14 @@ export const SupplierWalletModal: React.FC<SupplierWalletModalProps> = ({
         authHeader['Authorization'] = `Bearer ${token}`;
       }
 
-      const res = await fetch(`http://localhost:8080/api/v1/supplier/wallet/settings?${params.toString()}`, {
+      const { ok, status, data: result } = await requestJson(`/api/v1/supplier/wallet/settings?${params.toString()}`, {
         method: 'PUT',
         headers: authHeader,
         body: JSON.stringify(payload),
       });
 
-      const text = await res.text();
-      let result: any = {};
-      try {
-        result = JSON.parse(text);
-      } catch {
-        if (!res.ok) {
-          throw new Error(`Settings update failed (Server HTTP ${res.status})`);
-        }
-      }
-
-      if (!res.ok) {
-        throw new Error(result.message || result.error || 'Failed to update wallet banking settings');
+      if (!ok) {
+        throw new Error(result?.message || result?.error || `Failed to update wallet banking settings (HTTP ${status})`);
       }
 
       setSuccessMsg('Commercial wallet & payout accounts updated successfully!');
