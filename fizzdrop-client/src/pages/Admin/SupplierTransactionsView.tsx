@@ -14,6 +14,9 @@ import {
   Receipt,
   Printer,
   Package,
+  TrendingDown,
+  Layers,
+  Boxes,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -67,6 +70,16 @@ export const SupplierTransactionsView: React.FC = () => {
   const [flowFilter, setFlowFilter] = useState<string>('ALL');
 
   const [supplierProfile, setSupplierProfile] = useState<any>(null);
+  const [pnlData, setPnlData] = useState<{
+    procurement_spent: number;
+    wholesale_revenue: number;
+    wholesale_cogs: number;
+    wholesale_gross_profit: number;
+    profit_margin_pct: number;
+    depot_inventory_value: number;
+    depot_inventory_units: number;
+    net_cash_flow: number;
+  } | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -107,6 +120,20 @@ export const SupplierTransactionsView: React.FC = () => {
       if (resProfile.ok) {
         const prof = await resProfile.json();
         setSupplierProfile(prof);
+      }
+
+      // 4. Fetch Profit & Loss Telemetry
+      const resWallet = await fetch(`http://localhost:8080/api/v1/supplier/wallet?userId=${userId}`);
+      if (resWallet.ok) {
+        const text = await resWallet.text();
+        try {
+          const wData = JSON.parse(text);
+          if (wData.financial_pnl) {
+            setPnlData(wData.financial_pnl);
+          }
+        } catch {
+          // ignore non-json
+        }
       }
     } catch (err) {
       console.error('Error fetching transactions or financial summary:', err);
@@ -228,6 +255,79 @@ export const SupplierTransactionsView: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Supplier Live Profit & Loss (P&L) Statement Banner */}
+      {pnlData && (
+        <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2.5">
+              <div className={`w-9 h-9 rounded-2xl flex items-center justify-center ${
+                pnlData.wholesale_gross_profit >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
+              }`}>
+                {pnlData.wholesale_gross_profit >= 0 ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
+              </div>
+              <div>
+                <h3 className="font-oswald text-lg font-bold text-slate-900 tracking-wide flex items-center gap-2">
+                  <span>SUPPLIER PROFIT & LOSS (P&L) STATEMENT</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
+                    pnlData.wholesale_gross_profit >= 0 ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-rose-100 text-rose-800 border border-rose-300'
+                  }`}>
+                    {pnlData.wholesale_gross_profit >= 0 ? `+${pnlData.profit_margin_pct.toFixed(2)}% Margin` : `${pnlData.profit_margin_pct.toFixed(2)}% Margin`}
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Realized commercial performance from regional depot stock dispatches to franchise outlets.
+                </p>
+              </div>
+            </div>
+
+            <div className="text-right">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                Wholesale Realized Gross Profit / (Loss)
+              </span>
+              <span className={`font-oswald text-2xl font-black ${
+                pnlData.wholesale_gross_profit >= 0 ? 'text-emerald-600' : 'text-rose-600'
+              }`}>
+                {pnlData.wholesale_gross_profit >= 0 ? '+' : '-'}৳{Math.abs(pnlData.wholesale_gross_profit).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">Wholesale Revenue</span>
+              <span className="font-oswald text-base font-bold text-slate-800">
+                ৳{pnlData.wholesale_revenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+              <span className="text-[10px] text-slate-500 block">Earned from outlets</span>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">Wholesale COGS</span>
+              <span className="font-oswald text-base font-bold text-slate-700">
+                ৳{pnlData.wholesale_cogs.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+              <span className="text-[10px] text-slate-500 block">Cost of dispatched goods</span>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">Depot Inventory Asset</span>
+              <span className="font-oswald text-base font-bold text-teal-700">
+                ৳{pnlData.depot_inventory_value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+              <span className="text-[10px] text-slate-500 block">{pnlData.depot_inventory_units} units in warehouse</span>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">Net Commercial Cash Flow</span>
+              <span className={`font-oswald text-base font-bold ${pnlData.net_cash_flow >= 0 ? 'text-indigo-700' : 'text-rose-700'}`}>
+                {pnlData.net_cash_flow >= 0 ? '+' : ''}৳{pnlData.net_cash_flow.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+              <span className="text-[10px] text-slate-500 block">Revenue minus procurement</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* KPI Financial Overview Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

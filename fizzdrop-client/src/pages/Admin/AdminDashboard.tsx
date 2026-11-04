@@ -40,10 +40,15 @@ export const AdminDashboard: React.FC = () => {
 
   const fetchWallet = async () => {
     try {
-      const res = await fetch(`/api/v1/supplier/wallet?userId=${user?.user_id || 4}`);
+      const res = await fetch(`http://localhost:8080/api/v1/supplier/wallet?userId=${user?.user_id || 4}`);
       if (res.ok) {
-        const data = await res.json();
-        setWalletBalance(Number(data.wallet_balance || 0));
+        const text = await res.text();
+        try {
+          const data = JSON.parse(text);
+          setWalletBalance(Number(data.wallet_balance || 0));
+        } catch {
+          // Silent fallback if non-JSON returned
+        }
       }
     } catch (e) {
       console.error('Failed to load wallet balance', e);

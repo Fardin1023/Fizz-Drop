@@ -31,7 +31,8 @@ import {
   CreditCard,
   Phone,
   ShieldCheck,
-  Warehouse
+  Warehouse,
+  TrendingDown,
 } from 'lucide-react';
 
 interface CommercialSummary {
@@ -164,6 +165,24 @@ interface SupplierOption {
   outlet_count?: number;
   outlets_count?: number;
   outlets?: OutletItemUnderSupplier[];
+  financial_pnl?: {
+    procurement_spent: number;
+    wholesale_revenue: number;
+    wholesale_cogs: number;
+    wholesale_gross_profit: number;
+    profit_margin_pct: number;
+    depot_inventory_value: number;
+    depot_inventory_units: number;
+    net_cash_flow: number;
+  };
+  procurement_spent?: number;
+  wholesale_revenue?: number;
+  wholesale_cogs?: number;
+  wholesale_gross_profit?: number;
+  profit_margin_pct?: number;
+  depot_inventory_value?: number;
+  depot_inventory_units?: number;
+  net_cash_flow?: number;
 }
 
 interface SupplierPurchasedProduct {
@@ -1028,6 +1047,98 @@ export const SuperadminCommercialLogs: React.FC = () => {
               </span>
             </div>
           </div>
+
+          {/* Supplier Profit & Loss (P&L) Statement Section */}
+          {(() => {
+            const pnl = activeSupplier.financial_pnl || {
+              procurement_spent: activeSupplier.procurement_spent || 0,
+              wholesale_revenue: activeSupplier.wholesale_revenue || 0,
+              wholesale_cogs: activeSupplier.wholesale_cogs || 0,
+              wholesale_gross_profit: activeSupplier.wholesale_gross_profit || 0,
+              profit_margin_pct: activeSupplier.profit_margin_pct || 0,
+              depot_inventory_value: activeSupplier.depot_inventory_value || 0,
+              depot_inventory_units: activeSupplier.depot_inventory_units || 0,
+              net_cash_flow: activeSupplier.net_cash_flow || 0,
+            };
+            const grossProfit = Number(pnl.wholesale_gross_profit ?? 0);
+            const isProfit = grossProfit >= 0;
+            const marginPct = Number(pnl.profit_margin_pct ?? 0);
+            const revenue = Number(pnl.wholesale_revenue ?? 0);
+            const cogs = Number(pnl.wholesale_cogs ?? 0);
+            const procurementSpent = Number(pnl.procurement_spent ?? 0);
+            const inventoryVal = Number(pnl.depot_inventory_value ?? 0);
+            const inventoryUnits = Number(pnl.depot_inventory_units ?? 0);
+
+            return (
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white shadow-md border border-indigo-900/60 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center text-emerald-400">
+                      {isProfit ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4 text-rose-400" />}
+                    </div>
+                    <div>
+                      <h4 className="font-oswald text-base font-bold tracking-wide text-white flex items-center gap-2">
+                        <span>SUPPLIER COMMERCIAL PROFIT & LOSS (P&L) STATEMENT</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
+                          isProfit ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                        }`}>
+                          {isProfit ? `+${marginPct.toFixed(2)}% Margin` : `${marginPct.toFixed(2)}% Margin`}
+                        </span>
+                      </h4>
+                      <p className="text-[11px] text-slate-300">
+                        Wholesale margins realized from outlet dispatches vs central procurement investments.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">
+                      Wholesale Gross Profit / (Loss) Incurred
+                    </span>
+                    <span className={`font-oswald text-2xl font-black ${
+                      isProfit ? 'text-emerald-400' : 'text-rose-400'
+                    }`}>
+                      {isProfit ? '+' : '-'}৳{Math.abs(grossProfit).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                  <div className="p-3 rounded-xl bg-white/5 border border-white/10">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">Wholesale Revenue</span>
+                    <div className="font-oswald text-lg font-bold text-white">
+                      ৳{revenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                    <span className="text-[10px] text-slate-400 block">Earned from outlets</span>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-white/5 border border-white/10">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">Wholesale COGS</span>
+                    <div className="font-oswald text-lg font-bold text-slate-200">
+                      ৳{cogs.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                    <span className="text-[10px] text-slate-400 block">Cost of dispatched goods</span>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-white/5 border border-white/10">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">Depot Inventory Asset</span>
+                    <div className="font-oswald text-lg font-bold text-teal-300">
+                      ৳{inventoryVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                    <span className="text-[10px] text-slate-400 block">{inventoryUnits} cases held in stock</span>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-white/5 border border-white/10">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">Procurement Spend</span>
+                    <div className="font-oswald text-lg font-bold text-indigo-300">
+                      ৳{procurementSpent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                    <span className="text-[10px] text-slate-400 block">Paid to Superadmin</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Products Purchased from Superadmin Table */}
           <div className="pt-2">

@@ -1747,6 +1747,68 @@ public class RequisitionProcessingService {
         res.put("phone_number", profile.getPhoneNumber());
         res.put("division_name", profile.getDivisionName());
         res.put("transactions", txList);
+
+        // Calculate Supplier P&L (Profit and Loss)
+        double spProcurementSpent = 0.0;
+        try {
+            Double spSpent = jdbcTemplate.queryForObject(
+                "SELECT COALESCE(SUM(total_amount), 0) FROM stock_requisitions WHERE supplier_id = ?",
+                Double.class,
+                profile.getId()
+            );
+            if (spSpent != null) spProcurementSpent = spSpent;
+        } catch (Exception ignored) {}
+
+        double spDepotInventoryValue = 0.0;
+        int spDepotInventoryUnits = 0;
+        try {
+            List<Map<String, Object>> invRows = jdbcTemplate.queryForList(
+                "SELECT COALESCE(SUM(di.current_stock), 0) as total_units, " +
+                "COALESCE(SUM(di.current_stock * COALESCE(p.supplier_price, p.base_price, 0)), 0) as total_value " +
+                "FROM district_inventory di " +
+                "JOIN products p ON di.product_id = p.product_id " +
+                "WHERE di.district_id = ?",
+                profile.getPrimaryDistrictId()
+            );
+            if (!invRows.isEmpty()) {
+                spDepotInventoryUnits = ((Number) invRows.get(0).getOrDefault("total_units", 0)).intValue();
+                spDepotInventoryValue = ((Number) invRows.get(0).getOrDefault("total_value", 0.0)).doubleValue();
+            }
+        } catch (Exception ignored) {}
+
+        double spWholesaleRevenue = 0.0;
+        double spWholesaleCogs = 0.0;
+        double spWholesaleGrossProfit = 0.0;
+        try {
+            List<Map<String, Object>> pnlRows = jdbcTemplate.queryForList(
+                "SELECT " +
+                "COALESCE(SUM(COALESCE(r.total_amount, r.quantity * COALESCE(r.unit_price, p.outlet_price, 0))), 0) AS rev, " +
+                "COALESCE(SUM(r.quantity * COALESCE(p.supplier_price, p.base_price, 0)), 0) AS cogs, " +
+                "COALESCE(SUM(COALESCE(r.total_amount, r.quantity * COALESCE(r.unit_price, p.outlet_price, 0)) - (r.quantity * COALESCE(p.supplier_price, p.base_price, 0))), 0) AS profit " +
+                "FROM outlet_requisitions r " +
+                "JOIN products p ON r.product_id = p.product_id " +
+                "WHERE r.status = 'DISPATCHED'"
+            );
+            if (!pnlRows.isEmpty()) {
+                spWholesaleRevenue = ((Number) pnlRows.get(0).getOrDefault("rev", 0.0)).doubleValue();
+                spWholesaleCogs = ((Number) pnlRows.get(0).getOrDefault("cogs", 0.0)).doubleValue();
+                spWholesaleGrossProfit = ((Number) pnlRows.get(0).getOrDefault("profit", 0.0)).doubleValue();
+            }
+        } catch (Exception ignored) {}
+
+        double spMarginPct = spWholesaleRevenue > 0 ? (spWholesaleGrossProfit / spWholesaleRevenue) * 100.0 : 0.0;
+
+        Map<String, Object> pnl = new HashMap<>();
+        pnl.put("procurement_spent", spProcurementSpent);
+        pnl.put("wholesale_revenue", spWholesaleRevenue);
+        pnl.put("wholesale_cogs", spWholesaleCogs);
+        pnl.put("wholesale_gross_profit", spWholesaleGrossProfit);
+        pnl.put("profit_margin_pct", Math.round(spMarginPct * 100.0) / 100.0);
+        pnl.put("depot_inventory_value", spDepotInventoryValue);
+        pnl.put("depot_inventory_units", spDepotInventoryUnits);
+        pnl.put("net_cash_flow", spWholesaleRevenue - spProcurementSpent);
+
+        res.put("financial_pnl", pnl);
         return res;
     }
 

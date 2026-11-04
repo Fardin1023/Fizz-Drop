@@ -15,6 +15,11 @@ import {
   Receipt,
   Clock,
   Sparkles,
+  TrendingUp,
+  TrendingDown,
+  Percent,
+  Boxes,
+  Layers,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -50,6 +55,16 @@ export const SupplierWalletModal: React.FC<SupplierWalletModalProps> = ({
     mobile_banking_number?: string;
     default_payment_method?: string;
     transactions?: any[];
+    financial_pnl?: {
+      procurement_spent: number;
+      wholesale_revenue: number;
+      wholesale_cogs: number;
+      wholesale_gross_profit: number;
+      profit_margin_pct: number;
+      depot_inventory_value: number;
+      depot_inventory_units: number;
+      net_cash_flow: number;
+    };
   } | null>(null);
 
   // Form states for topup
@@ -66,16 +81,32 @@ export const SupplierWalletModal: React.FC<SupplierWalletModalProps> = ({
   const [bankAccountName, setBankAccountName] = useState<string>('');
   const [mobileBankingNumber, setMobileBankingNumber] = useState<string>('');
 
-  const [activeTab, setActiveTab] = useState<'topup' | 'settings' | 'history'>('topup');
+  const [activeTab, setActiveTab] = useState<'topup' | 'pnl' | 'settings' | 'history'>('topup');
+
+  // Safe JSON parser to guard against HTML error pages
+  const parseResponse = async (res: Response) => {
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      if (!res.ok) {
+        throw new Error(`Server returned HTTP ${res.status}: ${text.slice(0, 120)}`);
+      }
+      throw new Error('Received non-JSON response from server.');
+    }
+  };
 
   // Fetch live wallet details
   const fetchWallet = async () => {
     try {
       setLoading(true);
       setErrorMsg(null);
-      const res = await fetch(`/api/v1/supplier/wallet?userId=${userId}`);
-      if (!res.ok) throw new Error('Failed to load supplier wallet details');
-      const data = await res.json();
+      const res = await fetch(`http://localhost:8080/api/v1/supplier/wallet?userId=${userId}`);
+      if (!res.ok) {
+        const errObj = await parseResponse(res).catch(() => ({}));
+        throw new Error(errObj.message || `Failed to load supplier wallet details (HTTP ${res.status})`);
+      }
+      const data = await parseResponse(res);
       setWalletData(data);
       setBankName(data.bank_name || '');
       setBankAccountNumber(data.bank_account_number || '');
@@ -126,13 +157,13 @@ export const SupplierWalletModal: React.FC<SupplierWalletModalProps> = ({
         mobile_banking_number: mobileBankingNumber.trim(),
       };
 
-      const res = await fetch(`/api/v1/supplier/wallet/topup?userId=${userId}`, {
+      const res = await fetch(`http://localhost:8080/api/v1/supplier/wallet/topup?userId=${userId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
-      const result = await res.json();
+      const result = await parseResponse(res);
       if (!res.ok) {
         throw new Error(result.message || 'Failed to deposit funds into wallet');
       }
@@ -168,13 +199,13 @@ export const SupplierWalletModal: React.FC<SupplierWalletModalProps> = ({
         default_payment_method: paymentMethod,
       };
 
-      const res = await fetch(`/api/v1/supplier/wallet/settings?userId=${userId}`, {
+      const res = await fetch(`http://localhost:8080/api/v1/supplier/wallet/settings?userId=${userId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
-      const result = await res.json();
+      const result = await parseResponse(res);
       if (!res.ok) {
         throw new Error(result.message || 'Failed to update wallet banking settings');
       }
@@ -209,7 +240,7 @@ export const SupplierWalletModal: React.FC<SupplierWalletModalProps> = ({
               <Wallet className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-xl font-bold font-oswald tracking-wide flex items-center gap-2">
+              <h2 className="text-xl text-white-500 font-bold font-oswald tracking-wide flex items-center gap-2 ">
                 COMMERCIAL WALLET & TOP-UP
                 <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-sans px-2 py-0.5 rounded-full uppercase tracking-wider font-bold">
                   Verified Depot
@@ -245,7 +276,7 @@ export const SupplierWalletModal: React.FC<SupplierWalletModalProps> = ({
           </div>
 
           {/* Sub Navigation Tabs */}
-          <div className="flex gap-2 mt-4 pt-2 border-t border-white/10">
+          <div className="flex gap-2 mt-4 pt-2 border-t border-white/10 flex-wrap">
             <button
               onClick={() => setActiveTab('topup')}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
@@ -255,6 +286,17 @@ export const SupplierWalletModal: React.FC<SupplierWalletModalProps> = ({
               }`}
             >
               Deposit & Top-up
+            </button>
+            <button
+              onClick={() => setActiveTab('pnl')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                activeTab === 'pnl'
+                  ? 'bg-emerald-600 text-white shadow-md'
+                  : 'text-slate-300 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <TrendingUp className="w-3.5 h-3.5" />
+              <span>Profit & Loss (P&L)</span>
             </button>
             <button
               onClick={() => setActiveTab('settings')}
@@ -274,7 +316,7 @@ export const SupplierWalletModal: React.FC<SupplierWalletModalProps> = ({
                   : 'text-slate-300 hover:text-white hover:bg-white/5'
               }`}
             >
-              Recent Transactions ({walletData?.transactions?.length || 0})
+              Transactions ({walletData?.transactions?.length || 0})
             </button>
           </div>
         </div>
@@ -590,6 +632,144 @@ export const SupplierWalletModal: React.FC<SupplierWalletModalProps> = ({
                 </button>
               </div>
             </form>
+          )}
+
+          {/* 2. PROFIT & LOSS (P&L) STATEMENT TAB */}
+          {activeTab === 'pnl' && (
+            <div className="space-y-4 animate-fade-in">
+              {/* Primary P&L Banner */}
+              {(() => {
+                const pnl = walletData?.financial_pnl;
+                const grossProfit = Number(pnl?.wholesale_gross_profit ?? 0);
+                const isProfit = grossProfit >= 0;
+                const marginPct = Number(pnl?.profit_margin_pct ?? 0);
+                const revenue = Number(pnl?.wholesale_revenue ?? 0);
+                const cogs = Number(pnl?.wholesale_cogs ?? 0);
+                const procurementSpent = Number(pnl?.procurement_spent ?? 0);
+                const inventoryVal = Number(pnl?.depot_inventory_value ?? 0);
+                const inventoryUnits = Number(pnl?.depot_inventory_units ?? 0);
+                const netCashFlow = Number(pnl?.net_cash_flow ?? 0);
+
+                return (
+                  <>
+                    <div
+                      className={`p-4 rounded-2xl border ${
+                        isProfit
+                          ? 'bg-gradient-to-br from-emerald-500/10 via-teal-500/10 to-indigo-500/10 border-emerald-500/30'
+                          : 'bg-gradient-to-br from-rose-500/10 via-amber-500/10 to-rose-500/10 border-rose-500/30'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                          {isProfit ? (
+                            <TrendingUp className="w-4 h-4 text-emerald-600" />
+                          ) : (
+                            <TrendingDown className="w-4 h-4 text-rose-600" />
+                          )}
+                          <span>Wholesale Gross Profit / (Loss) Incurred</span>
+                        </span>
+                        <span
+                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
+                            isProfit
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                              : 'bg-rose-100 text-rose-800 border border-rose-300'
+                          }`}
+                        >
+                          {isProfit ? `+${marginPct.toFixed(2)}% Margin` : `${marginPct.toFixed(2)}% Margin`}
+                        </span>
+                      </div>
+
+                      <div className="flex items-baseline gap-2">
+                        <span
+                          className={`font-oswald text-3xl font-black ${
+                            isProfit ? 'text-emerald-700' : 'text-rose-700'
+                          }`}
+                        >
+                          {isProfit ? '+' : '-'}৳{Math.abs(grossProfit).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                        <span className="text-xs text-slate-500 font-medium">
+                          Realized on Dispatched Franchise Orders
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* 4 Key P&L Cards */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* Card 1: Wholesale Revenue */}
+                      <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                          Wholesale Outlet Revenue
+                        </span>
+                        <div className="font-oswald text-xl font-black text-slate-900">
+                          ৳{revenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
+                        <span className="text-[10px] text-slate-500 block mt-0.5">
+                          Earned from dispatched outlet requisitions
+                        </span>
+                      </div>
+
+                      {/* Card 2: Wholesale COGS */}
+                      <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                          Wholesale Cost of Goods Sold (COGS)
+                        </span>
+                        <div className="font-oswald text-xl font-black text-slate-800">
+                          ৳{cogs.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
+                        <span className="text-[10px] text-slate-500 block mt-0.5">
+                          Procurement cost basis for fulfilled outlet orders
+                        </span>
+                      </div>
+
+                      {/* Card 3: Procurement Spent */}
+                      <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                          Superadmin Stock Purchases
+                        </span>
+                        <div className="font-oswald text-xl font-black text-indigo-700">
+                          ৳{procurementSpent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
+                        <span className="text-[10px] text-slate-500 block mt-0.5">
+                          Total paid to Superadmin for depot restock
+                        </span>
+                      </div>
+
+                      {/* Card 4: Depot Inventory Asset Value */}
+                      <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                          Depot Unsold Inventory Asset Value
+                        </span>
+                        <div className="font-oswald text-xl font-black text-teal-700">
+                          ৳{inventoryVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
+                        <span className="text-[10px] text-slate-500 block mt-0.5">
+                          {inventoryUnits} cases held in regional warehouse
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Net Commercial Summary Strip */}
+                    <div className="p-3.5 rounded-2xl bg-indigo-50/70 border border-indigo-200/80 flex items-center justify-between text-xs">
+                      <div>
+                        <span className="font-bold text-slate-800 block">Net Cash Flow Position</span>
+                        <span className="text-[11px] text-slate-500">
+                          Wholesale Revenue received minus Procurement Spent
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span
+                          className={`font-oswald text-lg font-black ${
+                            netCashFlow >= 0 ? 'text-indigo-700' : 'text-rose-700'
+                          }`}
+                        >
+                          {netCashFlow >= 0 ? '+' : ''}৳{netCashFlow.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
           )}
 
           {/* 3. TRANSACTION HISTORY TAB */}

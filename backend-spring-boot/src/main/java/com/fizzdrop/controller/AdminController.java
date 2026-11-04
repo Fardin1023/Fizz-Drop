@@ -163,6 +163,80 @@ public class AdminController {
             sMap.put("outlets", underOutlets);
             sMap.put("outlets_count", underOutlets.size());
             sMap.put("outlet_count", underOutlets.size());
+
+            // Calculate Supplier P&L (Profit and Loss)
+            double spProcurementSpent = 0.0;
+            try {
+                Double spSpent = jdbcTemplate.queryForObject(
+                    "SELECT COALESCE(SUM(total_amount), 0) FROM stock_requisitions WHERE supplier_id = ?",
+                    Double.class,
+                    sp.getId()
+                );
+                if (spSpent != null) spProcurementSpent = spSpent;
+            } catch (Exception ignored) {}
+
+            double spDepotInventoryValue = 0.0;
+            int spDepotInventoryUnits = 0;
+            try {
+                List<Map<String, Object>> invRows = jdbcTemplate.queryForList(
+                    "SELECT COALESCE(SUM(di.current_stock), 0) as total_units, " +
+                    "COALESCE(SUM(di.current_stock * COALESCE(p.supplier_price, p.base_price, 0)), 0) as total_value " +
+                    "FROM district_inventory di " +
+                    "JOIN products p ON di.product_id = p.product_id " +
+                    "WHERE di.district_id = ?",
+                    sp.getPrimaryDistrictId()
+                );
+                if (!invRows.isEmpty()) {
+                    spDepotInventoryUnits = ((Number) invRows.get(0).getOrDefault("total_units", 0)).intValue();
+                    spDepotInventoryValue = ((Number) invRows.get(0).getOrDefault("total_value", 0.0)).doubleValue();
+                }
+            } catch (Exception ignored) {}
+
+            double spWholesaleRevenue = 0.0;
+            double spWholesaleCogs = 0.0;
+            double spWholesaleGrossProfit = 0.0;
+
+            if (!underOutlets.isEmpty()) {
+                List<Long> outIds = underOutlets.stream().map(m -> ((Number) m.get("outlet_id")).longValue()).toList();
+                String inSql = outIds.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(","));
+                try {
+                    List<Map<String, Object>> pnlRows = jdbcTemplate.queryForList(
+                        "SELECT " +
+                        "COALESCE(SUM(COALESCE(r.total_amount, r.quantity * COALESCE(r.unit_price, p.outlet_price, 0))), 0) AS rev, " +
+                        "COALESCE(SUM(r.quantity * COALESCE(p.supplier_price, p.base_price, 0)), 0) AS cogs, " +
+                        "COALESCE(SUM(COALESCE(r.total_amount, r.quantity * COALESCE(r.unit_price, p.outlet_price, 0)) - (r.quantity * COALESCE(p.supplier_price, p.base_price, 0))), 0) AS profit " +
+                        "FROM outlet_requisitions r " +
+                        "JOIN products p ON r.product_id = p.product_id " +
+                        "WHERE r.status = 'DISPATCHED' AND r.outlet_id IN (" + inSql + ")"
+                    );
+                    if (!pnlRows.isEmpty()) {
+                        spWholesaleRevenue = ((Number) pnlRows.get(0).getOrDefault("rev", 0.0)).doubleValue();
+                        spWholesaleCogs = ((Number) pnlRows.get(0).getOrDefault("cogs", 0.0)).doubleValue();
+                        spWholesaleGrossProfit = ((Number) pnlRows.get(0).getOrDefault("profit", 0.0)).doubleValue();
+                    }
+                } catch (Exception ignored) {}
+            }
+
+            double spMarginPct = spWholesaleRevenue > 0 ? (spWholesaleGrossProfit / spWholesaleRevenue) * 100.0 : 0.0;
+
+            Map<String, Object> pnlMap = new HashMap<>();
+            pnlMap.put("procurement_spent", spProcurementSpent);
+            pnlMap.put("wholesale_revenue", spWholesaleRevenue);
+            pnlMap.put("wholesale_cogs", spWholesaleCogs);
+            pnlMap.put("wholesale_gross_profit", spWholesaleGrossProfit);
+            pnlMap.put("profit_margin_pct", Math.round(spMarginPct * 100.0) / 100.0);
+            pnlMap.put("depot_inventory_value", spDepotInventoryValue);
+            pnlMap.put("depot_inventory_units", spDepotInventoryUnits);
+            pnlMap.put("net_cash_flow", spWholesaleRevenue - spProcurementSpent);
+
+            sMap.put("financial_pnl", pnlMap);
+            sMap.put("procurement_spent", spProcurementSpent);
+            sMap.put("wholesale_revenue", spWholesaleRevenue);
+            sMap.put("wholesale_gross_profit", spWholesaleGrossProfit);
+            sMap.put("profit_margin_pct", Math.round(spMarginPct * 100.0) / 100.0);
+            sMap.put("depot_inventory_value", spDepotInventoryValue);
+            sMap.put("depot_inventory_units", spDepotInventoryUnits);
+
             supplierList.add(sMap);
         }
 
