@@ -13,25 +13,19 @@ import {
   Boxes,
   ArrowUpRight,
   ArrowDownRight,
-  ChevronDown,
   Clock,
   Layers,
   Receipt,
   Truck,
   AlertTriangle,
-  CheckCircle2,
   SlidersHorizontal,
   Info,
   X,
   FileSpreadsheet,
-  MapPin,
   Store,
-  Tag,
   Wallet,
   CreditCard,
-  Phone,
   ShieldCheck,
-  Warehouse,
   TrendingDown,
 } from 'lucide-react';
 
@@ -183,6 +177,23 @@ interface SupplierOption {
   depot_inventory_value?: number;
   depot_inventory_units?: number;
   net_cash_flow?: number;
+  total_available_stock?: number;
+  available_stocks?: SupplierStockItem[];
+}
+
+interface SupplierStockItem {
+  supplier_id?: number;
+  supplier_name?: string;
+  product_id: number;
+  brand: string;
+  flavor_variant?: string;
+  size_volume?: string;
+  packaging?: string;
+  sku?: string;
+  current_stock: number;
+  reserved_stock?: number;
+  unit_price: number;
+  total_value: number;
 }
 
 interface SupplierPurchasedProduct {
@@ -244,9 +255,10 @@ export const SuperadminCommercialLogs: React.FC = () => {
   const [outlets, setOutlets] = useState<OutletOption[]>([]);
   const [products, setProducts] = useState<ProductOption[]>([]);
   const [supplierPurchasedProducts, setSupplierPurchasedProducts] = useState<SupplierPurchasedProduct[]>([]);
+  const [allSupplierInventory, setAllSupplierInventory] = useState<SupplierStockItem[]>([]);
 
   // Navigation Sub-tab
-  const [activeSubTab, setActiveSubTab] = useState<'matrix' | 'supplier_txns' | 'outlet_sales' | 'requisitions'>('matrix');
+  const [activeSubTab, setActiveSubTab] = useState<'matrix' | 'supplier_stocks' | 'supplier_txns' | 'outlet_sales' | 'requisitions'>('matrix');
 
   // Filter States
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>('ALL');
@@ -274,6 +286,16 @@ export const SuperadminCommercialLogs: React.FC = () => {
     if (Array.isArray(s.outlets)) return s.outlets.length;
     if (s.outlets_count !== undefined && s.outlets_count !== null) return Number(s.outlets_count);
     if (s.outlet_count !== undefined && s.outlet_count !== null) return Number(s.outlet_count);
+    return 0;
+  };
+
+  const getSupplierStockCount = (s: SupplierOption | undefined | null): number => {
+    if (!s) return 0;
+    if (s.total_available_stock !== undefined && s.total_available_stock !== null) return Number(s.total_available_stock);
+    if (s.depot_inventory_units !== undefined && s.depot_inventory_units !== null) return Number(s.depot_inventory_units);
+    if (Array.isArray(s.available_stocks)) {
+      return s.available_stocks.reduce((sum, item) => sum + Number(item.current_stock || 0), 0);
+    }
     return 0;
   };
 
@@ -305,6 +327,7 @@ export const SuperadminCommercialLogs: React.FC = () => {
       setOutlets(data.outlets || []);
       setProducts(data.products || []);
       setSupplierPurchasedProducts(data.supplier_purchased_products || []);
+      setAllSupplierInventory(data.all_supplier_inventory || []);
     } catch (err: any) {
       console.error('Error loading commercial logs:', err);
       setError(err.message || 'Unable to fetch commercial telemetry logs.');
@@ -466,6 +489,30 @@ export const SuperadminCommercialLogs: React.FC = () => {
     });
   }, [requisitions, searchQuery]);
 
+  // Filtered Supplier Available Stocks (Sub-tab: Supplier Available Stocks)
+  const filteredSupplierStocks = useMemo(() => {
+    return allSupplierInventory.filter((item) => {
+      if (selectedSupplierId !== 'ALL' && String(item.supplier_id) !== String(selectedSupplierId)) {
+        return false;
+      }
+      if (selectedProductId !== 'ALL' && String(item.product_id) !== String(selectedProductId)) {
+        return false;
+      }
+      if (searchQuery.trim() === '') return true;
+      const query = searchQuery.toLowerCase();
+      const brand = (item.brand || '').toLowerCase();
+      const flavor = (item.flavor_variant || '').toLowerCase();
+      const sku = (item.sku || '').toLowerCase();
+      const supplier = (item.supplier_name || '').toLowerCase();
+      return (
+        brand.includes(query) ||
+        flavor.includes(query) ||
+        sku.includes(query) ||
+        supplier.includes(query)
+      );
+    });
+  }, [allSupplierInventory, selectedSupplierId, selectedProductId, searchQuery]);
+
   // Export current table view as CSV
   const handleExportCSV = () => {
     let csvContent = 'data:text/csv;charset=utf-8,';
@@ -517,6 +564,24 @@ export const SuperadminCommercialLogs: React.FC = () => {
         csvContent += row.map((cell) => `"${cell}"`).join(',') + '\n';
       });
       downloadFile(csvContent, `fizzdrop-commercial-matrix-${timestamp}.csv`);
+    } else if (activeSubTab === 'supplier_stocks') {
+      const headers = ['Supplier ID', 'Supplier Name', 'Product Brand', 'Variant', 'Packaging & Volume', 'SKU', 'Available Stock (Cases)', 'Unit Supplier Rate (BDT)', 'Stock Valuation (BDT)'];
+      csvContent += headers.map((h) => `"${h}"`).join(',') + '\n';
+      filteredSupplierStocks.forEach((s) => {
+        const row = [
+          s.supplier_id ?? '',
+          s.supplier_name ?? '',
+          s.brand,
+          s.flavor_variant ?? '',
+          `${s.packaging ?? ''} ${s.size_volume ?? ''}`.trim(),
+          s.sku ?? '',
+          s.current_stock,
+          formatMoney(s.unit_price),
+          formatMoney(s.total_value),
+        ];
+        csvContent += row.map((cell) => `"${cell}"`).join(',') + '\n';
+      });
+      downloadFile(csvContent, `fizzdrop-supplier-available-stocks-${timestamp}.csv`);
     } else if (activeSubTab === 'supplier_txns') {
       const headers = ['Txn ID', 'Supplier Name', 'Type', 'Reference Code', 'Amount (BDT)', 'Quantity', 'Profit (BDT)', 'Balance After (BDT)', 'Date', 'Description'];
       csvContent += headers.map((h) => `"${h}"`).join(',') + '\n';
@@ -756,9 +821,10 @@ export const SuperadminCommercialLogs: React.FC = () => {
               {suppliers.map((s) => {
                 const sName = getSupplierDisplayName(s);
                 const count = getSupplierOutletCount(s);
+                const stock = getSupplierStockCount(s);
                 return (
                   <option key={s.supplier_id} value={String(s.supplier_id)}>
-                    {sName} ({count} {count === 1 ? 'outlet' : 'outlets'})
+                    {sName} ({count} {count === 1 ? 'outlet' : 'outlets'} · {stock} cases in stock)
                   </option>
                 );
               })}
@@ -987,7 +1053,7 @@ export const SuperadminCommercialLogs: React.FC = () => {
           </div>
 
           {/* Commercial Telemetry Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             {/* 1. Live Wallet Balance */}
             <div className="p-3.5 rounded-xl bg-gradient-to-br from-emerald-500/10 via-teal-500/10 to-indigo-500/10 border border-emerald-500/30">
               <div className="flex items-center justify-between text-emerald-800 mb-1">
@@ -1002,7 +1068,21 @@ export const SuperadminCommercialLogs: React.FC = () => {
               </span>
             </div>
 
-            {/* 2. Outlets Under this Supplier */}
+            {/* 2. Available Stocks in Depot */}
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+              <div className="flex items-center justify-between text-slate-600 mb-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider">Available Depot Stock</span>
+                <Boxes className="w-4 h-4 text-emerald-600" />
+              </div>
+              <div className="font-oswald text-2xl font-black text-slate-900">
+                {getSupplierStockCount(activeSupplier)} <span className="text-xs font-sans font-bold text-slate-500">cases</span>
+              </div>
+              <span className="text-[10px] text-slate-500 font-medium block mt-0.5 truncate">
+                ৳ {formatMoney(activeSupplier.depot_inventory_value || 0)} stock asset valuation
+              </span>
+            </div>
+
+            {/* 3. Outlets Under this Supplier */}
             <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
               <div className="flex items-center justify-between text-slate-600 mb-1">
                 <span className="text-[10px] font-bold uppercase tracking-wider">Outlets Under Supplier</span>
@@ -1016,7 +1096,7 @@ export const SuperadminCommercialLogs: React.FC = () => {
               </span>
             </div>
 
-            {/* 3. Central Stock Purchases Total */}
+            {/* 4. Central Stock Purchases Total */}
             <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
               <div className="flex items-center justify-between text-slate-600 mb-1">
                 <span className="text-[10px] font-bold uppercase tracking-wider">Total Depot Purchases</span>
@@ -1033,7 +1113,7 @@ export const SuperadminCommercialLogs: React.FC = () => {
               </span>
             </div>
 
-            {/* 4. Registered Settlement Accounts */}
+            {/* 5. Registered Settlement Accounts */}
             <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
               <div className="flex items-center justify-between text-slate-600 mb-1">
                 <span className="text-[10px] font-bold uppercase tracking-wider">Bank & Settlement</span>
@@ -1140,6 +1220,85 @@ export const SuperadminCommercialLogs: React.FC = () => {
             );
           })()}
 
+          {/* Available Stocks at Supplier Regional Depot Table */}
+          <div className="pt-2">
+            <div className="flex items-center justify-between mb-2.5">
+              <div className="flex items-center gap-2">
+                <Boxes className="w-4 h-4 text-emerald-600" />
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                  Current Available Stock in {getSupplierDisplayName(activeSupplier)} Regional Depot Warehouse
+                </h4>
+              </div>
+              <span className="text-[11px] text-slate-500 font-medium">
+                Total Available: <strong className="text-emerald-700 font-oswald text-sm">{getSupplierStockCount(activeSupplier)}</strong> cases (৳{formatMoney(activeSupplier.depot_inventory_value || 0)} valuation)
+              </span>
+            </div>
+
+            {(!activeSupplier.available_stocks || activeSupplier.available_stocks.length === 0) ? (
+              <div className="p-6 rounded-xl bg-slate-50 border border-dashed border-slate-200 text-center text-xs text-slate-500">
+                <Boxes className="w-8 h-8 text-slate-300 mx-auto mb-1.5" />
+                No physical stock currently stored in this supplier's regional warehouse depot.
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-slate-200">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-100/80 text-[10px] font-bold uppercase tracking-wider text-slate-600 border-b border-slate-200">
+                      <th className="py-2.5 px-3">Product Name & Variant</th>
+                      <th className="py-2.5 px-3">SKU & Pack</th>
+                      <th className="py-2.5 px-3 text-center">Stock Health</th>
+                      <th className="py-2.5 px-3 text-right">Available Depot Stock</th>
+                      <th className="py-2.5 px-3 text-right">Supplier Unit Rate (৳)</th>
+                      <th className="py-2.5 px-3 text-right">Stock Valuation (৳)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {activeSupplier.available_stocks.map((item) => {
+                      const stock = Number(item.current_stock || 0);
+                      const isOutOfStock = stock === 0;
+                      const isLowStock = stock > 0 && stock <= 20;
+
+                      return (
+                        <tr key={item.product_id} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="py-2.5 px-3 font-bold text-slate-900">
+                            {item.brand} {item.flavor_variant || ''}
+                          </td>
+                          <td className="py-2.5 px-3 text-[11px] text-slate-500 font-mono">
+                            {item.sku} • {item.size_volume || ''} {item.packaging || ''}
+                          </td>
+                          <td className="py-2.5 px-3 text-center">
+                            {isOutOfStock ? (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                                Out of Stock
+                              </span>
+                            ) : isLowStock ? (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                                Low Stock
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                In Stock
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-oswald text-sm font-black text-slate-900">
+                            {stock} <span className="text-[10px] font-sans font-normal text-slate-400">cases</span>
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-mono text-slate-700">
+                            ৳ {formatMoney(item.unit_price)}
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-700">
+                            ৳ {formatMoney(item.total_value)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
           {/* Products Purchased from Superadmin Table */}
           <div className="pt-2">
             <div className="flex items-center justify-between mb-2.5">
@@ -1229,6 +1388,21 @@ export const SuperadminCommercialLogs: React.FC = () => {
           <span>Outlet Product Matrix (Profit, Stocks, Price)</span>
           <span className="px-2 py-0.5 rounded-full text-[10px] bg-indigo-50 text-indigo-700 font-bold">
             {filteredLedger.length}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('supplier_stocks')}
+          className={`flex items-center gap-2 px-4 py-2.5 font-bold text-xs rounded-t-xl transition-all cursor-pointer whitespace-nowrap border-b-2 ${
+            activeSubTab === 'supplier_stocks'
+              ? 'border-indigo-600 text-indigo-700 bg-white shadow-2xs font-black'
+              : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100/60'
+          }`}
+        >
+          <Boxes className="w-4 h-4 text-emerald-600" />
+          <span>Supplier Available Stocks</span>
+          <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-50 text-emerald-700 font-bold">
+            {filteredSupplierStocks.length}
           </span>
         </button>
 
@@ -1435,6 +1609,125 @@ export const SuperadminCommercialLogs: React.FC = () => {
                       </td>
                     </tr>
                   ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        ) : activeSubTab === 'supplier_stocks' ? (
+          /* Sub-tab: Supplier Available Stocks */
+          <div className="overflow-x-auto">
+            {/* Summary strip above table */}
+            <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-3">
+                <span className="font-bold text-slate-800">
+                  Total Available Depot Stock:
+                </span>
+                <span className="px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-900 font-extrabold text-xs border border-emerald-200">
+                  {filteredSupplierStocks.reduce((sum, s) => sum + Number(s.current_stock || 0), 0)} Cases Available
+                </span>
+                <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-900 font-extrabold text-xs border border-indigo-200 font-mono">
+                  Valuation: ৳{formatMoney(filteredSupplierStocks.reduce((sum, s) => sum + Number(s.total_value || 0), 0))}
+                </span>
+              </div>
+              <span className="text-[11px] text-slate-500">
+                Tracking stocks available across <strong>{suppliers.length}</strong> regional distributor depots
+              </span>
+            </div>
+
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-slate-50/80 border-b border-slate-200/80 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                  <th className="py-3 px-4">Regional Supplier Depot</th>
+                  <th className="py-3 px-4">Beverage Product</th>
+                  <th className="py-3 px-3">SKU & Packaging</th>
+                  <th className="py-3 px-3 text-center">Stock Health</th>
+                  <th className="py-3 px-3 text-right">Available Stock</th>
+                  <th className="py-3 px-3 text-right">Supplier Unit Rate</th>
+                  <th className="py-3 px-4 text-right">Total Stock Value</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredSupplierStocks.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-12 text-center text-slate-400">
+                      No supplier stock records found matching current filter scope.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredSupplierStocks.map((item, idx) => {
+                    const stock = Number(item.current_stock || 0);
+                    const isOutOfStock = stock === 0;
+                    const isLowStock = stock > 0 && stock <= 20;
+
+                    return (
+                      <tr
+                        key={`${item.supplier_id}-${item.product_id}-${idx}`}
+                        className="hover:bg-indigo-50/30 transition-colors"
+                      >
+                        {/* Supplier Info */}
+                        <td className="py-3 px-4 font-bold text-slate-900">
+                          <div className="flex items-center gap-2">
+                            <Building2 className="w-4 h-4 text-indigo-500 shrink-0" />
+                            <div>
+                              <span>{item.supplier_name || `Supplier #${item.supplier_id}`}</span>
+                              <span className="block text-[10px] font-normal text-slate-400">
+                                Depot Hub #{item.supplier_id}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Beverage Product */}
+                        <td className="py-3 px-4 font-bold text-slate-800">
+                          <div>
+                            <span>{item.brand} {item.flavor_variant || ''}</span>
+                            <span className="block text-[10px] text-slate-400 font-normal">
+                              {item.size_volume || ''}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* SKU & Packaging */}
+                        <td className="py-3 px-3 font-mono text-[11px] text-slate-500">
+                          {item.sku} • {item.packaging || ''}
+                        </td>
+
+                        {/* Stock Health */}
+                        <td className="py-3 px-3 text-center">
+                          {isOutOfStock ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                              Out of Stock
+                            </span>
+                          ) : isLowStock ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                              Low Stock ({stock})
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              In Stock ({stock})
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Available Stock Cases */}
+                        <td className="py-3 px-3 text-right font-oswald text-sm font-black text-slate-900">
+                          {stock} <span className="text-[10px] font-sans font-normal text-slate-400">cases</span>
+                        </td>
+
+                        {/* Supplier Unit Rate */}
+                        <td className="py-3 px-3 text-right font-mono text-slate-700">
+                          ৳{formatMoney(item.unit_price)}
+                        </td>
+
+                        {/* Total Stock Value */}
+                        <td className="py-3 px-4 text-right">
+                          <span className="font-mono font-black text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                            ৳{formatMoney(item.total_value)}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>

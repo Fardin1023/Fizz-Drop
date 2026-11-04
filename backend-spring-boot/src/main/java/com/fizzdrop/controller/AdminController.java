@@ -236,6 +236,24 @@ public class AdminController {
             sMap.put("profit_margin_pct", Math.round(spMarginPct * 100.0) / 100.0);
             sMap.put("depot_inventory_value", spDepotInventoryValue);
             sMap.put("depot_inventory_units", spDepotInventoryUnits);
+            sMap.put("total_available_stock", spDepotInventoryUnits);
+
+            // Fetch available stock breakdown per product in supplier's regional depot
+            List<Map<String, Object>> supplierStocks = new ArrayList<>();
+            try {
+                supplierStocks = jdbcTemplate.queryForList(
+                    "SELECT di.product_id, p.brand, p.flavor_variant, p.size_volume, p.packaging, p.sku, " +
+                    "di.current_stock, di.reserved_stock, " +
+                    "COALESCE(p.supplier_price, p.base_price, 0) as unit_price, " +
+                    "(di.current_stock * COALESCE(p.supplier_price, p.base_price, 0)) as total_value " +
+                    "FROM district_inventory di " +
+                    "JOIN products p ON di.product_id = p.product_id " +
+                    "WHERE di.district_id = ? " +
+                    "ORDER BY di.current_stock DESC, p.brand ASC",
+                    sp.getPrimaryDistrictId()
+                );
+            } catch (Exception ignored) {}
+            sMap.put("available_stocks", supplierStocks);
 
             supplierList.add(sMap);
         }
@@ -553,6 +571,24 @@ public class AdminController {
             System.err.println("[Commercial Logs] Failed to query supplier purchased products: " + ex.getMessage());
         }
 
+        // Query Available Stocks Across All Individual Suppliers
+        List<Map<String, Object>> allSupplierStocks = new ArrayList<>();
+        try {
+            String allStocksSql =
+                "SELECT sp.id as supplier_id, sp.business_name as supplier_name, sp.primary_district_id, " +
+                "  di.product_id, p.brand, p.flavor_variant, p.size_volume, p.packaging, p.sku, " +
+                "  di.current_stock, di.reserved_stock, " +
+                "  COALESCE(p.supplier_price, p.base_price, 0) as unit_price, " +
+                "  (di.current_stock * COALESCE(p.supplier_price, p.base_price, 0)) as total_value " +
+                "FROM supplier_profiles sp " +
+                "JOIN district_inventory di ON sp.primary_district_id = di.district_id " +
+                "JOIN products p ON di.product_id = p.product_id " +
+                "ORDER BY sp.id ASC, di.current_stock DESC, p.brand ASC";
+            allSupplierStocks = jdbcTemplate.queryForList(allStocksSql);
+        } catch (Exception ex) {
+            System.err.println("[Commercial Logs] Failed to query all supplier stocks: " + ex.getMessage());
+        }
+
         Map<String, Object> response = new HashMap<>();
         response.put("summary", summary);
         response.put("suppliers", supplierList);
@@ -563,6 +599,7 @@ public class AdminController {
         response.put("supplier_transactions", supplierTxnLogs);
         response.put("outlet_requisitions", outletRequisitionLogs);
         response.put("supplier_purchased_products", supplierPurchasedProducts);
+        response.put("all_supplier_inventory", allSupplierStocks);
 
         return ResponseEntity.ok(response);
     }
