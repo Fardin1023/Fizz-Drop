@@ -75,7 +75,7 @@ public class SupplierProfile {
     @Column(name = "wallet_balance", precision = 15, scale = 2, nullable = false)
     @JsonProperty("wallet_balance")
     @JsonAlias({"wallet_balance", "walletBalance"})
-    private BigDecimal walletBalance = new BigDecimal("50000.00");
+    private BigDecimal walletBalance = BigDecimal.ZERO;
 
     @Column(name = "is_verified", nullable = false)
     @JsonProperty("is_verified")

@@ -69,7 +69,7 @@ export const SupplierWalletModal: React.FC<SupplierWalletModalProps> = ({
 
   // Form states for topup
   const [amount, setAmount] = useState<string>(
-    requiredAmount ? Math.ceil(requiredAmount).toString() : '50000'
+    requiredAmount ? Math.ceil(requiredAmount).toString() : ''
   );
   const [paymentMethod, setPaymentMethod] = useState<string>('BANK_TRANSFER');
   const [referenceCode, setReferenceCode] = useState<string>('');
