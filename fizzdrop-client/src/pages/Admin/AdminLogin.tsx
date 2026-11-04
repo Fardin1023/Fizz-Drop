@@ -275,28 +275,6 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onSuccess, requiredRole = 'any'
                       Dhaka Div.
                     </span>
                   </button>
-
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      setError(null);
-                      setLoading(true);
-                      const res = await loginAsSupplier('chittagong.supplier@fizzdrop.com');
-                      setLoading(false);
-                      if (res.success && onSuccess) onSuccess();
-                      else if (!res.success) setError(res.error || 'Failed to authenticate');
-                    }}
-                    disabled={loading}
-                    className="w-full py-2 px-3 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-semibold flex items-center justify-between transition-all cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Package className="w-3.5 h-3.5 text-cyan-500" />
-                      <span>Bay Chittagong Supplier</span>
-                    </div>
-                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300">
-                      Chittagong Div.
-                    </span>
-                  </button>
                 </>
               )}
             </div>

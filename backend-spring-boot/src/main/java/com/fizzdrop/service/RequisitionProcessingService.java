@@ -101,25 +101,22 @@ public class RequisitionProcessingService {
         District dhaka = districtRepository.findByNameIgnoreCase("Dhaka").orElse(null);
         Long dhakaDistId = (dhaka != null) ? dhaka.getId() : 1L;
 
-        // Ensure users exist in Users table
-        if (userRepository.findByEmail("central.supplier@fizzdrop.com").isEmpty()) {
-            userRepository.save(new User(3L, 1L, "central.supplier@fizzdrop.com", "supplier123"));
-        }
-        if (userRepository.findByEmail("chittagong.supplier@fizzdrop.com").isEmpty()) {
-            userRepository.save(new User(3L, 1L, "chittagong.supplier@fizzdrop.com", "supplier123"));
-        }
-        if (userRepository.findByEmail("sylhet.supplier@fizzdrop.com").isEmpty()) {
-            userRepository.save(new User(3L, 1L, "sylhet.supplier@fizzdrop.com", "supplier123"));
+        // Ensure central supplier user exists in Users table
+        Optional<User> centralUserOpt = userRepository.findByEmail("central.supplier@fizzdrop.com");
+        Long centralUserId = centralUserOpt.map(User::getUserId).orElse(1L);
+        if (centralUserOpt.isEmpty()) {
+            User savedCentral = userRepository.save(new User(3L, 1L, "central.supplier@fizzdrop.com", "supplier123"));
+            centralUserId = savedCentral.getUserId();
         }
 
-        // Supplier 1: Dhaka Division Hub (User ID 4)
-        if (supplierProfileRepository.findByUserId(4L).isEmpty()) {
+        // Supplier: Dhaka Division Hub
+        if (supplierProfileRepository.count() == 0) {
             District gazipur = districtRepository.findByNameIgnoreCase("Gazipur").orElse(null);
             District narayanganj = districtRepository.findByNameIgnoreCase("Narayanganj").orElse(null);
             String covered = dhakaDistId + (gazipur != null ? "," + gazipur.getId() : "") + (narayanganj != null ? "," + narayanganj.getId() : "");
 
             SupplierProfile dhakaProf = new SupplierProfile(
-                    4L,
+                    centralUserId,
                     "Dhaka Metropolitan & Central Beverage Logistics Hub",
                     dhakaDistId,
                     "Road 11, Plot 42, Gulshan-1 Logistics Depot, Dhaka",
@@ -134,11 +131,16 @@ public class RequisitionProcessingService {
             dhakaProf.setBankAccountNumber("115.120.984123-DHK");
             dhakaProf.setBankAccountName("FizzDrop Regional Logistics Depot");
             dhakaProf.setMobileBankingNumber("+8801700112233");
+            dhakaProf.setWalletBalance(new java.math.BigDecimal("100000.00"));
             dhakaProf.setAllocatedAreas("{\"Dhaka\":[\"Gulshan\",\"Banani\",\"Uttara\",\"Dhanmondi\",\"Mirpur\"],\"Gazipur\":[\"Tongi\",\"Joydebpur\"],\"Narayanganj\":[\"Chashara\",\"Siddhirganj\"]}");
             supplierProfileRepository.save(dhakaProf);
         } else {
-            SupplierProfile p = supplierProfileRepository.findByUserId(4L).get();
+            SupplierProfile p = supplierProfileRepository.findAll().get(0);
             boolean needSave = false;
+            if (p.getUserId() == null || !p.getUserId().equals(centralUserId)) {
+                p.setUserId(centralUserId);
+                needSave = true;
+            }
             if (p.getDivisionName() == null || p.getDivisionName().trim().isEmpty()) {
                 p.setDivisionName("Dhaka");
                 needSave = true;
@@ -156,92 +158,11 @@ public class RequisitionProcessingService {
             }
         }
 
-        // Supplier 2: Chittagong Coastal Beverage Hub (User ID 5 or lookup)
-        District ctgDist = districtRepository.findByNameIgnoreCase("Chittagong").orElse(null);
-        District coxDist = districtRepository.findByNameIgnoreCase("Cox's Bazar").orElse(null);
-        District comillaDist = districtRepository.findByNameIgnoreCase("Comilla").orElse(null);
-        if (ctgDist != null) {
-            Optional<User> ctgUserOpt = userRepository.findByEmail("chittagong.supplier@fizzdrop.com");
-            Long ctgUserId = ctgUserOpt.map(User::getUserId).orElse(5L);
-            if (supplierProfileRepository.findByUserId(ctgUserId).isEmpty()) {
-                String ctgCovered = ctgDist.getId() + (coxDist != null ? "," + coxDist.getId() : "") + (comillaDist != null ? "," + comillaDist.getId() : "");
-                SupplierProfile ctgProf = new SupplierProfile(
-                        ctgUserId,
-                        "Bay Beverage Logistics & Ports Depot",
-                        ctgDist.getId(),
-                        "Agrabad Commercial Area, Depot Block 4, Chittagong",
-                        "+8801811223344"
-                );
-                ctgProf.setDivisionName("Chittagong");
-                ctgProf.setCoveredDistrictIds(ctgCovered);
-                ctgProf.setTradeLicenseNumber("TRD-CTG-2026-4410");
-                ctgProf.setIsVerified(true);
-                ctgProf.setDefaultPaymentMethod("CORPORATE_BANK_TRANSFER");
-                ctgProf.setBankName("Eastern Bank PLC");
-                ctgProf.setBankAccountNumber("201.554.887192-CTG");
-                ctgProf.setBankAccountName("Bay Beverage Distribution Depot");
-                ctgProf.setMobileBankingNumber("+8801811223344");
-                ctgProf.setAllocatedAreas("{\"Chittagong\":[\"Agrabad\",\"GEC Circle\",\"Panchlaish\",\"Halishahar\"],\"Cox's Bazar\":[\"Kolatoli\",\"Laboni Point\"]}");
-                supplierProfileRepository.save(ctgProf);
-            } else {
-                supplierProfileRepository.findByUserId(ctgUserId).ifPresent(p -> {
-                    if (p.getAllocatedAreas() == null || p.getAllocatedAreas().trim().isEmpty()) {
-                        p.setAllocatedAreas("{\"Chittagong\":[\"Agrabad\",\"GEC Circle\",\"Panchlaish\",\"Halishahar\"],\"Cox's Bazar\":[\"Kolatoli\",\"Laboni Point\"]}");
-                        supplierProfileRepository.save(p);
-                    }
-                });
-            }
-        }
-
-        // Supplier 3: Surma Valley Beverage Hub (User ID 6 or lookup)
-        District sylDist = districtRepository.findByNameIgnoreCase("Sylhet").orElse(null);
-        District moulviDist = districtRepository.findByNameIgnoreCase("Moulvibazar").orElse(null);
-        if (sylDist != null) {
-            Optional<User> sylUserOpt = userRepository.findByEmail("sylhet.supplier@fizzdrop.com");
-            Long sylUserId = sylUserOpt.map(User::getUserId).orElse(6L);
-            if (supplierProfileRepository.findByUserId(sylUserId).isEmpty()) {
-                String sylCovered = sylDist.getId() + (moulviDist != null ? "," + moulviDist.getId() : "");
-                SupplierProfile sylProf = new SupplierProfile(
-                        sylUserId,
-                        "Surma Valley Beverage Supply Hub",
-                        sylDist.getId(),
-                        "Subidbazar Road, Ward 3 Depot, Sylhet",
-                        "+8801733445566"
-                );
-                sylProf.setDivisionName("Sylhet");
-                sylProf.setCoveredDistrictIds(sylCovered);
-                sylProf.setTradeLicenseNumber("TRD-SYL-2026-2209");
-                sylProf.setIsVerified(true);
-                sylProf.setDefaultPaymentMethod("BKASH_MERCHANT");
-                sylProf.setMobileBankingNumber("+8801733445566");
-                sylProf.setAllocatedAreas("{\"Sylhet\":[\"Zindabazar\",\"Amberkhana\",\"Shibganj\",\"Shahjalal Uposhohor\"]}");
-                supplierProfileRepository.save(sylProf);
-            } else {
-                supplierProfileRepository.findByUserId(sylUserId).ifPresent(p -> {
-                    if (p.getAllocatedAreas() == null || p.getAllocatedAreas().trim().isEmpty()) {
-                        p.setAllocatedAreas("{\"Sylhet\":[\"Zindabazar\",\"Amberkhana\",\"Shibganj\",\"Shahjalal Uposhohor\"]}");
-                        supplierProfileRepository.save(p);
-                    }
-                });
-            }
-        }
-
-        // 3. Seed initial district inventory for active products in Dhaka & key districts if empty
+        // 3. Seed initial district inventory for active products in Dhaka if empty
         if (districtInventoryRepository.count() == 0 && dhaka != null) {
             List<Product> products = productRepository.findAll();
             for (Product p : products) {
-                // Dhaka regional depot stock
                 districtInventoryRepository.save(new DistrictInventory(dhaka.getId(), p.getProductId(), 120, 0));
-                
-                // Chittagong regional depot stock
-                districtRepository.findByNameIgnoreCase("Chittagong").ifPresent(ctg -> {
-                    districtInventoryRepository.save(new DistrictInventory(ctg.getId(), p.getProductId(), 80, 0));
-                });
-
-                // Sylhet regional depot stock
-                districtRepository.findByNameIgnoreCase("Sylhet").ifPresent(syl -> {
-                    districtInventoryRepository.save(new DistrictInventory(syl.getId(), p.getProductId(), 60, 0));
-                });
             }
         }
 
@@ -313,37 +234,58 @@ public class RequisitionProcessingService {
         if (supplierId != null && supplierId > 0) {
             java.util.Optional<SupplierProfile> byId = supplierProfileRepository.findById(supplierId);
             if (byId.isPresent()) {
-                return byId.get();
+                SupplierProfile profile = byId.get();
+                enrichProfile(profile);
+                return profile;
             }
         }
         if (userId != null && userId > 0) {
             java.util.Optional<SupplierProfile> byUser = supplierProfileRepository.findByUserId(userId);
             if (byUser.isPresent()) {
-                return byUser.get();
+                SupplierProfile profile = byUser.get();
+                enrichProfile(profile);
+                return profile;
             }
         }
-        return getSupplierProfile(userId != null ? userId : 4L);
+        return getSupplierProfile(userId);
     }
 
     public SupplierProfile getSupplierProfile(Long userId) {
-        SupplierProfile profile = supplierProfileRepository.findByUserId(userId).orElseGet(() -> {
-            District dhaka = districtRepository.findByNameIgnoreCase("Dhaka").orElse(null);
-            Long defaultDistrictId = (dhaka != null) ? dhaka.getId() : 1L;
-            SupplierProfile newProf = new SupplierProfile(
-                    userId,
-                    "Supplier Depot Operations",
-                    defaultDistrictId,
-                    "Primary Regional Logistics Hub",
-                    "+8801700000000"
-            );
-            newProf.setDivisionName("Dhaka");
-            newProf.setCoveredDistrictIds(String.valueOf(defaultDistrictId));
-            newProf.setTradeLicenseNumber("TRD-PENDING-" + userId);
-            return supplierProfileRepository.save(newProf);
-        });
+        if (userId != null && userId > 0) {
+            Optional<SupplierProfile> byUser = supplierProfileRepository.findByUserId(userId);
+            if (byUser.isPresent()) {
+                SupplierProfile profile = byUser.get();
+                enrichProfile(profile);
+                return profile;
+            }
+        }
 
-        enrichProfile(profile);
-        return profile;
+        // Return first available primary supplier profile
+        List<SupplierProfile> all = supplierProfileRepository.findAll();
+        if (!all.isEmpty()) {
+            SupplierProfile profile = all.get(0);
+            enrichProfile(profile);
+            return profile;
+        }
+
+        // Fallback only if table is completely empty
+        District dhaka = districtRepository.findByNameIgnoreCase("Dhaka").orElse(null);
+        Long defaultDistrictId = (dhaka != null) ? dhaka.getId() : 1L;
+        SupplierProfile newProf = new SupplierProfile(
+                userId != null ? userId : 1L,
+                "Dhaka Metropolitan & Central Beverage Logistics Hub",
+                defaultDistrictId,
+                "Road 11, Plot 42, Gulshan-1 Logistics Depot, Dhaka",
+                "+8801700112233"
+        );
+        newProf.setDivisionName("Dhaka");
+        newProf.setCoveredDistrictIds("1,2,3");
+        newProf.setTradeLicenseNumber("TRD-DHK-2026-9812");
+        newProf.setIsVerified(true);
+        newProf.setWalletBalance(new java.math.BigDecimal("100000.00"));
+        SupplierProfile saved = supplierProfileRepository.save(newProf);
+        enrichProfile(saved);
+        return saved;
     }
 
     @Transactional
