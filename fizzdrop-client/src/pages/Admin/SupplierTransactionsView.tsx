@@ -673,6 +673,9 @@ export const SupplierTransactionsView: React.FC = () => {
       <SupplierWalletModal
         isOpen={isWalletModalOpen}
         onClose={() => setIsWalletModalOpen(false)}
+        initialBalance={financialSummary.wallet_balance}
+        supplierId={supplierProfile?.id || 1}
+        userId={user?.user_id}
         onWalletUpdated={() => {
           fetchData();
         }}

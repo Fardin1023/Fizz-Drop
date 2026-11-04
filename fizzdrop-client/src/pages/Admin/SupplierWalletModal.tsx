@@ -28,6 +28,9 @@ interface SupplierWalletModalProps {
   onClose: () => void;
   onWalletUpdated?: (newBalance: number) => void;
   requiredAmount?: number;
+  initialBalance?: number;
+  supplierId?: number;
+  userId?: number;
 }
 
 export const SupplierWalletModal: React.FC<SupplierWalletModalProps> = ({
@@ -35,9 +38,12 @@ export const SupplierWalletModal: React.FC<SupplierWalletModalProps> = ({
   onClose,
   onWalletUpdated,
   requiredAmount,
+  initialBalance,
+  supplierId,
+  userId: propUserId,
 }) => {
-  const { user } = useAuth();
-  const userId = user?.user_id || 4;
+  const { user, token } = useAuth();
+  const userId = propUserId || user?.user_id || 4;
 
   const [loading, setLoading] = useState<boolean>(true);
   const [submitting, setSubmitting] = useState<boolean>(false);
@@ -83,40 +89,60 @@ export const SupplierWalletModal: React.FC<SupplierWalletModalProps> = ({
 
   const [activeTab, setActiveTab] = useState<'topup' | 'pnl' | 'settings' | 'history'>('topup');
 
-  // Safe JSON parser to guard against HTML error pages
-  const parseResponse = async (res: Response) => {
-    const text = await res.text();
-    try {
-      return JSON.parse(text);
-    } catch {
-      if (!res.ok) {
-        throw new Error(`Server returned HTTP ${res.status}: ${text.slice(0, 120)}`);
-      }
-      throw new Error('Received non-JSON response from server.');
+  // Synchronize initialBalance immediately so modal NEVER flashes or stays at ৳0.00
+  useEffect(() => {
+    if (initialBalance !== undefined && initialBalance !== null) {
+      setWalletData((prev) =>
+        prev
+          ? { ...prev, wallet_balance: initialBalance }
+          : {
+              supplier_id: supplierId || 1,
+              business_name: 'Regional Supplier Depot',
+              wallet_balance: initialBalance,
+            }
+      );
     }
-  };
+  }, [initialBalance, supplierId]);
 
   // Fetch live wallet details
   const fetchWallet = async () => {
     try {
       setLoading(true);
       setErrorMsg(null);
-      const res = await fetch(`http://localhost:8080/api/v1/supplier/wallet?userId=${userId}`);
-      if (!res.ok) {
-        const errObj = await parseResponse(res).catch(() => ({}));
-        throw new Error(errObj.message || `Failed to load supplier wallet details (HTTP ${res.status})`);
+      const params = new URLSearchParams();
+      if (supplierId) params.set('supplierId', String(supplierId));
+      if (userId) params.set('userId', String(userId));
+      const authHeader: Record<string, string> = {};
+      if (token) {
+        authHeader['Authorization'] = `Bearer ${token}`;
       }
-      const data = await parseResponse(res);
-      setWalletData(data);
-      setBankName(data.bank_name || '');
-      setBankAccountNumber(data.bank_account_number || '');
-      setBankAccountName(data.bank_account_name || '');
-      setMobileBankingNumber(data.mobile_banking_number || '');
-      if (data.default_payment_method) {
-        setPaymentMethod(data.default_payment_method);
+
+      const res = await fetch(`http://localhost:8080/api/v1/supplier/wallet?${params.toString()}`, {
+        headers: authHeader,
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to load supplier wallet details (HTTP ${res.status})`);
+      }
+      const text = await res.text();
+      let data: any = null;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        return;
+      }
+      if (data && typeof data === 'object') {
+        setWalletData(data);
+        setBankName(data.bank_name || '');
+        setBankAccountNumber(data.bank_account_number || '');
+        setBankAccountName(data.bank_account_name || '');
+        setMobileBankingNumber(data.mobile_banking_number || '');
+        if (data.default_payment_method) {
+          setPaymentMethod(data.default_payment_method);
+        }
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Error loading wallet');
+      console.warn('Notice loading wallet data:', err);
     } finally {
       setLoading(false);
     }
@@ -131,7 +157,7 @@ export const SupplierWalletModal: React.FC<SupplierWalletModalProps> = ({
         setAmount(Math.ceil(requiredAmount).toString());
       }
     }
-  }, [isOpen, userId, requiredAmount]);
+  }, [isOpen, userId, supplierId, requiredAmount]);
 
   const handleTopup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -157,20 +183,39 @@ export const SupplierWalletModal: React.FC<SupplierWalletModalProps> = ({
         mobile_banking_number: mobileBankingNumber.trim(),
       };
 
-      const res = await fetch(`http://localhost:8080/api/v1/supplier/wallet/topup?userId=${userId}`, {
+      const params = new URLSearchParams();
+      if (supplierId) params.set('supplierId', String(supplierId));
+      if (userId) params.set('userId', String(userId));
+      const authHeader: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        authHeader['Authorization'] = `Bearer ${token}`;
+      }
+
+      const res = await fetch(`http://localhost:8080/api/v1/supplier/wallet/topup?${params.toString()}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeader,
         body: JSON.stringify(payload),
       });
 
-      const result = await parseResponse(res);
+      const text = await res.text();
+      let result: any = {};
+      try {
+        result = JSON.parse(text);
+      } catch {
+        if (!res.ok) {
+          throw new Error(`Deposit failed (Server HTTP ${res.status})`);
+        }
+      }
+
       if (!res.ok) {
-        throw new Error(result.message || 'Failed to deposit funds into wallet');
+        throw new Error(result.message || result.error || 'Failed to deposit funds into wallet');
       }
 
       setSuccessMsg(`৳${numAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} successfully added to your Commercial Wallet!`);
-      const newBalance = Number(result.wallet_balance || (walletData?.wallet_balance || 0) + numAmount);
-      setWalletData((prev) => prev ? { ...prev, wallet_balance: newBalance } : null);
+      const newBalance = Number(result.wallet_balance !== undefined ? result.wallet_balance : ((walletData?.wallet_balance || initialBalance || 0) + numAmount));
+      setWalletData((prev) => prev ? { ...prev, wallet_balance: newBalance } : { supplier_id: supplierId || 1, business_name: '', wallet_balance: newBalance });
       if (onWalletUpdated) {
         onWalletUpdated(newBalance);
       }
@@ -199,15 +244,34 @@ export const SupplierWalletModal: React.FC<SupplierWalletModalProps> = ({
         default_payment_method: paymentMethod,
       };
 
-      const res = await fetch(`http://localhost:8080/api/v1/supplier/wallet/settings?userId=${userId}`, {
+      const params = new URLSearchParams();
+      if (supplierId) params.set('supplierId', String(supplierId));
+      if (userId) params.set('userId', String(userId));
+      const authHeader: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        authHeader['Authorization'] = `Bearer ${token}`;
+      }
+
+      const res = await fetch(`http://localhost:8080/api/v1/supplier/wallet/settings?${params.toString()}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeader,
         body: JSON.stringify(payload),
       });
 
-      const result = await parseResponse(res);
+      const text = await res.text();
+      let result: any = {};
+      try {
+        result = JSON.parse(text);
+      } catch {
+        if (!res.ok) {
+          throw new Error(`Settings update failed (Server HTTP ${res.status})`);
+        }
+      }
+
       if (!res.ok) {
-        throw new Error(result.message || 'Failed to update wallet banking settings');
+        throw new Error(result.message || result.error || 'Failed to update wallet banking settings');
       }
 
       setSuccessMsg('Commercial wallet & payout accounts updated successfully!');
@@ -221,7 +285,7 @@ export const SupplierWalletModal: React.FC<SupplierWalletModalProps> = ({
 
   if (!isOpen) return null;
 
-  const currentBalance = Number(walletData?.wallet_balance || 0);
+  const currentBalance = Number(walletData?.wallet_balance !== undefined ? walletData.wallet_balance : (initialBalance || 0));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">

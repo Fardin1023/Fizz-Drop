@@ -418,6 +418,8 @@ export const AdminDashboard: React.FC = () => {
       <SupplierWalletModal
         isOpen={isWalletModalOpen}
         onClose={() => setIsWalletModalOpen(false)}
+        initialBalance={walletBalance}
+        userId={user?.user_id}
         onWalletUpdated={(newBal) => {
           setWalletBalance(newBal);
         }}

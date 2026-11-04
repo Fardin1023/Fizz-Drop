@@ -815,6 +815,9 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
       <SupplierWalletModal
         isOpen={isWalletModalOpen}
         onClose={() => setIsWalletModalOpen(false)}
+        initialBalance={walletBalance}
+        supplierId={profile?.id || 1}
+        userId={user?.user_id}
         requiredAmount={grandTotal > walletBalance ? (grandTotal - walletBalance) : undefined}
         onWalletUpdated={(newBal) => {
           setWalletBalance(newBal);

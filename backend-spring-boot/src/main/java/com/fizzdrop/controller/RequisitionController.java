@@ -221,9 +221,10 @@ public class RequisitionController {
     @GetMapping("/supplier/transactions")
     public ResponseEntity<SupplierFinancialSummaryDTO> getSupplierTransactions(
             @RequestHeader(value = "Authorization", required = false) String authHeader,
-            @RequestParam(value = "userId", required = false) Long userId) {
+            @RequestParam(value = "userId", required = false) Long userId,
+            @RequestParam(value = "supplierId", required = false) Long supplierId) {
         Long resolvedId = resolveUserId(authHeader, userId);
-        return ResponseEntity.ok(requisitionService.getSupplierFinancialSummary(resolvedId));
+        return ResponseEntity.ok(requisitionService.getSupplierFinancialSummary(resolvedId, supplierId));
     }
 
 
@@ -231,19 +232,21 @@ public class RequisitionController {
     @GetMapping("/supplier/wallet")
     public ResponseEntity<?> getSupplierWallet(
             @RequestHeader(value = "Authorization", required = false) String authHeader,
-            @RequestParam(value = "userId", required = false) Long userId) {
+            @RequestParam(value = "userId", required = false) Long userId,
+            @RequestParam(value = "supplierId", required = false) Long supplierId) {
         Long resolvedId = resolveUserId(authHeader, userId);
-        return ResponseEntity.ok(requisitionService.getSupplierWalletDetails(resolvedId));
+        return ResponseEntity.ok(requisitionService.getSupplierWalletDetails(resolvedId, supplierId));
     }
 
     @PostMapping("/supplier/wallet/topup")
     public ResponseEntity<?> topupSupplierWallet(
             @RequestHeader(value = "Authorization", required = false) String authHeader,
             @RequestParam(value = "userId", required = false) Long userId,
+            @RequestParam(value = "supplierId", required = false) Long supplierId,
             @RequestBody Map<String, Object> payload) {
         try {
             Long resolvedId = resolveUserId(authHeader, userId);
-            return ResponseEntity.ok(requisitionService.topupSupplierWallet(resolvedId, payload));
+            return ResponseEntity.ok(requisitionService.topupSupplierWallet(resolvedId, supplierId, payload));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));
         }
@@ -253,10 +256,11 @@ public class RequisitionController {
     public ResponseEntity<?> updateWalletSettings(
             @RequestHeader(value = "Authorization", required = false) String authHeader,
             @RequestParam(value = "userId", required = false) Long userId,
+            @RequestParam(value = "supplierId", required = false) Long supplierId,
             @RequestBody Map<String, String> payload) {
         try {
             Long resolvedId = resolveUserId(authHeader, userId);
-            return ResponseEntity.ok(requisitionService.updateSupplierWalletSettings(resolvedId, payload));
+            return ResponseEntity.ok(requisitionService.updateSupplierWalletSettings(resolvedId, supplierId, payload));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));
         }
