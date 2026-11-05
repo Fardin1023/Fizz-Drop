@@ -129,12 +129,12 @@ public class RequisitionProcessingService {
             dhakaProf.setCoveredDistrictIds(covered);
             dhakaProf.setTradeLicenseNumber("TRD-DHK-2026-9812");
             dhakaProf.setIsVerified(true);
-            dhakaProf.setDefaultPaymentMethod("CORPORATE_BANK_TRANSFER");
-            dhakaProf.setBankName("Dutch-Bangla Bank PLC");
-            dhakaProf.setBankAccountNumber("115.120.984123-DHK");
-            dhakaProf.setBankAccountName("FizzDrop Regional Logistics Depot");
+            dhakaProf.setDefaultPaymentMethod("STRIPE_CARD");
+            dhakaProf.setBankName(null);
+            dhakaProf.setBankAccountNumber(null);
+            dhakaProf.setBankAccountName(null);
             dhakaProf.setMobileBankingNumber("+8801700112233");
-            dhakaProf.setWalletBalance(new java.math.BigDecimal("100000.00"));
+            dhakaProf.setWalletBalance(java.math.BigDecimal.ZERO);
             dhakaProf.setAllocatedAreas("{\"Dhaka\":[\"Gulshan\",\"Banani\",\"Uttara\",\"Dhanmondi\",\"Mirpur\"],\"Gazipur\":[\"Tongi\",\"Joydebpur\"],\"Narayanganj\":[\"Chashara\",\"Siddhirganj\"]}");
             supplierProfileRepository.save(dhakaProf);
         } else {
