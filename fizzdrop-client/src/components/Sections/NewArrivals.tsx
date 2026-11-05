@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingBag, Heart, AlertCircle, PackageX } from 'lucide-react';
+import { ShoppingBag, Heart, AlertCircle, PackageX, ArrowRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import SectionsHeading from './SectionsHeading/SectionsHeading';
 import pepsiImg from '../../assets/img/pepsi.PNG';
 import sevenUpImg from '../../assets/img/7up.PNG';
@@ -34,6 +35,7 @@ interface NewArrivalsProps {
   branchId?: number | string;
   onAddToCart?: (product: ProductItem) => void;
   onAddToWishlist?: (product: ProductItem) => void;
+  limit?: number;
 }
 
 const getBrandFallback = (brand: string, category?: string, name?: string): string => {
@@ -55,6 +57,7 @@ const NewArrivals: React.FC<NewArrivalsProps> = ({
   branchId,
   onAddToCart,
   onAddToWishlist,
+  limit,
 }) => {
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -114,21 +117,27 @@ const NewArrivals: React.FC<NewArrivalsProps> = ({
     fetchNewArrivals();
   }, [branchId]);
 
+  const displayedProducts = limit && limit > 0 ? products.slice(0, limit) : products;
+
   return (
     <section className="relative z-10 py-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
       {/* 1. Header always renders */}
       <SectionsHeading
-        badge="Fresh Off The Truck"
-        title="New Drops & Flavors"
-        subtitle="The latest ice-cold arrivals, limited seasonal cans, and exclusive drops just hit the shelves."
-        actionText="View All Drops"
+        badge={limit ? "Curated Drops" : "Fresh Off The Truck"}
+        title={limit ? "Featured Refreshments" : "New Drops & Flavors"}
+        subtitle={
+          limit
+            ? "A handpicked selection of ice-cold favorites. Discover the complete catalog of drinks and merchandise in the beverages section."
+            : "The latest ice-cold arrivals, limited seasonal cans, and exclusive drops just hit the shelves."
+        }
+        actionText="View All Beverages"
         actionHref="/beverages"
       />
 
       {/* 2. Loading Skeleton */}
       {loading && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[...Array(4)].map((_, idx) => (
+          {[...Array(limit || 4)].map((_, idx) => (
             <div
               key={idx}
               className="rounded-3xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800 p-5 flex flex-col justify-between h-[360px] animate-pulse"
@@ -168,10 +177,10 @@ const NewArrivals: React.FC<NewArrivalsProps> = ({
         </div>
       )}
 
-      {/* 5. Dynamic Products Grid */}
-      {!loading && !error && products.length > 0 && (
+      {/* 5. Dynamic Products Grid (Curated subset when limit is passed) */}
+      {!loading && !error && displayedProducts.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {products.map((product) => {
+          {displayedProducts.map((product) => {
             const inStock = product.stockQuantity > 0;
             const priceVal = typeof product.price === 'number' ? product.price : parseFloat(product.price as any) || 0;
 
@@ -247,6 +256,27 @@ const NewArrivals: React.FC<NewArrivalsProps> = ({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* 6. Explore Full Beverages Catalog CTA Banner */}
+      {!loading && !error && products.length > 0 && limit && limit < products.length && (
+        <div className="mt-10 sm:mt-12 p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex flex-col sm:flex-row items-center justify-between gap-6 shadow-xl border border-indigo-500/20">
+          <div className="space-y-1 text-center sm:text-left">
+            <h3 className="font-oswald text-xl sm:text-2xl font-black uppercase tracking-wide">
+              Looking for our complete beverage lineup?
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-300 max-w-xl">
+              Explore all {products.length}+ chilled sodas, natural waters, energy drinks, and official merchandise in our dedicated Beverages section.
+            </p>
+          </div>
+          <Link
+            to="/beverages"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-white text-slate-950 hover:bg-slate-100 font-bold text-xs sm:text-sm tracking-wide shadow-md transition-all active:scale-95 shrink-0 group cursor-pointer"
+          >
+            <span>Explore All Beverages ({products.length}+ Drinks)</span>
+            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+          </Link>
         </div>
       )}
     </section>

@@ -1,7 +1,7 @@
 import React from 'react';
-import BrandVideoSection from '../components/Sections/BrandVideoSection';
 import HeroSection from '../components/HeroSection/HeroSection';
 import BrandMarquee from '../components/Sections/BrandMarquee';
+import BrandVideoSection from '../components/Sections/BrandVideoSection';
 import NewArrivals from '../components/Sections/NewArrivals';
 
 interface HomePageProps {
@@ -12,19 +12,17 @@ interface HomePageProps {
 const HomePage: React.FC<HomePageProps> = ({ onAddToCart, branchId }) => {
   return (
     <div className="flex flex-col">
-      {/* 1. Official Brand Video Showcase placed at the top for immediate consumer visibility */}
-      <BrandVideoSection />
+      {/* 1. Interactive Product Carousel Hero */}
+      <HeroSection />
 
-      {/* 2. Interactive Product Carousel Hero */}
-      <div id="hero-showcase">
-        <HeroSection />
-      </div>
-
-      {/* 3. Infinite Partner Brand Logos */}
+      {/* 2. Infinite Partner Brand Logos */}
       <BrandMarquee />
 
-      {/* 4. Live Franchise Outlet New Arrivals Catalog */}
-      <NewArrivals branchId={branchId} onAddToCart={onAddToCart} />
+      {/* 3. Official Brand Campaign Video Showcase */}
+      <BrandVideoSection />
+
+      {/* 4. Curated Featured Drops (Preview only on Home, complete catalog lives in /beverages) */}
+      <NewArrivals branchId={branchId} onAddToCart={onAddToCart} limit={4} />
     </div>
   );
 };
