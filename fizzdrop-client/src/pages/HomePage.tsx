@@ -1,6 +1,7 @@
 import React from 'react';
 import HeroSection from '../components/HeroSection/HeroSection';
 import BrandMarquee from '../components/Sections/BrandMarquee';
+import BrandVideoSection from '../components/Sections/BrandVideoSection';
 import NewArrivals from '../components/Sections/NewArrivals';
 
 interface HomePageProps {
@@ -13,6 +14,7 @@ const HomePage: React.FC<HomePageProps> = ({ onAddToCart, branchId }) => {
     <>
       <HeroSection />
       <BrandMarquee />
+      <BrandVideoSection />
       <NewArrivals branchId={branchId} onAddToCart={onAddToCart} />
     </>
   );
