@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import {
@@ -68,6 +68,7 @@ export const OutletDashboard: React.FC = () => {
   const [salesHistory, setSalesHistory] = useState<any[]>([]);
   const [requisitions, setRequisitions] = useState<any[]>([]);
   const [loadingData, setLoadingData] = useState<boolean>(true);
+  const hasLoadedOnceRef = useRef<boolean>(false);
   const [stripePaymentData, setStripePaymentData] = useState<{
     isOpen: boolean;
     amount: number;
@@ -100,7 +101,7 @@ export const OutletDashboard: React.FC = () => {
   // Auto-refresh shelf stock and delivery tracker when a dispatch notification arrives
   useEffect(() => {
     if (popupNotification && popupNotification.recipient_role === 'OUTLET') {
-      fetchDashboardData(outlet?.outlet_id || effectiveOutletId);
+      fetchDashboardData(outlet?.outlet_id || effectiveOutletId, true);
     }
   }, [popupNotification, effectiveOutletId]);
 
@@ -114,7 +115,7 @@ export const OutletDashboard: React.FC = () => {
           const currentId = Number(outlet?.outlet_id || effectiveOutletId);
           if (Number(event.data.outlet_id) === currentId) {
             setCustomerOrderAlert(event.data);
-            fetchDashboardData(currentId);
+            fetchDashboardData(currentId, true);
           }
         }
       };
@@ -123,22 +124,22 @@ export const OutletDashboard: React.FC = () => {
     const handleStorage = (e: StorageEvent) => {
       if (e.key === 'fizzdrop_last_sale_event') {
         const currentId = Number(outlet?.outlet_id || effectiveOutletId);
-        fetchDashboardData(currentId);
+        fetchDashboardData(currentId, true);
       }
     };
     window.addEventListener('storage', handleStorage);
 
-    // Guaranteed polling every 8 seconds to keep KPI and shelf stock accurate
+    // Periodic silent background sync every 25 seconds to keep shelf stock updated without flashing the screen
     const pollInterval = setInterval(() => {
-      fetchDashboardData(outlet?.outlet_id || effectiveOutletId);
-    }, 8000);
+      fetchDashboardData(outlet?.outlet_id || effectiveOutletId, true);
+    }, 25000);
 
     return () => {
       if (channel) channel.close();
       window.removeEventListener('storage', handleStorage);
       clearInterval(pollInterval);
     };
-  }, [outlet?.outlet_id, effectiveOutletId]);
+  }, [effectiveOutletId]);
 
   // Auto-dismiss customer order alert banner after 10s
   useEffect(() => {
@@ -172,9 +173,11 @@ export const OutletDashboard: React.FC = () => {
   const [posReceipt, setPosReceipt] = useState<ReceiptData | null>(null);
   const [showPosReceipt, setShowPosReceipt] = useState<boolean>(false);
 
-  // Fetch all branch data
-  const fetchDashboardData = async (targetOutletId = effectiveOutletId) => {
-    setLoadingData(true);
+  // Fetch all branch data (supports silent background re-fetching so UI never flickers)
+  const fetchDashboardData = async (targetOutletId = effectiveOutletId, isSilent = false) => {
+    if (!isSilent && !hasLoadedOnceRef.current) {
+      setLoadingData(true);
+    }
     try {
       // 1. Fetch Outlet Inventory & KPI
       const invRes = await fetch(`http://localhost:8080/api/inventory/outlet/${targetOutletId}`);
@@ -205,6 +208,7 @@ export const OutletDashboard: React.FC = () => {
         const allOutData = await allOutRes.json();
         if (Array.isArray(allOutData)) setAllOutlets(allOutData);
       }
+      hasLoadedOnceRef.current = true;
     } catch (err) {
       // ignore
     } finally {
