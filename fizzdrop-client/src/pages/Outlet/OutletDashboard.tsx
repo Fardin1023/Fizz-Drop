@@ -33,6 +33,7 @@ import {
   CreditCard,
   Banknote,
   Smartphone,
+  X,
 } from 'lucide-react';
 import logoImg from '../../assets/img/fizzdrop-logo.png';
 import { OutletSaleModal, type OutletProductItem } from './OutletSaleModal';

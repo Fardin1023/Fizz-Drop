@@ -283,3 +283,25 @@ code {
 .animate-fizz-bubble {
   animation: fizzdropBubbleRise linear infinite;
 }
+
+/* Glowing Neon Edges Animation for Video Showcase */
+@keyframes edgeGlowSweep {
+  0% {
+    background-position: 0% 50%;
+    filter: drop-shadow(0 0 16px rgba(6, 182, 212, 0.75)) drop-shadow(0 0 32px rgba(99, 102, 241, 0.5));
+  }
+  50% {
+    background-position: 100% 50%;
+    filter: drop-shadow(0 0 24px rgba(99, 102, 241, 0.85)) drop-shadow(0 0 48px rgba(236, 72, 153, 0.65));
+  }
+  100% {
+    background-position: 0% 50%;
+    filter: drop-shadow(0 0 16px rgba(6, 182, 212, 0.75)) drop-shadow(0 0 32px rgba(99, 102, 241, 0.5));
+  }
+}
+
+.animate-edge-glow {
+  background-size: 300% 300%;
+  animation: edgeGlowSweep 5s ease-in-out infinite;
+}
+

@@ -115,111 +115,119 @@ export const BrandVideoSection: React.FC = () => {
           </p>
         </div>
 
-        {/* Video Player Showcase Frame */}
-        <div
-          ref={containerRef}
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
-          className="relative mx-auto max-w-5xl rounded-3xl sm:rounded-[2.5rem] p-2 sm:p-3.5 bg-gradient-to-b from-white/80 via-slate-100/60 to-white/40 dark:from-zinc-800/80 dark:via-zinc-900/60 dark:to-zinc-950/40 border border-slate-200/80 dark:border-zinc-800/80 shadow-2xl backdrop-blur-xl transition-all duration-500 group"
-        >
-          {/* Inner Video Container */}
-          <div className="relative w-full aspect-video rounded-2xl sm:rounded-[2rem] overflow-hidden bg-slate-950 shadow-inner">
-            <video
-              ref={videoRef}
-              src="/videos/brand_ad.mp4"
-              className="w-full h-full object-cover cursor-pointer"
-              playsInline
-              muted
-              loop
-              autoPlay
-              onClick={togglePlay}
-              onTimeUpdate={handleTimeUpdate}
-            />
+        {/* Video Player Showcase Frame with Glowing Animated Edges */}
+        <div className="relative mx-auto max-w-5xl group">
+          {/* Animated Glowing Neon Edge Border */}
+          <div
+            aria-hidden="true"
+            className="absolute -inset-1 sm:-inset-1.5 rounded-[2.25rem] sm:rounded-[2.75rem] bg-gradient-to-r from-cyan-400 via-indigo-500 via-fuchsia-500 to-cyan-400 animate-edge-glow opacity-85 blur-md group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+          />
 
-            {/* Top Badge: Spotlight Tag */}
-            <div className="absolute top-4 left-4 sm:top-6 sm:left-6 z-20 pointer-events-none flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/70 backdrop-blur-md border border-white/10 text-white text-[11px] font-mono tracking-wider">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="font-bold">ORIGINAL CAMPAIGN</span>
-            </div>
+          <div
+            ref={containerRef}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+            className="relative rounded-3xl sm:rounded-[2.5rem] p-1.5 sm:p-2.5 bg-gradient-to-b from-white/95 via-slate-900/90 to-slate-950/95 dark:from-zinc-900/90 dark:via-zinc-950/95 dark:to-black border border-cyan-400/40 dark:border-cyan-500/30 shadow-2xl backdrop-blur-xl overflow-hidden transition-all duration-500"
+          >
+            {/* Inner Video Container */}
+            <div className="relative w-full aspect-video rounded-2xl sm:rounded-[2rem] overflow-hidden bg-slate-950 shadow-inner ring-1 ring-white/15">
+              <video
+                ref={videoRef}
+                src="/videos/brand_ad.mp4"
+                className="w-full h-full object-cover cursor-pointer"
+                playsInline
+                muted
+                loop
+                autoPlay
+                onClick={togglePlay}
+                onTimeUpdate={handleTimeUpdate}
+              />
 
-            {/* Floating Center Play/Pause Indicator (shown on hover or when paused) */}
-            <div
-              onClick={togglePlay}
-              className={`absolute inset-0 z-10 flex items-center justify-center transition-opacity duration-300 cursor-pointer ${
-                !isPlaying || isHovered ? 'opacity-100 bg-slate-950/20' : 'opacity-0'
-              }`}
-            >
-              <button
-                type="button"
-                className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white/90 hover:bg-white text-slate-900 flex items-center justify-center shadow-xl hover:scale-105 active:scale-95 transition-all backdrop-blur-md cursor-pointer"
-                title={isPlaying ? 'Pause Video' : 'Play Video'}
-              >
-                {isPlaying ? (
-                  <Pause className="w-6 h-6 fill-current text-slate-900" />
-                ) : (
-                  <Play className="w-6 h-6 fill-current text-slate-900 ml-1" />
-                )}
-              </button>
-            </div>
-
-            {/* Bottom Controls Bar (Fades in on hover or when paused) */}
-            <div
-              className={`absolute bottom-0 inset-x-0 z-20 p-4 sm:p-6 bg-gradient-to-t from-slate-950/90 via-slate-950/60 to-transparent transition-opacity duration-300 flex flex-col gap-2.5 ${
-                isHovered || !isPlaying ? 'opacity-100' : 'opacity-0 sm:opacity-0'
-              }`}
-            >
-              {/* Progress Bar / Scrubber */}
-              <div
-                onClick={handleSeek}
-                className="w-full h-1.5 sm:h-2 bg-white/20 rounded-full cursor-pointer overflow-hidden group/bar relative"
-              >
-                <div
-                  className="h-full bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-500 rounded-full transition-all duration-100 relative"
-                  style={{ width: `${progress}%` }}
-                />
+              {/* Top Badge: Spotlight Tag */}
+              <div className="absolute top-4 left-4 sm:top-6 sm:left-6 z-20 pointer-events-none flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/80 backdrop-blur-md border border-cyan-400/30 text-white text-[11px] font-mono tracking-wider shadow-lg">
+                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                <span className="font-bold text-cyan-300">DYNAMIC CAN EVOLUTION</span>
               </div>
 
-              {/* Bar Actions */}
-              <div className="flex items-center justify-between text-white text-xs">
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={togglePlay}
-                    className="p-1.5 rounded-lg hover:bg-white/20 transition-colors cursor-pointer text-white"
-                    title={isPlaying ? 'Pause' : 'Play'}
-                  >
-                    {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
-                  </button>
+              {/* Floating Center Play/Pause Indicator (shown on hover or when paused) */}
+              <div
+                onClick={togglePlay}
+                className={`absolute inset-0 z-10 flex items-center justify-center transition-opacity duration-300 cursor-pointer ${
+                  !isPlaying || isHovered ? 'opacity-100 bg-slate-950/20' : 'opacity-0'
+                }`}
+              >
+                <button
+                  type="button"
+                  className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white/90 hover:bg-white text-slate-900 flex items-center justify-center shadow-xl hover:scale-105 active:scale-95 transition-all backdrop-blur-md cursor-pointer"
+                  title={isPlaying ? 'Pause Video' : 'Play Video'}
+                >
+                  {isPlaying ? (
+                    <Pause className="w-6 h-6 fill-current text-slate-900" />
+                  ) : (
+                    <Play className="w-6 h-6 fill-current text-slate-900 ml-1" />
+                  )}
+                </button>
+              </div>
 
-                  <button
-                    onClick={toggleMute}
-                    className="flex items-center gap-1.5 p-1.5 px-2.5 rounded-lg bg-white/10 hover:bg-white/20 text-white font-medium text-xs transition-colors cursor-pointer"
-                    title={isMuted ? 'Unmute Audio' : 'Mute Audio'}
-                  >
-                    {isMuted ? (
-                      <>
-                        <VolumeX className="w-4 h-4 text-cyan-300" />
-                        <span className="text-[11px] font-mono">Unmute</span>
-                      </>
-                    ) : (
-                      <>
-                        <Volume2 className="w-4 h-4 text-cyan-300" />
-                        <span className="text-[11px] font-mono">Sound On</span>
-                      </>
-                    )}
-                  </button>
+              {/* Bottom Controls Bar (Fades in on hover or when paused) */}
+              <div
+                className={`absolute bottom-0 inset-x-0 z-20 p-4 sm:p-6 bg-gradient-to-t from-slate-950/90 via-slate-950/60 to-transparent transition-opacity duration-300 flex flex-col gap-2.5 ${
+                  isHovered || !isPlaying ? 'opacity-100' : 'opacity-0 sm:opacity-0'
+                }`}
+              >
+                {/* Progress Bar / Scrubber */}
+                <div
+                  onClick={handleSeek}
+                  className="w-full h-1.5 sm:h-2 bg-white/20 rounded-full cursor-pointer overflow-hidden group/bar relative"
+                >
+                  <div
+                    className="h-full bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-500 rounded-full transition-all duration-100 relative"
+                    style={{ width: `${progress}%` }}
+                  />
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <span className="hidden sm:inline-block font-mono text-[11px] text-slate-300">
-                    FIZZDROP 1080p HD
-                  </span>
-                  <button
-                    onClick={toggleFullscreen}
-                    className="p-1.5 rounded-lg hover:bg-white/20 transition-colors cursor-pointer text-white"
-                    title="Fullscreen"
-                  >
-                    <Maximize className="w-4 h-4" />
-                  </button>
+                {/* Bar Actions */}
+                <div className="flex items-center justify-between text-white text-xs">
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={togglePlay}
+                      className="p-1.5 rounded-lg hover:bg-white/20 transition-colors cursor-pointer text-white"
+                      title={isPlaying ? 'Pause' : 'Play'}
+                    >
+                      {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
+                    </button>
+
+                    <button
+                      onClick={toggleMute}
+                      className="flex items-center gap-1.5 p-1.5 px-2.5 rounded-lg bg-white/10 hover:bg-white/20 text-white font-medium text-xs transition-colors cursor-pointer"
+                      title={isMuted ? 'Unmute Audio' : 'Mute Audio'}
+                    >
+                      {isMuted ? (
+                        <>
+                          <VolumeX className="w-4 h-4 text-cyan-300" />
+                          <span className="text-[11px] font-mono">Unmute</span>
+                        </>
+                      ) : (
+                        <>
+                          <Volume2 className="w-4 h-4 text-cyan-300" />
+                          <span className="text-[11px] font-mono">Sound On</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <span className="hidden sm:inline-block font-mono text-[11px] text-slate-300">
+                      FIZZDROP 1080p HD
+                    </span>
+                    <button
+                      onClick={toggleFullscreen}
+                      className="p-1.5 rounded-lg hover:bg-white/20 transition-colors cursor-pointer text-white"
+                      title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+                    >
+                      <Maximize className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
