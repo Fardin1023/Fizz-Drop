@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, ShoppingBag, Heart, MapPin, ChevronDown, Menu, X, ShieldCheck, Crown, Store } from 'lucide-react';
-import fizzdropLogo from '../../assets/img/fizzdrop-logo.jpg';
+import fizzdropLogo from '../../assets/img/fizzdrop-logo.png';
 
 export interface Outlet {
   branchId: number | string;
@@ -33,7 +33,7 @@ const Navigation: React.FC<NavigationProps> = ({
             <img
               src={fizzdropLogo}
               alt="FizzDrop Beverage Co."
-              className="h-16 sm:h-20 w-auto max-w-[220px] sm:max-w-[280px] object-contain rounded-2xl bg-white shadow-xs border border-slate-200/60 group-hover:shadow-md transition-all"
+              className="h-14 sm:h-18 w-auto max-w-[220px] sm:max-w-[280px] object-contain rounded-2xl bg-white shadow-xs border border-slate-200/60 group-hover:shadow-md transition-all p-1"
             />
           </Link>
 
