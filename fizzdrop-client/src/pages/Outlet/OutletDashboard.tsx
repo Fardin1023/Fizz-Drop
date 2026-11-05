@@ -42,6 +42,7 @@ import { SaleReceiptModal, type ReceiptData } from './SaleReceiptModal';
 import { useNotifications } from '../../hooks/useNotifications';
 import { NotificationPopup } from '../../components/Notifications/NotificationPopup';
 import { NotificationDropdown } from '../../components/Notifications/NotificationDropdown';
+import { StripePaymentModal } from '../../components/Payment/StripePaymentModal';
 
 export const OutletDashboard: React.FC = () => {
   const { user, outlet: authOutlet, isAuthenticated, isOutlet, logout, isLoading } = useAuth();
@@ -67,6 +68,19 @@ export const OutletDashboard: React.FC = () => {
   const [salesHistory, setSalesHistory] = useState<any[]>([]);
   const [requisitions, setRequisitions] = useState<any[]>([]);
   const [loadingData, setLoadingData] = useState<boolean>(true);
+  const [stripePaymentData, setStripePaymentData] = useState<{
+    isOpen: boolean;
+    amount: number;
+    requisitionId: number;
+    title: string;
+    description: string;
+  }>({
+    isOpen: false,
+    amount: 0,
+    requisitionId: 0,
+    title: '',
+    description: '',
+  });
 
   // Real-time Notifications for this outlet
   const {
@@ -1195,9 +1209,30 @@ export const OutletDashboard: React.FC = () => {
                           )}
                         </div>
 
-                        <div className="text-right text-xs text-slate-400 font-mono">
-                          <p>{new Date(req.created_date).toLocaleDateString()}</p>
-                          <p>{new Date(req.created_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                        <div className="text-right text-xs text-slate-400 font-mono flex flex-col items-end justify-between">
+                          <div>
+                            <p>{new Date(req.created_date).toLocaleDateString()}</p>
+                            <p>{new Date(req.created_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                          </div>
+                          {req.status === 'PENDING' && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const amt = Number(req.total_amount || (req.quantity * (req.unit_price || 35)));
+                                setStripePaymentData({
+                                  isOpen: true,
+                                  amount: amt,
+                                  requisitionId: req.id,
+                                  title: `Settle Invoice: ${req.requisition_code}`,
+                                  description: `Restock consignment payment for ${req.quantity} units of ${req.product_name}`,
+                                });
+                              }}
+                              className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-bold text-xs shadow-xs transition-all active:scale-95 cursor-pointer"
+                            >
+                              <CreditCard className="w-3.5 h-3.5" />
+                              <span>Pay ৳{Number(req.total_amount || (req.quantity * (req.unit_price || 35))).toFixed(2)} with Stripe</span>
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -1424,6 +1459,28 @@ export const OutletDashboard: React.FC = () => {
         onAction={() => {
           dismissPopup();
           setActiveTab('deliveries');
+        }}
+      />
+
+      {/* Embedded Stripe Elements Modal for Outlet Requisition Invoice Payment */}
+      <StripePaymentModal
+        isOpen={stripePaymentData.isOpen}
+        onClose={() => setStripePaymentData((prev) => ({ ...prev, isOpen: false }))}
+        amount={stripePaymentData.amount}
+        paymentType="OUTLET_REQUISITION"
+        title={stripePaymentData.title}
+        description={stripePaymentData.description}
+        referenceId={stripePaymentData.requisitionId}
+        metadata={{
+          outlet_requisition_id: String(stripePaymentData.requisitionId),
+          outlet_id: String(outlet?.outlet_id || effectiveOutletId),
+        }}
+        payloadData={{
+          outlet_requisition_id: stripePaymentData.requisitionId,
+          outlet_id: outlet?.outlet_id || effectiveOutletId,
+        }}
+        onSuccess={() => {
+          fetchDashboardData(outlet?.outlet_id || effectiveOutletId);
         }}
       />
     </div>

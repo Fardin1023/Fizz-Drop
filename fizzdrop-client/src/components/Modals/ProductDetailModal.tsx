@@ -34,6 +34,7 @@ import {
   BIKE_PRESET_SVG,
   TSHIRT_PRESET_SVG,
 } from '../../assets/merchandisePresets';
+import { StripePaymentModal } from '../Payment/StripePaymentModal';
 
 export interface AvailableOutlet {
   outlet_id: number;
@@ -171,7 +172,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   // Order workflow states: 'details' -> 'checkout' -> 'success'
   const [orderStage, setOrderStage] = useState<'details' | 'checkout' | 'success'>('details');
-  const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Card' | 'bKash / MFS'>('Cash');
+  const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Card' | 'bKash / MFS'>('Card');
+  const [isStripeModalOpen, setIsStripeModalOpen] = useState<boolean>(false);
   const [customerName, setCustomerName] = useState<string>('');
   const [customerPhone, setCustomerPhone] = useState<string>('');
   const [customerNotes, setCustomerNotes] = useState<string>('');
@@ -305,6 +307,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     }
     if (quantity > selectedOutletStock) {
       setOrderError(`Only ${selectedOutletStock} units available at ${selectedOutlet?.outlet_name}.`);
+      return;
+    }
+
+    if (paymentMethod === 'Card') {
+      setIsStripeModalOpen(true);
       return;
     }
 
@@ -942,6 +949,50 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           </div>
         )}
       </div>
+
+      {/* Embedded Stripe Elements Modal for Customer Checkout */}
+      {selectedOutletId && product && (
+        <StripePaymentModal
+          isOpen={isStripeModalOpen}
+          onClose={() => setIsStripeModalOpen(false)}
+          amount={totalPrice}
+          paymentType="CONSUMER_ORDER"
+          title={`Order: ${product.brand} ${product.flavor_variant}`}
+          description={`Customer Order for ${quantity}x ${product.brand} at ${selectedOutlet?.outlet_name || 'Outlet'}`}
+          referenceId={`ORD-${Date.now().toString().slice(-6)}`}
+          metadata={{
+            outlet_id: String(selectedOutletId),
+            product_id: String(product.product_id),
+            quantity: String(quantity),
+          }}
+          payloadData={{
+            outlet_id: selectedOutletId,
+            product_id: product.product_id,
+            quantity: quantity,
+          }}
+          onSuccess={(confirmData) => {
+            if (selectedOutlet) {
+              selectedOutlet.stock_quantity = Math.max(0, (selectedOutlet.stock_quantity ?? quantity) - quantity);
+              if (selectedOutlet.stock_quantity === 0) {
+                selectedOutlet.in_stock = false;
+              }
+            }
+            setSaleReceipt({
+              sale_code: confirmData.sale_code || 'SL-STRIPE-' + Date.now().toString().slice(-6),
+              outlet_name: selectedOutlet?.outlet_name || 'Authorized Franchise Hub',
+              outlet_address: selectedOutlet?.location_address || 'Regional Logistics Hub',
+              product_name: `${product.brand} ${product.flavor_variant}`,
+              quantity: quantity,
+              unit_price: unitPrice,
+              total_amount: totalPrice,
+              payment_method: 'Stripe Card (Verified)',
+              remaining_stock: Math.max(0, (selectedOutlet?.stock_quantity ?? quantity) - quantity),
+            });
+            setOrderStage('success');
+            if (onAddToCart) onAddToCart(product, quantity);
+          }}
+        />
+      )}
     </div>
   );
 };

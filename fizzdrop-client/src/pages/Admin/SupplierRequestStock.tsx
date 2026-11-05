@@ -18,6 +18,7 @@ import { useAuth } from '../../context/AuthContext';
 import { broadcastRealtimeEvent } from '../../utils/broadcast';
 import { InvoiceModal, type InvoiceData } from '../../components/Invoice/InvoiceModal';
 import { SupplierWalletModal } from './SupplierWalletModal';
+import { StripePaymentModal } from '../../components/Payment/StripePaymentModal';
 import pepsiImg from '../../assets/img/pepsi.PNG';
 import sevenUpImg from '../../assets/img/7up.PNG';
 import dewImg from '../../assets/img/mountain dew.PNG';
@@ -87,6 +88,8 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [isWalletModalOpen, setIsWalletModalOpen] = useState<boolean>(false);
+  const [isStripeModalOpen, setIsStripeModalOpen] = useState<boolean>(false);
+  const [pendingStripeReq, setPendingStripeReq] = useState<any>(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -222,7 +225,13 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
 
       const created = await res.json();
       setSubmittedRequisition(created);
-      setSuccessMsg(`Requisition ${created.requisition_code} submitted successfully with PENDING status! Tax Invoice is available below.`);
+
+      if (paymentMethod === 'STRIPE_CARD') {
+        setPendingStripeReq(created);
+        setIsStripeModalOpen(true);
+      } else {
+        setSuccessMsg(`Requisition ${created.requisition_code} submitted successfully with PENDING status! Tax Invoice is available below.`);
+      }
       setWalletBalance((prev) => Math.max(0, prev - grandTotal));
       setQuantities({});
       setRemarks('');
@@ -614,6 +623,7 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
 
               <div className="grid grid-cols-2 gap-2">
                 {[
+                  { id: 'STRIPE_CARD', label: 'Stripe Card', desc: 'Instant Card / Digital' },
                   { id: 'CORPORATE_BANK_TRANSFER', label: 'Bank Wire / EFT', desc: 'Dutch-Bangla / BRAC' },
                   { id: 'BKASH_MERCHANT', label: 'bKash B2B', desc: 'Merchant Direct' },
                   { id: 'NET_30_CREDIT', label: 'Net-30 Terms', desc: 'Corporate Credit' },
@@ -823,6 +833,32 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
           setWalletBalance(newBal);
         }}
       />
+
+      {/* Embedded Stripe Elements Modal for Stock Requisition Payment */}
+      {pendingStripeReq && (
+        <StripePaymentModal
+          isOpen={isStripeModalOpen}
+          onClose={() => setIsStripeModalOpen(false)}
+          amount={grandTotal}
+          paymentType="STOCK_REQUISITION"
+          title={`Stock Consignment Payment: ${pendingStripeReq.requisition_code}`}
+          description={`Central Depot Stock Consignment ${pendingStripeReq.requisition_code} (${totalCasesRequested} cases)`}
+          referenceId={pendingStripeReq.id}
+          metadata={{
+            requisition_id: String(pendingStripeReq.id),
+            supplier_id: String(profile?.id || 1),
+          }}
+          payloadData={{
+            requisition_id: pendingStripeReq.id,
+            supplier_id: profile?.id || 1,
+          }}
+          onSuccess={(confirmData) => {
+            setSuccessMsg(`Requisition ${pendingStripeReq.requisition_code} paid successfully via Stripe Card! Status updated to PAID.`);
+            setSubmittedRequisition((prev) => prev ? { ...prev, payment_status: 'PAID', paid_amount: grandTotal, balance_due: 0 } : null);
+            setIsInvoiceOpen(true);
+          }}
+        />
+      )}
     </div>
   );
 };

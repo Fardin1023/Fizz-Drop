@@ -22,6 +22,7 @@ import {
   Layers,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { StripePaymentModal } from '../../components/Payment/StripePaymentModal';
 
 interface SupplierWalletModalProps {
   isOpen: boolean;
@@ -47,6 +48,7 @@ export const SupplierWalletModal: React.FC<SupplierWalletModalProps> = ({
 
   const [loading, setLoading] = useState<boolean>(true);
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const [isStripeModalOpen, setIsStripeModalOpen] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -193,6 +195,11 @@ export const SupplierWalletModal: React.FC<SupplierWalletModalProps> = ({
     const numAmount = parseFloat(amount);
     if (isNaN(numAmount) || numAmount <= 0) {
       setErrorMsg('Please enter a valid top-up deposit amount greater than 0.');
+      return;
+    }
+
+    if (paymentMethod === 'STRIPE_CARD' || paymentMethod === 'CORPORATE_CARD') {
+      setIsStripeModalOpen(true);
       return;
     }
 
@@ -474,10 +481,10 @@ export const SupplierWalletModal: React.FC<SupplierWalletModalProps> = ({
                 </label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {[
+                    { id: 'STRIPE_CARD', label: 'Stripe Card (Instant)', icon: CreditCard },
                     { id: 'BANK_TRANSFER', label: 'Corporate Bank', icon: Building },
                     { id: 'BKASH', label: 'bKash Merchant', icon: Smartphone },
                     { id: 'NAGAD', label: 'Nagad Commercial', icon: Smartphone },
-                    { id: 'CORPORATE_CARD', label: 'Debit / Card', icon: CreditCard },
                   ].map((method) => {
                     const Icon = method.icon;
                     const isSelected = paymentMethod === method.id;
@@ -917,6 +924,34 @@ export const SupplierWalletModal: React.FC<SupplierWalletModalProps> = ({
           )}
         </div>
       </div>
+
+      {/* Embedded Stripe Elements Modal for Instant Wallet Deposit */}
+      <StripePaymentModal
+        isOpen={isStripeModalOpen}
+        onClose={() => setIsStripeModalOpen(false)}
+        amount={parseFloat(amount) || 0}
+        paymentType="WALLET_TOPUP"
+        title="Commercial Wallet Deposit via Stripe"
+        description={`Commercial Wallet Top-Up (৳${parseFloat(amount) || 0} BDT)`}
+        metadata={{
+          user_id: String(userId),
+          supplier_id: String(supplierId || 1),
+        }}
+        payloadData={{
+          user_id: userId,
+          supplier_id: supplierId,
+        }}
+        onSuccess={(data) => {
+          const numAmount = parseFloat(amount) || 0;
+          const newBal = Number(data.wallet_balance !== undefined ? data.wallet_balance : ((walletData?.wallet_balance || initialBalance || 0) + numAmount));
+          setSuccessMsg(`৳${numAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} successfully added to your Commercial Wallet via Stripe!`);
+          setWalletData((prev) => prev ? { ...prev, wallet_balance: newBal } : { supplier_id: supplierId || 1, business_name: '', wallet_balance: newBal });
+          if (onWalletUpdated) onWalletUpdated(newBal);
+          setTimeout(() => {
+            fetchWallet();
+          }, 600);
+        }}
+      />
     </div>
   );
 };
