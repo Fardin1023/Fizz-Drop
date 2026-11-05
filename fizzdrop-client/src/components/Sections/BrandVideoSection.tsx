@@ -13,6 +13,39 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
+interface RgbColor {
+  r: number;
+  g: number;
+  b: number;
+}
+
+// Enhance color saturation and ensure a luminous radiant glow
+const enhanceColor = (r: number, g: number, b: number, boost: number = 1.35): RgbColor => {
+  const max = Math.max(r, g, b);
+
+  // If totally dark frame or fade transition, provide a luminous baseline neon cyan
+  if (max < 30) {
+    return { r: 6, g: 182, b: 212 };
+  }
+
+  // Boost color saturation around the RGB channel average
+  const avg = (r + g + b) / 3;
+  let nr = Math.min(255, Math.max(0, Math.round(avg + (r - avg) * boost)));
+  let ng = Math.min(255, Math.max(0, Math.round(avg + (g - avg) * boost)));
+  let nb = Math.min(255, Math.max(0, Math.round(avg + (b - avg) * boost)));
+
+  // Ensure radiant minimum luminance so the neon edge glow is always vivid
+  const lum = 0.299 * nr + 0.587 * ng + 0.114 * nb;
+  if (lum < 75) {
+    const scale = 75 / (lum || 1);
+    nr = Math.min(255, Math.round(nr * scale));
+    ng = Math.min(255, Math.round(ng * scale));
+    nb = Math.min(255, Math.round(nb * scale));
+  }
+
+  return { r: nr, g: ng, b: nb };
+};
+
 export const BrandVideoSection: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -22,6 +55,17 @@ export const BrandVideoSection: React.FC = () => {
   const [progress, setProgress] = useState<number>(0);
   const [isHovered, setIsHovered] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+
+  // Dynamic edge glow colors sampled in real-time from the video frames
+  const [edgeColors, setEdgeColors] = useState<{
+    left: RgbColor;
+    center: RgbColor;
+    right: RgbColor;
+  }>({
+    left: { r: 6, g: 182, b: 212 },    // default cyan-400
+    center: { r: 99, g: 102, b: 241 },  // default indigo-500
+    right: { r: 236, g: 72, b: 153 },  // default fuchsia-500
+  });
 
   // Auto-play when in view, pause when scrolled away to conserve device resources
   useEffect(() => {
@@ -44,6 +88,72 @@ export const BrandVideoSection: React.FC = () => {
 
     observer.observe(video);
     return () => observer.disconnect();
+  }, []);
+
+  // Real-time canvas frame color sampling for dynamic edge glow
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 16;
+    canvas.height = 9;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return;
+
+    let animFrameId: number;
+    let lastSampleTime = 0;
+
+    const sampleColors = (now: number) => {
+      // Sample every ~60ms (~16fps) for smooth responsiveness with minimal CPU usage
+      if (now - lastSampleTime > 60 && !video.paused && !video.ended && video.readyState >= 2) {
+        lastSampleTime = now;
+        try {
+          ctx.drawImage(video, 0, 0, 16, 9);
+          const { data } = ctx.getImageData(0, 0, 16, 9);
+
+          let lR = 0, lG = 0, lB = 0, lCount = 0;
+          let cR = 0, cG = 0, cB = 0, cCount = 0;
+          let rR = 0, rG = 0, rB = 0, rCount = 0;
+
+          // Sample left, center, and right regions across active rows
+          for (let y = 1; y < 8; y++) {
+            for (let x = 0; x < 16; x++) {
+              const idx = (y * 16 + x) * 4;
+              const r = data[idx];
+              const g = data[idx + 1];
+              const b = data[idx + 2];
+
+              if (x <= 4) {
+                lR += r; lG += g; lB += b; lCount++;
+              } else if (x <= 10) {
+                cR += r; cG += g; cB += b; cCount++;
+              } else {
+                rR += r; rG += g; rB += b; rCount++;
+              }
+            }
+          }
+
+          if (lCount > 0 && cCount > 0 && rCount > 0) {
+            setEdgeColors({
+              left: enhanceColor(lR / lCount, lG / lCount, lB / lCount, 1.35),
+              center: enhanceColor(cR / cCount, cG / cCount, cB / cCount, 1.45),
+              right: enhanceColor(rR / rCount, rG / rCount, rB / rCount, 1.35),
+            });
+          }
+        } catch {
+          // Graceful fallback
+        }
+      }
+
+      animFrameId = requestAnimationFrame(sampleColors);
+    };
+
+    animFrameId = requestAnimationFrame(sampleColors);
+
+    return () => {
+      cancelAnimationFrame(animFrameId);
+    };
   }, []);
 
   const togglePlay = () => {
@@ -92,8 +202,13 @@ export const BrandVideoSection: React.FC = () => {
 
   return (
     <section className="relative w-full py-16 sm:py-20 lg:py-24 overflow-hidden bg-gradient-to-b from-transparent via-slate-50/60 to-transparent dark:via-zinc-900/40">
-      {/* Ambient background glow orbs for depth without clutter */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[400px] bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-indigo-500/10 rounded-full blur-3xl pointer-events-none -z-10" />
+      {/* Ambient background glow orbs adapting dynamically to the video color */}
+      <div
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[750px] h-[450px] rounded-full blur-3xl pointer-events-none -z-10 transition-all duration-700"
+        style={{
+          background: `radial-gradient(ellipse at center, rgba(${edgeColors.center.r}, ${edgeColors.center.g}, ${edgeColors.center.b}, 0.22) 0%, rgba(${edgeColors.right.r}, ${edgeColors.right.g}, ${edgeColors.right.b}, 0.12) 50%, transparent 80%)`,
+        }}
+      />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
@@ -105,7 +220,12 @@ export const BrandVideoSection: React.FC = () => {
 
           <h2 className="font-oswald text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
             Feel The Chill.{' '}
-            <span className="bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 bg-clip-text text-transparent">
+            <span
+              className="bg-clip-text text-transparent transition-all duration-500"
+              style={{
+                backgroundImage: `linear-gradient(135deg, rgb(${edgeColors.left.r}, ${edgeColors.left.g}, ${edgeColors.left.b}), rgb(${edgeColors.center.r}, ${edgeColors.center.g}, ${edgeColors.center.b}), rgb(${edgeColors.right.r}, ${edgeColors.right.g}, ${edgeColors.right.b}))`,
+              }}
+            >
               Taste The Fizz.
             </span>
           </h2>
@@ -115,25 +235,36 @@ export const BrandVideoSection: React.FC = () => {
           </p>
         </div>
 
-        {/* Video Player Showcase Frame with Glowing Animated Edges */}
+        {/* Video Player Showcase Frame with Dynamic Edge Glow */}
         <div className="relative mx-auto max-w-5xl group">
-          {/* Animated Glowing Neon Edge Border */}
+          {/* Animated Glowing Edge Backdrop dynamically adapting to video frames */}
           <div
             aria-hidden="true"
-            className="absolute -inset-1 sm:-inset-1.5 rounded-[2.25rem] sm:rounded-[2.75rem] bg-gradient-to-r from-cyan-400 via-indigo-500 via-fuchsia-500 to-cyan-400 animate-edge-glow opacity-85 blur-md group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+            className="absolute -inset-1 sm:-inset-1.5 rounded-[2.25rem] sm:rounded-[2.75rem] opacity-90 blur-md group-hover:opacity-100 pointer-events-none"
+            style={{
+              background: `linear-gradient(135deg, rgb(${edgeColors.left.r}, ${edgeColors.left.g}, ${edgeColors.left.b}), rgb(${edgeColors.center.r}, ${edgeColors.center.g}, ${edgeColors.center.b}), rgb(${edgeColors.right.r}, ${edgeColors.right.g}, ${edgeColors.right.b}), rgb(${edgeColors.left.r}, ${edgeColors.left.g}, ${edgeColors.left.b}))`,
+              filter: `drop-shadow(0 0 24px rgba(${edgeColors.center.r}, ${edgeColors.center.g}, ${edgeColors.center.b}, 0.85)) drop-shadow(0 0 48px rgba(${edgeColors.right.r}, ${edgeColors.right.g}, ${edgeColors.right.b}, 0.55))`,
+              transition: 'background 400ms ease, filter 400ms ease',
+            }}
           />
 
           <div
             ref={containerRef}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
-            className="relative rounded-3xl sm:rounded-[2.5rem] p-1.5 sm:p-2.5 bg-gradient-to-b from-white/95 via-slate-900/90 to-slate-950/95 dark:from-zinc-900/90 dark:via-zinc-950/95 dark:to-black border border-cyan-400/40 dark:border-cyan-500/30 shadow-2xl backdrop-blur-xl overflow-hidden transition-all duration-500"
+            className="relative rounded-3xl sm:rounded-[2.5rem] p-1.5 sm:p-2.5 bg-gradient-to-b from-white/95 via-slate-900/90 to-slate-950/95 dark:from-zinc-900/90 dark:via-zinc-950/95 dark:to-black border shadow-2xl backdrop-blur-xl overflow-hidden"
+            style={{
+              borderColor: `rgba(${edgeColors.center.r}, ${edgeColors.center.g}, ${edgeColors.center.b}, 0.45)`,
+              boxShadow: `0 20px 50px -10px rgba(${edgeColors.center.r}, ${edgeColors.center.g}, ${edgeColors.center.b}, 0.35)`,
+              transition: 'border-color 400ms ease, box-shadow 400ms ease',
+            }}
           >
             {/* Inner Video Container */}
             <div className="relative w-full aspect-video rounded-2xl sm:rounded-[2rem] overflow-hidden bg-slate-950 shadow-inner ring-1 ring-white/15">
               <video
                 ref={videoRef}
                 src="/videos/brand_ad.mp4"
+                crossOrigin="anonymous"
                 className="w-full h-full object-cover cursor-pointer"
                 playsInline
                 muted
@@ -143,10 +274,31 @@ export const BrandVideoSection: React.FC = () => {
                 onTimeUpdate={handleTimeUpdate}
               />
 
-              {/* Top Badge: Spotlight Tag */}
-              <div className="absolute top-4 left-4 sm:top-6 sm:left-6 z-20 pointer-events-none flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/80 backdrop-blur-md border border-cyan-400/30 text-white text-[11px] font-mono tracking-wider shadow-lg">
-                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-                <span className="font-bold text-cyan-300">DYNAMIC CAN EVOLUTION</span>
+              {/* Top Badge: Spotlight Tag Synced with Video Theme */}
+              <div
+                className="absolute top-4 left-4 sm:top-6 sm:left-6 z-20 pointer-events-none flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/80 backdrop-blur-md border text-white text-[11px] font-mono tracking-wider shadow-lg"
+                style={{
+                  borderColor: `rgba(${edgeColors.center.r}, ${edgeColors.center.g}, ${edgeColors.center.b}, 0.5)`,
+                  transition: 'border-color 400ms ease',
+                }}
+              >
+                <span
+                  className="w-2 h-2 rounded-full animate-pulse"
+                  style={{
+                    backgroundColor: `rgb(${edgeColors.center.r}, ${edgeColors.center.g}, ${edgeColors.center.b})`,
+                    boxShadow: `0 0 10px rgb(${edgeColors.center.r}, ${edgeColors.center.g}, ${edgeColors.center.b})`,
+                    transition: 'background-color 400ms ease, box-shadow 400ms ease',
+                  }}
+                />
+                <span
+                  className="font-bold tracking-wider"
+                  style={{
+                    color: `rgb(${edgeColors.center.r}, ${edgeColors.center.g}, ${edgeColors.center.b})`,
+                    transition: 'color 400ms ease',
+                  }}
+                >
+                  DYNAMIC CAN EVOLUTION
+                </span>
               </div>
 
               {/* Floating Center Play/Pause Indicator (shown on hover or when paused) */}
@@ -181,8 +333,12 @@ export const BrandVideoSection: React.FC = () => {
                   className="w-full h-1.5 sm:h-2 bg-white/20 rounded-full cursor-pointer overflow-hidden group/bar relative"
                 >
                   <div
-                    className="h-full bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-500 rounded-full transition-all duration-100 relative"
-                    style={{ width: `${progress}%` }}
+                    className="h-full rounded-full transition-all duration-100 relative"
+                    style={{
+                      width: `${progress}%`,
+                      background: `linear-gradient(90deg, rgb(${edgeColors.left.r}, ${edgeColors.left.g}, ${edgeColors.left.b}), rgb(${edgeColors.center.r}, ${edgeColors.center.g}, ${edgeColors.center.b}), rgb(${edgeColors.right.r}, ${edgeColors.right.g}, ${edgeColors.right.b}))`,
+                      boxShadow: `0 0 10px rgba(${edgeColors.center.r}, ${edgeColors.center.g}, ${edgeColors.center.b}, 0.7)`,
+                    }}
                   />
                 </div>
 
