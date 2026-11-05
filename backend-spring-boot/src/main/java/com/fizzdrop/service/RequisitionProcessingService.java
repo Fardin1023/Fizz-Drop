@@ -33,6 +33,9 @@ public class RequisitionProcessingService {
     private final SupplierTransactionRepository supplierTransactionRepository;
     private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
+    @org.springframework.beans.factory.annotation.Value("${stripe.publishable.key:}")
+    private String stripePublishableKey;
+
     public RequisitionProcessingService(DistrictRepository districtRepository,
                                         SupplierProfileRepository supplierProfileRepository,
                                         DistrictInventoryRepository districtInventoryRepository,
@@ -1774,6 +1777,42 @@ public class RequisitionProcessingService {
         res.put("phone_number", profile.getPhoneNumber());
         res.put("division_name", profile.getDivisionName());
         res.put("transactions", txList);
+
+        // Available commercial payment options / deposit channels
+        List<Map<String, Object>> paymentOptions = new ArrayList<>();
+        Map<String, Object> stripeOpt = new HashMap<>();
+        stripeOpt.put("id", "STRIPE_CARD");
+        stripeOpt.put("label", "Stripe Card (Instant)");
+        stripeOpt.put("type", "GATEWAY");
+        stripeOpt.put("provider", "STRIPE");
+        stripeOpt.put("currency", "BDT");
+        stripeOpt.put("enabled", true);
+        paymentOptions.add(stripeOpt);
+
+        Map<String, Object> bankOpt = new HashMap<>();
+        bankOpt.put("id", "BANK_TRANSFER");
+        bankOpt.put("label", "Corporate Bank Wire");
+        bankOpt.put("type", "MANUAL_CLEARING");
+        bankOpt.put("enabled", true);
+        paymentOptions.add(bankOpt);
+
+        Map<String, Object> bkashOpt = new HashMap<>();
+        bkashOpt.put("id", "BKASH");
+        bkashOpt.put("label", "bKash Merchant");
+        bkashOpt.put("type", "MFS");
+        bkashOpt.put("enabled", true);
+        paymentOptions.add(bkashOpt);
+
+        Map<String, Object> nagadOpt = new HashMap<>();
+        nagadOpt.put("id", "NAGAD");
+        nagadOpt.put("label", "Nagad Commercial");
+        nagadOpt.put("type", "MFS");
+        nagadOpt.put("enabled", true);
+        paymentOptions.add(nagadOpt);
+
+        res.put("payment_options", paymentOptions);
+        res.put("stripe_enabled", true);
+        res.put("stripe_publishable_key", stripePublishableKey);
 
         // Calculate Supplier P&L (Profit and Loss)
         double spProcurementSpent = 0.0;

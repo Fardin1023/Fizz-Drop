@@ -79,7 +79,7 @@ export const SupplierWalletModal: React.FC<SupplierWalletModalProps> = ({
   const [amount, setAmount] = useState<string>(
     requiredAmount ? Math.ceil(requiredAmount).toString() : ''
   );
-  const [paymentMethod, setPaymentMethod] = useState<string>('BANK_TRANSFER');
+  const [paymentMethod, setPaymentMethod] = useState<string>('STRIPE_CARD');
   const [referenceCode, setReferenceCode] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
 
@@ -507,91 +507,112 @@ export const SupplierWalletModal: React.FC<SupplierWalletModalProps> = ({
                 </div>
               </div>
 
-              {/* Reference / Deposit Slip Code */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold uppercase text-slate-700 tracking-wider mb-1.5">
-                    Deposit Slip / Transaction Ref Code
-                  </label>
-                  <input
-                    type="text"
-                    value={referenceCode}
-                    onChange={(e) => setReferenceCode(e.target.value)}
-                    placeholder="e.g. TR-982348 or Bank Slip No"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                  />
+              {/* Dynamic details section depending on whether Stripe or Manual MFS/Bank is selected */}
+              {paymentMethod === 'STRIPE_CARD' ? (
+                <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-50 via-purple-50 to-cyan-50 border border-indigo-200/80 space-y-2.5">
+                  <div className="flex items-center gap-2 text-indigo-900">
+                    <CreditCard className="w-5 h-5 text-indigo-600 shrink-0" />
+                    <span className="text-xs font-bold uppercase tracking-wider">
+                      Instant Automated Deposit via Stripe Elements
+                    </span>
+                  </div>
+                  <p className="text-xs text-indigo-700/90 leading-relaxed">
+                    Powered by Stripe PCI-DSS Level 1 compliance. Supports Visa, Mastercard, American Express, and corporate debit cards in Bangladeshi Taka (BDT). Funds are instantly credited to your commercial balance with automated receipt generation.
+                  </p>
+                  <div className="flex items-center gap-2 text-[11px] text-slate-500 font-mono">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>256-bit SSL Encrypted • Zero Settlement Delay</span>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase text-slate-700 tracking-wider mb-1.5">
-                    Deposit Remarks / Notes
-                  </label>
-                  <input
-                    type="text"
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Optional deposit remark"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                  />
-                </div>
-              </div>
+              ) : (
+                <>
+                  {/* Reference / Deposit Slip Code */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold uppercase text-slate-700 tracking-wider mb-1.5">
+                        Deposit Slip / Transaction Ref Code
+                      </label>
+                      <input
+                        type="text"
+                        value={referenceCode}
+                        onChange={(e) => setReferenceCode(e.target.value)}
+                        placeholder="e.g. TR-982348 or Bank Slip No"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold uppercase text-slate-700 tracking-wider mb-1.5">
+                        Deposit Remarks / Notes
+                      </label>
+                      <input
+                        type="text"
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        placeholder="Optional deposit remark"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                      />
+                    </div>
+                  </div>
 
-              {/* Optional Quick Account Verification Fields */}
-              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
-                <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-indigo-500" />
-                  Depot Banking Details (Saved to Profile)
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <div>
-                    <label className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
-                      Bank Name
-                    </label>
-                    <input
-                      type="text"
-                      value={bankName}
-                      onChange={(e) => setBankName(e.target.value)}
-                      placeholder="e.g. Eastern Bank PLC"
-                      className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-indigo-500"
-                    />
+                  {/* Optional Quick Account Verification Fields */}
+                  <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
+                    <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block flex items-center gap-1.5">
+                      <ShieldCheck className="w-3.5 h-3.5 text-indigo-500" />
+                      Depot Banking Details (Saved to Profile)
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
+                          Bank Name
+                        </label>
+                        <input
+                          type="text"
+                          value={bankName}
+                          onChange={(e) => setBankName(e.target.value)}
+                          placeholder="e.g. Eastern Bank PLC"
+                          className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
+                          Bank Account Number
+                        </label>
+                        <input
+                          type="text"
+                          value={bankAccountNumber}
+                          onChange={(e) => setBankAccountNumber(e.target.value)}
+                          placeholder="e.g. 1041029384812"
+                          className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
+                          Account Holder Name
+                        </label>
+                        <input
+                          type="text"
+                          value={bankAccountName}
+                          onChange={(e) => setBankAccountName(e.target.value)}
+                          placeholder="e.g. Dhaka Logistics Beverage Ltd"
+                          className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
+                          Mobile Banking No (bKash/Nagad)
+                        </label>
+                        <input
+                          type="text"
+                          value={mobileBankingNumber}
+                          onChange={(e) => setMobileBankingNumber(e.target.value)}
+                          placeholder="e.g. 01700112233"
+                          className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
-                      Bank Account Number
-                    </label>
-                    <input
-                      type="text"
-                      value={bankAccountNumber}
-                      onChange={(e) => setBankAccountNumber(e.target.value)}
-                      placeholder="e.g. 1041029384812"
-                      className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-indigo-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
-                      Account Holder Name
-                    </label>
-                    <input
-                      type="text"
-                      value={bankAccountName}
-                      onChange={(e) => setBankAccountName(e.target.value)}
-                      placeholder="e.g. Dhaka Logistics Beverage Ltd"
-                      className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-indigo-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
-                      Mobile Banking No (bKash/Nagad)
-                    </label>
-                    <input
-                      type="text"
-                      value={mobileBankingNumber}
-                      onChange={(e) => setMobileBankingNumber(e.target.value)}
-                      placeholder="e.g. 01700112233"
-                      className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-indigo-500"
-                    />
-                  </div>
-                </div>
-              </div>
+                </>
+              )}
 
               <div className="pt-2 flex justify-end gap-3">
                 <button
@@ -604,12 +625,21 @@ export const SupplierWalletModal: React.FC<SupplierWalletModalProps> = ({
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white text-xs font-bold shadow-md shadow-indigo-500/20 flex items-center gap-2 transition disabled:opacity-50"
+                  className={`px-6 py-2.5 rounded-xl text-white text-xs font-bold shadow-md flex items-center gap-2 transition disabled:opacity-50 ${
+                    paymentMethod === 'STRIPE_CARD'
+                      ? 'bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 hover:from-indigo-700 hover:to-purple-700 shadow-indigo-500/25'
+                      : 'bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 shadow-indigo-500/20'
+                  }`}
                 >
                   {submitting ? (
                     <>
                       <RefreshCw className="w-4 h-4 animate-spin" />
                       <span>Processing Deposit...</span>
+                    </>
+                  ) : paymentMethod === 'STRIPE_CARD' ? (
+                    <>
+                      <CreditCard className="w-4 h-4" />
+                      <span>Pay ৳{Number(amount || 0).toLocaleString()} with Stripe Card (Instant)</span>
                     </>
                   ) : (
                     <>
@@ -688,6 +718,7 @@ export const SupplierWalletModal: React.FC<SupplierWalletModalProps> = ({
                   onChange={(e) => setPaymentMethod(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                 >
+                  <option value="STRIPE_CARD">Stripe Card / Credit Card (Instant)</option>
                   <option value="BANK_TRANSFER">Corporate Bank Wire (RTGS / BEFTN)</option>
                   <option value="BKASH">bKash Commercial Merchant</option>
                   <option value="NAGAD">Nagad Islamic / Commercial</option>

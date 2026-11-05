@@ -25,9 +25,12 @@ import java.util.Map;
 public class RequisitionController {
 
     private final RequisitionProcessingService requisitionService;
+    private final com.fizzdrop.service.StripePaymentService stripePaymentService;
 
-    public RequisitionController(RequisitionProcessingService requisitionService) {
+    public RequisitionController(RequisitionProcessingService requisitionService,
+                                 com.fizzdrop.service.StripePaymentService stripePaymentService) {
         this.requisitionService = requisitionService;
+        this.stripePaymentService = stripePaymentService;
     }
 
     private Long resolveUserId(String authHeader, Long explicitUserId) {
@@ -261,6 +264,40 @@ public class RequisitionController {
         try {
             Long resolvedId = resolveUserId(authHeader, userId);
             return ResponseEntity.ok(requisitionService.updateSupplierWalletSettings(resolvedId, supplierId, payload));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));
+        }
+    }
+
+    @PostMapping("/supplier/wallet/stripe/create-intent")
+    public ResponseEntity<?> createSupplierWalletStripeIntent(
+            @RequestHeader(value = "Authorization", required = false) String authHeader,
+            @RequestParam(value = "userId", required = false) Long userId,
+            @RequestParam(value = "supplierId", required = false) Long supplierId,
+            @RequestBody Map<String, Object> body) {
+        try {
+            Long resolvedId = resolveUserId(authHeader, userId);
+            java.math.BigDecimal amount = new java.math.BigDecimal(body.get("amount").toString());
+            com.fizzdrop.dto.StripePaymentRequestDTO req = new com.fizzdrop.dto.StripePaymentRequestDTO();
+            req.setAmount(amount);
+            req.setPaymentType("WALLET_TOPUP");
+            req.setDescription("Commercial Wallet Top-Up via Stripe");
+            req.setUserId(resolvedId);
+            req.setSupplierId(supplierId);
+            return ResponseEntity.ok(stripePaymentService.createPaymentIntent(req));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));
+        }
+    }
+
+    @PostMapping("/supplier/wallet/stripe/confirm")
+    public ResponseEntity<?> confirmSupplierWalletStripePayment(
+            @RequestBody Map<String, Object> body) {
+        try {
+            String paymentIntentId = (String) body.get("paymentIntentId");
+            String paymentType = body.get("paymentType") != null ? (String) body.get("paymentType") : "WALLET_TOPUP";
+            String referenceId = body.get("referenceId") != null ? body.get("referenceId").toString() : null;
+            return ResponseEntity.ok(stripePaymentService.confirmAndFulfill(paymentIntentId, paymentType, referenceId, body));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(ApiResponse.fail(e.getMessage()));
         }
