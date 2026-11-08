@@ -18,6 +18,20 @@ export interface User {
     status?: string;
     division_name?: string;
   };
+  sales_officer?: {
+    id: number;
+    officer_code: string;
+    name: string;
+    email?: string;
+    phone: string;
+    supplier_id: number;
+    district_id?: number;
+    city: string;
+    assigned_area: string;
+    status: string;
+    supplier_name?: string;
+    notes?: string;
+  };
 }
 
 interface AuthContextType {
@@ -27,12 +41,15 @@ interface AuthContextType {
   isSupplier: boolean;
   isSuperadmin: boolean;
   isOutlet: boolean;
+  isSalesOfficer: boolean;
   outlet: User['outlet'] | null;
+  salesOfficer: User['sales_officer'] | null;
   isLoading: boolean;
   login: (email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
   loginAsSupplier: (email?: string) => Promise<{ success: boolean; error?: string }>;
   loginAsSuperadmin: () => Promise<{ success: boolean; error?: string }>;
   loginAsOutlet: (outletId?: number, email?: string, password?: string) => Promise<{ success: boolean; error?: string }>;
+  loginAsSalesOfficer: (officerId?: number, email?: string, password?: string) => Promise<{ success: boolean; error?: string }>;
   registerOutlet: (outletData: any) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
 }
@@ -80,12 +97,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         (u.email || '').toLowerCase().includes('superadmin')
       );
 
+      const isSalesOfficer = (
+        u.role_id === 6 ||
+        u.roleId === 6 ||
+        (u.role_name || u.role || '').toLowerCase().includes('officer') ||
+        (u.email || '').toLowerCase().includes('.so@') ||
+        Boolean(data.sales_officer || u.sales_officer)
+      );
+
+      const isOutlet = (
+        u.role_id === 2 ||
+        u.roleId === 2 ||
+        (u.role_name || u.role || '').toLowerCase().includes('outlet') ||
+        Boolean(data.outlet || u.outlet)
+      );
+
       const normalizedUser: User = {
-        user_id: u.user_id ?? u.userId ?? (isSuper ? 99 : 4),
+        user_id: u.user_id ?? u.userId ?? (isSuper ? 99 : (isSalesOfficer ? 6 : 4)),
         email: u.email,
-        role_id: u.role_id ?? u.roleId ?? (isSuper ? 4 : 3),
-        role_name: isSuper ? 'Superadmin' : 'Supplier',
-        branch_id: u.branch_id ?? u.branchId ?? 1,
+        role_id: isSuper ? 4 : (isSalesOfficer ? 6 : (isOutlet ? 2 : 3)),
+        role_name: isSuper ? 'Superadmin' : (isSalesOfficer ? 'SalesOfficer' : (isOutlet ? 'Outlet' : 'Supplier')),
+        branch_id: u.branch_id ?? u.branchId ?? (isOutlet ? 2 : null),
+        outlet: data.outlet || u.outlet,
+        sales_officer: data.sales_officer || u.sales_officer,
       };
 
       setToken(data.token);
@@ -121,6 +155,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         role_name: 'Outlet',
         branch_id: o?.outlet_id ?? u.branch_id ?? 2,
         outlet: o,
+      };
+
+      setToken(data.token);
+      setUser(normalizedUser);
+      localStorage.setItem('fizzdrop_token', data.token);
+      localStorage.setItem('fizzdrop_user', JSON.stringify(normalizedUser));
+
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Server connection error' };
+    }
+  };
+
+  const loginAsSalesOfficer = async (officerId?: number, email?: string, password = 'Officer123!') => {
+    try {
+      const res = await fetch('http://localhost:8080/api/auth/sales-officer/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ officer_id: officerId, email, password }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, error: data.error || 'Sales Officer login failed' };
+      }
+
+      const u = data.user;
+      const so = data.sales_officer || u.sales_officer;
+      const normalizedUser: User = {
+        user_id: u.user_id ?? u.userId ?? so?.id ?? 6,
+        email: u.email || so?.email,
+        role_id: 6,
+        role_name: 'SalesOfficer',
+        branch_id: null,
+        sales_officer: so,
       };
 
       setToken(data.token);
@@ -198,11 +267,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       Boolean(user?.outlet)
   );
 
+  const isSalesOfficer = Boolean(
+    user?.role_id === 6 ||
+      user?.role_name?.toLowerCase().includes('officer') ||
+      user?.email?.toLowerCase().includes('.so@') ||
+      Boolean(user?.sales_officer)
+  );
+
   const isSupplier = Boolean(
-    user?.role_id === 3 ||
+    (user?.role_id === 3 ||
       user?.role_name?.toLowerCase().includes('supplier') ||
-      user?.email?.toLowerCase().includes('supplier') ||
-      (isSuperadmin && !isOutlet)
+      user?.email?.toLowerCase().includes('supplier')) &&
+      !isSalesOfficer &&
+      !isOutlet
   );
 
   return (
@@ -214,12 +291,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isSupplier,
         isSuperadmin,
         isOutlet,
+        isSalesOfficer,
         outlet: user?.outlet || null,
+        salesOfficer: user?.sales_officer || null,
         isLoading,
         login,
         loginAsSupplier,
         loginAsSuperadmin,
         loginAsOutlet,
+        loginAsSalesOfficer,
         registerOutlet,
         logout,
       }}

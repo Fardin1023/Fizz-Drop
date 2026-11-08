@@ -16,6 +16,10 @@ public interface SalesOfficerRepository extends JpaRepository<SalesOfficer, Long
 
     Optional<SalesOfficer> findByOfficerCode(String officerCode);
 
+    Optional<SalesOfficer> findByUserId(Long userId);
+
+    Optional<SalesOfficer> findByEmailIgnoreCase(String email);
+
     List<SalesOfficer> findByCityIgnoreCaseAndAssignedAreaIgnoreCase(String city, String assignedArea);
 
     Optional<SalesOfficer> findFirstBySupplierIdAndCityIgnoreCaseAndAssignedAreaIgnoreCase(Long supplierId, String city, String assignedArea);

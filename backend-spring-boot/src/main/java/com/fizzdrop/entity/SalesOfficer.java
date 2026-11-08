@@ -51,6 +51,15 @@ public class SalesOfficer {
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 
+    @Column(name = "user_id")
+    @JsonProperty("user_id")
+    @JsonAlias({"user_id", "userId"})
+    private Long userId;
+
+    @Column(name = "password_hash")
+    @JsonProperty("password_hash")
+    private String passwordHash = "Officer123!";
+
     @Column(name = "created_at", nullable = false)
     @JsonProperty("created_at")
     @JsonAlias({"created_at", "createdAt"})
@@ -92,6 +101,7 @@ public class SalesOfficer {
         if (this.createdAt == null) this.createdAt = LocalDateTime.now();
         if (this.updatedAt == null) this.updatedAt = LocalDateTime.now();
         if (this.status == null) this.status = "ACTIVE";
+        if (this.passwordHash == null) this.passwordHash = "Officer123!";
     }
 
     @PreUpdate
@@ -132,6 +142,12 @@ public class SalesOfficer {
 
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
+
+    public Long getUserId() { return userId; }
+    public void setUserId(Long userId) { this.userId = userId; }
+
+    public String getPasswordHash() { return passwordHash; }
+    public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

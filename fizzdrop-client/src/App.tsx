@@ -7,6 +7,7 @@ import AdminDashboard from './pages/Admin/AdminDashboard';
 import SuperadminDashboard from './pages/Superadmin/SuperadminDashboard';
 import { OutletDashboard } from './pages/Outlet/OutletDashboard';
 import { OutletAuth } from './pages/Outlet/OutletAuth';
+import SalesOfficerDashboard from './pages/SalesOfficer/SalesOfficerDashboard';
 import { AuthProvider } from './context/AuthContext';
 
 function App() {
@@ -19,7 +20,7 @@ function App() {
   const isAdminOrSuperadmin =
     location.pathname.startsWith('/admin') ||
     location.pathname.startsWith('/superadmin') ||
-    location.pathname.startsWith('/outlet');
+    location.pathname.startsWith('/outlet') || location.pathname.startsWith('/sales-officer');
 
   useEffect(() => {
     const fetchOutlets = async () => {
@@ -116,6 +117,14 @@ function App() {
             <Route
               path="/outlet/*"
               element={<OutletDashboard />}
+            />
+            <Route
+              path="/sales-officer"
+              element={<SalesOfficerDashboard />}
+            />
+            <Route
+              path="/sales-officer/*"
+              element={<SalesOfficerDashboard />}
             />
           </Routes>
         </main>

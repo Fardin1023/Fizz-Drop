@@ -3,16 +3,8 @@ package com.fizzdrop.controller;
 import com.fizzdrop.dto.ApiResponse;
 import com.fizzdrop.dto.AuthRequest;
 import com.fizzdrop.dto.AuthResponse;
-import com.fizzdrop.entity.District;
-import com.fizzdrop.entity.Outlet;
-import com.fizzdrop.entity.Product;
-import com.fizzdrop.entity.ShopInventory;
-import com.fizzdrop.entity.User;
-import com.fizzdrop.repository.DistrictRepository;
-import com.fizzdrop.repository.OutletRepository;
-import com.fizzdrop.repository.ProductRepository;
-import com.fizzdrop.repository.ShopInventoryRepository;
-import com.fizzdrop.repository.UserRepository;
+import com.fizzdrop.entity.*;
+import com.fizzdrop.repository.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -31,17 +23,23 @@ public class AuthController {
     private final ProductRepository productRepository;
     private final ShopInventoryRepository inventoryRepository;
     private final DistrictRepository districtRepository;
+    private final SalesOfficerRepository salesOfficerRepository;
+    private final SupplierProfileRepository supplierProfileRepository;
 
     public AuthController(UserRepository userRepository,
                           OutletRepository outletRepository,
                           ProductRepository productRepository,
                           ShopInventoryRepository inventoryRepository,
-                          DistrictRepository districtRepository) {
+                          DistrictRepository districtRepository,
+                          SalesOfficerRepository salesOfficerRepository,
+                          SupplierProfileRepository supplierProfileRepository) {
         this.userRepository = userRepository;
         this.outletRepository = outletRepository;
         this.productRepository = productRepository;
         this.inventoryRepository = inventoryRepository;
         this.districtRepository = districtRepository;
+        this.salesOfficerRepository = salesOfficerRepository;
+        this.supplierProfileRepository = supplierProfileRepository;
     }
 
     @PostMapping("/login")
@@ -67,13 +65,31 @@ public class AuthController {
             }
         }
 
+        // Sales Officer direct email check
+        Optional<SalesOfficer> officerByEmail = salesOfficerRepository.findByEmailIgnoreCase(email);
+        if (officerByEmail.isPresent()) {
+            SalesOfficer so = officerByEmail.get();
+            boolean matches = password.isEmpty() ||
+                    "Officer123!".equals(password) ||
+                    "Password123!".equals(password) ||
+                    (so.getPasswordHash() != null && so.getPasswordHash().equals(password));
+            if (matches) {
+                supplierProfileRepository.findById(so.getSupplierId()).ifPresent(sup -> so.setSupplierName(sup.getBusinessName()));
+                Long uid = so.getUserId() != null ? so.getUserId() : 100L + so.getId();
+                String token = "jwt-so-" + so.getId() + "-" + UUID.randomUUID();
+                AuthResponse res = new AuthResponse(token, uid, so.getEmail(), 6L, "SalesOfficer", null);
+                res.setSalesOfficer(so);
+                return ResponseEntity.ok(Map.of("success", true, "token", res.getToken(), "user", res, "sales_officer", so));
+            }
+        }
+
         // Database lookup fallback
         Optional<User> userOpt = userRepository.findByEmail(email);
         if (userOpt.isPresent()) {
             User u = userOpt.get();
             String storedPass = u.getPasswordHash();
             if (storedPass != null && !storedPass.isEmpty() && !password.isEmpty()) {
-                boolean matches = storedPass.equals(password) || "Password123!".equals(password) || "Supplier123!".equals(password);
+                boolean matches = storedPass.equals(password) || "Password123!".equals(password) || "Supplier123!".equals(password) || "Officer123!".equals(password);
                 if (!matches) {
                     return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                             .body(ApiResponse.fail("Invalid email or password credentials."));
@@ -81,11 +97,21 @@ public class AuthController {
             }
             boolean isSuper = (u.getRoleId() != null && (u.getRoleId() == 1L || u.getRoleId() == 4L)) || email.contains("super");
             boolean isOutlet = (u.getRoleId() != null && u.getRoleId() == 2L) || email.contains("outlet");
-            Long roleId = isSuper ? 4L : (isOutlet ? 2L : 3L);
-            String roleName = isSuper ? "Superadmin" : (isOutlet ? "Outlet" : "Supplier");
-            String token = "jwt-" + (isOutlet ? "outlet-" : "") + u.getUserId() + "-" + UUID.randomUUID();
+            boolean isSalesOfficer = (u.getRoleId() != null && u.getRoleId() == 6L) || email.contains(".so@") || email.contains("officer");
+
+            Long roleId = isSuper ? 4L : (isSalesOfficer ? 6L : (isOutlet ? 2L : 3L));
+            String roleName = isSuper ? "Superadmin" : (isSalesOfficer ? "SalesOfficer" : (isOutlet ? "Outlet" : "Supplier"));
+            String token = "jwt-" + (isSalesOfficer ? "so-" : (isOutlet ? "outlet-" : "")) + u.getUserId() + "-" + UUID.randomUUID();
             AuthResponse res = new AuthResponse(token, u.getUserId(), u.getEmail(), roleId, roleName, u.getBranchId() != null ? u.getBranchId() : 1L);
-            if (u.getBranchId() != null) {
+
+            if (isSalesOfficer) {
+                salesOfficerRepository.findByUserId(u.getUserId())
+                        .or(() -> salesOfficerRepository.findByEmailIgnoreCase(u.getEmail()))
+                        .ifPresent(so -> {
+                            supplierProfileRepository.findById(so.getSupplierId()).ifPresent(sup -> so.setSupplierName(sup.getBusinessName()));
+                            res.setSalesOfficer(so);
+                        });
+            } else if (u.getBranchId() != null) {
                 outletRepository.findById(u.getBranchId()).ifPresent(res::setOutlet);
             }
             return ResponseEntity.ok(Map.of("success", true, "token", res.getToken(), "user", res));
@@ -93,6 +119,50 @@ public class AuthController {
 
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(ApiResponse.fail("Invalid email or password credentials."));
+    }
+
+    /**
+     * Dedicated Sales Officer Login (1-click role login or credentials)
+     */
+    @PostMapping("/sales-officer/login")
+    public ResponseEntity<?> salesOfficerLogin(@RequestBody Map<String, Object> req) {
+        Long officerId = null;
+        if (req.containsKey("officer_id") && req.get("officer_id") != null) {
+            try {
+                officerId = Long.parseLong(req.get("officer_id").toString());
+            } catch (Exception ignored) {}
+        }
+        String email = (req.containsKey("email") && req.get("email") != null) ? req.get("email").toString().trim().toLowerCase() : "";
+        String code = (req.containsKey("code") && req.get("code") != null) ? req.get("code").toString().trim().toUpperCase() : "";
+
+        Optional<SalesOfficer> officerOpt = Optional.empty();
+        if (officerId != null) {
+            officerOpt = salesOfficerRepository.findById(officerId);
+        } else if (!email.isEmpty()) {
+            officerOpt = salesOfficerRepository.findByEmailIgnoreCase(email);
+        } else if (!code.isEmpty()) {
+            officerOpt = salesOfficerRepository.findByOfficerCode(code);
+        }
+
+        if (officerOpt.isEmpty()) {
+            List<SalesOfficer> all = salesOfficerRepository.findAll();
+            if (!all.isEmpty()) officerOpt = Optional.of(all.get(0));
+        }
+
+        if (officerOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.fail("Sales Officer account not found."));
+        }
+
+        SalesOfficer so = officerOpt.get();
+        supplierProfileRepository.findById(so.getSupplierId()).ifPresent(sup -> so.setSupplierName(sup.getBusinessName()));
+
+        Long userId = so.getUserId() != null ? so.getUserId() : 100L + so.getId();
+        String token = "jwt-so-" + so.getId() + "-" + UUID.randomUUID();
+        AuthResponse res = new AuthResponse(token, userId, so.getEmail() != null ? so.getEmail() : so.getOfficerCode().toLowerCase() + "@fizzdrop.com", 6L, "SalesOfficer", null);
+        res.setSalesOfficer(so);
+
+        return ResponseEntity.ok(Map.of("success", true, "token", res.getToken(), "user", res, "sales_officer", so));
     }
 
     /**
@@ -109,93 +179,74 @@ public class AuthController {
         String email = (req.containsKey("email") && req.get("email") != null) ? req.get("email").toString().trim().toLowerCase() : "";
         String password = (req.containsKey("password") && req.get("password") != null) ? req.get("password").toString().trim() : "";
 
-        Outlet outlet = null;
-        if (outletId != null && outletId > 0) {
-            outlet = outletRepository.findById(outletId).orElse(null);
+        Optional<Outlet> outletOpt;
+        if (outletId != null) {
+            outletOpt = outletRepository.findById(outletId);
         } else if (!email.isEmpty()) {
-            Optional<User> uOpt = userRepository.findByEmail(email);
-            if (uOpt.isPresent() && uOpt.get().getBranchId() != null) {
-                outlet = outletRepository.findById(uOpt.get().getBranchId()).orElse(null);
-            }
-            if (outlet == null) {
-                List<Outlet> all = outletRepository.findAll();
-                for (Outlet o : all) {
-                    String fn = (o.getFranchiseName() != null ? o.getFranchiseName() : "").toLowerCase().replaceAll("[^a-z0-9]", "");
-                    String bn = (o.getBranchName() != null ? o.getBranchName() : "").toLowerCase().replaceAll("[^a-z0-9]", "");
-                    if ((!fn.isEmpty() && email.contains(fn)) || (!bn.isEmpty() && email.contains(bn))) {
-                        outlet = o;
-                        break;
-                    }
-                }
-                if (outlet == null && !all.isEmpty()) {
-                    outlet = all.get(0);
-                }
-            }
+            outletOpt = outletRepository.findAll().stream()
+                    .filter(o -> {
+                        String autoEmail = (o.getFranchiseName() != null ? o.getFranchiseName().toLowerCase().replaceAll("[^a-z0-9]", "") : "outlet") +
+                                "." + (o.getBranchName() != null ? o.getBranchName().toLowerCase().replaceAll("[^a-z0-9]", "") : "branch") + "@outlet.fizzdrop.com";
+                        return autoEmail.equalsIgnoreCase(email);
+                    })
+                    .findFirst();
+        } else {
+            outletOpt = outletRepository.findAll().stream().findFirst();
         }
 
-        if (outlet == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(ApiResponse.fail("Franchise branch could not be identified. Please select your outlet branch."));
+        if (outletOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.fail("Retail outlet branch not found."));
         }
 
-        String safeEmail = !email.isEmpty() ? email : (
-                (outlet.getFranchiseName() != null ? outlet.getFranchiseName().toLowerCase().replaceAll("[^a-z0-9]", "") : "outlet") +
-                "." +
-                (outlet.getBranchName() != null ? outlet.getBranchName().toLowerCase().replaceAll("[^a-z0-9]", "") : "branch") +
-                "@outlet.fizzdrop.com"
-        );
-
+        Outlet outlet = outletOpt.get();
         String token = "jwt-outlet-" + outlet.getOutletId() + "-" + UUID.randomUUID();
-        AuthResponse res = new AuthResponse(token, 1000L + outlet.getOutletId(), safeEmail, 2L, "Outlet", outlet.getOutletId(), outlet);
-        return ResponseEntity.ok(Map.of("success", true, "token", token, "user", res, "outlet", outlet));
+        String assignedEmail = (outlet.getFranchiseName() != null ? outlet.getFranchiseName().toLowerCase().replaceAll("[^a-z0-9]", "") : "outlet") +
+                "." + (outlet.getBranchName() != null ? outlet.getBranchName().toLowerCase().replaceAll("[^a-z0-9]", "") : "branch") + "@outlet.fizzdrop.com";
+
+        AuthResponse res = new AuthResponse(token, 1000L + outlet.getOutletId(), assignedEmail, 2L, "Outlet", outlet.getOutletId(), outlet);
+        return ResponseEntity.ok(Map.of("success", true, "token", res.getToken(), "user", res, "outlet", outlet));
     }
 
     /**
-     * Dedicated Outlet Registration (Sign Up new branch)
+     * Self-Registration for new Franchise Outlets
      */
     @PostMapping("/outlet/register")
-    public ResponseEntity<?> outletRegister(@RequestBody Map<String, Object> req) {
-        String franchiseName = (req.containsKey("franchise_name") && req.get("franchise_name") != null) ? req.get("franchise_name").toString().trim() : "";
-        String branchName = (req.containsKey("branch_name") && req.get("branch_name") != null) ? req.get("branch_name").toString().trim() : "";
-        String city = (req.containsKey("city") && req.get("city") != null) ? req.get("city").toString().trim() : "";
-        String area = (req.containsKey("area") && req.get("area") != null) ? req.get("area").toString().trim() : "";
-        String address = (req.containsKey("location_address") && req.get("location_address") != null) ? req.get("location_address").toString().trim() : "";
-        String phone = (req.containsKey("contact_phone") && req.get("contact_phone") != null) ? req.get("contact_phone").toString().trim() : "";
-        String email = (req.containsKey("email") && req.get("email") != null) ? req.get("email").toString().trim().toLowerCase() : "";
-        String password = (req.containsKey("password") && req.get("password") != null) ? req.get("password").toString().trim() : "Password123!";
-        String divisionName = (req.containsKey("division_name") && req.get("division_name") != null) ? req.get("division_name").toString().trim() : "Dhaka";
+    public ResponseEntity<?> registerOutlet(@RequestBody Map<String, Object> req) {
+        String outletName = (String) req.get("outlet_name");
+        String franchiseName = (String) req.get("franchise_name");
+        String branchName = (String) req.get("branch_name");
+        String locationAddress = (String) req.get("location_address");
+        String city = (String) req.get("city");
+        String area = (String) req.get("area");
+        String contactPhone = (String) req.get("contact_phone");
+        String email = (String) req.get("email");
+        String password = (String) req.getOrDefault("password", "Password123!");
 
-        if (franchiseName.isEmpty()) return ResponseEntity.badRequest().body(ApiResponse.fail("Franchise brand name is required."));
-        if (branchName.isEmpty()) return ResponseEntity.badRequest().body(ApiResponse.fail("Branch name or location identifier is required."));
-        if (address.isEmpty()) address = branchName + ", " + (!area.isEmpty() ? area + ", " : "") + (!city.isEmpty() ? city : "Dhaka");
-        if (phone.isEmpty()) phone = "01" + (int)(Math.random() * 90000000 + 10000000);
-        if (email.isEmpty()) email = franchiseName.toLowerCase().replaceAll("[^a-z0-9]", "") + "." + branchName.toLowerCase().replaceAll("[^a-z0-9]", "") + "@outlet.fizzdrop.com";
+        if (outletName == null || outletName.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("Outlet/Branch name is required."));
+        }
+        if (locationAddress == null || locationAddress.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("Location address is required."));
+        }
+        if (email == null || email.trim().isEmpty()) {
+            email = "outlet." + System.currentTimeMillis() + "@outlet.fizzdrop.com";
+        }
 
         Outlet outlet = new Outlet();
-        outlet.setFranchiseName(franchiseName);
-        outlet.setBranchName(branchName);
-        outlet.setOutletName(franchiseName + " - " + branchName);
-        outlet.setCity(!city.isEmpty() ? city : "Dhaka");
-        outlet.setArea(!area.isEmpty() ? area : branchName);
-        outlet.setLocationAddress(address);
-        outlet.setContactPhone(phone);
+        outlet.setOutletName(outletName);
+        outlet.setFranchiseName(franchiseName != null ? franchiseName : "Franchise Partner");
+        outlet.setBranchName(branchName != null ? branchName : outletName);
+        outlet.setLocationAddress(locationAddress);
+        outlet.setCity(city != null ? city : "Dhaka");
+        outlet.setArea(area != null ? area : "Gulshan");
+        outlet.setContactPhone(contactPhone != null ? contactPhone : "+880 1700-000000");
         outlet.setStatus("Active");
-        outlet.setDivisionName(divisionName);
-
-        // Match district
-        for (District d : districtRepository.findAll()) {
-            if (d.getName().equalsIgnoreCase(city) || d.getName().equalsIgnoreCase(divisionName)) {
-                outlet.setDistrictId(d.getId());
-                outlet.setDistrictName(d.getName());
-                break;
-            }
-        }
-        if (outlet.getDistrictId() == null) outlet.setDistrictId(1L);
-
         outlet = outletRepository.save(outlet);
 
-        // Initialize ShopInventory for all existing products with 0 stock
-        for (Product p : productRepository.findAll()) {
+        // Seed 0 inventory for all products
+        List<Product> products = productRepository.findAll();
+        for (Product p : products) {
             var invOpt = inventoryRepository.findByBranchIdAndProductId(outlet.getOutletId(), p.getProductId());
             if (invOpt.isEmpty()) {
                 inventoryRepository.save(new ShopInventory(outlet.getOutletId(), p.getProductId(), 0));
@@ -230,6 +281,24 @@ public class AuthController {
             return ResponseEntity.ok(new AuthResponse(token, 99L, "superadmin@fizzdrop.com", 4L, "Superadmin", 1L));
         }
 
+        // Sales Officer token resolution: "jwt-so-{officerId}-{uuid}"
+        if (token.startsWith("jwt-so-")) {
+            String[] parts = token.split("-");
+            if (parts.length >= 3) {
+                try {
+                    Long soId = Long.parseLong(parts[2]);
+                    Optional<SalesOfficer> soOpt = salesOfficerRepository.findById(soId);
+                    if (soOpt.isPresent()) {
+                        SalesOfficer so = soOpt.get();
+                        supplierProfileRepository.findById(so.getSupplierId()).ifPresent(sup -> so.setSupplierName(sup.getBusinessName()));
+                        AuthResponse res = new AuthResponse(token, so.getUserId() != null ? so.getUserId() : 100L + so.getId(), so.getEmail(), 6L, "SalesOfficer", null);
+                        res.setSalesOfficer(so);
+                        return ResponseEntity.ok(res);
+                    }
+                } catch (NumberFormatException ignored) {}
+            }
+        }
+
         // Outlet token resolution: "jwt-outlet-{outletId}-{uuid}"
         if (token.startsWith("jwt-outlet-")) {
             String[] parts = token.split("-");
@@ -258,10 +327,13 @@ public class AuthController {
                         User u = uOpt.get();
                         boolean isSuper = (u.getRoleId() != null && (u.getRoleId() == 1L || u.getRoleId() == 4L)) || u.getEmail().contains("super");
                         boolean isOutlet = (u.getRoleId() != null && u.getRoleId() == 2L) || u.getEmail().contains("outlet");
-                        Long roleId = isSuper ? 4L : (isOutlet ? 2L : 3L);
-                        String roleName = isSuper ? "Superadmin" : (isOutlet ? "Outlet" : "Supplier");
+                        boolean isSalesOfficer = (u.getRoleId() != null && u.getRoleId() == 6L) || u.getEmail().contains(".so@") || u.getEmail().contains("officer");
+                        Long roleId = isSuper ? 4L : (isSalesOfficer ? 6L : (isOutlet ? 2L : 3L));
+                        String roleName = isSuper ? "Superadmin" : (isSalesOfficer ? "SalesOfficer" : (isOutlet ? "Outlet" : "Supplier"));
                         AuthResponse res = new AuthResponse(token, u.getUserId(), u.getEmail(), roleId, roleName, u.getBranchId() != null ? u.getBranchId() : 1L);
-                        if (u.getBranchId() != null) {
+                        if (isSalesOfficer) {
+                            salesOfficerRepository.findByUserId(u.getUserId()).ifPresent(res::setSalesOfficer);
+                        } else if (u.getBranchId() != null) {
                             outletRepository.findById(u.getBranchId()).ifPresent(res::setOutlet);
                         }
                         return ResponseEntity.ok(res);
@@ -273,4 +345,3 @@ public class AuthController {
         return ResponseEntity.ok(new AuthResponse(token, 4L, "central.supplier@fizzdrop.com", 3L, "Supplier", 1L));
     }
 }
-

@@ -10,6 +10,7 @@ import { SuperadminRequisitionsHub } from './SuperadminRequisitionsHub';
 import { SuperadminProductCatalog } from './SuperadminProductCatalog';
 import { SuperadminMerchandiseCatalog } from './SuperadminMerchandiseCatalog';
 import { SuperadminSupplierManagement } from './SuperadminSupplierManagement';
+import { SuperadminSalesOfficerManagement } from './SuperadminSalesOfficerManagement';
 import { SuperadminCommercialLogs } from './SuperadminCommercialLogs';
 import {
   ShieldCheck,
@@ -39,7 +40,7 @@ import { NotificationPopup } from '../../components/Notifications/NotificationPo
 
 export const SuperadminDashboard: React.FC = () => {
   const { user, isSuperadmin, isAuthenticated, logout, isLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<'products' | 'merchandise' | 'requisitions' | 'suppliers' | 'logs' | 'tables' | 'outlets' | 'inventory' | 'query'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'merchandise' | 'requisitions' | 'suppliers' | 'sales-officers' | 'logs' | 'tables' | 'outlets' | 'inventory' | 'query'>('products');
   const [consoleInitialQuery, setConsoleInitialQuery] = useState<string>('SELECT * FROM Outlets LIMIT 25;');
   const [isDbConfigOpen, setIsDbConfigOpen] = useState(false);
   const [dbStatus, setDbStatus] = useState<any>(null);
@@ -134,6 +135,15 @@ export const SuperadminDashboard: React.FC = () => {
       icon: Users,
       gradient: 'from-purple-600 via-pink-600 to-rose-600',
       badge: 'Allotment',
+    },
+    {
+      id: 'sales-officers' as const,
+      label: 'Sales Officer Accounts & Territory',
+      shortLabel: 'Sales Officers',
+      desc: 'Provision officer accounts, link suppliers & assign areas',
+      icon: UserCheck,
+      gradient: 'from-blue-600 via-cyan-600 to-teal-600',
+      badge: 'Territory',
     },
     {
       id: 'logs' as const,
@@ -437,6 +447,7 @@ export const SuperadminDashboard: React.FC = () => {
           {activeTab === 'merchandise' && <SuperadminMerchandiseCatalog />}
           {activeTab === 'requisitions' && <SuperadminRequisitionsHub />}
           {activeTab === 'suppliers' && <SuperadminSupplierManagement />}
+          {activeTab === 'sales-officers' && <SuperadminSalesOfficerManagement />}
           {activeTab === 'logs' && <SuperadminCommercialLogs />}
           {activeTab === 'tables' && (
             <DatabaseExplorer onOpenQueryWithTable={handleOpenQueryWithTable} />

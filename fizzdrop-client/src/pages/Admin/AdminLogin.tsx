@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { ShieldCheck, Crown, Lock, Mail, ArrowRight, AlertCircle, Package, Home } from 'lucide-react';
+import { ShieldCheck, Crown, Lock, Mail, ArrowRight, AlertCircle, Package, Home, UserCheck } from 'lucide-react';
 import { AnimatedFizzdropBackdrop } from '../../components/Background/AnimatedFizzdropBackdrop';
 
 interface AdminLoginProps {
@@ -19,7 +19,9 @@ interface DynamicSupplier {
 }
 
 const AdminLogin: React.FC<AdminLoginProps> = ({ onSuccess, requiredRole = 'any' }) => {
-  const { login, loginAsSupplier, loginAsSuperadmin } = useAuth();
+  const { login, loginAsSupplier, loginAsSuperadmin, loginAsSalesOfficer } = useAuth();
+  const navigate = useNavigate();
+  const [salesOfficersList, setSalesOfficersList] = useState<any[]>([]);
   const [email, setEmail] = useState(
     requiredRole === 'superadmin' ? 'superadmin@fizzdrop.com' : 'central.supplier@fizzdrop.com'
   );
@@ -43,6 +45,10 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onSuccess, requiredRole = 'any'
       }
     };
     fetchSuppliers();
+    fetch('http://localhost:8080/api/v1/sales-officers')
+      .then(r => r.json())
+      .then(data => { if (Array.isArray(data)) setSalesOfficersList(data); })
+      .catch(() => {});
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -281,6 +287,51 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onSuccess, requiredRole = 'any'
                   </button>
                 </>
               )}
+            </div>
+
+            {/* Sales Officer Accounts */}
+            <div className="space-y-1.5 pt-2">
+              <span className="block text-[10px] font-semibold text-slate-400 dark:text-zinc-500 uppercase tracking-wider text-left pl-1">
+                Territory Sales Officers (Wholesale Channels)
+              </span>
+
+              {salesOfficersList.length > 0 ? (
+                <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                  {salesOfficersList.map((so) => (
+                    <button
+                      key={so.id}
+                      type="button"
+                      onClick={async () => {
+                        setError(null);
+                        setLoading(true);
+                        const res = await loginAsSalesOfficer(so.id, so.email);
+                        setLoading(false);
+                        if (res.success) {
+                          navigate('/sales-officer');
+                          if (onSuccess) onSuccess();
+                        } else {
+                          setError(res.error || 'Failed to authenticate Sales Officer');
+                        }
+                      }}
+                      disabled={loading}
+                      className="w-full py-2 px-3 rounded-xl bg-blue-50/70 hover:bg-blue-100 dark:bg-blue-950/30 dark:hover:bg-blue-900/40 border border-blue-200 dark:border-blue-800 text-zinc-800 dark:text-zinc-200 text-xs font-semibold flex items-center justify-between transition-all cursor-pointer text-left"
+                    >
+                      <div className="flex items-center gap-2 min-w-0 pr-2">
+                        <UserCheck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                        <div className="min-w-0">
+                          <span className="block truncate font-bold">{so.name}</span>
+                          <span className="block text-[10px] font-mono text-slate-400 dark:text-zinc-400 truncate">
+                            {so.officer_code} • {so.assigned_area} ({so.city})
+                          </span>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-300 shrink-0 font-bold">
+                        Officer
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
             </div>
           </div>
 
