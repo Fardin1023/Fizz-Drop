@@ -101,19 +101,6 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
 
   useEffect(() => {
     fetchRequisitions();
-
-    // Listen for cross-tab realtime events from outlets
-    try {
-      const channel = new BroadcastChannel('fizzdrop_realtime_events');
-      channel.onmessage = (event) => {
-        if (event.data?.recipientRole === 'SUPPLIER') {
-          fetchRequisitions();
-        }
-      };
-      return () => channel.close();
-    } catch (e) {
-      // BroadcastChannel fallback
-    }
   }, [userId]);
 
   // Direct fast dispatch (Quick Fulfill)
@@ -153,21 +140,6 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
       setActionSuccessMsg(
         `Successfully dispatched ${req.quantity} units of ${req.product_name} via Sales Officer ${req.sales_officer_name || ''} (${req.sales_officer_code || req.area}) for ${req.outlet_name}!`
       );
-
-      // Broadcast update to Outlet tabs
-      try {
-        const channel = new BroadcastChannel('fizzdrop_realtime_events');
-        channel.postMessage({
-          recipientRole: 'OUTLET',
-          recipientUserId: req.outlet_id,
-          title: `Stock Dispatched: ${req.product_name}`,
-          message: `Supplier dispatched ${req.quantity} units to ${req.outlet_name}. Shelf stock updated!`,
-          type: 'APPROVED',
-          referenceCode: req.requisition_code,
-          referenceId: req.outlet_id,
-        });
-        setTimeout(() => channel.close(), 100);
-      } catch (e) {}
 
       fetchRequisitions();
     } catch (err: any) {

@@ -276,28 +276,6 @@ public class InventoryController {
             }
         });
 
-        // Notify Outlet in real time
-        try {
-            AppNotification outNotif = new AppNotification();
-            outNotif.setRecipientRole("OUTLET");
-            outNotif.setRecipientUserId(outlet.getOutletId());
-
-            if (isUnrequestedDirectSupply) {
-                outNotif.setTitle("Direct Stock Received (Unrequested): " + product.getBrand() + " " + product.getFlavorVariant());
-                outNotif.setMessage("Regional Supplier sent an unrequested direct shipment of " + req.getQuantity() + " units of " + product.getBrand() + " " + product.getFlavorVariant() + " to " + outlet.getOutletName() + ". Added to shelf stock and logged in Deliveries Tracker.");
-                outNotif.setType("DIRECT_DISPATCH");
-                outNotif.setReferenceCode("DIR-SUPPLY-" + outlet.getOutletId());
-            } else {
-                outNotif.setTitle("Stock Dispatched: " + product.getBrand() + " " + product.getFlavorVariant());
-                outNotif.setMessage("Regional Supplier dispatched " + req.getQuantity() + " units of " + product.getBrand() + " " + product.getFlavorVariant() + " to " + outlet.getOutletName() + ". Added to your shelf stock!");
-                outNotif.setType("APPROVED");
-                outNotif.setReferenceCode("DISPATCH-" + outlet.getOutletId());
-            }
-
-            outNotif.setReferenceId(outlet.getOutletId());
-            notificationRepository.save(outNotif);
-        } catch (Exception ignored) {}
-
         // Recalculate total product stock
         Integer totalStock = inventoryRepository.getTotalStockByProductId(product.getProductId());
         if (totalStock == null) totalStock = newStock;
@@ -624,15 +602,6 @@ public class InventoryController {
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, NOW(), NOW())",
                 reqCode, outletId, productId, prodName, qty, unitPrice, totalAmount, urgency, remarks
             );
-
-            // Send notification to Supplier
-            AppNotification notif = new AppNotification();
-            notif.setRecipientRole("SUPPLIER");
-            notif.setTitle("New Outlet Requisition (" + outlet.getOutletName() + ")");
-            notif.setMessage("Branch " + outlet.getOutletName() + " requested " + qty + " units of " + prodName + " (" + urgency + " priority).");
-            notif.setType("NEW_REQUISITION");
-            notif.setReferenceCode(reqCode);
-            notificationRepository.save(notif);
         } catch (Exception ignored) {}
 
         Map<String, Object> res = new HashMap<>();

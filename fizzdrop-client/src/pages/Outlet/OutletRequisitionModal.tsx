@@ -74,22 +74,6 @@ export const OutletRequisitionModal: React.FC<OutletRequisitionModalProps> = ({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to submit requisition');
 
-      // Real-time broadcast to Supplier browser tabs
-      try {
-        const channel = new BroadcastChannel('fizzdrop_realtime_events');
-        channel.postMessage({
-          recipientRole: 'SUPPLIER',
-          title: `New Outlet Requisition (${outletName})`,
-          message: `Branch ${outletName} requested ${qty} units of ${currentProduct?.brand || 'Beverage'} ${currentProduct?.flavor_variant || ''} (${urgency} priority).`,
-          type: 'NEW_REQUISITION',
-          status: 'PENDING',
-          referenceCode: data.requisition_code,
-        });
-        setTimeout(() => channel.close(), 100);
-      } catch (broadcastErr) {
-        // BroadcastChannel fallback
-      }
-
       setSuccessMsg(data.message || 'Requisition submitted to Regional Supplier!');
       setTimeout(() => {
         if (onSubmitted) onSubmitted();
