@@ -74,7 +74,7 @@ public class DatabaseConfig {
                 String dbPath = uri.getPath() != null && uri.getPath().length() > 1 ? uri.getPath().substring(1) : "defaultdb";
                 int port = uri.getPort() != -1 ? uri.getPort() : 3306;
                 effectiveUrl = "jdbc:mysql://" + uri.getHost() + ":" + port + "/" + dbPath 
-                        + "?sslMode=REQUIRED&useSSL=true&allowPublicKeyRetrieval=true&serverTimezone=UTC";
+                        + "?sslMode=REQUIRED&useSSL=true&allowPublicKeyRetrieval=true&serverTimezone=UTC&connectTimeout=15000&socketTimeout=30000&cachePrepStmts=true&prepStmtCacheSize=250&prepStmtCacheSqlLimit=2048&useServerPrepStmts=true&rewriteBatchedStatements=true";
                 System.out.println("[DatabaseConfig] Converted Aiven URI to Cloud JDBC URL: " + uri.getHost() + ":" + port + "/" + dbPath);
             } catch (Exception ex) {
                 System.err.println("[DatabaseConfig] Error parsing Aiven mysql:// URI: " + ex.getMessage());
@@ -84,17 +84,26 @@ public class DatabaseConfig {
         System.out.println("[DatabaseConfig] Testing connection to MySQL at: " + effectiveUrl);
         boolean mysqlAvailable = false;
 
-        try {
-            // Cloud timeout for TLS/SSL handshake (up to 8 seconds)
-            DriverManager.setLoginTimeout(8);
-            try (Connection conn = DriverManager.getConnection(effectiveUrl, effectiveUser, effectivePass)) {
-                if (conn.isValid(5)) {
-                    mysqlAvailable = true;
-                    System.out.println("[DatabaseConfig] Successfully connected to live MySQL instance (" + effectiveUrl + ")!");
+        // Try up to 2 attempts for cloud TLS handshake
+        for (int attempt = 1; attempt <= 2; attempt++) {
+            try {
+                DriverManager.setLoginTimeout(15);
+                try (Connection conn = DriverManager.getConnection(effectiveUrl, effectiveUser, effectivePass)) {
+                    if (conn.isValid(5)) {
+                        mysqlAvailable = true;
+                        System.out.println("[DatabaseConfig] Successfully connected to live MySQL instance (" + effectiveUrl + ")!");
+                        break;
+                    }
+                }
+            } catch (Exception e) {
+                System.out.println("[DatabaseConfig] MySQL connection attempt " + attempt + " failed (" + e.getMessage() + ").");
+                if (attempt < 2) {
+                    try { Thread.sleep(1000); } catch (InterruptedException ignored) {}
                 }
             }
-        } catch (Exception e) {
-            System.out.println("[DatabaseConfig] MySQL connection failed (" + e.getMessage() + ").");
+        }
+
+        if (!mysqlAvailable) {
             System.out.println("[DatabaseConfig] Activating resilient local relational engine (H2 MySQL-Compatible persistent store).");
         }
 
@@ -104,9 +113,12 @@ public class DatabaseConfig {
             config.setUsername(effectiveUser);
             config.setPassword(effectivePass);
             config.setDriverClassName("com.mysql.cj.jdbc.Driver");
-            config.setMaximumPoolSize(10);
-            config.setConnectionTimeout(15000);
-            config.setIdleTimeout(600000);
+            config.setMaximumPoolSize(25);
+            config.setMinimumIdle(5);
+            config.setConnectionTimeout(20000);
+            config.setIdleTimeout(300000);
+            config.setMaxLifetime(1200000);
+            config.setPoolName("FizzDropHikariPool");
         } else {
             // Persistent file-backed relational database in MySQL mode (consistent directory location)
             java.io.File dataDir = new java.io.File("data");
