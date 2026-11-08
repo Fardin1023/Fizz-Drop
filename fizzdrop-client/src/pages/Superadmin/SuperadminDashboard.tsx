@@ -32,6 +32,7 @@ import {
   Menu,
   Sparkles,
   TrendingUp,
+  UserCheck,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useNotifications } from '../../hooks/useNotifications';
