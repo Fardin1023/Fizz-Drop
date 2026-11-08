@@ -348,7 +348,6 @@ export const SupplierAvailableProducts: React.FC<SupplierAvailableProductsProps>
                     Your Depot Stock (Holding)
                   </th>
                   <th className="py-3.5 px-4 text-center">Superadmin Central Stock</th>
-                  <th className="py-3.5 px-4">Outlets Stock Distribution</th>
                   <th className="py-3.5 px-4 text-right">Actions</th>
                 </tr>
               </thead>
@@ -480,49 +479,6 @@ export const SupplierAvailableProducts: React.FC<SupplierAvailableProductsProps>
                         <span className="text-[9px] font-mono text-slate-400 block mt-0.5">
                           {isAvailable ? 'In Central Warehouse' : 'Awaiting Superadmin Restock'}
                         </span>
-                      </td>
-
-                      <td className="py-3 px-4">
-                        <div className="space-y-1 max-w-[260px]">
-                          <div className="flex flex-wrap gap-1">
-                            {p.available_outlets && p.available_outlets.length > 0 ? (
-                              p.available_outlets.map((ao) => (
-                                <span
-                                  key={ao.outlet_id}
-                                  className="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-md border bg-slate-50 border-slate-200 text-slate-700"
-                                >
-                                  <span className="font-semibold truncate max-w-[90px]">{ao.outlet_name}:</span>
-                                  <strong className={ao.stock_quantity > 0 ? 'text-emerald-600' : 'text-slate-400'}>
-                                    {ao.stock_quantity}
-                                  </strong>
-                                </span>
-                              ))
-                            ) : (
-                              <span className="text-[10px] text-slate-400 italic">No outlet stock allocated</span>
-                            )}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (!hasSupplierStock) {
-                                setZeroStockAlertData({
-                                  productName: `${p.brand} ${p.flavor_variant}`,
-                                  productId: p.product_id,
-                                  category: p.category,
-                                  sku: p.sku,
-                                });
-                                setIsZeroStockAlertOpen(true);
-                                return;
-                              }
-                              setTargetProduct(p.product_id);
-                              setIsSupplyModalOpen(true);
-                            }}
-                            className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-1 cursor-pointer pt-0.5"
-                          >
-                            <Store className="w-3 h-3 text-indigo-500" />
-                            <span>Supply / Adjust Outlets</span>
-                          </button>
-                        </div>
                       </td>
 
                       <td className="py-3 px-4 text-right">
