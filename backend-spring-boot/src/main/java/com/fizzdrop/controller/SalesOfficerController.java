@@ -441,12 +441,13 @@ public class SalesOfficerController {
 
         BigDecimal monthlyTarget = officer.getMonthlyTarget() != null ? officer.getMonthlyTarget() : new BigDecimal("2000000.00");
 
-        // Amount spent buying products from supplier in current month
+        // Amount spent buying products from supplier in current month (strictly for confirmed/dispatched purchases)
         BigDecimal amountSpent = BigDecimal.ZERO;
+        BigDecimal pendingSpent = BigDecimal.ZERO;
         try {
             Double spentSum = jdbcTemplate.queryForObject(
                 "SELECT COALESCE(SUM(total_amount), 0) FROM outlet_requisitions " +
-                "WHERE (sales_officer_id = ? OR outlet_remarks LIKE ?) AND created_date >= ?",
+                "WHERE (sales_officer_id = ? OR outlet_remarks LIKE ?) AND status IN ('DISPATCHED', 'COMPLETED') AND created_date >= ?",
                 Double.class,
                 officer.getId(),
                 "%[" + officer.getName() + "%",
@@ -454,6 +455,18 @@ public class SalesOfficerController {
             );
             if (spentSum != null) {
                 amountSpent = BigDecimal.valueOf(spentSum).setScale(2, java.math.RoundingMode.HALF_UP);
+            }
+
+            Double pendingSum = jdbcTemplate.queryForObject(
+                "SELECT COALESCE(SUM(total_amount), 0) FROM outlet_requisitions " +
+                "WHERE (sales_officer_id = ? OR outlet_remarks LIKE ?) AND status = 'PENDING' AND created_date >= ?",
+                Double.class,
+                officer.getId(),
+                "%[" + officer.getName() + "%",
+                startOfMonth
+            );
+            if (pendingSum != null) {
+                pendingSpent = BigDecimal.valueOf(pendingSum).setScale(2, java.math.RoundingMode.HALF_UP);
             }
         } catch (Exception ignored) {}
 
@@ -508,6 +521,7 @@ public class SalesOfficerController {
         Map<String, Object> targetSummary = new HashMap<>();
         targetSummary.put("monthly_target", monthlyTarget);
         targetSummary.put("amount_spent", amountSpent);
+        targetSummary.put("pending_spent", pendingSpent);
         targetSummary.put("remaining_target", remainingTarget);
         targetSummary.put("progress_percentage", Math.round(progressPct * 100.0) / 100.0);
         targetSummary.put("is_target_met", isTargetMet);

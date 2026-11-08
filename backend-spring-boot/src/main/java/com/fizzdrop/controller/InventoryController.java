@@ -196,15 +196,30 @@ public class InventoryController {
 
         if (!isUnrequestedDirectSupply) {
             try {
-                List<Map<String, Object>> rRows = jdbcTemplate.queryForList("SELECT requisition_code FROM outlet_requisitions WHERE id = ?", req.getRequisitionId());
-                if (!rRows.isEmpty() && rRows.get(0).get("requisition_code") != null) {
-                    dispatchRefCode = rRows.get(0).get("requisition_code").toString();
-                } else {
-                    dispatchRefCode = "REQ-OUT-" + req.getRequisitionId();
+                List<Map<String, Object>> rRows = jdbcTemplate.queryForList("SELECT requisition_code, sales_officer_id, unit_price FROM outlet_requisitions WHERE id = ?", req.getRequisitionId());
+                BigDecimal finalUnitPrice = product.getOutletPrice() != null ? product.getOutletPrice() : (product.getBasePrice() != null ? product.getBasePrice() : BigDecimal.ZERO);
+                if (!rRows.isEmpty()) {
+                    if (rRows.get(0).get("requisition_code") != null) {
+                        dispatchRefCode = rRows.get(0).get("requisition_code").toString();
+                    } else {
+                        dispatchRefCode = "REQ-OUT-" + req.getRequisitionId();
+                    }
+                    if (targetOfficer == null && rRows.get(0).get("sales_officer_id") != null) {
+                        try {
+                            Long soId = ((Number) rRows.get(0).get("sales_officer_id")).longValue();
+                            targetOfficer = salesOfficerRepository.findById(soId).orElse(null);
+                        } catch (Exception ignored) {}
+                    }
+                    if (rRows.get(0).get("unit_price") != null) {
+                        try {
+                            finalUnitPrice = new BigDecimal(rRows.get(0).get("unit_price").toString());
+                        } catch (Exception ignored) {}
+                    }
                 }
+                BigDecimal finalTotal = finalUnitPrice.multiply(BigDecimal.valueOf(req.getQuantity()));
                 jdbcTemplate.update(
-                    "UPDATE outlet_requisitions SET status = 'DISPATCHED', updated_date = NOW() WHERE id = ?",
-                    req.getRequisitionId()
+                    "UPDATE outlet_requisitions SET status = 'DISPATCHED', quantity = ?, unit_price = ?, total_amount = ?, updated_date = NOW() WHERE id = ?",
+                    req.getQuantity(), finalUnitPrice, finalTotal, req.getRequisitionId()
                 );
             } catch (Exception ignored) {}
         } else {
@@ -232,6 +247,27 @@ public class InventoryController {
                     note
                 );
             } catch (Exception ignored) {}
+        }
+
+        // Create real-time notification for Sales Officer confirming stock purchase and monthly budget deduction
+        if (targetOfficer != null) {
+            try {
+                BigDecimal finalUnitPrice = product.getOutletPrice() != null ? product.getOutletPrice() : (product.getBasePrice() != null ? product.getBasePrice() : BigDecimal.ZERO);
+                BigDecimal totalSpent = finalUnitPrice.multiply(BigDecimal.valueOf(req.getQuantity()));
+                AppNotification soNotif = new AppNotification();
+                soNotif.setRecipientRole("SALES_OFFICER");
+                soNotif.setRecipientUserId(targetOfficer.getUserId() != null ? targetOfficer.getUserId() : targetOfficer.getId());
+                soNotif.setTitle("Stock Purchase Confirmed by Supplier");
+                soNotif.setMessage("Supplier approved and dispatched " + req.getQuantity() + " cases of " 
+                        + product.getBrand() + " " + product.getFlavorVariant() + " @ ৳" + String.format(Locale.US, "%.2f", finalUnitPrice.doubleValue()) 
+                        + "/case. ৳" + String.format(Locale.US, "%.2f", totalSpent.doubleValue()) + " has been successfully purchased and deducted from your monthly budget target.");
+                soNotif.setType("SALES_OFFICER_PURCHASE_CONFIRMED");
+                soNotif.setReferenceCode(dispatchRefCode);
+                soNotif.setReferenceId(targetOfficer.getId());
+                notificationRepository.save(soNotif);
+            } catch (Exception ex) {
+                System.err.println("[InventoryController] Failed to create Sales Officer notification: " + ex.getMessage());
+            }
         }
 
         // Record Wholesale Transaction for Supplier (Tier 2: Supplier sells to Sales Officer at outlet_price)
@@ -311,6 +347,15 @@ public class InventoryController {
         result.put("current_outlet_stock", newStock);
         result.put("total_product_stock", totalStock);
         result.put("timestamp", LocalDateTime.now().toString());
+
+        if (targetOfficer != null) {
+            result.put("sales_officer_id", targetOfficer.getId());
+            result.put("sales_officer_user_id", targetOfficer.getUserId());
+            result.put("sales_officer_name", targetOfficer.getName());
+            BigDecimal finalUnitPrice = product.getOutletPrice() != null ? product.getOutletPrice() : (product.getBasePrice() != null ? product.getBasePrice() : BigDecimal.ZERO);
+            result.put("final_unit_price", finalUnitPrice);
+            result.put("final_total_amount", finalUnitPrice.multiply(BigDecimal.valueOf(req.getQuantity())));
+        }
 
         return ResponseEntity.ok(result);
         } catch (Exception ex) {
@@ -774,6 +819,8 @@ public class InventoryController {
         if (body != null && (body.containsKey("sales_officer_id") || body.containsKey("salesOfficerId"))) {
             Object soObj = body.get("sales_officer_id") != null ? body.get("sales_officer_id") : body.get("salesOfficerId");
             try { supplyReq.setSalesOfficerId(Long.parseLong(soObj.toString())); } catch (Exception ignored) {}
+        } else if (reqRow.get("sales_officer_id") != null) {
+            try { supplyReq.setSalesOfficerId(((Number) reqRow.get("sales_officer_id")).longValue()); } catch (Exception ignored) {}
         }
 
         supplyReq.setNotes(body != null && body.containsKey("notes") && body.get("notes") != null ? body.get("notes").toString() : "Fulfilling requisition " + reqRow.get("requisition_code"));

@@ -36,6 +36,9 @@ import {
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import AdminLogin from '../Admin/AdminLogin';
+import { useNotifications } from '../../hooks/useNotifications';
+import { NotificationDropdown } from '../../components/Notifications/NotificationDropdown';
+import { NotificationPopup } from '../../components/Notifications/NotificationPopup';
 
 interface TerritoryOutlet {
   outlet_id: number;
@@ -66,6 +69,7 @@ interface ProductItem {
 
 interface OfficerProfile {
   id: number;
+  user_id?: number;
   officer_code: string;
   name: string;
   email?: string;
@@ -90,6 +94,7 @@ interface SupplierInfo {
 export interface FinancialTargetData {
   monthly_target: number;
   amount_spent: number;
+  pending_spent?: number;
   remaining_target: number;
   progress_percentage: number;
   is_target_met: boolean;
@@ -137,6 +142,18 @@ export const SalesOfficerDashboard: React.FC = () => {
   const [distributions, setDistributions] = useState<DistributionRecord[]>([]);
   const [allOfficers, setAllOfficers] = useState<OfficerProfile[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Real-time Notifications for Sales Officer
+  const {
+    notifications,
+    unreadCount,
+    popupNotification,
+    dismissPopup,
+    markAsRead,
+    markAllAsRead,
+    deleteNotification,
+    clearOldNotifications,
+  } = useNotifications('SALES_OFFICER', officer?.user_id || officer?.id);
 
   // Distribution Modal State
   const [isDistributeModalOpen, setIsDistributeModalOpen] = useState(false);
@@ -201,6 +218,38 @@ export const SalesOfficerDashboard: React.FC = () => {
   useEffect(() => {
     fetchDashboardData();
   }, [user?.user_id]);
+
+  // Auto-refresh financial target and order status upon Supplier purchase confirmation
+  useEffect(() => {
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel('fizzdrop_realtime_events');
+      channel.onmessage = (event) => {
+        const payload = event.data;
+        if (
+          payload?.type === 'SALES_OFFICER_PURCHASE_CONFIRMED' ||
+          payload?.type === 'REQUISITION_ACTION' ||
+          payload?.type === 'PRICE_UPDATED'
+        ) {
+          if (
+            !payload.recipientUserId ||
+            payload.recipientUserId === officer?.user_id ||
+            payload.referenceId === officer?.id
+          ) {
+            if (officer?.id) {
+              fetchDashboardData(officer.id);
+            }
+          }
+        }
+      };
+    } catch (e) {}
+
+    return () => {
+      if (channel) {
+        channel.close();
+      }
+    };
+  }, [officer?.id, officer?.user_id]);
 
   const handleSwitchOfficer = async (off: OfficerProfile) => {
     await loginAsSalesOfficer(off.id, off.email);
@@ -335,6 +384,13 @@ export const SalesOfficerDashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50/80 text-zinc-900 flex flex-col pb-16 selection:bg-blue-500/20 selection:text-blue-900">
+      {/* Real-time Animated Notification Pop-up Window */}
+      <NotificationPopup
+        notification={popupNotification}
+        onDismiss={dismissPopup}
+        onAction={() => setActiveTab('demands')}
+      />
+
       {/* 1. Top Navbar Fixed Subheader */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-2xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5">
@@ -407,6 +463,18 @@ export const SalesOfficerDashboard: React.FC = () => {
                   </select>
                 </div>
               )}
+
+              {/* Notification Center */}
+              <NotificationDropdown
+                notifications={notifications}
+                unreadCount={unreadCount}
+                onMarkAsRead={markAsRead}
+                onMarkAllAsRead={markAllAsRead}
+                onDeleteNotification={deleteNotification}
+                onClearOldNotifications={clearOldNotifications}
+                onSelectNotification={() => setActiveTab('demands')}
+                isScrolled={true}
+              />
 
               <button
                 onClick={() => logout()}
@@ -560,6 +628,11 @@ export const SalesOfficerDashboard: React.FC = () => {
                     style={{ width: `${Math.min(100, Math.max(5, financialTarget?.progress_percentage ?? 0))}%` }}
                   />
                 </div>
+                {Boolean(financialTarget?.pending_spent && financialTarget.pending_spent > 0) && (
+                  <p className="text-[10px] text-amber-300/90 font-mono pt-1">
+                    ⏳ ৳{Number(financialTarget?.pending_spent).toLocaleString()} awaiting Supplier confirmation
+                  </p>
+                )}
               </div>
             </div>
 

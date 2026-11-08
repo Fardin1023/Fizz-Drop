@@ -177,6 +177,21 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
         } catch (e) {}
       }
 
+      // Broadcast stock purchase confirmation to Sales Officer tabs
+      try {
+        const soChannel = new BroadcastChannel('fizzdrop_realtime_events');
+        soChannel.postMessage({
+          type: 'SALES_OFFICER_PURCHASE_CONFIRMED',
+          recipientRole: 'SALES_OFFICER',
+          recipientUserId: data.sales_officer_user_id || fulfillModalReq.sales_officer_id,
+          referenceId: data.sales_officer_id || fulfillModalReq.sales_officer_id,
+          title: 'Stock Purchase Confirmed by Supplier',
+          message: `Supplier approved and dispatched ${fulfillQty} units of ${fulfillModalReq.product_name} at ৳${Number(fulfillPrice).toFixed(2)}/case.`,
+          final_total_amount: data.final_total_amount || (fulfillQty * fulfillPrice),
+        });
+        setTimeout(() => soChannel.close(), 100);
+      } catch (e) {}
+
       setActionSuccessMsg(
         `Successfully dispatched ${fulfillQty} units of ${fulfillModalReq.product_name} at ৳${Number(fulfillPrice).toFixed(2)}/case to Sales Officer ${fulfillModalReq.sales_officer_name || ''}!`
       );
@@ -222,6 +237,21 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
       if (!res.ok) {
         throw new Error(data.error || data.message || 'Failed to dispatch stock');
       }
+
+      // Broadcast stock purchase confirmation to Sales Officer tabs
+      try {
+        const soChannel = new BroadcastChannel('fizzdrop_realtime_events');
+        soChannel.postMessage({
+          type: 'SALES_OFFICER_PURCHASE_CONFIRMED',
+          recipientRole: 'SALES_OFFICER',
+          recipientUserId: data.sales_officer_user_id || req.sales_officer_id,
+          referenceId: data.sales_officer_id || req.sales_officer_id,
+          title: 'Stock Purchase Confirmed by Supplier',
+          message: `Supplier approved and dispatched ${req.quantity} units of ${req.product_name}.`,
+          final_total_amount: data.final_total_amount,
+        });
+        setTimeout(() => soChannel.close(), 100);
+      } catch (e) {}
 
       setActionSuccessMsg(
         `Successfully dispatched ${req.quantity} units of ${req.product_name} via Sales Officer ${req.sales_officer_name || ''} (${req.sales_officer_code || req.area}) for ${req.outlet_name}!`
