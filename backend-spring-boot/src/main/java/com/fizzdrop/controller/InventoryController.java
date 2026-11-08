@@ -14,6 +14,8 @@ import com.fizzdrop.repository.ShopInventoryRepository;
 import com.fizzdrop.repository.SupplierProfileRepository;
 import com.fizzdrop.entity.SupplierTransaction;
 import com.fizzdrop.repository.SupplierTransactionRepository;
+import com.fizzdrop.entity.SalesOfficer;
+import com.fizzdrop.repository.SalesOfficerRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -37,6 +39,7 @@ public class InventoryController {
     private final JdbcTemplate jdbcTemplate;
     private final AppNotificationRepository notificationRepository;
     private final SupplierTransactionRepository supplierTransactionRepository;
+    private final SalesOfficerRepository salesOfficerRepository;
 
     public InventoryController(ShopInventoryRepository inventoryRepository,
                                ProductRepository productRepository,
@@ -45,7 +48,8 @@ public class InventoryController {
                                SupplierProfileRepository supplierProfileRepository,
                                JdbcTemplate jdbcTemplate,
                                AppNotificationRepository notificationRepository,
-                               SupplierTransactionRepository supplierTransactionRepository) {
+                               SupplierTransactionRepository supplierTransactionRepository,
+                               SalesOfficerRepository salesOfficerRepository) {
         this.inventoryRepository = inventoryRepository;
         this.productRepository = productRepository;
         this.outletRepository = outletRepository;
@@ -54,6 +58,7 @@ public class InventoryController {
         this.jdbcTemplate = jdbcTemplate;
         this.notificationRepository = notificationRepository;
         this.supplierTransactionRepository = supplierTransactionRepository;
+        this.salesOfficerRepository = salesOfficerRepository;
     }
 
     /**
@@ -65,12 +70,36 @@ public class InventoryController {
             if (req.getProductId() == null) {
                 return ResponseEntity.badRequest().body(ApiResponse.fail("Product ID is required"));
             }
-        if (req.getOutletId() == null) {
-            return ResponseEntity.badRequest().body(ApiResponse.fail("Outlet ID is required"));
-        }
-        if (req.getQuantity() == null || req.getQuantity() <= 0) {
-            return ResponseEntity.badRequest().body(ApiResponse.fail("Supply quantity must be greater than 0"));
-        }
+
+            // Support Sales Officer direct supply: resolve outlet if salesOfficerId is supplied
+            SalesOfficer targetOfficer = null;
+            if (req.getSalesOfficerId() != null) {
+                targetOfficer = salesOfficerRepository.findById(req.getSalesOfficerId()).orElse(null);
+            }
+
+            if (req.getOutletId() == null && targetOfficer != null) {
+                String soArea = targetOfficer.getAssignedArea().toLowerCase().trim();
+                Optional<Outlet> matched = outletRepository.findAll().stream()
+                        .filter(o -> {
+                            String oArea = o.getArea() != null ? o.getArea().toLowerCase().trim() : "";
+                            String oAddr = o.getLocationAddress() != null ? o.getLocationAddress().toLowerCase().trim() : "";
+                            return !soArea.isEmpty() && (oArea.contains(soArea) || soArea.contains(oArea) || oAddr.contains(soArea));
+                        })
+                        .findFirst();
+                if (matched.isPresent()) {
+                    req.setOutletId(matched.get().getOutletId());
+                } else {
+                    List<Outlet> allO = outletRepository.findAll();
+                    req.setOutletId(allO.isEmpty() ? 1L : allO.get(0).getOutletId());
+                }
+            }
+
+            if (req.getOutletId() == null && req.getSalesOfficerId() == null) {
+                return ResponseEntity.badRequest().body(ApiResponse.fail("Sales Officer or Destination selection is required"));
+            }
+            if (req.getQuantity() == null || req.getQuantity() <= 0) {
+                return ResponseEntity.badRequest().body(ApiResponse.fail("Supply quantity must be greater than 0"));
+            }
 
         // Verify product exists in database
         Optional<Product> prodOpt = productRepository.findById(req.getProductId());
@@ -197,8 +226,9 @@ public class InventoryController {
             } catch (Exception ignored) {}
         }
 
-        // Record Wholesale Transaction for Supplier (Tier 2: Supplier sells to Outlet at outlet_price)
+        // Record Wholesale Transaction for Supplier (Tier 2: Supplier sells to Sales Officer at outlet_price)
         final String finalRefCode = dispatchRefCode;
+        final SalesOfficer finalOfficer = targetOfficer;
         profileOpt.ifPresent(sp -> {
             try {
                 BigDecimal buyPrice = product.getSupplierPrice() != null ? product.getSupplierPrice() : (product.getBasePrice() != null ? product.getBasePrice() : BigDecimal.ZERO);
@@ -206,6 +236,24 @@ public class InventoryController {
                 BigDecimal wholesaleTotal = sellPrice.multiply(BigDecimal.valueOf(req.getQuantity()));
                 BigDecimal unitProfit = sellPrice.subtract(buyPrice);
                 BigDecimal totalProfit = unitProfit.multiply(BigDecimal.valueOf(req.getQuantity()));
+
+                String recipientDesc;
+                if (finalOfficer != null) {
+                    recipientDesc = "Sales Officer " + finalOfficer.getName() + " (" + finalOfficer.getOfficerCode() + ", Area: " + finalOfficer.getAssignedArea() + ")";
+                } else if (outlet.getArea() != null && !outlet.getArea().trim().isEmpty()) {
+                    List<SalesOfficer> officers = salesOfficerRepository.findBySupplierId(sp.getId());
+                    SalesOfficer found = officers.stream()
+                            .filter(so -> so.getAssignedArea().equalsIgnoreCase(outlet.getArea().trim()))
+                            .findFirst()
+                            .orElse(null);
+                    if (found != null) {
+                        recipientDesc = "Sales Officer " + found.getName() + " (" + found.getOfficerCode() + ", Area: " + found.getAssignedArea() + ")";
+                    } else {
+                        recipientDesc = "Area Sales Officer (" + outlet.getArea() + ")";
+                    }
+                } else {
+                    recipientDesc = "Area Sales Officer (" + outlet.getOutletName() + ")";
+                }
 
                 SupplierTransaction saleTx = new SupplierTransaction(
                     "TXN-OUT-" + System.currentTimeMillis() + "-" + (100 + new Random().nextInt(900)),
@@ -218,7 +266,7 @@ public class InventoryController {
                     wholesaleTotal,
                     "OUTLET_WHOLESALE",
                     String.format("Wholesale delivery of %d units of %s %s to %s @ ৳%.2f/unit. (Buy rate: ৳%.2f, Profit: +৳%.2f)",
-                        req.getQuantity(), product.getBrand(), product.getFlavorVariant(), outlet.getOutletName(),
+                        req.getQuantity(), product.getBrand(), product.getFlavorVariant(), recipientDesc,
                         sellPrice.doubleValue(), buyPrice.doubleValue(), totalProfit.doubleValue()),
                     "COMPLETED"
                 );
@@ -652,6 +700,8 @@ public class InventoryController {
             return ResponseEntity.ok(Collections.emptyList());
         }
 
+        List<SalesOfficer> officers = profileOpt.map(p -> salesOfficerRepository.findBySupplierId(p.getId())).orElse(Collections.emptyList());
+
         List<Map<String, Object>> response = new ArrayList<>();
         for (Map<String, Object> row : list) {
             Map<String, Object> map = new HashMap<>(row);
@@ -665,6 +715,24 @@ public class InventoryController {
             }
             map.put("supplier_available_stock", availableStock);
             map.put("can_dispatch", availableStock > 0);
+
+            // Associate with Superadmin-assigned Sales Officer for this area
+            String oArea = row.get("area") != null ? row.get("area").toString().toLowerCase().trim() : "";
+            SalesOfficer matchedSO = officers.stream()
+                    .filter(so -> !oArea.isEmpty() && (oArea.contains(so.getAssignedArea().toLowerCase().trim()) || so.getAssignedArea().toLowerCase().trim().contains(oArea)))
+                    .findFirst()
+                    .orElse(officers.isEmpty() ? null : officers.get(0));
+
+            if (matchedSO != null) {
+                map.put("sales_officer_id", matchedSO.getId());
+                map.put("sales_officer_name", matchedSO.getName());
+                map.put("sales_officer_code", matchedSO.getOfficerCode());
+                map.put("sales_officer_area", matchedSO.getAssignedArea());
+                map.put("sales_officer_phone", matchedSO.getPhone());
+            } else {
+                map.put("sales_officer_name", "Area Sales Officer (" + (row.get("area") != null ? row.get("area") : "Assigned Zone") + ")");
+            }
+
             response.add(map);
         }
 
@@ -697,6 +765,12 @@ public class InventoryController {
         SupplyRequest supplyReq = new SupplyRequest(outletId, productId, dispatchQty, "ADD");
         supplyReq.setUserId(userId);
         supplyReq.setRequisitionId(id);
+
+        if (body != null && (body.containsKey("sales_officer_id") || body.containsKey("salesOfficerId"))) {
+            Object soObj = body.get("sales_officer_id") != null ? body.get("sales_officer_id") : body.get("salesOfficerId");
+            try { supplyReq.setSalesOfficerId(Long.parseLong(soObj.toString())); } catch (Exception ignored) {}
+        }
+
         supplyReq.setNotes(body != null && body.containsKey("notes") && body.get("notes") != null ? body.get("notes").toString() : "Fulfilling requisition " + reqRow.get("requisition_code"));
 
         return supplyStockToOutlet(supplyReq);

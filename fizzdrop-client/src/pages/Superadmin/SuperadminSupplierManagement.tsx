@@ -24,6 +24,7 @@ import {
   FileCheck2,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { SuperadminSalesOfficerModal } from './SuperadminSalesOfficerModal';
 import {
   DocumentViewerModal,
   getDocCategory,
@@ -103,6 +104,15 @@ export const SuperadminSupplierManagement: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingUserId, setEditingUserId] = useState<number | null>(null);
+
+  // Sales Officers Modal State
+  const [salesOfficerSupplier, setSalesOfficerSupplier] = useState<SupplierRecord | null>(null);
+  const [isSalesOfficerModalOpen, setIsSalesOfficerModalOpen] = useState(false);
+
+  const handleOpenSalesOfficers = (s: SupplierRecord) => {
+    setSalesOfficerSupplier(s);
+    setIsSalesOfficerModalOpen(true);
+  };
 
   // Form Fields
   const [businessName, setBusinessName] = useState('');
@@ -934,6 +944,14 @@ export const SuperadminSupplierManagement: React.FC = () => {
                   </span>
                   <div className="flex items-center gap-1.5">
                     <button
+                      onClick={() => handleOpenSalesOfficers(s)}
+                      className="px-2.5 py-1 rounded-lg border border-indigo-200 bg-indigo-50/70 hover:bg-indigo-100 text-indigo-700 font-semibold text-xs flex items-center gap-1 transition-colors cursor-pointer"
+                      title="Manage Assigned Sales Officers"
+                    >
+                      <Users className="w-3 h-3 text-indigo-600" />
+                      <span>Sales Officers</span>
+                    </button>
+                    <button
                       onClick={() => handleOpenEditModal(s)}
                       className="px-2.5 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 font-medium text-xs flex items-center gap-1 transition-colors cursor-pointer"
                     >
@@ -1708,6 +1726,16 @@ export const SuperadminSupplierManagement: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Superadmin Manage Sales Officers Modal */}
+      <SuperadminSalesOfficerModal
+        isOpen={isSalesOfficerModalOpen}
+        onClose={() => {
+          setIsSalesOfficerModalOpen(false);
+          setSalesOfficerSupplier(null);
+        }}
+        supplier={salesOfficerSupplier}
+      />
+
       {/* Document Preview & Download Modal */}
       <DocumentViewerModal
         isOpen={viewerModal.isOpen}

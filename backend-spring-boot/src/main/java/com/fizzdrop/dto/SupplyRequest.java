@@ -9,6 +9,10 @@ public class SupplyRequest {
     @JsonAlias({"outlet_id", "outletId", "branch_id", "branchId"})
     private Long outletId;
 
+    @JsonProperty("sales_officer_id")
+    @JsonAlias({"sales_officer_id", "salesOfficerId"})
+    private Long salesOfficerId;
+
     @JsonProperty("product_id")
     @JsonAlias({"product_id", "productId"})
     private Long productId;
@@ -47,6 +51,9 @@ public class SupplyRequest {
 
     public Long getOutletId() { return outletId; }
     public void setOutletId(Long outletId) { this.outletId = outletId; }
+
+    public Long getSalesOfficerId() { return salesOfficerId; }
+    public void setSalesOfficerId(Long salesOfficerId) { this.salesOfficerId = salesOfficerId; }
 
     public Long getProductId() { return productId; }
     public void setProductId(Long productId) { this.productId = productId; }

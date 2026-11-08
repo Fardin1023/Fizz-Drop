@@ -24,6 +24,7 @@ import {
   Warehouse,
   Store,
   Wallet,
+  Users,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useNotifications } from '../../hooks/useNotifications';
@@ -95,12 +96,12 @@ export const AdminDashboard: React.FC = () => {
     },
     {
       id: 'outlet-requests' as const,
-      label: 'Outlet Stock Requisitions',
-      shortLabel: 'Outlet Orders',
-      desc: 'Branch restock orders & depot dispatches',
+      label: 'Area Demands & Requisitions',
+      shortLabel: 'Area Demands',
+      desc: 'Restock orders channeled via assigned Sales Officers',
       icon: Store,
       gradient: 'from-emerald-600 via-teal-600 to-cyan-600',
-      badge: 'Outlet Orders',
+      badge: 'Area Demands',
       badgeHighlight: notifications.some((n) => n.type === 'NEW_REQUISITION' && !n.is_read),
     },
     {
@@ -124,12 +125,12 @@ export const AdminDashboard: React.FC = () => {
     },
     {
       id: 'outlets' as const,
-      label: 'Allocated Franchise Outlets',
-      shortLabel: 'Allocated Outlets',
-      desc: 'Physical hubs within your assigned zones',
-      icon: Warehouse,
+      label: 'Assigned Sales Officers & Territory',
+      shortLabel: 'Sales Officers',
+      desc: 'Superadmin assigned sales officers & territory coverage',
+      icon: Users,
       gradient: 'from-amber-600 via-orange-600 to-red-600',
-      badge: 'Territory',
+      badge: 'Sales Officers',
     },
     {
       id: 'profile' as const,

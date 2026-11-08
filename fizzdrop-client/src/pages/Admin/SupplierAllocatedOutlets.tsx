@@ -1,8 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  Warehouse,
+  Building2,
+  Store,
+  Users,
+  UserCheck,
   MapPin,
   Phone,
+  Mail,
   Search,
   Filter,
   Compass,
@@ -11,15 +15,15 @@ import {
   CheckCircle2,
   AlertCircle,
   Building,
-  Building2,
-  Store,
   Layers,
   Globe,
   ExternalLink,
+  ArrowRight,
+  ShieldCheck,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { parseAllocatedAreas } from '../../constants/cityAreas';
-import { SupplyStockModal, type OutletOption } from './SupplyStockModal';
+import { SupplyStockModal, type OutletOption, type SalesOfficerOption } from './SupplyStockModal';
 import {
   extractFranchiseName,
   extractBranchName,
@@ -39,6 +43,22 @@ export interface AllocatedOutlet {
   status: string;
   district_name?: string;
   division_name?: string;
+}
+
+export interface SalesOfficerData {
+  id: number;
+  officer_code: string;
+  name: string;
+  email?: string;
+  phone: string;
+  supplier_id: number;
+  district_id?: number;
+  city: string;
+  assigned_area: string;
+  status: string;
+  notes?: string;
+  supplier_name?: string;
+  outlet_count?: number;
 }
 
 interface SupplierProfileData {
@@ -62,27 +82,28 @@ export const SupplierAllocatedOutlets: React.FC<SupplierAllocatedOutletsProps> =
   const { user, token } = useAuth();
   const userId = user?.user_id || 4;
 
+  const [salesOfficers, setSalesOfficers] = useState<SalesOfficerData[]>([]);
   const [outlets, setOutlets] = useState<AllocatedOutlet[]>([]);
   const [profile, setProfile] = useState<SupplierProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [selectedFranchiseFilter, setSelectedFranchiseFilter] = useState('ALL');
   const [selectedCityFilter, setSelectedCityFilter] = useState('ALL');
   const [selectedAreaFilter, setSelectedAreaFilter] = useState('ALL');
-  const [viewMode, setViewMode] = useState<'GROUPED' | 'LIST'>('GROUPED');
+  const [viewMode, setViewMode] = useState<'OFFICERS' | 'TERRITORY_OUTLETS'>('OFFICERS');
 
   // Supply Stock Modal state
   const [isSupplyModalOpen, setIsSupplyModalOpen] = useState(false);
-  const [selectedOutletForSupply, setSelectedOutletForSupply] = useState<number | null>(null);
+  const [selectedOfficerForSupply, setSelectedOfficerForSupply] = useState<number | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [outletsRes, profileRes] = await Promise.all([
+      const [outletsRes, profileRes, officersRes] = await Promise.all([
         fetch(`http://localhost:8080/api/outlets?userId=${userId}`),
         fetch(`http://localhost:8080/api/v1/supplier/profile?userId=${userId}`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         }),
+        fetch(`http://localhost:8080/api/v1/supplier/sales-officers?userId=${userId}`),
       ]);
 
       if (outletsRes.ok) {
@@ -118,8 +139,14 @@ export const SupplierAllocatedOutlets: React.FC<SupplierAllocatedOutletsProps> =
         const profData = await profileRes.json();
         setProfile(profData);
       }
+
+      if (officersRes.ok) {
+        const officersData = await officersRes.json();
+        const list: SalesOfficerData[] = officersData?.sales_officers || officersData || [];
+        setSalesOfficers(Array.isArray(list) ? list : []);
+      }
     } catch (err) {
-      console.error('Error fetching supplier allocated outlets:', err);
+      console.error('Error fetching supplier data:', err);
     } finally {
       setLoading(false);
     }
@@ -133,66 +160,75 @@ export const SupplierAllocatedOutlets: React.FC<SupplierAllocatedOutletsProps> =
   const allocatedCities = Object.keys(allocatedMap);
 
   // Filter options
-  const uniqueFranchises = Array.from(
-    new Set(outlets.map((o) => o.franchise_name).filter(Boolean) as string[])
-  );
-
   const filterableCities = Array.from(
-    new Set(outlets.map((o) => o.city || o.district_name).filter(Boolean) as string[])
+    new Set([
+      ...salesOfficers.map((so) => so.city).filter(Boolean),
+      ...outlets.map((o) => o.city || o.district_name).filter(Boolean),
+    ] as string[])
   );
 
   const filterableAreas = Array.from(
-    new Set(
-      outlets
-        .filter(
-          (o) =>
-            selectedCityFilter === 'ALL' ||
-            (o.city || o.district_name)?.toLowerCase() === selectedCityFilter.toLowerCase()
-        )
-        .map((o) => o.area)
-        .filter(Boolean) as string[]
-    )
+    new Set([
+      ...salesOfficers.map((so) => so.assigned_area).filter(Boolean),
+      ...outlets.map((o) => o.area).filter(Boolean),
+    ] as string[])
   );
 
-  const filteredOutlets = useMemo(() => {
-    return outlets.filter((o) => {
-      const oFranchise = (o.franchise_name || '').toLowerCase();
-      const oBranch = (o.branch_name || '').toLowerCase();
-      const oCity = (o.city || o.district_name || '').toLowerCase();
-      const oArea = (o.area || '').toLowerCase();
+  // Filtered Sales Officers
+  const filteredOfficers = useMemo(() => {
+    return salesOfficers.filter((so) => {
       const term = search.toLowerCase();
-
       const matchesSearch =
         !term ||
-        o.outlet_name.toLowerCase().includes(term) ||
-        oFranchise.includes(term) ||
-        oBranch.includes(term) ||
-        o.location_address.toLowerCase().includes(term) ||
-        oCity.includes(term) ||
-        oArea.includes(term);
-
-      const matchesFranchise =
-        selectedFranchiseFilter === 'ALL' ||
-        (o.franchise_name || '').toLowerCase() === selectedFranchiseFilter.toLowerCase();
+        so.name.toLowerCase().includes(term) ||
+        so.officer_code.toLowerCase().includes(term) ||
+        so.assigned_area.toLowerCase().includes(term) ||
+        so.city.toLowerCase().includes(term) ||
+        (so.phone && so.phone.includes(term));
 
       const matchesCity =
-        selectedCityFilter === 'ALL' || oCity === selectedCityFilter.toLowerCase();
+        selectedCityFilter === 'ALL' || so.city.toLowerCase() === selectedCityFilter.toLowerCase();
 
       const matchesArea =
-        selectedAreaFilter === 'ALL' || oArea.includes(selectedAreaFilter.toLowerCase());
+        selectedAreaFilter === 'ALL' || so.assigned_area.toLowerCase() === selectedAreaFilter.toLowerCase();
 
-      return matchesSearch && matchesFranchise && matchesCity && matchesArea;
+      return matchesSearch && matchesCity && matchesArea;
     });
-  }, [outlets, search, selectedFranchiseFilter, selectedCityFilter, selectedAreaFilter]);
+  }, [salesOfficers, search, selectedCityFilter, selectedAreaFilter]);
 
-  const franchiseGroups: FranchiseGroup<AllocatedOutlet>[] = useMemo(() => {
-    return groupOutletsByFranchise(filteredOutlets);
-  }, [filteredOutlets]);
+  // Map each Sales Officer to their covered outlets
+  const officerWithOutlets = useMemo(() => {
+    return filteredOfficers.map((so) => {
+      const matchedOutlets = outlets.filter((o) => {
+        const oArea = (o.area || '').toLowerCase();
+        const soArea = so.assigned_area.toLowerCase();
+        return oArea.includes(soArea) || soArea.includes(oArea);
+      });
+      return {
+        ...so,
+        outlets: matchedOutlets,
+        activeOutletCount: matchedOutlets.length,
+      };
+    });
+  }, [filteredOfficers, outlets]);
 
-  const handleOpenSupplyModal = (outletId: number) => {
-    setSelectedOutletForSupply(outletId);
+  const handleOpenSupplyModal = (officerId: number) => {
+    setSelectedOfficerForSupply(officerId);
     setIsSupplyModalOpen(true);
   };
+
+  const modalSalesOfficers: SalesOfficerOption[] = salesOfficers.map((so) => ({
+    id: so.id,
+    officer_code: so.officer_code,
+    name: so.name,
+    email: so.email,
+    phone: so.phone,
+    supplier_id: so.supplier_id,
+    city: so.city,
+    assigned_area: so.assigned_area,
+    status: so.status,
+    outlet_count: so.outlet_count,
+  }));
 
   const modalOutlets: OutletOption[] = outlets.map((o) => ({
     outlet_id: o.outlet_id,
@@ -213,19 +249,19 @@ export const SupplierAllocatedOutlets: React.FC<SupplierAllocatedOutletsProps> =
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-start gap-3.5">
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-600 to-orange-600 text-white flex items-center justify-center shadow-lg shadow-orange-500/20 shrink-0">
-              <Building2 className="w-6 h-6" />
+              <Users className="w-6 h-6" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-oswald text-xl font-bold uppercase tracking-wide text-zinc-900">
-                  Allocated Franchise Outlets & Branches
+                  Assigned Sales Officers & Territory Coverage
                 </h3>
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                  Assigned Zone
+                  Wholesale Channel
                 </span>
               </div>
               <p className="text-xs text-slate-500 max-w-xl mt-1 leading-relaxed">
-                Physical retail branches located within your authorized territorial allotment. Organize dispatches by franchise chain (e.g. Shwapno) across all approved municipal zones.
+                Superadmin-assigned territory Sales Officers for your wholesale distribution. You supply inventory directly to each designated Sales Officer, who oversees retail stores in their allocated area.
               </p>
             </div>
           </div>
@@ -245,7 +281,7 @@ export const SupplierAllocatedOutlets: React.FC<SupplierAllocatedOutletsProps> =
             <button
               onClick={fetchData}
               className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 border border-slate-200 transition-colors cursor-pointer"
-              title="Refresh allocated outlets"
+              title="Refresh assigned officers"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-amber-600' : ''}`} />
             </button>
@@ -256,7 +292,7 @@ export const SupplierAllocatedOutlets: React.FC<SupplierAllocatedOutletsProps> =
         <div className="mt-4 pt-4 border-t border-slate-100">
           <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 mb-2">
             <Compass className="w-3.5 h-3.5 text-indigo-600" />
-            <span>Your Authorized Regional Coverage & Municipal Areas:</span>
+            <span>Superadmin Approved Allotment & Assigned Municipal Areas:</span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
@@ -274,7 +310,7 @@ export const SupplierAllocatedOutlets: React.FC<SupplierAllocatedOutletsProps> =
                         {cityName}
                       </span>
                       <span className="text-[10px] font-mono text-slate-500 font-semibold">
-                        {zones.length} Zones
+                        {zones.length} Zones Allotted
                       </span>
                     </div>
                     <div className="flex flex-wrap gap-1">
@@ -308,8 +344,8 @@ export const SupplierAllocatedOutlets: React.FC<SupplierAllocatedOutletsProps> =
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by franchise, branch or area..."
-              className="w-full pl-8 pr-7 py-1.5 rounded-xl bg-slate-50 border border-slate-200 focus:border-blue-500 focus:bg-white text-xs text-slate-800 placeholder-slate-400 outline-none transition-all"
+              placeholder="Search sales officers by name, code, area or phone..."
+              className="w-full pl-8 pr-7 py-1.5 rounded-xl bg-slate-50 border border-slate-200 focus:border-amber-500 focus:bg-white text-xs text-slate-800 placeholder-slate-400 outline-none transition-all"
             />
           </div>
 
@@ -318,34 +354,30 @@ export const SupplierAllocatedOutlets: React.FC<SupplierAllocatedOutletsProps> =
             <div className="flex items-center p-1 rounded-xl bg-slate-100 border border-slate-200 text-xs font-semibold">
               <button
                 type="button"
-                onClick={() => setViewMode('GROUPED')}
-                className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
-                  viewMode === 'GROUPED'
+                onClick={() => setViewMode('OFFICERS')}
+                className={`px-3 py-1 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                  viewMode === 'OFFICERS'
                     ? 'bg-white text-amber-700 shadow-xs'
                     : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <Layers className="w-3.5 h-3.5" />
-                <span>By Franchise</span>
+                <Users className="w-3.5 h-3.5" />
+                <span>Sales Officers ({filteredOfficers.length})</span>
               </button>
 
               <button
                 type="button"
-                onClick={() => setViewMode('LIST')}
-                className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
-                  viewMode === 'LIST'
+                onClick={() => setViewMode('TERRITORY_OUTLETS')}
+                className={`px-3 py-1 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                  viewMode === 'TERRITORY_OUTLETS'
                     ? 'bg-white text-amber-700 shadow-xs'
                     : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
                 <Store className="w-3.5 h-3.5" />
-                <span>All Branches</span>
+                <span>Territory Outlets by Area</span>
               </button>
             </div>
-
-            <span className="text-xs font-mono text-slate-500">
-              Showing <strong className="text-blue-700">{filteredOutlets.length}</strong> of {outlets.length} branches
-            </span>
           </div>
         </div>
 
@@ -353,28 +385,7 @@ export const SupplierAllocatedOutlets: React.FC<SupplierAllocatedOutletsProps> =
         <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 text-xs">
           <div className="flex items-center gap-1 text-[11px] font-bold text-slate-500 uppercase tracking-wider mr-1">
             <Filter className="w-3 h-3 text-indigo-600" />
-            <span>Filter Outlets:</span>
-          </div>
-
-          {/* Franchise Filter */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-50 border border-slate-200">
-            <Building2 className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-            <span className="text-slate-400 font-medium">Franchise:</span>
-            <select
-              value={selectedFranchiseFilter}
-              onChange={(e) => setSelectedFranchiseFilter(e.target.value)}
-              className="bg-transparent text-slate-800 font-semibold focus:outline-none cursor-pointer"
-            >
-              <option value="ALL">All Franchises ({uniqueFranchises.length})</option>
-              {uniqueFranchises.map((f) => {
-                const count = outlets.filter((o) => o.franchise_name === f).length;
-                return (
-                  <option key={f} value={f}>
-                    {f} ({count})
-                  </option>
-                );
-              })}
-            </select>
+            <span>Filter Officers:</span>
           </div>
 
           {/* City Filter */}
@@ -388,7 +399,7 @@ export const SupplierAllocatedOutlets: React.FC<SupplierAllocatedOutletsProps> =
               }}
               className="bg-transparent text-slate-800 font-semibold focus:outline-none cursor-pointer"
             >
-              <option value="ALL">All Covered Cities ({filterableCities.length})</option>
+              <option value="ALL">All Cities ({filterableCities.length})</option>
               {filterableCities.map((c) => (
                 <option key={c} value={c}>{c}</option>
               ))}
@@ -398,23 +409,22 @@ export const SupplierAllocatedOutlets: React.FC<SupplierAllocatedOutletsProps> =
           {/* Area Filter */}
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-50 border border-slate-200">
             <Compass className="w-3 h-3 text-cyan-600 shrink-0" />
-            <span className="text-slate-400 font-medium">Area:</span>
+            <span className="text-slate-400 font-medium">Assigned Area:</span>
             <select
               value={selectedAreaFilter}
               onChange={(e) => setSelectedAreaFilter(e.target.value)}
               className="bg-transparent text-slate-800 font-semibold focus:outline-none cursor-pointer"
             >
-              <option value="ALL">All Allocated Areas ({filterableAreas.length})</option>
+              <option value="ALL">All Areas ({filterableAreas.length})</option>
               {filterableAreas.map((a) => (
                 <option key={a} value={a}>{a}</option>
               ))}
             </select>
           </div>
 
-          {(selectedFranchiseFilter !== 'ALL' || selectedCityFilter !== 'ALL' || selectedAreaFilter !== 'ALL' || search) && (
+          {(selectedCityFilter !== 'ALL' || selectedAreaFilter !== 'ALL' || search) && (
             <button
               onClick={() => {
-                setSelectedFranchiseFilter('ALL');
                 setSelectedCityFilter('ALL');
                 setSelectedAreaFilter('ALL');
                 setSearch('');
@@ -427,261 +437,265 @@ export const SupplierAllocatedOutlets: React.FC<SupplierAllocatedOutletsProps> =
         </div>
       </div>
 
-      {/* 3. Outlets Grid */}
+      {/* 3. Main Content: Sales Officers or Territory Outlets */}
       {loading ? (
         <div className="py-20 text-center text-xs text-slate-500 space-y-2">
-          <div className="w-6 h-6 border-2 border-blue-600/30 border-t-blue-600 rounded-full animate-spin mx-auto" />
-          <span className="font-mono">Loading outlets in allocated areas...</span>
+          <div className="w-6 h-6 border-2 border-amber-600/30 border-t-amber-600 rounded-full animate-spin mx-auto" />
+          <span className="font-mono">Loading assigned Sales Officers and territory coverage...</span>
         </div>
-      ) : filteredOutlets.length === 0 ? (
+      ) : filteredOfficers.length === 0 ? (
         <div className="py-16 text-center rounded-3xl bg-white border border-slate-200/90 p-8 space-y-3 shadow-xs">
-          <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center mx-auto shadow-2xs">
-            <Warehouse className="w-6 h-6" />
+          <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center mx-auto shadow-2xs">
+            <Users className="w-6 h-6" />
           </div>
           <div>
-            <h4 className="font-bold text-base text-zinc-900">No Outlets Found in Selected Area</h4>
+            <h4 className="font-bold text-base text-zinc-900">No Sales Officers Assigned Yet</h4>
             <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
-              {outlets.length === 0
-                ? 'No franchise outlets have been registered in your allocated municipal zones yet. Superadmin can register outlets with matching City and Area tags in the Franchise Outlets manager.'
-                : 'No outlets match your current search and filter criteria.'}
+              Superadmin assigns dedicated Sales Officers to your supplier account for each allocated municipal area. Once assigned, you can dispatch wholesale inventory directly to them.
             </p>
           </div>
-          {(selectedFranchiseFilter !== 'ALL' || selectedCityFilter !== 'ALL' || selectedAreaFilter !== 'ALL' || search) && (
+          {(selectedCityFilter !== 'ALL' || selectedAreaFilter !== 'ALL' || search) && (
             <button
               onClick={() => {
-                setSelectedFranchiseFilter('ALL');
                 setSelectedCityFilter('ALL');
                 setSelectedAreaFilter('ALL');
                 setSearch('');
               }}
-              className="px-4 py-2 rounded-xl bg-blue-600 text-white font-bold text-xs shadow-sm hover:shadow transition-all cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-amber-600 text-white font-bold text-xs shadow-sm hover:shadow transition-all cursor-pointer"
             >
               Reset Filters
             </button>
           )}
         </div>
-      ) : viewMode === 'GROUPED' ? (
-        /* HIERARCHICAL VIEW BY FRANCHISE BRAND */
-        <div className="space-y-4">
-          {franchiseGroups.map((group) => (
-            <div
-              key={group.franchiseName}
-              className="rounded-3xl bg-white border border-slate-200/90 shadow-sm overflow-hidden"
-            >
-              {/* Franchise Header */}
-              <div className="p-4 sm:p-5 bg-gradient-to-r from-slate-50 via-amber-50/20 to-orange-50/20 border-b border-slate-200/80 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-600 to-orange-600 text-white flex items-center justify-center shadow-md shadow-orange-500/20 shrink-0">
-                    <Building2 className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-oswald text-lg font-bold uppercase tracking-wide text-zinc-900">
-                        {group.franchiseName}
-                      </h4>
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                        {group.totalBranches} {group.totalBranches === 1 ? 'Branch' : 'Branches'} in Territory
-                      </span>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                      {group.cities.map((c) => (
-                        <span
-                          key={c}
-                          className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-blue-50 text-blue-800 border border-blue-200"
-                        >
-                          <MapPin className="w-2.5 h-2.5 text-blue-600" />
-                          {c}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Branches Grid */}
-              <div className="p-4 sm:p-5 bg-white">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-                  {group.branches.map((outlet) => (
-                    <div
-                      key={outlet.outlet_id}
-                      className="rounded-2xl border border-slate-200/90 hover:border-amber-400 p-4 bg-slate-50/50 hover:bg-white flex flex-col justify-between shadow-2xs hover:shadow-md transition-all group"
-                    >
-                      <div>
-                        <div className="flex items-start justify-between gap-2 mb-2">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 flex items-center justify-center shrink-0">
-                              <Store className="w-4 h-4" />
-                            </div>
-                            <div>
-                              <h5 className="font-bold text-sm text-zinc-900 group-hover:text-amber-700 transition-colors">
-                                {outlet.branch_name || outlet.outlet_name}
-                              </h5>
-                              <span className="text-[10px] font-mono text-slate-400 font-semibold">
-                                ID #{outlet.outlet_id}
-                              </span>
-                            </div>
-                          </div>
-
-                          <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0 font-mono ${
-                              outlet.status === 'Active'
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                : 'bg-slate-100 text-slate-500'
-                            }`}
-                          >
-                            {outlet.status}
-                          </span>
-                        </div>
-
-                        {/* City and Area Tags */}
-                        <div className="flex flex-wrap gap-1.5 mb-2.5">
-                          {outlet.division_name && (
-                            <span className="inline-flex items-center gap-1 font-mono font-semibold text-[10px] px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200/80">
-                              <Globe className="w-2.5 h-2.5 text-purple-500" />
-                              {outlet.division_name}
-                            </span>
-                          )}
-
-                          <span className="inline-flex items-center gap-1 font-mono font-bold text-[10px] px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200">
-                            <MapPin className="w-2.5 h-2.5 text-blue-500" />
-                            {outlet.city || outlet.district_name || 'City'}
-                          </span>
-
-                          {outlet.area && (
-                            <span className="inline-flex items-center gap-1 font-mono font-semibold text-[10px] px-2 py-0.5 rounded-md bg-cyan-50 text-cyan-700 border border-cyan-200">
-                              <Compass className="w-2.5 h-2.5 text-cyan-600" />
-                              {outlet.area}
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="space-y-1.5 text-xs text-slate-600 pt-2 border-t border-slate-100">
-                          <p className="flex items-start gap-1.5 leading-snug">
-                            <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                            <span className="truncate">{outlet.location_address}</span>
-                          </p>
-
-                          {outlet.contact_phone && (
-                            <p className="flex items-center gap-1.5 font-mono text-[11px] text-slate-500">
-                              <Phone className="w-3 h-3 text-slate-400" />
-                              <span>{outlet.contact_phone}</span>
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Dispatch Stock Action Button */}
-                      <div className="pt-3 mt-3 border-t border-slate-100">
-                        <button
-                          type="button"
-                          onClick={() => handleOpenSupplyModal(outlet.outlet_id)}
-                          className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-amber-600 via-orange-600 to-red-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold text-xs shadow-md shadow-orange-500/20 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
-                        >
-                          <Truck className="w-3.5 h-3.5 text-white" />
-                          <span>Dispatch Stock to this Branch</span>
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        /* FLAT LIST VIEW */
+      ) : viewMode === 'OFFICERS' ? (
+        /* SALES OFFICERS CARDS (DIRECT WHOLESALE CHANNELS) */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredOutlets.map((outlet) => (
+          {officerWithOutlets.map((so) => (
             <div
-              key={outlet.outlet_id}
-              className="rounded-2xl bg-white border border-slate-200/90 hover:border-amber-300 p-4 flex flex-col justify-between shadow-xs hover:shadow-md transition-all group"
+              key={so.id}
+              className="rounded-3xl bg-white border border-slate-200/90 hover:border-amber-400 p-5 flex flex-col justify-between shadow-xs hover:shadow-md transition-all group"
             >
               <div>
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 flex items-center justify-center shrink-0">
-                      <Store className="w-4 h-4" />
+                {/* Header: Officer Code & Status */}
+                <div className="flex items-start justify-between gap-2 mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-600 text-white flex items-center justify-center shadow-md shadow-orange-500/20 shrink-0 font-bold text-sm">
+                      <UserCheck className="w-5 h-5" />
                     </div>
                     <div>
-                      <span className="text-[10px] font-bold font-mono text-amber-700 uppercase tracking-wide block">
-                        {outlet.franchise_name}
-                      </span>
-                      <h4 className="font-bold text-sm text-zinc-900 group-hover:text-amber-700 transition-colors">
-                        {outlet.branch_name || outlet.outlet_name}
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200">
+                          {so.officer_code}
+                        </span>
+                        <span
+                          className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                            so.status === 'Active'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : 'bg-slate-100 text-slate-500'
+                          }`}
+                        >
+                          {so.status}
+                        </span>
+                      </div>
+                      <h4 className="font-bold text-base text-zinc-900 group-hover:text-amber-700 transition-colors mt-0.5">
+                        {so.name}
                       </h4>
                     </div>
                   </div>
+                </div>
 
-                  <span
-                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0 font-mono ${
-                      outlet.status === 'Active'
-                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                        : 'bg-slate-100 text-slate-500'
-                    }`}
-                  >
-                    {outlet.status}
+                {/* Assigned Jurisdiction Badges */}
+                <div className="flex flex-wrap gap-1.5 mb-3.5">
+                  <span className="inline-flex items-center gap-1 font-mono font-bold text-[10px] px-2.5 py-1 rounded-xl bg-blue-50 text-blue-800 border border-blue-200">
+                    <MapPin className="w-3 h-3 text-blue-600" />
+                    {so.city}
+                  </span>
+
+                  <span className="inline-flex items-center gap-1 font-mono font-bold text-[10px] px-2.5 py-1 rounded-xl bg-amber-50 text-amber-800 border border-amber-200">
+                    <Compass className="w-3 h-3 text-amber-600" />
+                    Area: {so.assigned_area}
+                  </span>
+
+                  <span className="inline-flex items-center gap-1 font-mono font-semibold text-[10px] px-2 py-1 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200">
+                    <Store className="w-3 h-3 text-emerald-600" />
+                    {so.activeOutletCount} {so.activeOutletCount === 1 ? 'Outlet' : 'Outlets'} in Area
                   </span>
                 </div>
 
-                <div className="flex flex-wrap gap-1.5 mb-2.5">
-                  <span className="inline-flex items-center gap-1 font-mono font-bold text-[10px] px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200">
-                    <MapPin className="w-2.5 h-2.5 text-blue-500" />
-                    {outlet.city || outlet.district_name || 'City'}
-                  </span>
-
-                  {outlet.area && (
-                    <span className="inline-flex items-center gap-1 font-mono font-semibold text-[10px] px-2 py-0.5 rounded-md bg-cyan-50 text-cyan-700 border border-cyan-200">
-                      <Compass className="w-2.5 h-2.5 text-cyan-600" />
-                      {outlet.area}
-                    </span>
-                  )}
-                </div>
-
-                <div className="space-y-1.5 text-xs text-slate-600">
-                  <p className="flex items-start gap-1.5 leading-snug">
-                    <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                    <span>{outlet.location_address}</span>
+                {/* Contact Info */}
+                <div className="space-y-1.5 text-xs text-slate-600 pt-3 border-t border-slate-100">
+                  <p className="flex items-center gap-2 font-mono text-[11px] text-slate-700">
+                    <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span className="font-bold">{so.phone}</span>
                   </p>
-
-                  {outlet.contact_phone && (
-                    <p className="flex items-center gap-1.5 font-mono text-[11px] text-slate-500">
-                      <Phone className="w-3 h-3 text-slate-400" />
-                      <span>{outlet.contact_phone}</span>
+                  {so.email && (
+                    <p className="flex items-center gap-2 text-[11px] text-slate-600 truncate">
+                      <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span className="truncate">{so.email}</span>
+                    </p>
+                  )}
+                  {so.notes && (
+                    <p className="text-[11px] text-slate-500 italic bg-slate-50 p-2 rounded-xl border border-slate-100 mt-2">
+                      "{so.notes}"
                     </p>
                   )}
                 </div>
               </div>
 
-              <div className="pt-3 mt-3 border-t border-slate-100">
+              {/* Action Button: Supply Stock Directly to Sales Officer */}
+              <div className="pt-4 mt-4 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => handleOpenSupplyModal(outlet.outlet_id)}
-                  className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-amber-600 via-orange-600 to-red-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold text-xs shadow-md shadow-orange-500/20 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                  onClick={() => handleOpenSupplyModal(so.id)}
+                  className="w-full py-2.5 px-4 rounded-2xl bg-gradient-to-r from-amber-600 via-orange-600 to-red-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold text-xs shadow-md shadow-orange-500/20 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95"
                 >
-                  <Truck className="w-3.5 h-3.5 text-white" />
-                  <span>Dispatch Stock to this Branch</span>
+                  <Truck className="w-4 h-4 text-white" />
+                  <span>Supply Stock to Sales Officer</span>
                 </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        /* TERRITORY OUTLETS GROUPED BY SALES OFFICER */
+        <div className="space-y-4">
+          {officerWithOutlets.map((so) => (
+            <div
+              key={so.id}
+              className="rounded-3xl bg-white border border-slate-200/90 shadow-sm overflow-hidden"
+            >
+              {/* Officer Group Header */}
+              <div className="p-4 sm:p-5 bg-gradient-to-r from-slate-50 via-amber-50/20 to-orange-50/20 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-600 to-orange-600 text-white flex items-center justify-center shadow-md shadow-orange-500/20 shrink-0 font-bold">
+                    <UserCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-oswald text-lg font-bold uppercase tracking-wide text-zinc-900">
+                        Sales Officer: {so.name}
+                      </h4>
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                        {so.officer_code}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-slate-600">
+                      <span className="inline-flex items-center gap-1 font-semibold text-blue-800">
+                        <MapPin className="w-3 h-3 text-blue-600" />
+                        {so.city} ({so.assigned_area})
+                      </span>
+                      <span>•</span>
+                      <span className="font-mono text-slate-600 flex items-center gap-1">
+                        <Phone className="w-3 h-3 text-slate-400" />
+                        {so.phone}
+                      </span>
+                      <span>•</span>
+                      <span className="font-bold text-amber-800">
+                        {so.outlets.length} Outlets Covered
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleOpenSupplyModal(so.id)}
+                  className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
+                >
+                  <Truck className="w-3.5 h-3.5" />
+                  <span>Supply to {so.name.split(' ')[0]}</span>
+                </button>
+              </div>
+
+              {/* Covered Outlets in this Sales Officer's Area */}
+              <div className="p-4 sm:p-5 bg-white">
+                {so.outlets.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-slate-400 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
+                    No registered franchise outlets in {so.assigned_area} yet. New branches registered in this area will automatically map to this Sales Officer.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                    {so.outlets.map((outlet) => (
+                      <div
+                        key={outlet.outlet_id}
+                        className="rounded-2xl border border-slate-200/90 p-4 bg-slate-50/40 hover:bg-white flex flex-col justify-between shadow-2xs hover:shadow-xs transition-all"
+                      >
+                        <div>
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 flex items-center justify-center shrink-0">
+                                <Store className="w-4 h-4" />
+                              </div>
+                              <div>
+                                <h5 className="font-bold text-sm text-zinc-900">
+                                  {outlet.branch_name || outlet.outlet_name}
+                                </h5>
+                                <span className="text-[10px] font-mono text-slate-400">
+                                  ID #{outlet.outlet_id} • {outlet.franchise_name}
+                                </span>
+                              </div>
+                            </div>
+
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider shrink-0 font-mono ${
+                                outlet.status === 'Active'
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  : 'bg-slate-100 text-slate-500'
+                              }`}
+                            >
+                              {outlet.status}
+                            </span>
+                          </div>
+
+                          <div className="space-y-1 text-xs text-slate-600 pt-2 border-t border-slate-100">
+                            <p className="flex items-start gap-1.5 leading-snug">
+                              <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                              <span className="truncate">{outlet.location_address}</span>
+                            </p>
+                            {outlet.contact_phone && (
+                              <p className="flex items-center gap-1.5 font-mono text-[11px] text-slate-500">
+                                <Phone className="w-3 h-3 text-slate-400" />
+                                <span>{outlet.contact_phone}</span>
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="pt-2 mt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                          <span className="text-[10px] font-semibold text-indigo-700">
+                            Supplied via {so.officer_code}
+                          </span>
+                          <span className="font-mono text-[10px] text-slate-400">
+                            {outlet.area}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* Supply Stock Modal with outlet pre-selected */}
+      {/* Supply Stock Modal with Sales Officer Preselected */}
       <SupplyStockModal
         isOpen={isSupplyModalOpen}
         onClose={() => {
           setIsSupplyModalOpen(false);
-          setSelectedOutletForSupply(null);
+          setSelectedOfficerForSupply(null);
         }}
         onSuccess={() => {
           setIsSupplyModalOpen(false);
           fetchData();
         }}
         onRequestStock={onRequestStock}
-        initialOutletId={selectedOutletForSupply || undefined}
+        initialOfficerId={selectedOfficerForSupply || undefined}
+        salesOfficers={modalSalesOfficers}
         outlets={modalOutlets}
+        userId={userId}
       />
     </div>
   );

@@ -17,6 +17,8 @@ import {
   Calendar,
   Layers,
   Send,
+  UserCheck,
+  Phone,
 } from 'lucide-react';
 import { SupplyStockModal, type ProductOption, type OutletOption } from './SupplyStockModal';
 import { ZeroStockAlertModal, type ZeroStockAlertData } from '../../components/Alerts/ZeroStockAlertModal';
@@ -48,6 +50,11 @@ export interface OutletRequisitionItem {
   updated_date?: string;
   supplier_available_stock: number;
   can_dispatch: boolean;
+  sales_officer_id?: number;
+  sales_officer_name?: string;
+  sales_officer_code?: string;
+  sales_officer_area?: string;
+  sales_officer_phone?: string;
 }
 
 interface SupplierOutletRequisitionsProps {
@@ -133,7 +140,8 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
         body: JSON.stringify({
           quantity: req.quantity,
           user_id: userId,
-          notes: `Fulfilling requisition ${req.requisition_code} for ${req.outlet_name}`,
+          sales_officer_id: req.sales_officer_id,
+          notes: `Wholesale fulfillment to Sales Officer ${req.sales_officer_name || ''} (${req.sales_officer_code || 'Territory'}) for ${req.outlet_name}`,
         }),
       });
 
@@ -143,7 +151,7 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
       }
 
       setActionSuccessMsg(
-        `Successfully dispatched ${req.quantity} units of ${req.product_name} to ${req.outlet_name}!`
+        `Successfully dispatched ${req.quantity} units of ${req.product_name} via Sales Officer ${req.sales_officer_name || ''} (${req.sales_officer_code || req.area}) for ${req.outlet_name}!`
       );
 
       // Broadcast update to Outlet tabs
@@ -416,6 +424,26 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
                     </span>
                   </div>
 
+                  {/* Sales Officer Assignment Banner */}
+                  <div className="flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-xl bg-indigo-50/80 border border-indigo-200/80 text-xs text-indigo-900 font-medium mb-1">
+                    <UserCheck className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                    <span>Channeled via Sales Officer:</span>
+                    <strong className="font-bold text-indigo-800">{req.sales_officer_name || "Designated Sales Officer"}</strong>
+                    {req.sales_officer_code && (
+                      <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-white text-indigo-700 border border-indigo-200 font-bold">
+                        {req.sales_officer_code}
+                      </span>
+                    )}
+                    <span className="text-slate-500 text-[11px] font-normal">
+                      • Area: <strong className="text-slate-700">{req.sales_officer_area || req.area}</strong>
+                    </span>
+                    {req.sales_officer_phone && (
+                      <span className="text-slate-500 text-[11px] font-mono flex items-center gap-1">
+                        <Phone className="w-2.5 h-2.5 text-slate-400" /> {req.sales_officer_phone}
+                      </span>
+                    )}
+                  </div>
+
                   {/* Outlet & Beverage Header */}
                   <div>
                     <div className="flex items-center gap-2 text-sm sm:text-base font-black text-slate-900">
@@ -525,7 +553,7 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
                           ) : hasDepotStock ? (
                             <>
                               <Send className="w-3.5 h-3.5" />
-                              <span>Dispatch {req.quantity} Units</span>
+                              <span>Dispatch {req.quantity} Units to Sales Officer</span>
                             </>
                           ) : (
                             <>
