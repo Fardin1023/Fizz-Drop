@@ -319,7 +319,7 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onSuccess, requiredRole = 'any'
                       <div className="flex items-center gap-2 min-w-0 pr-2">
                         <UserCheck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                         <div className="min-w-0">
-                          <span className="block truncate font-bold">{so.name}</span>
+                          <span className="block truncate font-bold text-teal-700 dark:text-teal-300">{so.name}</span>
                           <span className="block text-[10px] font-mono text-slate-400 dark:text-zinc-400 truncate">
                             {so.officer_code} • {so.assigned_area} ({so.city})
                           </span>

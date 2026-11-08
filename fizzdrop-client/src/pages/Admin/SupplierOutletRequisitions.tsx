@@ -428,7 +428,7 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
                   <div className="flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-xl bg-indigo-50/80 border border-indigo-200/80 text-xs text-indigo-900 font-medium mb-1">
                     <UserCheck className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
                     <span>Channeled via Sales Officer:</span>
-                    <strong className="font-bold text-indigo-800">{req.sales_officer_name || "Designated Sales Officer"}</strong>
+                    <strong className="font-bold text-teal-700">{req.sales_officer_name || "Designated Sales Officer"}</strong>
                     {req.sales_officer_code && (
                       <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-white text-indigo-700 border border-indigo-200 font-bold">
                         {req.sales_officer_code}

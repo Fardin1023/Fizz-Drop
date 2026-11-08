@@ -305,7 +305,7 @@ export const SuperadminSalesOfficerModal: React.FC<SuperadminSalesOfficerModalPr
                                 {so.status}
                               </span>
                             </div>
-                            <h5 className="font-bold text-sm text-slate-900 mt-0.5">
+                            <h5 className="font-bold text-sm text-teal-700 font-extrabold mt-0.5">
                               {so.name}
                             </h5>
                           </div>

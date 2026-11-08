@@ -497,7 +497,7 @@ export const SupplierAllocatedOutlets: React.FC<SupplierAllocatedOutletsProps> =
                           {so.status}
                         </span>
                       </div>
-                      <h4 className="font-bold text-base text-zinc-900 group-hover:text-amber-700 transition-colors mt-0.5">
+                      <h4 className="font-bold text-base text-teal-700 group-hover:text-teal-800 font-extrabold transition-colors mt-0.5">
                         {so.name}
                       </h4>
                     </div>
@@ -573,7 +573,7 @@ export const SupplierAllocatedOutlets: React.FC<SupplierAllocatedOutletsProps> =
                   <div>
                     <div className="flex items-center gap-2">
                       <h4 className="font-oswald text-lg font-bold uppercase tracking-wide text-zinc-900">
-                        Sales Officer: {so.name}
+                        Sales Officer: <span className="text-teal-700 font-extrabold">{so.name}</span>
                       </h4>
                       <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-100 text-amber-800 border border-amber-200">
                         {so.officer_code}

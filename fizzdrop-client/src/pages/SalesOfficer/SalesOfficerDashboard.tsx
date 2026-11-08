@@ -266,7 +266,7 @@ export const SalesOfficerDashboard: React.FC = () => {
                 <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-slate-50 border border-slate-200/90 text-xs">
                   <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                   <div>
-                    <span className="font-bold text-slate-800 block text-[11px] leading-tight">
+                    <span className="font-bold text-teal-600 block text-[11px] leading-tight">
                       {officer.name} ({officer.officer_code})
                     </span>
                     <span className="text-[10px] text-slate-500 font-mono">
@@ -350,7 +350,7 @@ export const SalesOfficerDashboard: React.FC = () => {
                     {officer?.status || 'ACTIVE'}
                   </span>
                 </div>
-                <h2 className="font-oswald text-2xl sm:text-3xl font-bold uppercase tracking-wide">
+                <h2 className="font-oswald text-2xl sm:text-3xl font-bold uppercase tracking-wide bg-gradient-to-r from-teal-300 via-cyan-300 to-emerald-400 bg-clip-text text-transparent drop-shadow-sm">
                   {officer?.name || 'Assigned Sales Officer'}
                 </h2>
                 <div className="flex flex-wrap items-center gap-3 text-xs text-blue-200/90 pt-1">

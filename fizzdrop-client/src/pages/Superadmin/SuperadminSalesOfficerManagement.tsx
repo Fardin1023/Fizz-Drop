@@ -546,7 +546,7 @@ export const SuperadminSalesOfficerManagement: React.FC = () => {
                             </span>
                             <span className="text-[10px] text-slate-400 font-mono">ID #{so.id}</span>
                           </div>
-                          <h4 className="font-bold text-sm text-slate-900 mt-0.5">{so.name}</h4>
+                          <h4 className="font-bold text-sm text-teal-700 font-extrabold mt-0.5">{so.name}</h4>
                           <p className="text-[11px] text-slate-500 font-mono mt-0.5 flex items-center gap-1">
                             <Phone className="w-3 h-3 text-slate-400" /> {so.phone}
                           </p>
