@@ -36,17 +36,29 @@ export const AdminDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'catalog' | 'outlet-requests' | 'request' | 'history' | 'outlets' | 'profile' | 'transactions'>('catalog');
   const [selectedProductId, setSelectedProductId] = useState<number | undefined>(undefined);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [walletBalance, setWalletBalance] = useState<number>(() => {
+    try {
+      const cached = localStorage.getItem('fizzdrop_supplier_wallet');
+      return cached ? parseFloat(cached) : 0;
+    } catch {
+      return 0;
+    }
+  });
   const [isWalletModalOpen, setIsWalletModalOpen] = useState<boolean>(false);
 
   const fetchWallet = async () => {
     try {
-      const res = await fetch(`http://localhost:8080/api/v1/supplier/wallet?userId=${user?.user_id || 4}`);
+      const targetUserId = user?.user_id || 1;
+      const res = await fetch(`http://localhost:8080/api/v1/supplier/wallet?userId=${targetUserId}`);
       if (res.ok) {
         const text = await res.text();
         try {
           const data = JSON.parse(text);
-          setWalletBalance(Number(data.wallet_balance || 0));
+          if (data && data.wallet_balance !== undefined) {
+            const bal = Number(data.wallet_balance);
+            setWalletBalance(bal);
+            localStorage.setItem('fizzdrop_supplier_wallet', bal.toString());
+          }
         } catch {
           // Silent fallback if non-JSON returned
         }
@@ -59,6 +71,16 @@ export const AdminDashboard: React.FC = () => {
   useEffect(() => {
     fetchWallet();
   }, [user]);
+
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'fizzdrop_supplier_wallet' && e.newValue) {
+        setWalletBalance(parseFloat(e.newValue));
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
 
   const {
     notifications,
@@ -423,6 +445,7 @@ export const AdminDashboard: React.FC = () => {
         userId={user?.user_id}
         onWalletUpdated={(newBal) => {
           setWalletBalance(newBal);
+          localStorage.setItem('fizzdrop_supplier_wallet', newBal.toString());
         }}
       />
     </div>

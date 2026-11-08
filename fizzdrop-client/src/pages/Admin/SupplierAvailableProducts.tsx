@@ -61,6 +61,10 @@ export const SupplierAvailableProducts: React.FC<SupplierAvailableProductsProps>
   // Animated Zero-Stock Alert Modal state
   const [isZeroStockAlertOpen, setIsZeroStockAlertOpen] = useState<boolean>(false);
   const [zeroStockAlertData, setZeroStockAlertData] = useState<ZeroStockAlertData | null>(null);
+  const [priceModalProduct, setPriceModalProduct] = useState<AvailableProduct | null>(null);
+  const [newPriceValue, setNewPriceValue] = useState<number>(0);
+  const [priceSubmitting, setPriceSubmitting] = useState<boolean>(false);
+  const [priceSuccessMsg, setPriceSuccessMsg] = useState<string | null>(null);
 
   const handleSavePrice = async (e: React.FormEvent) => {
     e.preventDefault();

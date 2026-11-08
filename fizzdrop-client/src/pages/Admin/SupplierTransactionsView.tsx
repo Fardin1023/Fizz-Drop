@@ -57,7 +57,14 @@ export const SupplierTransactionsView: React.FC = () => {
     total_spent: 0,
     total_refunded: 0,
     net_investment: 0,
-    wallet_balance: 0,
+    wallet_balance: (() => {
+      try {
+        const cached = localStorage.getItem('fizzdrop_supplier_wallet');
+        return cached ? parseFloat(cached) : 0;
+      } catch {
+        return 0;
+      }
+    })(),
     total_deposited: 0,
     total_revenue: 0,
     total_wholesale_profit: 0,
@@ -97,11 +104,13 @@ export const SupplierTransactionsView: React.FC = () => {
       });
       if (resTx.ok) {
         const dataTx = await resTx.json();
+        const bal = Number(dataTx.wallet_balance || 0);
+        localStorage.setItem('fizzdrop_supplier_wallet', bal.toString());
         setFinancialSummary({
           total_spent: Number(dataTx.total_spent || 0),
           total_refunded: Number(dataTx.total_refunded || 0),
           net_investment: Number(dataTx.net_investment || 0),
-          wallet_balance: Number(dataTx.wallet_balance || 0),
+          wallet_balance: bal,
           total_deposited: Number(dataTx.total_deposited || 0),
           total_revenue: Number(dataTx.total_revenue || 0),
           total_wholesale_profit: Number(dataTx.total_wholesale_profit || 0),

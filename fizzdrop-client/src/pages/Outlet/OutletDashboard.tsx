@@ -101,7 +101,7 @@ export const OutletDashboard: React.FC = () => {
 
   // Auto-refresh shelf stock and delivery tracker when a dispatch notification arrives
   useEffect(() => {
-    if (popupNotification && popupNotification.recipient_role === 'OUTLET') {
+    if (popupNotification && (popupNotification.recipient_role as any) === 'OUTLET') {
       fetchDashboardData(outlet?.outlet_id || effectiveOutletId, true);
     }
   }, [popupNotification, effectiveOutletId]);

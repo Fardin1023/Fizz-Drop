@@ -60,7 +60,9 @@ public class AuthController {
         if ("central.supplier@fizzdrop.com".equalsIgnoreCase(email) || "supplier@fizzdrop.com".equalsIgnoreCase(email)) {
             if ("Password123!".equals(password) || "supplier123".equals(password) || "admin123".equals(password) || password.isEmpty()) {
                 String token = "jwt-supplier-" + UUID.randomUUID();
-                AuthResponse res = new AuthResponse(token, 4L, email, 3L, "Supplier", 1L);
+                Optional<User> uOpt = userRepository.findByEmail(email.toLowerCase());
+                Long uid = uOpt.map(User::getUserId).orElse(1L);
+                AuthResponse res = new AuthResponse(token, uid, email, 3L, "Supplier", 1L);
                 return ResponseEntity.ok(Map.of("success", true, "token", res.getToken(), "user", res));
             }
         }
@@ -342,6 +344,8 @@ public class AuthController {
             }
         }
 
-        return ResponseEntity.ok(new AuthResponse(token, 4L, "central.supplier@fizzdrop.com", 3L, "Supplier", 1L));
+        Optional<User> uOpt = userRepository.findByEmail("central.supplier@fizzdrop.com");
+        Long uid = uOpt.map(User::getUserId).orElse(1L);
+        return ResponseEntity.ok(new AuthResponse(token, uid, "central.supplier@fizzdrop.com", 3L, "Supplier", 1L));
     }
 }

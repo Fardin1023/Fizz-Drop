@@ -119,9 +119,12 @@ public class InventoryController {
 
         // Enforce supplier depot stock validation: reject if 0 stock or insufficient stock
         Long resolvedUserId = (req.getUserId() != null && req.getUserId() > 0) ? req.getUserId() : 4L;
-        var profileOpt = supplierProfileRepository.findByUserId(resolvedUserId);
-        if (profileOpt.isPresent()) {
-            SupplierProfile sp = profileOpt.get();
+        SupplierProfile sp = supplierProfileRepository.findByUserId(resolvedUserId).orElse(null);
+        if (sp == null) {
+            List<SupplierProfile> all = supplierProfileRepository.findAll();
+            if (!all.isEmpty()) sp = all.get(0);
+        }
+        if (sp != null) {
             List<Long> districtIds = new ArrayList<>();
             if (sp.getCoveredDistrictIds() != null && !sp.getCoveredDistrictIds().trim().isEmpty()) {
                 for (String sid : sp.getCoveredDistrictIds().split(",")) {
@@ -177,7 +180,7 @@ public class InventoryController {
         inventoryRepository.save(inventory);
 
         // Deduct supplied stock from supplier's district/depot inventory if tracked
-        profileOpt.ifPresent(sp -> {
+        if (sp != null) {
             Long targetDistId = (req.getDistrictId() != null && req.getDistrictId() > 0) ? req.getDistrictId() : sp.getPrimaryDistrictId();
             if (targetDistId != null) {
                 districtInventoryRepository.findByDistrictIdAndProductId(targetDistId, product.getProductId()).ifPresent(di -> {
@@ -186,7 +189,7 @@ public class InventoryController {
                     districtInventoryRepository.save(di);
                 });
             }
-        });
+        }
 
         boolean isUnrequestedDirectSupply = (req.getRequisitionId() == null || req.getRequisitionId() <= 0);
         String dispatchRefCode = "DSP-" + System.currentTimeMillis();
@@ -234,7 +237,7 @@ public class InventoryController {
         // Record Wholesale Transaction for Supplier (Tier 2: Supplier sells to Sales Officer at outlet_price)
         final String finalRefCode = dispatchRefCode;
         final SalesOfficer finalOfficer = targetOfficer;
-        profileOpt.ifPresent(sp -> {
+        if (sp != null) {
             try {
                 BigDecimal buyPrice = product.getSupplierPrice() != null ? product.getSupplierPrice() : (product.getBasePrice() != null ? product.getBasePrice() : BigDecimal.ZERO);
                 BigDecimal sellPrice = product.getOutletPrice() != null ? product.getOutletPrice() : (product.getBasePrice() != null ? product.getBasePrice() : BigDecimal.ZERO);
@@ -275,11 +278,19 @@ public class InventoryController {
                         sellPrice.doubleValue(), buyPrice.doubleValue(), totalProfit.doubleValue()),
                     "COMPLETED"
                 );
-                supplierTransactionRepository.save(saleTx);
+                supplierTransactionRepository.saveAndFlush(saleTx);
+
+                // Credit supplier wallet balance for earned wholesale delivery revenue
+                BigDecimal cur = sp.getWalletBalance() != null ? sp.getWalletBalance() : BigDecimal.ZERO;
+                sp.setWalletBalance(cur.add(wholesaleTotal));
+                supplierProfileRepository.saveAndFlush(sp);
+                try {
+                    jdbcTemplate.update("UPDATE supplier_profiles SET wallet_balance = ?, updated_at = NOW() WHERE id = ?", sp.getWalletBalance(), sp.getId());
+                } catch (Exception ignored) {}
             } catch (Exception ex) {
                 // Ignore transaction audit logging error to preserve core supply flow
             }
-        });
+        }
 
         // Recalculate total product stock
         Integer totalStock = inventoryRepository.getTotalStockByProductId(product.getProductId());
@@ -644,11 +655,14 @@ public class InventoryController {
     @GetMapping("/supplier/outlet-requisitions")
     public ResponseEntity<?> getSupplierOutletRequisitions(@RequestParam(required = false) Long userId) {
         Long resolvedUserId = (userId != null && userId > 0) ? userId : 4L;
-        var profileOpt = supplierProfileRepository.findByUserId(resolvedUserId);
+        SupplierProfile sp = supplierProfileRepository.findByUserId(resolvedUserId).orElse(null);
+        if (sp == null) {
+            List<SupplierProfile> all = supplierProfileRepository.findAll();
+            if (!all.isEmpty()) sp = all.get(0);
+        }
 
         List<Long> districtIds = new ArrayList<>();
-        if (profileOpt.isPresent()) {
-            SupplierProfile sp = profileOpt.get();
+        if (sp != null) {
             if (sp.getCoveredDistrictIds() != null && !sp.getCoveredDistrictIds().trim().isEmpty()) {
                 for (String sid : sp.getCoveredDistrictIds().split(",")) {
                     try { districtIds.add(Long.parseLong(sid.trim())); } catch (Exception ignored) {}
@@ -674,7 +688,7 @@ public class InventoryController {
             return ResponseEntity.ok(Collections.emptyList());
         }
 
-        List<SalesOfficer> officers = profileOpt.map(p -> salesOfficerRepository.findBySupplierId(p.getId())).orElse(Collections.emptyList());
+        List<SalesOfficer> officers = (sp != null) ? salesOfficerRepository.findBySupplierId(sp.getId()) : Collections.emptyList();
 
         List<Map<String, Object>> response = new ArrayList<>();
         for (Map<String, Object> row : list) {

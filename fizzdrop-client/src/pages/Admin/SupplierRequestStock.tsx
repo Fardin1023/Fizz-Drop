@@ -86,7 +86,14 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
   const [isInvoiceOpen, setIsInvoiceOpen] = useState<boolean>(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [walletBalance, setWalletBalance] = useState<number>(() => {
+    try {
+      const cached = localStorage.getItem('fizzdrop_supplier_wallet');
+      return cached ? parseFloat(cached) : 0;
+    } catch {
+      return 0;
+    }
+  });
   const [isWalletModalOpen, setIsWalletModalOpen] = useState<boolean>(false);
   const [isStripeModalOpen, setIsStripeModalOpen] = useState<boolean>(false);
   const [pendingStripeReq, setPendingStripeReq] = useState<any>(null);
@@ -104,7 +111,11 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
       if (profRes.ok) {
         const profData = await profRes.json();
         setProfile(profData);
-        setWalletBalance(Number(profData.wallet_balance || 0));
+        if (profData && profData.wallet_balance !== undefined) {
+          const bal = Number(profData.wallet_balance);
+          setWalletBalance(bal);
+          localStorage.setItem('fizzdrop_supplier_wallet', bal.toString());
+        }
         if (profData.primary_district_id) {
           setDestinationDistrictId(profData.primary_district_id);
         }
@@ -232,7 +243,9 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
       } else {
         setSuccessMsg(`Requisition ${created.requisition_code} submitted successfully with PENDING status! Tax Invoice is available below.`);
       }
-      setWalletBalance((prev) => Math.max(0, prev - grandTotal));
+      const remainingBal = Math.max(0, walletBalance - grandTotal);
+      setWalletBalance(remainingBal);
+      localStorage.setItem('fizzdrop_supplier_wallet', remainingBal.toString());
       setQuantities({});
       setRemarks('');
       setUrgency('NORMAL');
@@ -831,6 +844,7 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
         requiredAmount={grandTotal > walletBalance ? (grandTotal - walletBalance) : undefined}
         onWalletUpdated={(newBal) => {
           setWalletBalance(newBal);
+          localStorage.setItem('fizzdrop_supplier_wallet', newBal.toString());
         }}
       />
 

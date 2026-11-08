@@ -82,6 +82,10 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
   // Animated Zero Stock Alert Modal State
   const [zeroStockAlertData, setZeroStockAlertData] = useState<ZeroStockAlertData | null>(null);
   const [isZeroStockAlertOpen, setIsZeroStockAlertOpen] = useState<boolean>(false);
+  const [fulfillModalReq, setFulfillModalReq] = useState<OutletRequisitionItem | null>(null);
+  const [fulfillQty, setFulfillQty] = useState<number>(0);
+  const [fulfillPrice, setFulfillPrice] = useState<number>(0);
+  const [fulfillSubmitting, setFulfillSubmitting] = useState<boolean>(false);
 
   // Fetch incoming requisitions
   const fetchRequisitions = async () => {
@@ -638,7 +642,7 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
       <ZeroStockAlertModal
         isOpen={isZeroStockAlertOpen}
         onClose={() => setIsZeroStockAlertOpen(false)}
-        alertData={zeroStockAlertData}
+        data={zeroStockAlertData}
         onRequestStock={() => {
           setIsZeroStockAlertOpen(false);
           if (onRequestRestockFromSuperadmin) {

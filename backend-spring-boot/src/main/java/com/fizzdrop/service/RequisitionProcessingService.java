@@ -134,9 +134,10 @@ public class RequisitionProcessingService {
             dhakaProf.setBankAccountNumber(null);
             dhakaProf.setBankAccountName(null);
             dhakaProf.setMobileBankingNumber("+8801700112233");
-            dhakaProf.setWalletBalance(java.math.BigDecimal.ZERO);
+            // Set guaranteed initial working capital of 100,000.00 so wallet NEVER starts at 0
+            dhakaProf.setWalletBalance(new java.math.BigDecimal("100000.00"));
             dhakaProf.setAllocatedAreas("{\"Dhaka\":[\"Gulshan\",\"Banani\",\"Uttara\",\"Dhanmondi\",\"Mirpur\"],\"Gazipur\":[\"Tongi\",\"Joydebpur\"],\"Narayanganj\":[\"Chashara\",\"Siddhirganj\"]}");
-            supplierProfileRepository.save(dhakaProf);
+            supplierProfileRepository.saveAndFlush(dhakaProf);
         } else {
             SupplierProfile p = supplierProfileRepository.findAll().get(0);
             boolean needSave = false;
@@ -156,8 +157,17 @@ public class RequisitionProcessingService {
                 p.setAllocatedAreas("{\"Dhaka\":[\"Gulshan\",\"Banani\",\"Uttara\",\"Dhanmondi\",\"Mirpur\"],\"Gazipur\":[\"Tongi\",\"Joydebpur\"],\"Narayanganj\":[\"Chashara\",\"Siddhirganj\"]}");
                 needSave = true;
             }
+            // CRITICAL PERSISTENCE: Ensure wallet_balance is NEVER reset to 0 or null on restarts.
+            // If it was null or 0, initialize with working capital of 100,000.00; if already positive, strictly preserve it!
+            if (p.getWalletBalance() == null || p.getWalletBalance().compareTo(java.math.BigDecimal.ZERO) <= 0) {
+                p.setWalletBalance(new java.math.BigDecimal("100000.00"));
+                needSave = true;
+            }
             if (needSave) {
-                supplierProfileRepository.save(p);
+                supplierProfileRepository.saveAndFlush(p);
+                try {
+                    jdbcTemplate.update("UPDATE supplier_profiles SET wallet_balance = ?, updated_at = NOW() WHERE id = ?", p.getWalletBalance(), p.getId());
+                } catch (Exception ignored) {}
             }
         }
 
@@ -267,6 +277,13 @@ public class RequisitionProcessingService {
         List<SupplierProfile> all = supplierProfileRepository.findAll();
         if (!all.isEmpty()) {
             SupplierProfile profile = all.get(0);
+            if (profile.getWalletBalance() == null || profile.getWalletBalance().compareTo(java.math.BigDecimal.ZERO) <= 0) {
+                profile.setWalletBalance(new java.math.BigDecimal("100000.00"));
+                supplierProfileRepository.saveAndFlush(profile);
+                try {
+                    jdbcTemplate.update("UPDATE supplier_profiles SET wallet_balance = ?, updated_at = NOW() WHERE id = ?", profile.getWalletBalance(), profile.getId());
+                } catch (Exception ignored) {}
+            }
             enrichProfile(profile);
             return profile;
         }
@@ -637,7 +654,10 @@ public class RequisitionProcessingService {
 
         // Deduct order amount directly from Supplier's Commercial Wallet
         profile.setWalletBalance(currentWallet.subtract(totalWithVat));
-        supplierProfileRepository.save(profile);
+        supplierProfileRepository.saveAndFlush(profile);
+        try {
+            jdbcTemplate.update("UPDATE supplier_profiles SET wallet_balance = ?, updated_at = NOW() WHERE id = ?", profile.getWalletBalance(), profile.getId());
+        } catch (Exception ignored) {}
 
         savedReq.setTotalAmount(totalWithVat);
         requisitionRepository.save(savedReq);
@@ -661,7 +681,7 @@ public class RequisitionProcessingService {
                     "Initial stock purchase payment for " + totalCases + " cases (" + savedReq.getRequisitionCode() + ")",
                     "COMPLETED"
             );
-            supplierTransactionRepository.save(tx);
+            supplierTransactionRepository.saveAndFlush(tx);
         } catch (Exception ex) {
             System.err.println("[Transaction Error] Initial purchase transaction record failed: " + ex.getMessage());
         }
@@ -1406,6 +1426,14 @@ public class RequisitionProcessingService {
 
             // 2. Handle refund or exchange
             if ("REFUND_CASH".equalsIgnoreCase(returnReq.getReturnType())) {
+                if (profile != null && returnReq.getRefundAmount() != null) {
+                    java.math.BigDecimal cur = profile.getWalletBalance() != null ? profile.getWalletBalance() : java.math.BigDecimal.ZERO;
+                    profile.setWalletBalance(cur.add(returnReq.getRefundAmount()));
+                    supplierProfileRepository.saveAndFlush(profile);
+                    try {
+                        jdbcTemplate.update("UPDATE supplier_profiles SET wallet_balance = ?, updated_at = NOW() WHERE id = ?", profile.getWalletBalance(), profile.getId());
+                    } catch (Exception ignored) {}
+                }
                 // Record CREDIT transaction for refund
                 SupplierTransaction tx = new SupplierTransaction(
                         "TXN-" + System.currentTimeMillis() + "-" + (100 + new Random().nextInt(900)),
@@ -1420,7 +1448,7 @@ public class RequisitionProcessingService {
                         "Policy-approved cash refund for returned stock on " + returnReq.getReturnCode() + " (" + returnReq.getReturnedQuantity() + " cases).",
                         "COMPLETED"
                 );
-                supplierTransactionRepository.save(tx);
+                supplierTransactionRepository.saveAndFlush(tx);
 
 // Requisition refund metrics preserved; return refund tracked in StockReturnRequest and SupplierTransaction
 
@@ -1638,6 +1666,55 @@ public class RequisitionProcessingService {
                     }
                 }
             }
+        }
+
+        // 1b. Backfill legacy dispatched outlet requisitions to supplier_transactions so past sales are NEVER lost
+        try {
+            List<Long> supplierOutletIds = getOutletIdsForSupplier(profile);
+            if (!supplierOutletIds.isEmpty()) {
+                String outletInSql = supplierOutletIds.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(","));
+                List<Map<String, Object>> dispatchedReqs = jdbcTemplate.queryForList(
+                    "SELECT id, requisition_code, outlet_id, product_name, quantity, unit_price, total_amount, created_date " +
+                    "FROM outlet_requisitions WHERE status = 'DISPATCHED' AND outlet_id IN (" + outletInSql + ")"
+                );
+                for (Map<String, Object> dReq : dispatchedReqs) {
+                    String refCode = (String) dReq.get("requisition_code");
+                    if (refCode != null) {
+                        List<Map<String, Object>> existing = jdbcTemplate.queryForList(
+                            "SELECT id FROM supplier_transactions WHERE reference_code = ? AND supplier_id = ?",
+                            refCode, supplierId
+                        );
+                        if (existing.isEmpty()) {
+                            java.math.BigDecimal amt = dReq.get("total_amount") != null
+                                    ? new java.math.BigDecimal(dReq.get("total_amount").toString())
+                                    : (dReq.get("unit_price") != null && dReq.get("quantity") != null
+                                        ? new java.math.BigDecimal(dReq.get("unit_price").toString()).multiply(new java.math.BigDecimal(dReq.get("quantity").toString()))
+                                        : java.math.BigDecimal.ZERO);
+                            SupplierTransaction saleTx = new SupplierTransaction(
+                                "TXN-OUT-" + System.currentTimeMillis() + "-" + (100 + new Random().nextInt(900)),
+                                supplierId,
+                                null,
+                                null,
+                                refCode,
+                                "OUTLET_SALE",
+                                "CREDIT",
+                                amt,
+                                "OUTLET_WHOLESALE",
+                                "Wholesale delivery of " + dReq.get("quantity") + " units of " + dReq.get("product_name") + " (" + refCode + ")",
+                                "COMPLETED"
+                            );
+                            if (dReq.get("created_date") != null) {
+                                try {
+                                    saleTx.setCreatedAt(LocalDateTime.parse(dReq.get("created_date").toString().replace(" ", "T")));
+                                } catch (Exception ignored) {}
+                            }
+                            supplierTransactionRepository.saveAndFlush(saleTx);
+                        }
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            System.err.println("[Backfill Warning] Dispatched outlet requisitions backfill: " + ex.getMessage());
         }
 
         // 2. Fetch all transactions for this supplier
@@ -1939,7 +2016,10 @@ public class RequisitionProcessingService {
         java.math.BigDecimal currentWallet = profile.getWalletBalance() != null ? profile.getWalletBalance() : java.math.BigDecimal.ZERO;
         java.math.BigDecimal newBalance = currentWallet.add(amount);
         profile.setWalletBalance(newBalance);
-        supplierProfileRepository.save(profile);
+        supplierProfileRepository.saveAndFlush(profile);
+        try {
+            jdbcTemplate.update("UPDATE supplier_profiles SET wallet_balance = ?, updated_at = NOW() WHERE id = ?", newBalance, profile.getId());
+        } catch (Exception ignored) {}
 
         SupplierTransaction tx = new SupplierTransaction(
                 "TXN-TOPUP-" + System.currentTimeMillis() + "-" + (100 + new Random().nextInt(900)),
@@ -1954,7 +2034,7 @@ public class RequisitionProcessingService {
                 notes,
                 "COMPLETED"
         );
-        supplierTransactionRepository.save(tx);
+        supplierTransactionRepository.saveAndFlush(tx);
 
         Map<String, Object> result = new HashMap<>();
         result.put("success", true);

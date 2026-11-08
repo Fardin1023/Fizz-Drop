@@ -557,7 +557,7 @@ export const SupplyStockModal: React.FC<SupplyStockModalProps> = ({
           onClose();
           if (onRequestStock) onRequestStock(productId);
         }}
-        alertData={zeroStockAlertData}
+        data={zeroStockAlertData}
       />
     </div>
   );

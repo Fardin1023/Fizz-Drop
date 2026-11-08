@@ -115,7 +115,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ invoice, isOpen, onC
   const fulfilledGrandTotal = Number(invoice.fulfilled_amount !== undefined ? invoice.fulfilled_amount : Number((fulfilledSubtotal + fulfilledVat).toFixed(2)));
 
   const totalReqCases = items.reduce((s, it) => s + (Number(it.requested_quantity) || 0), 0);
-  const totalAppCases = items.reduce((s, it) => s + (it.approved_quantity !== undefined ? Number(it.approved_quantity) : (isPreview ? Number(it.requested_quantity || 0) : Number(it.approved_quantity || 0))), 0);
+  const totalAppCases = items.reduce((s, it) => s + (it.approved_quantity !== undefined ? Number(it.approved_quantity) : (invoice.status === 'PENDING' ? Number(it.requested_quantity || 0) : 0)), 0);
 
   let refundAmount = 0;
   let dueAmount = 0;

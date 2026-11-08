@@ -293,7 +293,7 @@ export const SuperadminRequisitionsHub: React.FC = () => {
     activeReconciliation.items.forEach((it) => {
       const isAllowed = allowStockOptions[it.id] ?? true;
       const appQty = isAllowed ? (approvedQuantities[it.id] ?? it.requested_quantity) : 0;
-      const price = Number(it.supplier_price || it.base_price || 0);
+      const price = Number((it as any).supplier_price || it.base_price || 0);
       totalReqCases += (it.requested_quantity || 0);
       totalAppCases += appQty;
       originalSubtotal += (it.requested_quantity || 0) * price;
