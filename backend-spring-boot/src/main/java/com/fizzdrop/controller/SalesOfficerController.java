@@ -214,6 +214,13 @@ public class SalesOfficerController {
             so.setPasswordHash(password);
             so.setStatus(status != null ? status : "ACTIVE");
 
+            if (payload.get("monthly_target") != null || payload.get("monthlyTarget") != null) {
+                Object tgt = payload.get("monthly_target") != null ? payload.get("monthly_target") : payload.get("monthlyTarget");
+                try {
+                    so.setMonthlyTarget(new BigDecimal(tgt.toString()));
+                } catch (Exception ignored) {}
+            }
+
             if (payload.get("notes") != null) {
                 so.setNotes(payload.get("notes").toString());
             }
@@ -265,6 +272,14 @@ public class SalesOfficerController {
             }
             if (payload.containsKey("status")) so.setStatus(payload.get("status").toString().trim());
             if (payload.containsKey("notes")) so.setNotes(payload.get("notes") != null ? payload.get("notes").toString() : null);
+            if (payload.containsKey("monthly_target") || payload.containsKey("monthlyTarget")) {
+                Object tgt = payload.get("monthly_target") != null ? payload.get("monthly_target") : payload.get("monthlyTarget");
+                if (tgt != null) {
+                    try {
+                        so.setMonthlyTarget(new BigDecimal(tgt.toString()));
+                    } catch (Exception ignored) {}
+                }
+            }
 
             // If reassigning supplier or area
             if (payload.containsKey("supplier_id") || payload.containsKey("supplierId") || payload.containsKey("assigned_area")) {
@@ -408,11 +423,101 @@ public class SalesOfficerController {
             requisitions = jdbcTemplate.queryForList(
                     "SELECT r.* FROM outlet_requisitions r " +
                     "JOIN outlets o ON r.outlet_id = o.outlet_id " +
-                    "WHERE (LOWER(o.area) LIKE ? OR LOWER(?) LIKE LOWER(o.area)) " +
+                    "WHERE (r.sales_officer_id = ? OR LOWER(o.area) LIKE ? OR LOWER(?) LIKE LOWER(o.area)) " +
                     "ORDER BY r.created_date DESC LIMIT 50",
-                    "%" + targetArea + "%", targetArea
+                    officer.getId(), "%" + targetArea + "%", targetArea
             );
         } catch (Exception ignored) {}
+
+        // Current Month Target & Financial Spent Calculation
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime startOfMonth = now.withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0);
+        java.time.YearMonth yearMonth = java.time.YearMonth.from(now);
+        int daysInMonth = yearMonth.lengthOfMonth();
+        int currentDay = now.getDayOfMonth();
+        int daysLeft = Math.max(0, daysInMonth - currentDay);
+        String monthName = now.getMonth().getDisplayName(java.time.format.TextStyle.FULL, Locale.ENGLISH) + " " + now.getYear();
+        String endOfMonthStr = yearMonth.atEndOfMonth().toString();
+
+        BigDecimal monthlyTarget = officer.getMonthlyTarget() != null ? officer.getMonthlyTarget() : new BigDecimal("2000000.00");
+
+        // Amount spent buying products from supplier in current month
+        BigDecimal amountSpent = BigDecimal.ZERO;
+        try {
+            Double spentSum = jdbcTemplate.queryForObject(
+                "SELECT COALESCE(SUM(total_amount), 0) FROM outlet_requisitions " +
+                "WHERE (sales_officer_id = ? OR outlet_remarks LIKE ?) AND created_date >= ?",
+                Double.class,
+                officer.getId(),
+                "%[" + officer.getName() + "%",
+                startOfMonth
+            );
+            if (spentSum != null) {
+                amountSpent = BigDecimal.valueOf(spentSum).setScale(2, java.math.RoundingMode.HALF_UP);
+            }
+        } catch (Exception ignored) {}
+
+        BigDecimal remainingTarget = monthlyTarget.subtract(amountSpent);
+        if (remainingTarget.compareTo(BigDecimal.ZERO) < 0) {
+            remainingTarget = BigDecimal.ZERO;
+        }
+
+        double progressPct = 0.0;
+        if (monthlyTarget.compareTo(BigDecimal.ZERO) > 0) {
+            progressPct = Math.min(100.0, (amountSpent.doubleValue() / monthlyTarget.doubleValue()) * 100.0);
+        }
+        boolean isTargetMet = amountSpent.compareTo(monthlyTarget) >= 0;
+
+        // Query profit gained and distributions to outlets
+        BigDecimal totalProfitGained = BigDecimal.ZERO;
+        BigDecimal totalDistributionRevenue = BigDecimal.ZERO;
+        BigDecimal totalDistributionCost = BigDecimal.ZERO;
+        int totalUnitsSold = 0;
+
+        try {
+            Map<String, Object> summary = jdbcTemplate.queryForMap(
+                "SELECT COALESCE(SUM(profit_earned), 0) as total_profit, " +
+                "COALESCE(SUM(total_revenue), 0) as total_revenue, " +
+                "COALESCE(SUM(total_cost), 0) as total_cost, " +
+                "COALESCE(SUM(quantity), 0) as total_units " +
+                "FROM sales_officer_distributions WHERE sales_officer_id = ?",
+                officer.getId()
+            );
+            if (summary != null) {
+                if (summary.get("total_profit") != null) totalProfitGained = new BigDecimal(summary.get("total_profit").toString()).setScale(2, java.math.RoundingMode.HALF_UP);
+                if (summary.get("total_revenue") != null) totalDistributionRevenue = new BigDecimal(summary.get("total_revenue").toString()).setScale(2, java.math.RoundingMode.HALF_UP);
+                if (summary.get("total_cost") != null) totalDistributionCost = new BigDecimal(summary.get("total_cost").toString()).setScale(2, java.math.RoundingMode.HALF_UP);
+                if (summary.get("total_units") != null) totalUnitsSold = ((Number) summary.get("total_units")).intValue();
+            }
+        } catch (Exception ignored) {}
+
+        // Recent distributions list with store & product details
+        List<Map<String, Object>> distributions = new ArrayList<>();
+        try {
+            distributions = jdbcTemplate.queryForList(
+                "SELECT d.*, o.outlet_name, o.branch_name, o.franchise_name, p.brand, p.flavor_variant, p.sku " +
+                "FROM sales_officer_distributions d " +
+                "JOIN outlets o ON d.outlet_id = o.outlet_id " +
+                "JOIN products p ON d.product_id = p.product_id " +
+                "WHERE d.sales_officer_id = ? " +
+                "ORDER BY d.distribution_date DESC LIMIT 50",
+                officer.getId()
+            );
+        } catch (Exception ignored) {}
+
+        Map<String, Object> targetSummary = new HashMap<>();
+        targetSummary.put("monthly_target", monthlyTarget);
+        targetSummary.put("amount_spent", amountSpent);
+        targetSummary.put("remaining_target", remainingTarget);
+        targetSummary.put("progress_percentage", Math.round(progressPct * 100.0) / 100.0);
+        targetSummary.put("is_target_met", isTargetMet);
+        targetSummary.put("month_name", monthName);
+        targetSummary.put("days_left", daysLeft);
+        targetSummary.put("end_of_month", endOfMonthStr);
+        targetSummary.put("total_profit_gained", totalProfitGained);
+        targetSummary.put("total_distribution_revenue", totalDistributionRevenue);
+        targetSummary.put("total_distribution_cost", totalDistributionCost);
+        targetSummary.put("total_units_sold_to_outlets", totalUnitsSold);
 
         Map<String, Object> response = new HashMap<>();
         response.put("sales_officer", officer);
@@ -421,10 +526,16 @@ public class SalesOfficerController {
         response.put("outlet_count", territoryOutlets.size());
         response.put("products", productCatalog);
         response.put("requisitions", requisitions);
+        response.put("financial_target", targetSummary);
+        response.put("distributions", distributions);
         response.put("stats", Map.of(
                 "total_outlets", territoryOutlets.size(),
                 "pending_demands", requisitions.stream().filter(r -> "PENDING".equals(r.get("status"))).count(),
-                "total_products", products.size()
+                "total_products", products.size(),
+                "monthly_target", monthlyTarget,
+                "amount_spent", amountSpent,
+                "remaining_target", remainingTarget,
+                "total_profit_gained", totalProfitGained
         ));
 
         return ResponseEntity.ok(response);
@@ -447,6 +558,8 @@ public class SalesOfficerController {
             Optional<Product> prodOpt = productRepository.findById(productId);
             if (prodOpt.isEmpty()) return ResponseEntity.badRequest().body(ApiResponse.fail("Product not found"));
 
+            Product prod = prodOpt.get();
+
             // Increase outlet shelf inventory
             var invOpt = shopInventoryRepository.findByBranchIdAndProductId(outletId, productId);
             ShopInventory inv;
@@ -459,12 +572,50 @@ public class SalesOfficerController {
             }
             shopInventoryRepository.save(inv);
 
+            // Determine Sales Officer ID
+            Long officerId = null;
+            if (payload.get("sales_officer_id") != null) {
+                officerId = Long.parseLong(payload.get("sales_officer_id").toString());
+            }
+            if (officerId == null) {
+                String oArea = outletOpt.get().getArea() != null ? outletOpt.get().getArea().toLowerCase() : "";
+                List<SalesOfficer> matchOfficers = salesOfficerRepository.findAll().stream()
+                        .filter(so -> so.getAssignedArea() != null &&
+                                (so.getAssignedArea().toLowerCase().contains(oArea) ||
+                                 oArea.contains(so.getAssignedArea().toLowerCase())))
+                        .toList();
+                officerId = !matchOfficers.isEmpty() ? matchOfficers.get(0).getId() : 1L;
+            }
+
+            // Financial profit calculations
+            BigDecimal costPrice = prod.getSupplierPrice() != null ? prod.getSupplierPrice() : (prod.getBasePrice() != null ? prod.getBasePrice() : BigDecimal.valueOf(35));
+            BigDecimal salePrice = prod.getOutletPrice() != null ? prod.getOutletPrice() : costPrice.multiply(BigDecimal.valueOf(1.15));
+            BigDecimal totalCost = costPrice.multiply(BigDecimal.valueOf(quantity));
+            BigDecimal totalRevenue = salePrice.multiply(BigDecimal.valueOf(quantity));
+            BigDecimal profitEarned = totalRevenue.subtract(totalCost);
+
+            // Record distribution and profit earned
+            try {
+                jdbcTemplate.update(
+                    "INSERT INTO sales_officer_distributions (sales_officer_id, outlet_id, product_id, quantity, cost_price, sale_price, total_cost, total_revenue, profit_earned, notes, distribution_date) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())",
+                    officerId, outletId, productId, quantity, costPrice, salePrice, totalCost, totalRevenue, profitEarned, notes
+                );
+            } catch (Exception ex) {
+                System.err.println("Failed to insert sales_officer_distributions: " + ex.getMessage());
+            }
+
             return ResponseEntity.ok(Map.of(
                     "success", true,
-                    "message", "Successfully distributed " + quantity + " units of " + prodOpt.get().getBrand() + " to " + outletOpt.get().getOutletName(),
+                    "message", "Successfully distributed " + quantity + " units of " + prod.getBrand() + " " + prod.getFlavorVariant() + " to " + outletOpt.get().getOutletName() + "! (Profit earned: ৳" + String.format("%.2f", profitEarned) + ")",
                     "outlet_id", outletId,
                     "product_id", productId,
-                    "new_stock", inv.getStockQuantity()
+                    "new_stock", inv.getStockQuantity(),
+                    "quantity", quantity,
+                    "profit_earned", profitEarned,
+                    "total_revenue", totalRevenue,
+                    "cost_price", costPrice,
+                    "sale_price", salePrice
             ));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -591,11 +742,12 @@ public class SalesOfficerController {
 
             // Save requisition in outlet_requisitions so supplier sees it under Area Demands
             jdbcTemplate.update(
-                "INSERT INTO outlet_requisitions (requisition_code, outlet_id, product_id, product_name, quantity, unit_price, total_amount, urgency, status, outlet_remarks, created_date, updated_date) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, NOW(), NOW())",
+                "INSERT INTO outlet_requisitions (requisition_code, outlet_id, product_id, product_name, quantity, unit_price, total_amount, urgency, status, outlet_remarks, sales_officer_id, created_date, updated_date) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, NOW(), NOW())",
                 reqCode, outletId, productId, product.getBrand() + " " + product.getFlavorVariant(),
                 quantity, unitPrice, totalAmount, urgency,
-                "Sales Officer Demand [" + officer.getName() + " - " + area + "]: " + notes
+                "Sales Officer Demand [" + officer.getName() + " - " + area + "]: " + notes,
+                officer.getId()
             );
 
             // Create notification for Supplier

@@ -41,6 +41,7 @@ export interface SalesOfficerItem {
   outlet_count?: number;
   created_at?: string;
   user_id?: number;
+  monthly_target?: number;
 }
 
 export interface SupplierSummary {
@@ -76,6 +77,7 @@ export const SuperadminSalesOfficerManagement: React.FC = () => {
   const [formSupplierId, setFormSupplierId] = useState<number | string>('');
   const [formCity, setFormCity] = useState('');
   const [formArea, setFormArea] = useState('');
+  const [formMonthlyTarget, setFormMonthlyTarget] = useState('2000000');
   const [formStatus, setFormStatus] = useState('ACTIVE');
   const [formNotes, setFormNotes] = useState('');
 
@@ -156,6 +158,7 @@ export const SuperadminSalesOfficerManagement: React.FC = () => {
     setFormEmail('');
     setFormPassword('Officer123!');
     setFormPhone('');
+    setFormMonthlyTarget('2000000');
     setFormStatus('ACTIVE');
     setFormNotes('');
     setErrorMsg(null);
@@ -175,6 +178,7 @@ export const SuperadminSalesOfficerManagement: React.FC = () => {
     setFormSupplierId(so.supplier_id);
     setFormCity(so.city);
     setFormArea(so.assigned_area);
+    setFormMonthlyTarget(String(so.monthly_target || 2000000));
     setFormStatus(so.status);
     setFormNotes(so.notes || '');
     setErrorMsg(null);
@@ -213,6 +217,7 @@ export const SuperadminSalesOfficerManagement: React.FC = () => {
       supplier_id: Number(formSupplierId),
       city: formCity,
       assigned_area: formArea,
+      monthly_target: parseFloat(formMonthlyTarget) || 2000000,
       status: formStatus,
       notes: formNotes.trim() || undefined,
     };
@@ -526,6 +531,7 @@ export const SuperadminSalesOfficerManagement: React.FC = () => {
                   <th className="px-4 py-3.5">Linked Supplier</th>
                   <th className="px-4 py-3.5">Assigned Territory</th>
                   <th className="px-4 py-3.5 text-center">Retail Outlets</th>
+                  <th className="px-4 py-3.5 text-center">Monthly Target</th>
                   <th className="px-4 py-3.5">Status</th>
                   <th className="px-5 py-3.5 text-right">Actions</th>
                 </tr>
@@ -601,6 +607,14 @@ export const SuperadminSalesOfficerManagement: React.FC = () => {
                         <Store className="w-3 h-3 text-emerald-600" />
                         {so.outlet_count || 0} Stores
                       </span>
+                    </td>
+
+                    {/* Monthly Target */}
+                    <td className="px-4 py-4 text-center">
+                      <span className="font-mono font-bold text-xs text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-xl inline-block shadow-2xs">
+                        ৳{Number(so.monthly_target || 2000000).toLocaleString()}
+                      </span>
+                      <span className="text-[9px] text-slate-400 block font-mono mt-0.5">Wholesale Target</span>
                     </td>
 
                     {/* Status */}
@@ -826,6 +840,31 @@ export const SuperadminSalesOfficerManagement: React.FC = () => {
                     ))}
                   </select>
                 </div>
+              </div>
+
+              {/* Monthly Purchasing Target */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                    Monthly Purchase Target (৳) *
+                  </label>
+                  <span className="text-[10px] text-indigo-700 font-semibold font-mono">
+                    Wholesale Budget from Supplier
+                  </span>
+                </div>
+                <input
+                  type="number"
+                  min="1000"
+                  step="1000"
+                  required
+                  value={formMonthlyTarget}
+                  onChange={(e) => setFormMonthlyTarget(e.target.value)}
+                  placeholder="e.g. 2000000"
+                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 font-mono font-bold text-slate-800"
+                />
+                <p className="text-[10px] text-slate-400 mt-0.5">
+                  The sales officer must purchase this total value of beverage stock from the supplier by the end of the month.
+                </p>
               </div>
 
               {/* Notes */}

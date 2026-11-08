@@ -33,6 +33,7 @@ export interface SalesOfficerRecord {
   outlet_count?: number;
   supplier_name?: string;
   created_at?: string;
+  monthly_target?: number;
 }
 
 interface SuperadminSalesOfficerModalProps {
@@ -60,6 +61,7 @@ export const SuperadminSalesOfficerModal: React.FC<SuperadminSalesOfficerModalPr
   const [email, setEmail] = useState('');
   const [selectedCity, setSelectedCity] = useState('');
   const [selectedArea, setSelectedArea] = useState('');
+  const [monthlyTarget, setMonthlyTarget] = useState('2000000');
   const [notes, setNotes] = useState('');
 
   // Parse supplier's allocated areas
@@ -145,6 +147,7 @@ export const SuperadminSalesOfficerModal: React.FC<SuperadminSalesOfficerModalPr
           supplier_id: supplier.id,
           city: selectedCity,
           assigned_area: selectedArea,
+          monthly_target: parseFloat(monthlyTarget) || 2000000,
           notes: notes.trim() || undefined,
         }),
       });
@@ -154,10 +157,11 @@ export const SuperadminSalesOfficerModal: React.FC<SuperadminSalesOfficerModalPr
         throw new Error(data.message || data.error || 'Failed to assign Sales Officer');
       }
 
-      setSuccess(`Sales Officer ${data.name} (${data.officer_code}) successfully assigned to ${data.assigned_area}, ${data.city}!`);
+      setSuccess(`Sales Officer ${data.name} (${data.officer_code}) successfully assigned with ৳${Number(data.monthly_target || monthlyTarget).toLocaleString()} monthly budget!`);
       setName('');
       setPhone('');
       setEmail('');
+      setMonthlyTarget('2000000');
       setNotes('');
       fetchOfficers();
       if (onOfficerChanged) onOfficerChanged();
@@ -335,6 +339,9 @@ export const SuperadminSalesOfficerModal: React.FC<SuperadminSalesOfficerModalPr
                           <Store className="w-2.5 h-2.5 text-emerald-600" />
                           {so.outlet_count || 0} Outlets in Area
                         </span>
+                        <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-purple-50 text-purple-800 border border-purple-200">
+                          Target: ৳{Number(so.monthly_target || 2000000).toLocaleString()}
+                        </span>
                       </div>
 
                       <div className="text-xs text-slate-600 flex flex-wrap items-center gap-x-4 gap-y-1 pt-2 border-t border-slate-100">
@@ -456,6 +463,31 @@ export const SuperadminSalesOfficerModal: React.FC<SuperadminSalesOfficerModalPr
                   </select>
                   <p className="text-[10px] text-slate-400 mt-1">
                     Area selection is strictly restricted to areas allocated by Superadmin to this supplier.
+                  </p>
+                </div>
+
+                {/* Monthly Target Budget */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                      Monthly Purchasing Target (৳) *
+                    </label>
+                    <span className="text-[10px] text-indigo-700 font-semibold font-mono">
+                      Wholesale Target
+                    </span>
+                  </div>
+                  <input
+                    type="number"
+                    min="1000"
+                    step="1000"
+                    required
+                    value={monthlyTarget}
+                    onChange={(e) => setMonthlyTarget(e.target.value)}
+                    placeholder="e.g. 2000000"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/30 font-mono font-bold text-slate-800"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Mandatory purchasing target the officer must buy from the supplier this month.
                   </p>
                 </div>
 

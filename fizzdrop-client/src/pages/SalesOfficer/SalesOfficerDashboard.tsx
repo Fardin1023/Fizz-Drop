@@ -26,6 +26,12 @@ import {
   Layers,
   Sparkles,
   ExternalLink,
+  Target,
+  DollarSign,
+  Coins,
+  Award,
+  Calendar,
+  Percent,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -81,9 +87,45 @@ interface SupplierInfo {
   allocated_areas?: string;
 }
 
+export interface FinancialTargetData {
+  monthly_target: number;
+  amount_spent: number;
+  remaining_target: number;
+  progress_percentage: number;
+  is_target_met: boolean;
+  month_name: string;
+  days_left: number;
+  end_of_month: string;
+  total_profit_gained: number;
+  total_distribution_revenue: number;
+  total_distribution_cost: number;
+  total_units_sold_to_outlets: number;
+}
+
+export interface DistributionRecord {
+  id: number;
+  sales_officer_id: number;
+  outlet_id: number;
+  product_id: number;
+  quantity: number;
+  cost_price: number;
+  sale_price: number;
+  total_cost: number;
+  total_revenue: number;
+  profit_earned: number;
+  distribution_date: string;
+  notes?: string;
+  outlet_name?: string;
+  branch_name?: string;
+  franchise_name?: string;
+  brand?: string;
+  flavor_variant?: string;
+  sku?: string;
+}
+
 export const SalesOfficerDashboard: React.FC = () => {
   const { user, isAuthenticated, logout, loginAsSalesOfficer, isSalesOfficer, isSuperadmin } = useAuth();
-  const [activeTab, setActiveTab] = useState<'overview' | 'outlets' | 'demands' | 'supplier-link'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'profit-ledger' | 'outlets' | 'demands' | 'supplier-link'>('overview');
   
   // Dashboard Data State
   const [officer, setOfficer] = useState<OfficerProfile | null>(null);
@@ -91,6 +133,8 @@ export const SalesOfficerDashboard: React.FC = () => {
   const [outlets, setOutlets] = useState<TerritoryOutlet[]>([]);
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [requisitions, setRequisitions] = useState<any[]>([]);
+  const [financialTarget, setFinancialTarget] = useState<FinancialTargetData | null>(null);
+  const [distributions, setDistributions] = useState<DistributionRecord[]>([]);
   const [allOfficers, setAllOfficers] = useState<OfficerProfile[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -132,6 +176,8 @@ export const SalesOfficerDashboard: React.FC = () => {
         setOutlets(data.outlets || []);
         setProducts(data.products || []);
         setRequisitions(data.requisitions || []);
+        setFinancialTarget(data.financial_target || null);
+        setDistributions(data.distributions || []);
 
         if (data.outlets && data.outlets.length > 0 && !selectedOutletForDist) {
           setSelectedOutletForDist(data.outlets[0].outlet_id);
@@ -179,6 +225,7 @@ export const SalesOfficerDashboard: React.FC = () => {
         body: JSON.stringify({
           outlet_id: Number(selectedOutletForDist),
           product_id: Number(selectedProductForDist),
+          sales_officer_id: officer?.id,
           quantity: distQuantity,
           notes: distNotes || `Territory stock allocation by Sales Officer ${officer?.name}`,
         }),
@@ -458,7 +505,182 @@ export const SalesOfficerDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* 3. Key Metric KPI Strip */}
+        {/* 3. MONTHLY TARGET & WHOLESALE PROFIT COMMAND CENTER */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Card 1: Monthly Purchase Target & Live Deductions */}
+          <div className="p-5 rounded-3xl bg-gradient-to-br from-indigo-900 via-slate-900 to-blue-950 text-white border border-indigo-500/30 shadow-xl relative overflow-hidden flex flex-col justify-between">
+            <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none" />
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-3">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-200 border border-indigo-400/30">
+                  <Target className="w-3.5 h-3.5 text-indigo-400" />
+                  Monthly Purchase Target
+                </span>
+                <span className={`text-[10px] font-bold font-mono px-2.5 py-0.5 rounded-full ${
+                  financialTarget?.is_target_met
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30'
+                    : 'bg-amber-500/20 text-amber-300 border border-amber-400/30'
+                }`}>
+                  {financialTarget?.is_target_met ? 'TARGET MET 🎉' : `${financialTarget?.days_left ?? 0} DAYS LEFT`}
+                </span>
+              </div>
+
+              {/* Big Target Remaining / Live Deduction */}
+              <div className="space-y-1">
+                <span className="text-[11px] text-indigo-200 font-semibold uppercase tracking-wider block">
+                  Remaining Target to Fulfill
+                </span>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-white">
+                    ৳{Number(financialTarget?.remaining_target ?? 2000000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <p className="text-xs text-indigo-200/80">
+                  Initial Monthly Quota: <strong className="text-white font-mono">৳{Number(financialTarget?.monthly_target ?? 2000000).toLocaleString()}</strong>
+                </p>
+              </div>
+
+              {/* Progress Bar & Deducted Amount */}
+              <div className="mt-4 space-y-1.5">
+                <div className="flex justify-between text-[11px] font-mono">
+                  <span className="text-indigo-200">
+                    Spent on Supplier Stock: <strong className="text-cyan-300">৳{Number(financialTarget?.amount_spent ?? 0).toLocaleString()}</strong>
+                  </span>
+                  <span className="font-bold text-cyan-300">
+                    {financialTarget?.progress_percentage ?? 0}% Achieved
+                  </span>
+                </div>
+                <div className="w-full h-3 rounded-full bg-white/10 overflow-hidden p-0.5 border border-white/10">
+                  <div
+                    className={`h-full rounded-full transition-all duration-700 ${
+                      financialTarget?.is_target_met
+                        ? 'bg-gradient-to-r from-emerald-400 to-teal-400'
+                        : 'bg-gradient-to-r from-blue-500 via-indigo-400 to-cyan-400'
+                    }`}
+                    style={{ width: `${Math.min(100, Math.max(5, financialTarget?.progress_percentage ?? 0))}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Deadline Notice */}
+            <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-[11px] text-blue-200/80 relative z-10">
+              <span className="flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Must Meet By: <strong>{financialTarget?.end_of_month || 'End of Month'}</strong></span>
+              </span>
+              <span className="font-bold text-white font-mono">{financialTarget?.month_name}</span>
+            </div>
+          </div>
+
+          {/* Card 2: Wholesale Profit Gained from Outlets */}
+          <div className="p-5 rounded-3xl bg-gradient-to-br from-emerald-950 via-slate-900 to-teal-950 text-white border border-emerald-500/30 shadow-xl relative overflow-hidden flex flex-col justify-between">
+            <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-3">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-200 border border-emerald-400/30">
+                  <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                  Wholesale Earnings & Margins
+                </span>
+                <span className="text-[10px] font-bold font-mono px-2.5 py-0.5 rounded-full bg-emerald-500/30 text-emerald-200 border border-emerald-400/40">
+                  REVENUE SHARE
+                </span>
+              </div>
+
+              <div className="space-y-1">
+                <span className="text-[11px] text-emerald-200 font-semibold uppercase tracking-wider block">
+                  Net Profit Gained from Outlet Sales
+                </span>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-emerald-400">
+                    +৳{Number(financialTarget?.total_profit_gained ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <p className="text-xs text-emerald-200/80">
+                  Gained by distributing <strong className="text-white font-mono">{financialTarget?.total_units_sold_to_outlets ?? 0} cases</strong> to retail branches
+                </p>
+              </div>
+
+              {/* Breakdown Grid */}
+              <div className="mt-4 grid grid-cols-2 gap-2 pt-3 border-t border-emerald-500/20 text-xs">
+                <div className="p-2.5 rounded-2xl bg-white/5 border border-white/5">
+                  <span className="text-[10px] text-slate-400 block uppercase font-bold">Store Invoiced Revenue</span>
+                  <span className="font-mono font-bold text-white text-sm">
+                    ৳{Number(financialTarget?.total_distribution_revenue ?? 0).toLocaleString()}
+                  </span>
+                </div>
+                <div className="p-2.5 rounded-2xl bg-white/5 border border-white/5">
+                  <span className="text-[10px] text-slate-400 block uppercase font-bold">Stock Purchase Cost</span>
+                  <span className="font-mono font-bold text-slate-300 text-sm">
+                    ৳{Number(financialTarget?.total_distribution_cost ?? 0).toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-[11px] text-emerald-200 relative z-10">
+              <span className="flex items-center gap-1.5">
+                <Award className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Profit Margin: <strong>{financialTarget?.total_distribution_revenue ? ((financialTarget.total_profit_gained / financialTarget.total_distribution_revenue) * 100).toFixed(1) : '15.0'}%</strong></span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setActiveTab('profit-ledger')}
+                className="text-[10px] text-emerald-300 hover:text-white font-bold underline cursor-pointer"
+              >
+                View Profit Ledger →
+              </button>
+            </div>
+          </div>
+
+          {/* Card 3: Quick Action & Territory Demands */}
+          <div className="p-5 rounded-3xl bg-white border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs uppercase font-bold tracking-wider text-slate-400">Territory Logistics Command</span>
+                <span className="text-[10px] font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
+                  {officer?.assigned_area} Zone
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <div className="p-3 rounded-2xl bg-blue-50/70 border border-blue-100">
+                  <span className="text-[10px] uppercase font-bold text-blue-700 block">Retail Stores</span>
+                  <span className="text-2xl font-black text-blue-900 font-mono">{outlets.length}</span>
+                  <span className="text-[10px] text-blue-600 block">Physical Outlets</span>
+                </div>
+                <div className="p-3 rounded-2xl bg-amber-50/70 border border-amber-100">
+                  <span className="text-[10px] uppercase font-bold text-amber-700 block">Open Demands</span>
+                  <span className="text-2xl font-black text-amber-900 font-mono">{pendingDemandsCount}</span>
+                  <span className="text-[10px] text-amber-600 block">Awaiting Supply</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-2 border-t border-slate-100">
+              <button
+                onClick={() => {
+                  if (products.length > 0 && !reqProductId) setReqProductId(products[0].product_id);
+                  setIsRequestModalOpen(true);
+                }}
+                className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs cursor-pointer transition-all active:scale-95"
+              >
+                <Truck className="w-3.5 h-3.5" />
+                <span>Buy Stock from Supplier (Deduct Target)</span>
+              </button>
+
+              <button
+                onClick={() => setIsDistributeModalOpen(true)}
+                className="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs cursor-pointer transition-all active:scale-95"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>Distribute to Outlet & Earn Profit</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* 4. Secondary Metric Strip */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
           <div className="p-4 rounded-3xl bg-white border border-slate-200/90 shadow-2xs">
             <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Retail Outlets in Area</p>
@@ -502,6 +724,7 @@ export const SalesOfficerDashboard: React.FC = () => {
           <div className="flex items-center gap-1.5 overflow-x-auto">
             {[
               { id: 'overview', label: 'Territory Hub & Stock Buffer', icon: Boxes },
+              { id: 'profit-ledger', label: `Wholesale Profit & Target (${distributions.length})`, icon: TrendingUp },
               { id: 'outlets', label: `Retail Stores (${outlets.length})`, icon: Store },
               { id: 'demands', label: `Branch Demands (${pendingDemandsCount})`, icon: Clock },
               { id: 'supplier-link', label: 'Supplier Depot & Logistics', icon: Building2 },
@@ -628,6 +851,218 @@ export const SalesOfficerDashboard: React.FC = () => {
                   </div>
                 ))}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB: WHOLESALE PROFIT & MONTHLY TARGET LEDGER */}
+        {activeTab === 'profit-ledger' && (
+          <div className="space-y-5">
+            {/* 1. Monthly Target & Requisition Deduction Breakdown */}
+            <div className="rounded-3xl bg-white border border-slate-200/90 p-5 shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 flex items-center justify-center shrink-0">
+                    <Target className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-oswald text-lg font-bold uppercase tracking-wide text-slate-900">
+                      Monthly Stock Purchasing Target & Budget Ledger
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Every stock requisition placed to the supplier deducts from your ৳{Number(financialTarget?.monthly_target ?? 2000000).toLocaleString()} monthly quota. Must fulfill by {financialTarget?.end_of_month}.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-xs px-3 py-1 rounded-xl bg-slate-100 text-slate-700 font-bold border border-slate-200">
+                    Remaining: ৳{Number(financialTarget?.remaining_target ?? 2000000).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              </div>
+
+              {/* Progress Summary Strip */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-medium text-slate-600">
+                    Monthly Quota Progress ({financialTarget?.month_name}):
+                  </span>
+                  <span className="font-mono font-bold text-indigo-700">
+                    ৳{Number(financialTarget?.amount_spent ?? 0).toLocaleString()} spent of ৳{Number(financialTarget?.monthly_target ?? 2000000).toLocaleString()} target ({financialTarget?.progress_percentage ?? 0}%)
+                  </span>
+                </div>
+                <div className="w-full h-3 rounded-full bg-slate-200 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 transition-all duration-500"
+                    style={{ width: `${Math.min(100, Math.max(3, financialTarget?.progress_percentage ?? 0))}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono pt-1">
+                  <span>Start of Month</span>
+                  <span className="text-amber-700 font-bold">
+                    {financialTarget?.days_left ?? 0} days remaining until monthly target deadline
+                  </span>
+                  <span>End of Month Target (৳{Number(financialTarget?.monthly_target ?? 2000000).toLocaleString()})</span>
+                </div>
+              </div>
+
+              {/* Supplier Purchase Deductions Log */}
+              <div className="space-y-2 pt-2">
+                <h4 className="font-bold text-xs uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                  <Truck className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Supplier Stock Purchases this Month (Target Deductions)</span>
+                </h4>
+
+                {requisitions.length === 0 ? (
+                  <div className="p-6 text-center text-slate-400 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200 text-xs">
+                    No supplier stock purchases recorded yet this month. Click "Buy Stock from Supplier" to requisition inventory.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-2xl border border-slate-200/80">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                        <tr>
+                          <th className="py-2.5 px-3">Req Code</th>
+                          <th className="py-2.5 px-3">Product Name</th>
+                          <th className="py-2.5 px-3 text-center">Cases</th>
+                          <th className="py-2.5 px-3 text-right">Unit Wholesale Price</th>
+                          <th className="py-2.5 px-3 text-right text-indigo-900 font-black">Amount Deducted</th>
+                          <th className="py-2.5 px-3">Order Status</th>
+                          <th className="py-2.5 px-3 text-right">Date</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-mono text-[11px]">
+                        {requisitions.map((r: any) => (
+                          <tr key={r.id || r.requisition_code} className="hover:bg-slate-50/70">
+                            <td className="py-2.5 px-3 font-bold text-blue-700">{r.requisition_code}</td>
+                            <td className="py-2.5 px-3 font-sans font-semibold text-slate-800">{r.product_name}</td>
+                            <td className="py-2.5 px-3 text-center">{r.quantity} cases</td>
+                            <td className="py-2.5 px-3 text-right">৳{Number(r.unit_price || 0).toFixed(2)}</td>
+                            <td className="py-2.5 px-3 text-right font-black text-rose-600">
+                              -৳{Number(r.total_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </td>
+                            <td className="py-2.5 px-3 font-sans">
+                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${
+                                r.status === 'DISPATCHED' || r.status === 'COMPLETED'
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  : 'bg-amber-50 text-amber-700 border border-amber-200'
+                              }`}>
+                                {r.status}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 text-right text-slate-400 text-[10px]">
+                              {r.created_date ? new Date(r.created_date).toLocaleDateString() : 'Recent'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 2. Retail Outlet Profit Ledger */}
+            <div className="rounded-3xl bg-white border border-slate-200/90 p-5 shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center shrink-0">
+                    <TrendingUp className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-oswald text-lg font-bold uppercase tracking-wide text-slate-900">
+                      Wholesale Profit Gained from Outlet Sales
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Real-time profit earned by supplying beverage cases to supermarkets & retail stores in {officer?.assigned_area}.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-xs px-3 py-1 rounded-xl bg-emerald-100 text-emerald-800 font-black border border-emerald-300">
+                    Total Profit: +৳{Number(financialTarget?.total_profit_gained ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </span>
+                  <button
+                    onClick={() => setIsDistributeModalOpen(true)}
+                    className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Distribute Stock</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Profit Ledger Table */}
+              {distributions.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
+                  <TrendingUp className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+                  <p className="font-bold text-slate-700 text-sm">No Outlet Distributions Logged Yet</p>
+                  <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+                    When you distribute beverage cases from your territory stock buffer to physical retail stores, the exact wholesale revenue, purchase cost, and net profit will be recorded here permanently.
+                  </p>
+                  <button
+                    onClick={() => setIsDistributeModalOpen(true)}
+                    className="mt-3 px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 cursor-pointer"
+                  >
+                    Make First Store Distribution
+                  </button>
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-2xl border border-slate-200/80">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                      <tr>
+                        <th className="py-2.5 px-3">Date & Time</th>
+                        <th className="py-2.5 px-3">Target Retail Outlet</th>
+                        <th className="py-2.5 px-3">Product</th>
+                        <th className="py-2.5 px-3 text-center">Cases</th>
+                        <th className="py-2.5 px-3 text-right">Buy Price</th>
+                        <th className="py-2.5 px-3 text-right">Sale Price</th>
+                        <th className="py-2.5 px-3 text-right">Total Revenue</th>
+                        <th className="py-2.5 px-3 text-right font-black text-emerald-700">Net Profit Gained</th>
+                        <th className="py-2.5 px-3">Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-mono text-[11px]">
+                      {distributions.map((d) => (
+                        <tr key={d.id} className="hover:bg-slate-50/70">
+                          <td className="py-2.5 px-3 text-slate-500 text-[10px]">
+                            {d.distribution_date ? new Date(d.distribution_date).toLocaleString() : 'Recent'}
+                          </td>
+                          <td className="py-2.5 px-3 font-sans font-bold text-slate-800">
+                            {d.branch_name || d.outlet_name || `Outlet #${d.outlet_id}`}
+                            {d.franchise_name && <span className="text-[10px] text-slate-400 block font-normal">{d.franchise_name}</span>}
+                          </td>
+                          <td className="py-2.5 px-3 font-sans font-semibold text-indigo-700">
+                            {d.brand} {d.flavor_variant}
+                            {d.sku && <span className="text-[9px] font-mono text-slate-400 block">{d.sku}</span>}
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-bold text-slate-700">
+                            {d.quantity} cases
+                          </td>
+                          <td className="py-2.5 px-3 text-right text-slate-500">
+                            ৳{Number(d.cost_price).toFixed(2)}
+                          </td>
+                          <td className="py-2.5 px-3 text-right text-indigo-700 font-semibold">
+                            ৳{Number(d.sale_price).toFixed(2)}
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-semibold text-slate-800">
+                            ৳{Number(d.total_revenue).toFixed(2)}
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-black text-emerald-600 bg-emerald-50/50">
+                            +৳{Number(d.profit_earned).toFixed(2)}
+                          </td>
+                          <td className="py-2.5 px-3 font-sans text-slate-500 text-[10px] truncate max-w-[150px]">
+                            {d.notes || 'Direct distribution'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -993,6 +1428,46 @@ export const SalesOfficerDashboard: React.FC = () => {
                   className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
                 />
               </div>
+
+              {/* Dynamic Wholesale Profit Calculation Box */}
+              {(() => {
+                const prod = products.find((p) => p.product_id === Number(selectedProductForDist));
+                const unitBuy = Number(prod?.supplier_price || prod?.base_price || 35);
+                const unitSell = Number(prod?.outlet_price || (unitBuy * 1.15));
+                const totalCost = unitBuy * distQuantity;
+                const totalRev = unitSell * distQuantity;
+                const estProfit = totalRev - totalCost;
+
+                return (
+                  <div className="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200 space-y-2 text-xs animate-scale-up">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-emerald-950 flex items-center gap-1.5">
+                        <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
+                        Wholesale Margin Preview
+                      </span>
+                      <span className="font-mono font-black text-emerald-800 bg-white px-2 py-0.5 rounded-md border border-emerald-300">
+                        +৳{estProfit.toFixed(2)} Profit Gained
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
+                      <div>
+                        <span className="text-slate-500 block">Buy Rate (Supplier):</span>
+                        <strong className="text-slate-700">৳{unitBuy.toFixed(2)} / case</strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block">Sell Rate (Outlet):</span>
+                        <strong className="text-indigo-700">৳{unitSell.toFixed(2)} / case</strong>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-emerald-200/80 flex items-center justify-between text-[11px]">
+                      <span className="text-slate-600">Total Delivery Revenue:</span>
+                      <span className="font-bold font-mono text-zinc-900">৳{totalRev.toFixed(2)}</span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
                 <button

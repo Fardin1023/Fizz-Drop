@@ -33,6 +33,33 @@ public class DataInitializer {
             }
 
             // Product & merchandise persistence is preserved strictly for user/admin input (Zero automatic seed)
+            try {
+                jdbcTemplate.execute("ALTER TABLE sales_officers ADD COLUMN monthly_target DECIMAL(15,2) NOT NULL DEFAULT 2000000.00");
+            } catch (Exception ignored) {}
+
+            try {
+                jdbcTemplate.execute("ALTER TABLE outlet_requisitions ADD COLUMN sales_officer_id BIGINT NULL");
+            } catch (Exception ignored) {}
+
+            try {
+                jdbcTemplate.execute(
+                    "CREATE TABLE IF NOT EXISTS sales_officer_distributions (" +
+                    "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
+                    "sales_officer_id BIGINT NOT NULL, " +
+                    "outlet_id BIGINT NOT NULL, " +
+                    "product_id BIGINT NOT NULL, " +
+                    "quantity INT NOT NULL, " +
+                    "cost_price DECIMAL(10,2) NOT NULL, " +
+                    "sale_price DECIMAL(10,2) NOT NULL, " +
+                    "total_cost DECIMAL(12,2) NOT NULL, " +
+                    "total_revenue DECIMAL(12,2) NOT NULL, " +
+                    "profit_earned DECIMAL(12,2) NOT NULL, " +
+                    "distribution_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, " +
+                    "notes TEXT, " +
+                    "INDEX idx_so_dist (sales_officer_id, distribution_date)" +
+                    ")"
+                );
+            } catch (Exception ignored) {}
         };
     }
 }

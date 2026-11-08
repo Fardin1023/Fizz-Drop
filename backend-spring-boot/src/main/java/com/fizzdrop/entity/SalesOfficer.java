@@ -51,6 +51,11 @@ public class SalesOfficer {
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 
+    @Column(name = "monthly_target", nullable = false)
+    @JsonProperty("monthly_target")
+    @JsonAlias({"monthly_target", "monthlyTarget", "budget"})
+    private java.math.BigDecimal monthlyTarget = new java.math.BigDecimal("2000000.00");
+
     @Column(name = "user_id")
     @JsonProperty("user_id")
     @JsonAlias({"user_id", "userId"})
@@ -102,6 +107,7 @@ public class SalesOfficer {
         if (this.updatedAt == null) this.updatedAt = LocalDateTime.now();
         if (this.status == null) this.status = "ACTIVE";
         if (this.passwordHash == null) this.passwordHash = "Officer123!";
+        if (this.monthlyTarget == null) this.monthlyTarget = new java.math.BigDecimal("2000000.00");
     }
 
     @PreUpdate
@@ -142,6 +148,9 @@ public class SalesOfficer {
 
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
+
+    public java.math.BigDecimal getMonthlyTarget() { return monthlyTarget; }
+    public void setMonthlyTarget(java.math.BigDecimal monthlyTarget) { this.monthlyTarget = monthlyTarget; }
 
     public Long getUserId() { return userId; }
     public void setUserId(Long userId) { this.userId = userId; }
