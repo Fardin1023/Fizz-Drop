@@ -59,6 +59,7 @@ export const NotificationPopup: React.FC<NotificationPopupProps> = ({
   const isPartial = notification.type === 'PARTIALLY_APPROVED';
   const isRejected = notification.type === 'REJECTED';
   const isNewReq = notification.type === 'NEW_REQUISITION';
+  const isSOReq = notification.type === 'SALES_OFFICER_REQUISITION';
 
   // Format relative time
   const getTimeString = () => {

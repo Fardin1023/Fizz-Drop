@@ -66,6 +66,20 @@ export const SuperadminProductCatalog: React.FC = () => {
     fetchCatalogAndBranches();
   }, []);
 
+  // Real-time listener for price updates set by Supplier
+  useEffect(() => {
+    try {
+      const channel = new BroadcastChannel('fizzdrop_realtime_events');
+      channel.onmessage = (event) => {
+        if (event.data?.type === 'PRICE_UPDATED' || event.data?.type === 'PRODUCT_UPDATED') {
+          fetchCatalogAndBranches();
+        }
+      };
+      return () => channel.close();
+    } catch (e) {}
+  }, []);
+
+
   const handleOpenCreateModal = () => {
     setEditingProduct(null);
     setIsModalOpen(true);
@@ -385,9 +399,14 @@ export const SuperadminProductCatalog: React.FC = () => {
                             </span>
                           </div>
                           <div className="flex items-center gap-1.5 text-[11px] font-mono">
-                            <span className="text-slate-400 w-16 uppercase text-[9px] font-bold">Outlet:</span>
-                            <span className="font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-100">
+                            <span className="text-slate-400 w-16 uppercase text-[9px] font-bold">Outlet / SO:</span>
+                            <span className="font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-100 flex items-center gap-1">
                               ৳{outletRate.toFixed(2)}
+                              {p.outlet_price != null && (
+                                <span className="text-[8px] px-1 py-0.2 rounded bg-indigo-100 text-indigo-800 font-sans font-bold uppercase" title="Live price set by Regional Supplier">
+                                  Supplier Set
+                                </span>
+                              )}
                             </span>
                           </div>
                           <div className="flex items-center gap-1.5 text-[11px] font-mono">

@@ -27,6 +27,7 @@ public class SalesOfficerController {
     private final ShopInventoryRepository shopInventoryRepository;
     private final DistrictInventoryRepository districtInventoryRepository;
     private final JdbcTemplate jdbcTemplate;
+    private final AppNotificationRepository notificationRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public SalesOfficerController(SalesOfficerRepository salesOfficerRepository,
@@ -37,7 +38,9 @@ public class SalesOfficerController {
                                   ProductRepository productRepository,
                                   ShopInventoryRepository shopInventoryRepository,
                                   DistrictInventoryRepository districtInventoryRepository,
-                                  JdbcTemplate jdbcTemplate) {
+                                  JdbcTemplate jdbcTemplate,
+                                  AppNotificationRepository notificationRepository) {
+        this.notificationRepository = notificationRepository;
         this.salesOfficerRepository = salesOfficerRepository;
         this.supplierProfileRepository = supplierProfileRepository;
         this.outletRepository = outletRepository;
@@ -554,4 +557,72 @@ public class SalesOfficerController {
             // Json parsing error fallback
         }
     }
+    /**
+     * Sales Officer requests products from their linked Supplier
+     */
+    @PostMapping("/api/v1/sales-officer/request-stock")
+    public ResponseEntity<?> requestStockFromSupplier(@RequestBody Map<String, Object> payload) {
+        try {
+            Long officerId = Long.parseLong(payload.get("sales_officer_id").toString());
+            Long productId = Long.parseLong(payload.get("product_id").toString());
+            int quantity = Integer.parseInt(payload.get("quantity").toString());
+            String urgency = payload.getOrDefault("urgency", "NORMAL").toString();
+            String notes = payload.getOrDefault("notes", "Territory demand request by Sales Officer").toString();
+
+            SalesOfficer officer = salesOfficerRepository.findById(officerId)
+                    .orElseThrow(() -> new IllegalArgumentException("Sales Officer not found"));
+
+            Product product = productRepository.findById(productId)
+                    .orElseThrow(() -> new IllegalArgumentException("Product not found"));
+
+            SupplierProfile supplier = supplierProfileRepository.findById(officer.getSupplierId())
+                    .orElseThrow(() -> new IllegalArgumentException("Linked Supplier not found"));
+
+            String reqCode = "SO-REQ-" + (100000 + new Random().nextInt(900000));
+            BigDecimal unitPrice = product.getOutletPrice() != null ? product.getOutletPrice() : (product.getBasePrice() != null ? product.getBasePrice() : BigDecimal.ZERO);
+            BigDecimal totalAmount = unitPrice.multiply(BigDecimal.valueOf(quantity));
+
+            // Find an outlet in officer's area or representative outlet ID
+            String area = officer.getAssignedArea() != null ? officer.getAssignedArea() : "Territory";
+            List<Outlet> areaOutlets = outletRepository.findAll().stream()
+                    .filter(o -> o.getArea() != null && (o.getArea().equalsIgnoreCase(area) || o.getArea().toLowerCase().contains(area.toLowerCase())))
+                    .toList();
+            Long outletId = !areaOutlets.isEmpty() ? areaOutlets.get(0).getOutletId() : 2L;
+
+            // Save requisition in outlet_requisitions so supplier sees it under Area Demands
+            jdbcTemplate.update(
+                "INSERT INTO outlet_requisitions (requisition_code, outlet_id, product_id, product_name, quantity, unit_price, total_amount, urgency, status, outlet_remarks, created_date, updated_date) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, NOW(), NOW())",
+                reqCode, outletId, productId, product.getBrand() + " " + product.getFlavorVariant(),
+                quantity, unitPrice, totalAmount, urgency,
+                "Sales Officer Demand [" + officer.getName() + " - " + area + "]: " + notes
+            );
+
+            // Create notification for Supplier
+            try {
+                AppNotification notif = new AppNotification();
+                notif.setRecipientRole("SUPPLIER");
+                notif.setRecipientUserId(supplier.getUserId());
+                notif.setTitle("New Product Request from Sales Officer " + officer.getName());
+                notif.setMessage("Sales Officer " + officer.getName() + " (" + area + " zone) requested " + quantity + " cases of " + product.getBrand() + " " + product.getFlavorVariant() + " (" + urgency + " priority).");
+                notif.setType("SALES_OFFICER_REQUISITION");
+                notif.setReferenceCode(reqCode);
+                notificationRepository.save(notif);
+            } catch (Exception ignored) {}
+
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Requisition " + reqCode + " successfully submitted to Supplier " + supplier.getBusinessName() + "!",
+                "requisition_code", reqCode,
+                "sales_officer", officer.getName(),
+                "product_name", product.getBrand() + " " + product.getFlavorVariant(),
+                "quantity", quantity,
+                "supplier_user_id", supplier.getUserId()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.fail("Stock request failed: " + e.getMessage()));
+        }
+    }
+
 }

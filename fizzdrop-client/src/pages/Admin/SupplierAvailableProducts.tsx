@@ -62,6 +62,53 @@ export const SupplierAvailableProducts: React.FC<SupplierAvailableProductsProps>
   const [isZeroStockAlertOpen, setIsZeroStockAlertOpen] = useState<boolean>(false);
   const [zeroStockAlertData, setZeroStockAlertData] = useState<ZeroStockAlertData | null>(null);
 
+  const handleSavePrice = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!priceModalProduct || newPriceValue <= 0) return;
+
+    setPriceSubmitting(true);
+    try {
+      const res = await fetch(`http://localhost:8080/api/products/${priceModalProduct.product_id}/price`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ outlet_price: newPriceValue }),
+      });
+
+      if (!res.ok) throw new Error('Failed to update product pricing');
+
+      // Update local product list
+      setProducts((prev) =>
+        prev.map((item) =>
+          item.product_id === priceModalProduct.product_id
+            ? { ...item, outlet_price: newPriceValue }
+            : item
+        )
+      );
+
+      // Real-time broadcast to Superadmin tabs
+      try {
+        const channel = new BroadcastChannel('fizzdrop_realtime_events');
+        channel.postMessage({
+          type: 'PRICE_UPDATED',
+          product_id: priceModalProduct.product_id,
+          outlet_price: newPriceValue,
+          product_name: `${priceModalProduct.brand} ${priceModalProduct.flavor_variant}`,
+        });
+        setTimeout(() => channel.close(), 100);
+      } catch (e) {}
+
+      setPriceSuccessMsg(
+        `Price for ${priceModalProduct.brand} ${priceModalProduct.flavor_variant} updated to ৳${newPriceValue.toFixed(2)}. Superadmin dashboard has been updated.`
+      );
+      setTimeout(() => setPriceSuccessMsg(null), 4000);
+      setPriceModalProduct(null);
+    } catch (err: any) {
+      alert(err.message || 'Error updating price');
+    } finally {
+      setPriceSubmitting(false);
+    }
+  };
+
   const fetchAvailableProducts = async () => {
     setLoading(true);
     try {

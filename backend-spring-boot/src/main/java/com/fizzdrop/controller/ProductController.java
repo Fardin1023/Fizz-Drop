@@ -270,6 +270,30 @@ public class ProductController {
         }
     }
 
+    
+    @PutMapping("/{id}/price")
+    public ResponseEntity<?> updateProductPrice(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> body) {
+        return productRepository.findById(id).map(product -> {
+            if (body.containsKey("outlet_price") && body.get("outlet_price") != null) {
+                product.setOutletPrice(new BigDecimal(body.get("outlet_price").toString()));
+            }
+            if (body.containsKey("supplier_price") && body.get("supplier_price") != null) {
+                product.setSupplierPrice(new BigDecimal(body.get("supplier_price").toString()));
+            }
+            if (body.containsKey("base_price") && body.get("base_price") != null) {
+                product.setBasePrice(new BigDecimal(body.get("base_price").toString()));
+            }
+            Product saved = productRepository.save(product);
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Product pricing updated successfully by supplier!",
+                "product", saved
+            ));
+        }).orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("success", false, "message", "Product not found")));
+    }
+
     @PutMapping("/{id}")
     public ResponseEntity<?> updateProduct(@PathVariable Long id, @RequestBody Product productUpdates) {
         return productRepository.findById(id).map(existing -> {

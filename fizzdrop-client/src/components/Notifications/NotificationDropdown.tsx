@@ -151,6 +151,7 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
                 const isPartial = n.type === 'PARTIALLY_APPROVED';
                 const isRejected = n.type === 'REJECTED';
                 const isNewReq = n.type === 'NEW_REQUISITION';
+                const isSOReq = n.type === 'SALES_OFFICER_REQUISITION';
 
                 return (
                   <div

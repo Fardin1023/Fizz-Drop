@@ -102,7 +102,7 @@ export const AdminDashboard: React.FC = () => {
       icon: Store,
       gradient: 'from-emerald-600 via-teal-600 to-cyan-600',
       badge: 'Area Demands',
-      badgeHighlight: false,
+      badgeHighlight: notifications.some((n) => (n.type === 'SALES_OFFICER_REQUISITION' || n.type === 'NEW_REQUISITION') && !n.is_read),
     },
     {
       id: 'request' as const,

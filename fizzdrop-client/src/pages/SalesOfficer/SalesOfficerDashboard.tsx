@@ -104,6 +104,14 @@ export const SalesOfficerDashboard: React.FC = () => {
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
   const [actionErrorMsg, setActionErrorMsg] = useState<string | null>(null);
 
+  // Request Products from Supplier Modal State
+  const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
+  const [reqProductId, setReqProductId] = useState<number | string>('');
+  const [reqQuantity, setReqQuantity] = useState<number>(30);
+  const [reqUrgency, setReqUrgency] = useState<string>('NORMAL');
+  const [reqNotes, setReqNotes] = useState<string>('');
+  const [reqSubmitting, setReqSubmitting] = useState(false);
+
   // Search & Filters
   const [outletSearch, setOutletSearch] = useState('');
   const [demandStatusFilter, setDemandStatusFilter] = useState<'ALL' | 'PENDING' | 'DISPATCHED'>('ALL');
@@ -188,6 +196,62 @@ export const SalesOfficerDashboard: React.FC = () => {
       setActionErrorMsg(err.message || 'Error communicating with server');
     } finally {
       setDistSubmitting(false);
+    }
+  };
+
+  const handleRequestStockFromSupplier = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!officer?.id || !reqProductId || reqQuantity <= 0) {
+      setActionErrorMsg('Please select a beverage product and valid quantity');
+      return;
+    }
+
+    setReqSubmitting(true);
+    setActionErrorMsg(null);
+    setActionSuccessMsg(null);
+
+    try {
+      const res = await fetch('http://localhost:8080/api/v1/sales-officer/request-stock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sales_officer_id: officer.id,
+          product_id: Number(reqProductId),
+          quantity: reqQuantity,
+          urgency: reqUrgency,
+          notes: reqNotes || `Stock request for ${officer.assigned_area} territory`,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || data.error || 'Request failed');
+      }
+
+      // Real-time broadcast to Supplier browser tabs
+      try {
+        const bc = new BroadcastChannel('fizzdrop_realtime_events');
+        const currentProd = products.find((p) => p.product_id === Number(reqProductId));
+        bc.postMessage({
+          recipientRole: 'SUPPLIER',
+          recipientUserId: data.supplier_user_id,
+          title: `New Product Request from Sales Officer ${officer.name}`,
+          message: `Sales Officer ${officer.name} (${officer.assigned_area}) requested ${reqQuantity} cases of ${currentProd?.brand || 'Beverage'} ${currentProd?.flavor_variant || ''} (${reqUrgency} priority).`,
+          type: 'SALES_OFFICER_REQUISITION',
+          status: 'PENDING',
+          referenceCode: data.requisition_code,
+        });
+        setTimeout(() => bc.close(), 100);
+      } catch (err) {}
+
+      setActionSuccessMsg(data.message || `Successfully submitted request for ${reqQuantity} cases to Supplier!`);
+      setIsRequestModalOpen(false);
+      setReqNotes('');
+      fetchDashboardData(officer.id);
+    } catch (err: any) {
+      setActionErrorMsg(err.message || 'Error communicating with server');
+    } finally {
+      setReqSubmitting(false);
     }
   };
 
@@ -461,14 +525,28 @@ export const SalesOfficerDashboard: React.FC = () => {
             })}
           </div>
 
-          {/* Quick Distribute Stock Trigger */}
-          <button
-            onClick={() => setIsDistributeModalOpen(true)}
+          <div className="flex items-center gap-2">
+            {/* Request Stock from Supplier Button */}
+            <button
+              onClick={() => {
+                if (products.length > 0 && !reqProductId) setReqProductId(products[0].product_id);
+                setIsRequestModalOpen(true);
+              }}
+              className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-bold text-xs shadow-md shadow-blue-600/20 flex items-center gap-2 transition-all cursor-pointer active:scale-95 shrink-0"
+            >
+              <Truck className="w-3.5 h-3.5" />
+              <span>Request Products from Supplier</span>
+            </button>
+
+            {/* Quick Distribute Stock Trigger */}
+            <button
+              onClick={() => setIsDistributeModalOpen(true)}
             className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs shadow-md shadow-emerald-600/20 flex items-center gap-2 transition-all cursor-pointer active:scale-95 shrink-0"
           >
             <Send className="w-3.5 h-3.5" />
             <span>Distribute Stock to Outlet</span>
           </button>
+          </div>
         </div>
 
         {/* 5. TAB 1: OVERVIEW & WHOLESALE STOCK BUFFER */}
@@ -935,6 +1013,142 @@ export const SalesOfficerDashboard: React.FC = () => {
                     <>
                       <Send className="w-3.5 h-3.5" />
                       <span>Dispatch {distQuantity} Cases</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 10. REQUEST STOCK FROM SUPPLIER MODAL */}
+      {isRequestModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden animate-scale-up">
+            <div className="px-6 py-5 bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center">
+                  <Truck className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-oswald text-lg font-bold uppercase tracking-wide">
+                    Request Stock from Supplier
+                  </h3>
+                  <p className="text-xs text-blue-100">
+                    Order wholesale inventory for {officer?.assigned_area} territory
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsRequestModalOpen(false)}
+                className="p-1.5 rounded-xl text-blue-200 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleRequestStockFromSupplier} className="p-6 space-y-4">
+              {/* Supplier Info */}
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
+                  Assigned Regional Supplier
+                </span>
+                <p className="font-bold text-sm text-slate-900 flex items-center gap-1.5">
+                  <Building2 className="w-4 h-4 text-blue-600 shrink-0" />
+                  <span>{supplier?.business_name || officer?.supplier_name || 'Regional Logistics Hub'}</span>
+                </p>
+                {supplier?.depot_address && (
+                  <p className="text-[11px] text-slate-500 font-mono">
+                    Depot: {supplier.depot_address}
+                  </p>
+                )}
+              </div>
+
+              {/* Product */}
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+                  Beverage Product *
+                </label>
+                <select
+                  value={reqProductId}
+                  onChange={(e) => setReqProductId(e.target.value)}
+                  required
+                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 cursor-pointer"
+                >
+                  <option value="">-- Choose Product --</option>
+                  {products.map((p) => (
+                    <option key={p.product_id} value={p.product_id}>
+                      {p.brand} {p.flavor_variant} (Wholesale: ৳{Number(p.supplier_price || p.base_price || 35).toFixed(2)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Quantity */}
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+                  Quantity Cases Needed *
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  required
+                  value={reqQuantity}
+                  onChange={(e) => setReqQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 font-mono font-black text-blue-800 text-base focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                />
+              </div>
+
+              {/* Urgency */}
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+                  Requisition Urgency *
+                </label>
+                <select
+                  value={reqUrgency}
+                  onChange={(e) => setReqUrgency(e.target.value)}
+                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 cursor-pointer"
+                >
+                  <option value="NORMAL">Normal Restock (2-3 Days)</option>
+                  <option value="HIGH">High Priority (Next Day)</option>
+                  <option value="CRITICAL">Critical Rush (Immediate Surge)</option>
+                </select>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+                  Territory Justification / Demand Notes
+                </label>
+                <input
+                  type="text"
+                  value={reqNotes}
+                  onChange={(e) => setReqNotes(e.target.value)}
+                  placeholder="e.g. Retail stores in Dhanmondi reporting low shelf stocks"
+                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsRequestModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={reqSubmitting}
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs shadow-md shadow-blue-600/20 flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {reqSubmitting ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <Send className="w-3.5 h-3.5" />
+                      <span>Send Request to Supplier</span>
                     </>
                   )}
                 </button>

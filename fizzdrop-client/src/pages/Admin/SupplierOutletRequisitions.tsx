@@ -103,6 +103,88 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
     fetchRequisitions();
   }, [userId]);
 
+  const openFulfillModal = (req: OutletRequisitionItem) => {
+    // If depot is completely empty, trigger ZeroStockAlertModal
+    if (req.supplier_available_stock <= 0) {
+      setZeroStockAlertData({
+        productName: req.product_name,
+        productId: req.product_id,
+        outletName: req.outlet_name,
+      });
+      setIsZeroStockAlertOpen(true);
+      return;
+    }
+    setFulfillModalReq(req);
+    setFulfillQty(Math.min(req.quantity, req.supplier_available_stock));
+    setFulfillPrice(Number(req.unit_price || 35));
+  };
+
+  const handleFulfillSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!fulfillModalReq) return;
+
+    // Stock validation
+    if (fulfillModalReq.supplier_available_stock <= 0) {
+      setActionErrorMsg("Cannot dispatch: Depot stock is 0 cases. Please request stock from Superadmin first.");
+      return;
+    }
+    if (fulfillModalReq.supplier_available_stock < 5) {
+      setActionErrorMsg(`Cannot dispatch: Depot stock is critically low (${fulfillModalReq.supplier_available_stock} cases). Minimum reserve is 5 cases. Please restock from Superadmin central catalog first.`);
+      return;
+    }
+    if (fulfillQty > fulfillModalReq.supplier_available_stock) {
+      setActionErrorMsg(`Cannot dispatch beyond stock limit: You hold ${fulfillModalReq.supplier_available_stock} cases in depot, but requested to supply ${fulfillQty} cases.`);
+      return;
+    }
+
+    setFulfillSubmitting(true);
+    setActionErrorMsg(null);
+    setActionSuccessMsg(null);
+
+    try {
+      const res = await fetch(`http://localhost:8080/api/inventory/supplier/outlet-requisitions/${fulfillModalReq.id}/dispatch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          quantity: fulfillQty,
+          unit_price: fulfillPrice,
+          user_id: userId,
+          sales_officer_id: fulfillModalReq.sales_officer_id,
+          notes: `Wholesale fulfillment to Sales Officer ${fulfillModalReq.sales_officer_name || ''} (${fulfillModalReq.sales_officer_code || 'Territory'})`,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || data.message || 'Failed to dispatch stock');
+      }
+
+      // If price was adjusted, broadcast to Superadmin tabs
+      if (fulfillPrice > 0 && fulfillPrice !== fulfillModalReq.unit_price) {
+        try {
+          const channel = new BroadcastChannel('fizzdrop_realtime_events');
+          channel.postMessage({
+            type: 'PRICE_UPDATED',
+            product_id: fulfillModalReq.product_id,
+            outlet_price: fulfillPrice,
+            product_name: fulfillModalReq.product_name,
+          });
+          setTimeout(() => channel.close(), 100);
+        } catch (e) {}
+      }
+
+      setActionSuccessMsg(
+        `Successfully dispatched ${fulfillQty} units of ${fulfillModalReq.product_name} at ৳${Number(fulfillPrice).toFixed(2)}/case to Sales Officer ${fulfillModalReq.sales_officer_name || ''}!`
+      );
+      setFulfillModalReq(null);
+      fetchRequisitions();
+    } catch (err: any) {
+      setActionErrorMsg(err.message || 'Error communicating with server');
+    } finally {
+      setFulfillSubmitting(false);
+    }
+  };
+
   // Direct fast dispatch (Quick Fulfill)
   const handleDirectDispatch = async (req: OutletRequisitionItem) => {
     setActionErrorMsg(null);
@@ -507,30 +589,33 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
                         {/* Direct Fast Dispatch Button */}
                         <button
                           type="button"
-                          onClick={() => handleDirectDispatch(req)}
+                          onClick={() => openFulfillModal(req)}
                           disabled={dispatchingId === req.id}
                           className={`py-3 px-4 rounded-2xl font-black text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md ${
-                            hasDepotStock
-                              ? 'bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-emerald-600/20'
+                            hasDepotStock && req.supplier_available_stock >= 5
+                              ? 'bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-emerald-600/20 active:scale-95'
                               : 'bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700'
                           }`}
                           title={
                             hasDepotStock
-                              ? `Fulfill and dispatch ${req.quantity} units to outlet`
+                              ? 'Review, adjust quantity/price & fulfill request'
                               : '0 stock in depot — click for restock alert'
                           }
                         >
-                          {dispatchingId === req.id ? (
-                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          ) : hasDepotStock ? (
-                            <>
-                              <Send className="w-3.5 h-3.5" />
-                              <span>Dispatch {req.quantity} Units to Sales Officer</span>
-                            </>
-                          ) : (
+                          {req.supplier_available_stock <= 0 ? (
                             <>
                               <ShieldAlert className="w-3.5 h-3.5 text-rose-600" />
                               <span>0 Stock in Depot</span>
+                            </>
+                          ) : req.supplier_available_stock < 5 ? (
+                            <>
+                              <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+                              <span>Low Depot Stock ({req.supplier_available_stock})</span>
+                            </>
+                          ) : (
+                            <>
+                              <Send className="w-3.5 h-3.5" />
+                              <span>Adjust & Dispatch to Sales Officer</span>
                             </>
                           )}
                         </button>

@@ -140,11 +140,16 @@ public class InventoryController {
                 availableDepotStock += distInv.map(DistrictInventory::getCurrentStock).orElse(0);
             }
 
+            // 1. Low stock logic: If depot stock is 0 or low (< 5), reject dispatch
             if (availableDepotStock <= 0) {
-                return ResponseEntity.badRequest().body(ApiResponse.fail("No stocks in your regional depot for this beverage, so cannot dispatch to outlets. Please request stock from Superadmin first."));
+                return ResponseEntity.badRequest().body(ApiResponse.fail("Cannot dispatch: Supplier depot stock is 0 cases (out of stock). Please request stock from Superadmin first."));
             }
-            if ("ADD".equalsIgnoreCase(req.getMode()) && req.getQuantity() > availableDepotStock) {
-                return ResponseEntity.badRequest().body(ApiResponse.fail("Cannot dispatch " + req.getQuantity() + " units: You only hold " + availableDepotStock + " units in depot stock."));
+            if (availableDepotStock < 5) {
+                return ResponseEntity.badRequest().body(ApiResponse.fail("Cannot dispatch: Supplier depot stock is critically low (" + availableDepotStock + " cases remaining). Minimum reserve is 5 cases. Please restock from Superadmin central catalog first."));
+            }
+            // 2. Beyond stock limit logic: Cannot give products beyond stock limit
+            if (req.getQuantity() > availableDepotStock) {
+                return ResponseEntity.badRequest().body(ApiResponse.fail("Cannot dispatch beyond stock limit: You attempted to supply " + req.getQuantity() + " cases, but your depot only holds " + availableDepotStock + " cases. Adjust the quantity to at most " + availableDepotStock + " cases."));
             }
         }
 
@@ -730,6 +735,23 @@ public class InventoryController {
             try { dispatchQty = Integer.parseInt(body.get("quantity").toString()); } catch (Exception ignored) {}
         }
         Long userId = (body != null && body.containsKey("user_id") && body.get("user_id") != null) ? Long.parseLong(body.get("user_id").toString()) : 4L;
+
+        // If supplier adjusted product price, update Product entity so Superadmin sees it
+        if (body != null && body.containsKey("unit_price") && body.get("unit_price") != null) {
+            try {
+                BigDecimal updatedPrice = new BigDecimal(body.get("unit_price").toString());
+                if (updatedPrice.compareTo(BigDecimal.ZERO) > 0) {
+                    Product prod = productRepository.findById(productId).orElse(null);
+                    if (prod != null) {
+                        prod.setOutletPrice(updatedPrice);
+                        productRepository.save(prod);
+                        // Also update requisition unit price and total amount
+                        jdbcTemplate.update("UPDATE outlet_requisitions SET unit_price = ?, total_amount = ? WHERE id = ?",
+                                updatedPrice, updatedPrice.multiply(BigDecimal.valueOf(dispatchQty)), id);
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
 
         SupplyRequest supplyReq = new SupplyRequest(outletId, productId, dispatchQty, "ADD");
         supplyReq.setUserId(userId);
