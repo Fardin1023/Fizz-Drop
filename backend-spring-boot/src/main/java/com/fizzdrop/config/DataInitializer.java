@@ -167,30 +167,7 @@ public class DataInitializer {
                 );
             } catch (Exception ignored) {}
 
-            try {
-                Integer psrCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM pre_sales_officers", Integer.class);
-                if (psrCount == null || psrCount == 0) {
-                    jdbcTemplate.update(
-                        "INSERT INTO pre_sales_officers (psr_code, name, phone, email, sales_officer_id, sub_route, assigned_area, status, notes, user_id) VALUES " +
-                        "('PSR-GLS-01', 'Kabir Hossain', '+8801819001101', 'kabir.psr@fizzdrop.com', 1, 'Gulshan 2 - Circle North Sub-Route', 'Gulshan', 'ACTIVE', 'Covers Circle 2 supermarkets & high-density retail cluster', 201), " +
-                        "('PSR-GLS-02', 'Farhan Ahmed', '+8801819001102', 'farhan.psr@fizzdrop.com', 1, 'Gulshan 1 - South Commercial Sub-Route', 'Gulshan', 'ACTIVE', 'Covers Gulshan 1 DCC market & perimeter beverage bodegas', 202), " +
-                        "('PSR-GLS-03', 'Tanvir Hasan', '+8801819001103', 'tanvir.psr@fizzdrop.com', 1, 'Gulshan Avenue - High Street Route', 'Gulshan', 'ACTIVE', 'Main arterial avenue retail stores & convenience outlets', 203), " +
-                        "('PSR-UTT-01', 'Sabbir Rahman', '+8801819001104', 'sabbir.psr@fizzdrop.com', 2, 'Uttara Sector 3 & 7 Commercial Route', 'Uttara', 'ACTIVE', 'Sector 3 & 7 retail hubs and hypermarkets', 204), " +
-                        "('PSR-UTT-02', 'Arif Chowdhury', '+8801819001105', 'arif.psr@fizzdrop.com', 2, 'Uttara Sector 11 & 13 Market Route', 'Uttara', 'ACTIVE', 'Sector 11-13 departmental outlets & chain stores', 205), " +
-                        "('PSR-DHN-01', 'Imtiaz Hossain', '+8801819001106', 'imtiaz.psr@fizzdrop.com', 3, 'Dhanmondi 27 & Mirpur Road Route', 'Dhanmondi', 'ACTIVE', 'Dhanmondi central commercial corridor', 206), " +
-                        "('PSR-GZP-01', 'Zahid Hasan', '+8801819001107', 'zahid.psr@fizzdrop.com', 4, 'Joydebpur Station Bazaar Sub-Route', 'Joydebpur', 'ACTIVE', 'Central Gazipur wholesale distribution hub', 207)"
-                    );
-                }
-            } catch (Exception ignored) {}
-
-            try {
-                jdbcTemplate.update("UPDATE outlets SET sub_route = 'Gulshan 2 - Circle North Sub-Route', assigned_psr_id = 1 WHERE outlet_id = 2 AND (sub_route IS NULL OR sub_route = '')");
-                jdbcTemplate.update("UPDATE outlets SET sub_route = 'Gulshan 2 - Circle North Sub-Route', assigned_psr_id = 1 WHERE outlet_id = 9 AND (sub_route IS NULL OR sub_route = '')");
-                jdbcTemplate.update("UPDATE outlets SET sub_route = 'Dhanmondi 27 & Mirpur Road Route', assigned_psr_id = 6 WHERE outlet_id = 3 AND (sub_route IS NULL OR sub_route = '')");
-                jdbcTemplate.update("UPDATE outlets SET sub_route = 'Joydebpur Station Bazaar Sub-Route', assigned_psr_id = 7 WHERE outlet_id = 4 AND (sub_route IS NULL OR sub_route = '')");
-                jdbcTemplate.update("UPDATE outlets SET sub_route = 'Uttara Sector 3 & 7 Commercial Route', assigned_psr_id = 4 WHERE outlet_id = 6 AND (sub_route IS NULL OR sub_route = '')");
-                jdbcTemplate.update("UPDATE outlets SET sub_route = 'Uttara Sector 11 & 13 Market Route', assigned_psr_id = 5 WHERE outlet_id = 7 AND (sub_route IS NULL OR sub_route = '')");
-            } catch (Exception ignored) {}
+            // Pre-Sales Officers and Outlets are cleanly created and assigned by the Superadmin and Sales Officers.
         };
     }
 }
