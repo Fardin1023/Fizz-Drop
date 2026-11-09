@@ -336,7 +336,11 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onSuccess, requiredRole = 'any'
                     </button>
                   ))}
                 </div>
-              ) : null}
+              ) : (
+                <p className="text-[11px] text-slate-400 italic py-1 px-1">
+                  No Sales Officers created yet. Add officers in Superadmin Portal.
+                </p>
+              )}
             </div>
 
             {/* Pre-Sales Officers (PSR) Field Team */}
@@ -381,7 +385,11 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onSuccess, requiredRole = 'any'
                     </button>
                   ))}
                 </div>
-              ) : null}
+              ) : (
+                <p className="text-[11px] text-slate-400 italic py-1 px-1">
+                  No Pre-Sales Officers created yet. Register PSRs in Superadmin Portal.
+                </p>
+              )}
             </div>
           </div>
 
