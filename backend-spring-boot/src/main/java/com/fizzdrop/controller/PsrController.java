@@ -59,7 +59,8 @@ public class PsrController {
     }
 
     /**
-     * Provision or create a new Pre-Sales Officer (PSR).
+     * Provision or create a new Pre-Sales Officer (PSR) by Superadmin.
+     * Automatically assigns to designated Sales Officer and sets up sub-route.
      */
     @PostMapping
     public ResponseEntity<?> createPsr(@RequestBody Map<String, Object> req) {
@@ -71,18 +72,119 @@ public class PsrController {
             String subRoute = (String) req.get("sub_route");
             String assignedArea = (String) req.get("assigned_area");
             String notes = (String) req.get("notes");
+            String password = req.containsKey("password") && req.get("password") != null && !req.get("password").toString().isEmpty()
+                    ? req.get("password").toString()
+                    : "Psr123!";
 
-            String psrCode = req.containsKey("psr_code") && req.get("psr_code") != null
+            SalesOfficer so = salesOfficerRepository.findById(salesOfficerId)
+                    .orElseThrow(() -> new RuntimeException("Assigned Sales Officer with ID " + salesOfficerId + " not found."));
+
+            if (assignedArea == null || assignedArea.trim().isEmpty()) {
+                assignedArea = so.getAssignedArea();
+            }
+
+            String psrCode = req.containsKey("psr_code") && req.get("psr_code") != null && !req.get("psr_code").toString().trim().isEmpty()
                     ? req.get("psr_code").toString().trim().toUpperCase()
-                    : "PSR-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+                    : "PSR-" + so.getOfficerCode().replaceAll("[^A-Z0-9]", "") + "-" + (10 + (int)(Math.random() * 90));
 
             PreSalesOfficer psr = new PreSalesOfficer(psrCode, name, phone, email, salesOfficerId, subRoute, assignedArea);
+            psr.setPasswordHash(password);
             psr.setNotes(notes);
+            psr.setStatus("ACTIVE");
+            psr.setCreatedAt(LocalDateTime.now());
+            psr.setUpdatedAt(LocalDateTime.now());
+
             psrRepository.save(psr);
+            enrichPsrs(List.of(psr));
 
             return ResponseEntity.status(HttpStatus.CREATED).body(psr);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(ApiResponse.fail("Failed to create PSR: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Update PSR profile or Reassign to another Sales Officer (Superadmin action).
+     */
+    @PutMapping("/{id}")
+    public ResponseEntity<?> updatePsr(@PathVariable Long id, @RequestBody Map<String, Object> req) {
+        try {
+            PreSalesOfficer psr = psrRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Pre-Sales Officer with ID " + id + " not found."));
+
+            if (req.containsKey("name") && req.get("name") != null) psr.setName(req.get("name").toString());
+            if (req.containsKey("phone") && req.get("phone") != null) psr.setPhone(req.get("phone").toString());
+            if (req.containsKey("email") && req.get("email") != null) psr.setEmail(req.get("email").toString());
+            if (req.containsKey("password") && req.get("password") != null && !req.get("password").toString().isEmpty()) {
+                psr.setPasswordHash(req.get("password").toString());
+            }
+            if (req.containsKey("sales_officer_id") && req.get("sales_officer_id") != null) {
+                Long newSoId = Long.parseLong(req.get("sales_officer_id").toString());
+                psr.setSalesOfficerId(newSoId);
+                salesOfficerRepository.findById(newSoId).ifPresent(so -> {
+                    if (!req.containsKey("assigned_area") || req.get("assigned_area") == null) {
+                        psr.setAssignedArea(so.getAssignedArea());
+                    }
+                });
+            }
+            if (req.containsKey("sub_route") && req.get("sub_route") != null) psr.setSubRoute(req.get("sub_route").toString());
+            if (req.containsKey("assigned_area") && req.get("assigned_area") != null) psr.setAssignedArea(req.get("assigned_area").toString());
+            if (req.containsKey("status") && req.get("status") != null) psr.setStatus(req.get("status").toString());
+            if (req.containsKey("notes") && req.get("notes") != null) psr.setNotes(req.get("notes").toString());
+
+            psr.setUpdatedAt(LocalDateTime.now());
+            psrRepository.save(psr);
+
+            enrichPsrs(List.of(psr));
+            return ResponseEntity.ok(psr);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("Failed to update PSR: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Dedicated Endpoint for Superadmin to Assign / Reassign a PSR to a Sales Officer.
+     */
+    @PutMapping("/{id}/assign-sales-officer")
+    public ResponseEntity<?> assignSalesOfficer(@PathVariable Long id, @RequestBody Map<String, Object> req) {
+        try {
+            PreSalesOfficer psr = psrRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Pre-Sales Officer with ID " + id + " not found."));
+
+            Long newSoId = Long.parseLong(req.get("sales_officer_id").toString());
+            SalesOfficer so = salesOfficerRepository.findById(newSoId)
+                    .orElseThrow(() -> new RuntimeException("Sales Officer with ID " + newSoId + " not found."));
+
+            psr.setSalesOfficerId(newSoId);
+            psr.setAssignedArea(so.getAssignedArea());
+            psr.setUpdatedAt(LocalDateTime.now());
+            psrRepository.save(psr);
+
+            enrichPsrs(List.of(psr));
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "PSR " + psr.getName() + " successfully assigned to Sales Officer " + so.getName() + " (" + so.getAssignedArea() + ")!",
+                "psr", psr
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("Failed to assign Sales Officer: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Deactivate / Delete PSR.
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deletePsr(@PathVariable Long id) {
+        try {
+            PreSalesOfficer psr = psrRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Pre-Sales Officer with ID " + id + " not found."));
+            psr.setStatus("INACTIVE");
+            psr.setUpdatedAt(LocalDateTime.now());
+            psrRepository.save(psr);
+            return ResponseEntity.ok(Map.of("success", true, "message", "PSR " + psr.getName() + " has been deactivated."));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("Failed to delete PSR: " + e.getMessage()));
         }
     }
 

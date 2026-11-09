@@ -11,6 +11,7 @@ import { SuperadminProductCatalog } from './SuperadminProductCatalog';
 import { SuperadminMerchandiseCatalog } from './SuperadminMerchandiseCatalog';
 import { SuperadminSupplierManagement } from './SuperadminSupplierManagement';
 import { SuperadminSalesOfficerManagement } from './SuperadminSalesOfficerManagement';
+import { SuperadminPsrManagement } from './SuperadminPsrManagement';
 import { SuperadminCommercialLogs } from './SuperadminCommercialLogs';
 import {
   ShieldCheck,
@@ -33,6 +34,7 @@ import {
   Sparkles,
   TrendingUp,
   UserCheck,
+  Store,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useNotifications } from '../../hooks/useNotifications';
@@ -41,7 +43,7 @@ import { NotificationPopup } from '../../components/Notifications/NotificationPo
 
 export const SuperadminDashboard: React.FC = () => {
   const { user, isSuperadmin, isAuthenticated, logout, isLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<'products' | 'merchandise' | 'requisitions' | 'suppliers' | 'sales-officers' | 'logs' | 'tables' | 'outlets' | 'inventory' | 'query'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'merchandise' | 'requisitions' | 'suppliers' | 'sales-officers' | 'psr-officers' | 'logs' | 'tables' | 'outlets' | 'inventory' | 'query'>('products');
   const [consoleInitialQuery, setConsoleInitialQuery] = useState<string>('SELECT * FROM Outlets LIMIT 25;');
   const [isDbConfigOpen, setIsDbConfigOpen] = useState(false);
   const [dbStatus, setDbStatus] = useState<any>(null);
@@ -145,6 +147,15 @@ export const SuperadminDashboard: React.FC = () => {
       icon: UserCheck,
       gradient: 'from-blue-600 via-cyan-600 to-teal-600',
       badge: 'Territory',
+    },
+    {
+      id: 'psr-officers' as const,
+      label: 'Pre-Sales (PSR) Accounts & Routes',
+      shortLabel: 'Pre-Sales (PSR)',
+      desc: 'Provision PSR accounts, assign to Sales Officers & sub-routes',
+      icon: Store,
+      gradient: 'from-orange-500 via-amber-500 to-yellow-500',
+      badge: 'Field Beats',
     },
     {
       id: 'logs' as const,
@@ -449,6 +460,7 @@ export const SuperadminDashboard: React.FC = () => {
           {activeTab === 'requisitions' && <SuperadminRequisitionsHub />}
           {activeTab === 'suppliers' && <SuperadminSupplierManagement />}
           {activeTab === 'sales-officers' && <SuperadminSalesOfficerManagement />}
+          {activeTab === 'psr-officers' && <SuperadminPsrManagement />}
           {activeTab === 'logs' && <SuperadminCommercialLogs />}
           {activeTab === 'tables' && (
             <DatabaseExplorer onOpenQueryWithTable={handleOpenQueryWithTable} />
