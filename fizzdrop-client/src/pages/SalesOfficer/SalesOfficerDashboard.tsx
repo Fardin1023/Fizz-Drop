@@ -130,7 +130,7 @@ export interface DistributionRecord {
 
 export const SalesOfficerDashboard: React.FC = () => {
   const { user, isAuthenticated, logout, loginAsSalesOfficer, isSalesOfficer, isSuperadmin } = useAuth();
-  const [activeTab, setActiveTab] = useState<'overview' | 'profit-ledger' | 'outlets' | 'demands' | 'supplier-link'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'psr-team' | 'profit-ledger' | 'outlets' | 'demands' | 'supplier-link'>('overview');
   
   // Dashboard Data State
   const [officer, setOfficer] = useState<OfficerProfile | null>(null);
@@ -142,6 +142,12 @@ export const SalesOfficerDashboard: React.FC = () => {
   const [distributions, setDistributions] = useState<DistributionRecord[]>([]);
   const [allOfficers, setAllOfficers] = useState<OfficerProfile[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Pre-Sales Officers (PSR) & Sub-Routes Data
+  const [psrs, setPsrs] = useState<any[]>([]);
+  const [psrOrders, setPsrOrders] = useState<any[]>([]);
+  const [psrRefunds, setPsrRefunds] = useState<any[]>([]);
+  const [psrSummary, setPsrSummary] = useState<any | null>(null);
 
   // Real-time Notifications for Sales Officer
   const {
@@ -202,6 +208,10 @@ export const SalesOfficerDashboard: React.FC = () => {
         if (data.products && data.products.length > 0 && !selectedProductForDist) {
           setSelectedProductForDist(data.products[0].product_id);
         }
+
+        if (data.sales_officer?.id) {
+          fetchPsrData(data.sales_officer.id);
+        }
       }
 
       if (allOffRes.ok) {
@@ -212,6 +222,21 @@ export const SalesOfficerDashboard: React.FC = () => {
       console.error('Error fetching sales officer dashboard data:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchPsrData = async (officerId: number) => {
+    try {
+      const res = await fetch(`http://localhost:8080/api/v1/psr/so-summary/${officerId}`);
+      if (res.ok) {
+        const json = await res.json();
+        setPsrs(json.psrs || []);
+        setPsrOrders(json.orders || []);
+        setPsrRefunds(json.refunds || []);
+        setPsrSummary(json);
+      }
+    } catch (e) {
+      console.error('Error fetching PSR data:', e);
     }
   };
 
@@ -229,7 +254,9 @@ export const SalesOfficerDashboard: React.FC = () => {
         if (
           payload?.type === 'SALES_OFFICER_PURCHASE_CONFIRMED' ||
           payload?.type === 'REQUISITION_ACTION' ||
-          payload?.type === 'PRICE_UPDATED'
+          payload?.type === 'PRICE_UPDATED' ||
+          payload?.type === 'NEW_PSR_ORDER' ||
+          payload?.type === 'NEW_PSR_REFUND'
         ) {
           if (
             !payload.recipientUserId ||
@@ -238,6 +265,7 @@ export const SalesOfficerDashboard: React.FC = () => {
           ) {
             if (officer?.id) {
               fetchDashboardData(officer.id);
+              fetchPsrData(officer.id);
             }
           }
         }
@@ -250,6 +278,44 @@ export const SalesOfficerDashboard: React.FC = () => {
       }
     };
   }, [officer?.id, officer?.user_id]);
+
+  const handleConsolidateOrderToSupplier = (order: any) => {
+    setReqProductId(order.product_id);
+    setReqQuantity(order.quantity);
+    setReqUrgency(order.urgency || 'HIGH');
+    setReqNotes(`Consolidating field demand from PSR ${order.psr_name || 'Team'} for ${order.outlet_name} on sub-route ${order.sub_route}`);
+    setIsRequestModalOpen(true);
+  };
+
+  const handleUpdatePsrOrderStatus = async (orderId: number, status: string) => {
+    try {
+      const res = await fetch(`http://localhost:8080/api/v1/psr/orders/${orderId}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      if (res.ok && officer?.id) {
+        fetchPsrData(officer.id);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleUpdatePsrRefundStatus = async (refundId: number, status: string, soRemarks: string) => {
+    try {
+      const res = await fetch(`http://localhost:8080/api/v1/psr/refunds/${refundId}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, so_remarks: soRemarks }),
+      });
+      if (res.ok && officer?.id) {
+        fetchPsrData(officer.id);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const handleSwitchOfficer = async (off: OfficerProfile) => {
     await loginAsSalesOfficer(off.id, off.email);
@@ -797,6 +863,7 @@ export const SalesOfficerDashboard: React.FC = () => {
           <div className="flex items-center gap-1.5 overflow-x-auto">
             {[
               { id: 'overview', label: 'Territory Hub & Stock Buffer', icon: Boxes },
+              { id: 'psr-team', label: `Pre-Sales (PSR) Team & Sub-Routes (${psrs.length})`, icon: UserCheck },
               { id: 'profit-ledger', label: `Wholesale Profit & Target (${distributions.length})`, icon: TrendingUp },
               { id: 'outlets', label: `Retail Stores (${outlets.length})`, icon: Store },
               { id: 'demands', label: `Branch Demands (${pendingDemandsCount})`, icon: Clock },
@@ -924,6 +991,325 @@ export const SalesOfficerDashboard: React.FC = () => {
                   </div>
                 ))}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB: PRE-SALES (PSR) TEAM & SUB-ROUTES */}
+        {activeTab === 'psr-team' && (
+          <div className="space-y-6">
+            {/* Operational Hierarchy Info Banner */}
+            <div className="rounded-3xl bg-gradient-to-r from-orange-600 via-amber-600 to-yellow-600 text-white p-6 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] uppercase font-bold tracking-wider bg-white/20 px-2.5 py-0.5 rounded-full">
+                    Field Distribution Hierarchy
+                  </span>
+                  <span className="text-xs bg-black/20 text-white font-semibold px-2 py-0.5 rounded-full">
+                    Zone: {officer?.assigned_area || 'Territory'}
+                  </span>
+                </div>
+                <h3 className="text-xl font-black tracking-tight">
+                  Pre-Sales Representatives (PSR) & Field Sub-Routes
+                </h3>
+                <p className="text-xs text-orange-100 max-w-2xl leading-relaxed">
+                  As Sales Officer, your assigned territory is partitioned into designated sub-routes. Dedicated Pre-Sales Officers visit retail shops along their route to book demand orders and verify refund claims. Review incoming field demands below and consolidate them into wholesale orders from your Central Supplier.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (products.length > 0 && !reqProductId) setReqProductId(products[0].product_id);
+                    setIsRequestModalOpen(true);
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-white text-orange-700 font-bold text-xs hover:bg-orange-50 shadow-md transition flex items-center gap-1.5 shrink-0"
+                >
+                  <Truck className="w-4 h-4" />
+                  <span>Request Supplier Stock</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Sub-Route & PSR Representative Directory */}
+            <div className="rounded-3xl bg-white border border-slate-200/90 p-5 shadow-xs space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-oswald text-base font-bold uppercase tracking-wide text-slate-900">
+                    Assigned Field Representatives ({psrs.length})
+                  </h4>
+                  <p className="text-xs text-slate-500">
+                    PSRs deployed across sub-routes in {officer?.assigned_area || 'your area'}.
+                  </p>
+                </div>
+                <button
+                  onClick={() => officer?.id && fetchPsrData(officer.id)}
+                  className="p-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-500 text-xs flex items-center gap-1 transition"
+                  title="Refresh PSR team status"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Sync Routes</span>
+                </button>
+              </div>
+
+              {psrs.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 text-xs">
+                  No PSR field agents assigned yet.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                  {psrs.map((psr) => (
+                    <div
+                      key={psr.id}
+                      className="p-4 rounded-2xl border border-slate-200/90 bg-slate-50/50 hover:bg-white hover:border-orange-400 transition flex flex-col justify-between gap-3 shadow-2xs"
+                    >
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-orange-100 text-orange-800 border border-orange-200">
+                            {psr.psr_code}
+                          </span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                            {psr.status || 'ACTIVE'}
+                          </span>
+                        </div>
+
+                        <div>
+                          <h5 className="font-bold text-slate-900 text-sm">{psr.name}</h5>
+                          <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                            <Phone className="w-3 h-3 text-slate-400" />
+                            <span>{psr.phone}</span>
+                          </p>
+                        </div>
+
+                        <div className="p-2.5 rounded-xl bg-white border border-slate-200/80 space-y-1 text-xs">
+                          <p className="text-[10px] uppercase font-bold text-slate-400">Designated Sub-Route</p>
+                          <p className="font-semibold text-slate-800 truncate" title={psr.sub_route}>
+                            {psr.sub_route}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                        <span><strong>{psr.outlet_count ?? 2}</strong> outlets covered</span>
+                        <span>•</span>
+                        <span><strong className="text-orange-600">{psr.active_orders_count ?? 0}</strong> active orders</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Field Orders from Outlets (via PSR) */}
+            <div className="rounded-3xl bg-white border border-slate-200/90 p-5 shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h4 className="font-oswald text-base font-bold uppercase tracking-wide text-slate-900">
+                    Incoming Outlet Orders from PSR Field Visits ({psrOrders.length})
+                  </h4>
+                  <p className="text-xs text-slate-500">
+                    Orders taken at store counters by PSRs. Consolidate into Supplier stock requests to fulfill.
+                  </p>
+                </div>
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-orange-100 text-orange-800 self-start sm:self-auto">
+                  {psrOrders.filter((o) => o.status === 'SUBMITTED_TO_SO').length} Awaiting SO Review
+                </span>
+              </div>
+
+              {psrOrders.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 text-xs">
+                  No outlet orders collected by PSRs yet. Orders taken in the PSR portal will show up here in real-time.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 text-slate-500 uppercase font-semibold border-b border-slate-200">
+                      <tr>
+                        <th className="p-3">Order Code</th>
+                        <th className="p-3">PSR Agent</th>
+                        <th className="p-3">Sub-Route / Outlet</th>
+                        <th className="p-3">Beverage Item</th>
+                        <th className="p-3 text-right">Cases</th>
+                        <th className="p-3 text-right">Unit Price</th>
+                        <th className="p-3 text-right">Total (৳)</th>
+                        <th className="p-3 text-center">Urgency</th>
+                        <th className="p-3 text-center">Status</th>
+                        <th className="p-3 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {psrOrders.map((ord) => {
+                        const isPending = ord.status === 'SUBMITTED_TO_SO';
+                        return (
+                          <tr key={ord.id} className="hover:bg-slate-50/70 transition">
+                            <td className="p-3 font-mono font-bold text-orange-600">{ord.order_code}</td>
+                            <td className="p-3 font-semibold text-slate-800">{ord.psr_name || 'PSR'}</td>
+                            <td className="p-3">
+                              <span className="font-bold text-slate-900 block">{ord.outlet_name}</span>
+                              <span className="text-[10px] text-slate-400 truncate block max-w-xs">{ord.sub_route}</span>
+                            </td>
+                            <td className="p-3 font-medium">{ord.product_name}</td>
+                            <td className="p-3 text-right font-black text-slate-900">{ord.quantity}</td>
+                            <td className="p-3 text-right text-slate-500">৳{Number(ord.unit_price).toFixed(2)}</td>
+                            <td className="p-3 text-right font-black text-slate-900">
+                              ৳{Number(ord.total_amount).toLocaleString()}
+                            </td>
+                            <td className="p-3 text-center">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">
+                                {ord.urgency || 'NORMAL'}
+                              </span>
+                            </td>
+                            <td className="p-3 text-center">
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  ord.status === 'APPROVED_BY_SO'
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : ord.status === 'DELIVERED'
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : 'bg-amber-100 text-amber-800'
+                                }`}
+                              >
+                                {ord.status}
+                              </span>
+                            </td>
+                            <td className="p-3 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleConsolidateOrderToSupplier(ord)}
+                                  className="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-[11px] shadow-xs flex items-center gap-1 transition cursor-pointer"
+                                  title="Consolidate demand and request stock from Supplier"
+                                >
+                                  <Truck className="w-3 h-3" />
+                                  <span>Request from Supplier</span>
+                                </button>
+                                {isPending && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdatePsrOrderStatus(ord.id, 'APPROVED_BY_SO')}
+                                    className="px-2 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-[11px] transition"
+                                    title="Approve field order"
+                                  >
+                                    Approve
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Field Refund Claims & Damage Returns (via PSR) */}
+            <div className="rounded-3xl bg-white border border-slate-200/90 p-5 shadow-xs space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-oswald text-base font-bold uppercase tracking-wide text-slate-900">
+                    Outlet Damage & Refund Requests Logged by PSRs ({psrRefunds.length})
+                  </h4>
+                  <p className="text-xs text-slate-500">
+                    Defective, leaked, or expired stocks inspected in the field. Review and approve credit settlement.
+                  </p>
+                </div>
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-red-100 text-red-800">
+                  {psrRefunds.filter((r) => r.status === 'SUBMITTED_TO_SO').length} Pending Review
+                </span>
+              </div>
+
+              {psrRefunds.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 text-xs">
+                  No return claims reported by PSRs along sub-routes.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 text-slate-500 uppercase font-semibold border-b border-slate-200">
+                      <tr>
+                        <th className="p-3">Claim Code</th>
+                        <th className="p-3">PSR Inspector</th>
+                        <th className="p-3">Outlet Store</th>
+                        <th className="p-3">Product</th>
+                        <th className="p-3 text-right">Units</th>
+                        <th className="p-3 text-right">Amount (৳)</th>
+                        <th className="p-3">Reason</th>
+                        <th className="p-3 text-center">Status</th>
+                        <th className="p-3 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {psrRefunds.map((ref) => {
+                        const isPending = ref.status === 'SUBMITTED_TO_SO';
+                        return (
+                          <tr key={ref.id} className="hover:bg-slate-50/70 transition">
+                            <td className="p-3 font-mono font-bold text-red-600">{ref.refund_code}</td>
+                            <td className="p-3 font-medium text-slate-800">{ref.psr_name || 'PSR'}</td>
+                            <td className="p-3 font-bold text-slate-900">{ref.outlet_name}</td>
+                            <td className="p-3 font-medium">{ref.product_name}</td>
+                            <td className="p-3 text-right font-black text-red-600">{ref.quantity}</td>
+                            <td className="p-3 text-right font-black text-slate-900">
+                              ৳{Number(ref.refund_amount).toLocaleString()}
+                            </td>
+                            <td className="p-3">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-700 border border-red-200">
+                                {ref.reason}
+                              </span>
+                            </td>
+                            <td className="p-3 text-center">
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  ref.status === 'SETTLED'
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : ref.status === 'APPROVED_BY_SO'
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : ref.status === 'REJECTED'
+                                    ? 'bg-red-100 text-red-800'
+                                    : 'bg-amber-100 text-amber-800'
+                                }`}
+                              >
+                                {ref.status}
+                              </span>
+                            </td>
+                            <td className="p-3 text-right">
+                              {isPending ? (
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdatePsrRefundStatus(ref.id, 'APPROVED_BY_SO', 'Verified by Sales Officer')}
+                                    className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] transition"
+                                  >
+                                    Approve
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdatePsrRefundStatus(ref.id, 'SETTLED', 'Credit settled')}
+                                    className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] transition"
+                                  >
+                                    Settle
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdatePsrRefundStatus(ref.id, 'REJECTED', 'Claim rejected')}
+                                    className="px-2 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 font-bold text-[11px] transition"
+                                  >
+                                    Reject
+                                  </button>
+                                </div>
+                              ) : (
+                                <span className="text-[11px] text-slate-400 italic">Processed</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         )}

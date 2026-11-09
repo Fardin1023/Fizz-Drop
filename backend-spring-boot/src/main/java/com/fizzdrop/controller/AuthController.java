@@ -25,6 +25,7 @@ public class AuthController {
     private final DistrictRepository districtRepository;
     private final SalesOfficerRepository salesOfficerRepository;
     private final SupplierProfileRepository supplierProfileRepository;
+    private final PreSalesOfficerRepository preSalesOfficerRepository;
 
     public AuthController(UserRepository userRepository,
                           OutletRepository outletRepository,
@@ -32,7 +33,8 @@ public class AuthController {
                           ShopInventoryRepository inventoryRepository,
                           DistrictRepository districtRepository,
                           SalesOfficerRepository salesOfficerRepository,
-                          SupplierProfileRepository supplierProfileRepository) {
+                          SupplierProfileRepository supplierProfileRepository,
+                          PreSalesOfficerRepository preSalesOfficerRepository) {
         this.userRepository = userRepository;
         this.outletRepository = outletRepository;
         this.productRepository = productRepository;
@@ -40,6 +42,7 @@ public class AuthController {
         this.districtRepository = districtRepository;
         this.salesOfficerRepository = salesOfficerRepository;
         this.supplierProfileRepository = supplierProfileRepository;
+        this.preSalesOfficerRepository = preSalesOfficerRepository;
     }
 
     @PostMapping("/login")
@@ -82,6 +85,27 @@ public class AuthController {
                 AuthResponse res = new AuthResponse(token, uid, so.getEmail(), 6L, "SalesOfficer", null);
                 res.setSalesOfficer(so);
                 return ResponseEntity.ok(Map.of("success", true, "token", res.getToken(), "user", res, "sales_officer", so));
+            }
+        }
+
+        // Pre-Sales Officer (PSR) direct email check
+        Optional<PreSalesOfficer> psrByEmail = preSalesOfficerRepository.findByEmailIgnoreCase(email);
+        if (psrByEmail.isPresent()) {
+            PreSalesOfficer psr = psrByEmail.get();
+            boolean matches = password.isEmpty() ||
+                    "Psr123!".equals(password) ||
+                    "Password123!".equals(password) ||
+                    (psr.getPasswordHash() != null && psr.getPasswordHash().equals(password));
+            if (matches) {
+                salesOfficerRepository.findById(psr.getSalesOfficerId()).ifPresent(so -> {
+                    psr.setSalesOfficerName(so.getName());
+                    psr.setSalesOfficerCode(so.getOfficerCode());
+                });
+                Long uid = psr.getUserId() != null ? psr.getUserId() : 200L + psr.getId();
+                String token = "jwt-psr-" + psr.getId() + "-" + UUID.randomUUID();
+                AuthResponse res = new AuthResponse(token, uid, psr.getEmail(), 7L, "PreSalesOfficer", null);
+                res.setPreSalesOfficer(psr);
+                return ResponseEntity.ok(Map.of("success", true, "token", res.getToken(), "user", res, "pre_sales_officer", psr, "psr", psr));
             }
         }
 
@@ -165,6 +189,53 @@ public class AuthController {
         res.setSalesOfficer(so);
 
         return ResponseEntity.ok(Map.of("success", true, "token", res.getToken(), "user", res, "sales_officer", so));
+    }
+
+    /**
+     * Dedicated Pre-Sales Officer (PSR) Login (1-click role login or credentials)
+     */
+    @PostMapping("/psr/login")
+    public ResponseEntity<?> psrLogin(@RequestBody Map<String, Object> req) {
+        Long psrId = null;
+        if (req.containsKey("psr_id") && req.get("psr_id") != null) {
+            try {
+                psrId = Long.parseLong(req.get("psr_id").toString());
+            } catch (Exception ignored) {}
+        }
+        String email = (req.containsKey("email") && req.get("email") != null) ? req.get("email").toString().trim().toLowerCase() : "";
+        String code = (req.containsKey("code") && req.get("code") != null) ? req.get("code").toString().trim().toUpperCase() : "";
+
+        Optional<PreSalesOfficer> psrOpt = Optional.empty();
+        if (psrId != null) {
+            psrOpt = preSalesOfficerRepository.findById(psrId);
+        } else if (!email.isEmpty()) {
+            psrOpt = preSalesOfficerRepository.findByEmailIgnoreCase(email);
+        } else if (!code.isEmpty()) {
+            psrOpt = preSalesOfficerRepository.findByPsrCode(code);
+        }
+
+        if (psrOpt.isEmpty()) {
+            List<PreSalesOfficer> all = preSalesOfficerRepository.findAll();
+            if (!all.isEmpty()) psrOpt = Optional.of(all.get(0));
+        }
+
+        if (psrOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.fail("Pre-Sales Officer account not found."));
+        }
+
+        PreSalesOfficer psr = psrOpt.get();
+        salesOfficerRepository.findById(psr.getSalesOfficerId()).ifPresent(so -> {
+            psr.setSalesOfficerName(so.getName());
+            psr.setSalesOfficerCode(so.getOfficerCode());
+        });
+
+        Long userId = psr.getUserId() != null ? psr.getUserId() : 200L + psr.getId();
+        String token = "jwt-psr-" + psr.getId() + "-" + UUID.randomUUID();
+        AuthResponse res = new AuthResponse(token, userId, psr.getEmail() != null ? psr.getEmail() : psr.getPsrCode().toLowerCase() + "@fizzdrop.com", 7L, "PreSalesOfficer", null);
+        res.setPreSalesOfficer(psr);
+
+        return ResponseEntity.ok(Map.of("success", true, "token", res.getToken(), "user", res, "pre_sales_officer", psr, "psr", psr));
     }
 
     /**

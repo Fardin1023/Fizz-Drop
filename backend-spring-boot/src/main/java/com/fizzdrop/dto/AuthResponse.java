@@ -2,6 +2,7 @@ package com.fizzdrop.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fizzdrop.entity.Outlet;
+import com.fizzdrop.entity.PreSalesOfficer;
 import com.fizzdrop.entity.SalesOfficer;
 
 public class AuthResponse {
@@ -29,6 +30,9 @@ public class AuthResponse {
     @JsonProperty("sales_officer")
     private SalesOfficer salesOfficer;
 
+    @JsonProperty("pre_sales_officer")
+    private PreSalesOfficer preSalesOfficer;
+
     public AuthResponse() {}
 
     public AuthResponse(String token, Long userId, String email, Long roleId, String roleName, Long branchId) {
@@ -51,6 +55,9 @@ public class AuthResponse {
 
     public SalesOfficer getSalesOfficer() { return salesOfficer; }
     public void setSalesOfficer(SalesOfficer salesOfficer) { this.salesOfficer = salesOfficer; }
+
+    public PreSalesOfficer getPreSalesOfficer() { return preSalesOfficer; }
+    public void setPreSalesOfficer(PreSalesOfficer preSalesOfficer) { this.preSalesOfficer = preSalesOfficer; }
 
     public String getToken() { return token; }
     public void setToken(String token) { this.token = token; }

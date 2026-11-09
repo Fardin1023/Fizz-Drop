@@ -3,7 +3,7 @@ import type { AppNotification, RealtimeEventPayload } from '../types/notificatio
 import { playNotificationChime } from '../utils/sound';
 
 export const useNotifications = (
-  role: 'SUPERADMIN' | 'SUPPLIER' | 'OUTLET' | 'SALES_OFFICER',
+  role: 'SUPERADMIN' | 'SUPPLIER' | 'OUTLET' | 'SALES_OFFICER' | 'PSR' | string,
   userId?: number,
   enabled: boolean = true
 ) => {

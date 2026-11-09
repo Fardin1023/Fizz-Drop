@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { ShieldCheck, Crown, Lock, Mail, ArrowRight, AlertCircle, Package, Home, UserCheck } from 'lucide-react';
+import { ShieldCheck, Crown, Lock, Mail, ArrowRight, AlertCircle, Package, Home, UserCheck, Store } from 'lucide-react';
 import { AnimatedFizzdropBackdrop } from '../../components/Background/AnimatedFizzdropBackdrop';
 
 interface AdminLoginProps {
@@ -19,9 +19,10 @@ interface DynamicSupplier {
 }
 
 const AdminLogin: React.FC<AdminLoginProps> = ({ onSuccess, requiredRole = 'any' }) => {
-  const { login, loginAsSupplier, loginAsSuperadmin, loginAsSalesOfficer } = useAuth();
+  const { login, loginAsSupplier, loginAsSuperadmin, loginAsSalesOfficer, loginAsPsr } = useAuth();
   const navigate = useNavigate();
   const [salesOfficersList, setSalesOfficersList] = useState<any[]>([]);
+  const [psrsList, setPsrsList] = useState<any[]>([]);
   const [email, setEmail] = useState(
     requiredRole === 'superadmin' ? 'superadmin@fizzdrop.com' : 'central.supplier@fizzdrop.com'
   );
@@ -48,6 +49,10 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onSuccess, requiredRole = 'any'
     fetch('http://localhost:8080/api/v1/sales-officers')
       .then(r => r.json())
       .then(data => { if (Array.isArray(data)) setSalesOfficersList(data); })
+      .catch(() => {});
+    fetch('http://localhost:8080/api/v1/psr/all')
+      .then(r => r.json())
+      .then(data => { if (Array.isArray(data)) setPsrsList(data); })
       .catch(() => {});
   }, []);
 
@@ -327,6 +332,51 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onSuccess, requiredRole = 'any'
                       </div>
                       <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-300 shrink-0 font-bold">
                         Officer
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+
+            {/* Pre-Sales Officers (PSR) Field Team */}
+            <div className="space-y-1.5 pt-2">
+              <span className="block text-[10px] font-semibold text-orange-500 uppercase tracking-wider text-left pl-1">
+                Pre-Sales Officers (PSR) • Sub-Route Field Agents
+              </span>
+
+              {psrsList.length > 0 ? (
+                <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                  {psrsList.map((psr) => (
+                    <button
+                      key={psr.id}
+                      type="button"
+                      onClick={async () => {
+                        setError(null);
+                        setLoading(true);
+                        const res = await loginAsPsr(psr.id, psr.email);
+                        setLoading(false);
+                        if (res.success) {
+                          navigate('/psr');
+                          if (onSuccess) onSuccess();
+                        } else {
+                          setError(res.error || 'Failed to authenticate Pre-Sales Officer');
+                        }
+                      }}
+                      disabled={loading}
+                      className="w-full py-2 px-3 rounded-xl bg-orange-50/70 hover:bg-orange-100 dark:bg-orange-950/30 dark:hover:bg-orange-900/40 border border-orange-200 dark:border-orange-800 text-zinc-800 dark:text-zinc-200 text-xs font-semibold flex items-center justify-between transition-all cursor-pointer text-left"
+                    >
+                      <div className="flex items-center gap-2 min-w-0 pr-2">
+                        <Store className="w-3.5 h-3.5 text-orange-600 shrink-0" />
+                        <div className="min-w-0">
+                          <span className="block truncate font-bold text-orange-800 dark:text-orange-300">{psr.name}</span>
+                          <span className="block text-[10px] font-mono text-slate-400 dark:text-zinc-400 truncate">
+                            {psr.psr_code} • {psr.sub_route}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-900/60 text-orange-800 dark:text-orange-300 shrink-0 font-bold">
+                        PSR
                       </span>
                     </button>
                   ))}

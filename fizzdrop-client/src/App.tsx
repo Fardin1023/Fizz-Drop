@@ -8,6 +8,7 @@ import SuperadminDashboard from './pages/Superadmin/SuperadminDashboard';
 import { OutletDashboard } from './pages/Outlet/OutletDashboard';
 import { OutletAuth } from './pages/Outlet/OutletAuth';
 import SalesOfficerDashboard from './pages/SalesOfficer/SalesOfficerDashboard';
+import PsrDashboard from './pages/PSR/PsrDashboard';
 import { AuthProvider } from './context/AuthContext';
 
 function App() {
@@ -16,11 +17,13 @@ function App() {
   const [outlets, setOutlets] = useState<{ branchId: string | number; branchName: string }[]>([]);
   const location = useLocation();
 
-  // Hide the customer navigation bar on Admin, Superadmin and Outlet portals
+  // Hide the customer navigation bar on Admin, Superadmin, Outlet, Sales Officer and PSR portals
   const isAdminOrSuperadmin =
     location.pathname.startsWith('/admin') ||
     location.pathname.startsWith('/superadmin') ||
-    location.pathname.startsWith('/outlet') || location.pathname.startsWith('/sales-officer');
+    location.pathname.startsWith('/outlet') ||
+    location.pathname.startsWith('/sales-officer') ||
+    location.pathname.startsWith('/psr');
 
   useEffect(() => {
     const fetchOutlets = async () => {
@@ -125,6 +128,14 @@ function App() {
             <Route
               path="/sales-officer/*"
               element={<SalesOfficerDashboard />}
+            />
+            <Route
+              path="/psr"
+              element={<PsrDashboard />}
+            />
+            <Route
+              path="/psr/*"
+              element={<PsrDashboard />}
             />
           </Routes>
         </main>

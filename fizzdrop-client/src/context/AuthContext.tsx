@@ -32,6 +32,23 @@ export interface User {
     supplier_name?: string;
     notes?: string;
   };
+  pre_sales_officer?: {
+    id: number;
+    psr_code: string;
+    name: string;
+    phone: string;
+    email: string;
+    sales_officer_id: number;
+    sub_route: string;
+    assigned_area: string;
+    status: string;
+    notes?: string;
+    sales_officer_name?: string;
+    sales_officer_code?: string;
+    outlet_count?: number;
+    active_orders_count?: number;
+    pending_refunds_count?: number;
+  };
 }
 
 interface AuthContextType {
@@ -42,14 +59,17 @@ interface AuthContextType {
   isSuperadmin: boolean;
   isOutlet: boolean;
   isSalesOfficer: boolean;
+  isPsr: boolean;
   outlet: User['outlet'] | null;
   salesOfficer: User['sales_officer'] | null;
+  psr: User['pre_sales_officer'] | null;
   isLoading: boolean;
   login: (email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
   loginAsSupplier: (email?: string) => Promise<{ success: boolean; error?: string }>;
   loginAsSuperadmin: () => Promise<{ success: boolean; error?: string }>;
   loginAsOutlet: (outletId?: number, email?: string, password?: string) => Promise<{ success: boolean; error?: string }>;
   loginAsSalesOfficer: (officerId?: number, email?: string, password?: string) => Promise<{ success: boolean; error?: string }>;
+  loginAsPsr: (psrId?: number, email?: string, password?: string) => Promise<{ success: boolean; error?: string }>;
   registerOutlet: (outletData: any) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
 }
@@ -105,6 +125,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         Boolean(data.sales_officer || u.sales_officer)
       );
 
+      const isPsr = (
+        u.role_id === 7 ||
+        u.roleId === 7 ||
+        (u.role_name || u.role || '').toLowerCase().includes('psr') ||
+        (u.role_name || u.role || '').toLowerCase().includes('presales') ||
+        (u.email || '').toLowerCase().includes('.psr@') ||
+        Boolean(data.pre_sales_officer || data.psr || u.pre_sales_officer)
+      );
+
       const isOutlet = (
         u.role_id === 2 ||
         u.roleId === 2 ||
@@ -113,13 +142,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       );
 
       const normalizedUser: User = {
-        user_id: u.user_id ?? u.userId ?? (isSuper ? 99 : (isSalesOfficer ? 6 : 4)),
+        user_id: u.user_id ?? u.userId ?? (isSuper ? 99 : (isSalesOfficer ? 6 : (isPsr ? 7 : 4))),
         email: u.email,
-        role_id: isSuper ? 4 : (isSalesOfficer ? 6 : (isOutlet ? 2 : 3)),
-        role_name: isSuper ? 'Superadmin' : (isSalesOfficer ? 'SalesOfficer' : (isOutlet ? 'Outlet' : 'Supplier')),
+        role_id: isSuper ? 4 : (isSalesOfficer ? 6 : (isPsr ? 7 : (isOutlet ? 2 : 3))),
+        role_name: isSuper ? 'Superadmin' : (isSalesOfficer ? 'SalesOfficer' : (isPsr ? 'PreSalesOfficer' : (isOutlet ? 'Outlet' : 'Supplier'))),
         branch_id: u.branch_id ?? u.branchId ?? (isOutlet ? 2 : null),
         outlet: data.outlet || u.outlet,
         sales_officer: data.sales_officer || u.sales_officer,
+        pre_sales_officer: data.pre_sales_officer || data.psr || u.pre_sales_officer,
       };
 
       setToken(data.token);
@@ -238,6 +268,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const loginAsPsr = async (psrId?: number, email?: string, password = 'Psr123!') => {
+    try {
+      const res = await fetch('http://localhost:8080/api/auth/psr/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ psr_id: psrId, email, password }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, error: data.error || 'Pre-Sales Officer login failed' };
+      }
+
+      const u = data.user;
+      const psr = data.pre_sales_officer || data.psr || u.pre_sales_officer;
+      const normalizedUser: User = {
+        user_id: u.user_id ?? u.userId ?? (psr?.id ? 200 + psr.id : 201),
+        email: u.email || psr?.email,
+        role_id: 7,
+        role_name: 'PreSalesOfficer',
+        branch_id: null,
+        pre_sales_officer: psr,
+      };
+
+      setToken(data.token);
+      setUser(normalizedUser);
+      localStorage.setItem('fizzdrop_token', data.token);
+      localStorage.setItem('fizzdrop_user', JSON.stringify(normalizedUser));
+
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Server connection error' };
+    }
+  };
+
   const loginAsSupplier = async (email = 'central.supplier@fizzdrop.com') => {
     return login(email, 'Password123!');
   };
@@ -274,12 +339,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       Boolean(user?.sales_officer)
   );
 
+  const isPsr = Boolean(
+    user?.role_id === 7 ||
+      user?.role_name?.toLowerCase().includes('psr') ||
+      user?.role_name?.toLowerCase().includes('presales') ||
+      user?.email?.toLowerCase().includes('.psr@') ||
+      Boolean(user?.pre_sales_officer)
+  );
+
   const isSupplier = Boolean(
     (user?.role_id === 3 ||
       user?.role_name?.toLowerCase().includes('supplier') ||
       user?.email?.toLowerCase().includes('supplier')) &&
       !isSalesOfficer &&
-      !isOutlet
+      !isOutlet &&
+      !isPsr
   );
 
   return (
@@ -292,14 +366,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isSuperadmin,
         isOutlet,
         isSalesOfficer,
+        isPsr,
         outlet: user?.outlet || null,
         salesOfficer: user?.sales_officer || null,
+        psr: user?.pre_sales_officer || null,
         isLoading,
         login,
         loginAsSupplier,
         loginAsSuperadmin,
         loginAsOutlet,
         loginAsSalesOfficer,
+        loginAsPsr,
         registerOutlet,
         logout,
       }}

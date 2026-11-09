@@ -1,0 +1,658 @@
+package com.fizzdrop.controller;
+
+import com.fizzdrop.dto.ApiResponse;
+import com.fizzdrop.entity.*;
+import com.fizzdrop.repository.*;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.web.bind.annotation.*;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.*;
+
+@RestController
+@RequestMapping("/api/v1/psr")
+@CrossOrigin(origins = "*")
+public class PsrController {
+
+    private final PreSalesOfficerRepository psrRepository;
+    private final SalesOfficerRepository salesOfficerRepository;
+    private final OutletRepository outletRepository;
+    private final ProductRepository productRepository;
+    private final AppNotificationRepository notificationRepository;
+    private final JdbcTemplate jdbcTemplate;
+
+    public PsrController(PreSalesOfficerRepository psrRepository,
+                         SalesOfficerRepository salesOfficerRepository,
+                         OutletRepository outletRepository,
+                         ProductRepository productRepository,
+                         AppNotificationRepository notificationRepository,
+                         JdbcTemplate jdbcTemplate) {
+        this.psrRepository = psrRepository;
+        this.salesOfficerRepository = salesOfficerRepository;
+        this.outletRepository = outletRepository;
+        this.productRepository = productRepository;
+        this.notificationRepository = notificationRepository;
+        this.jdbcTemplate = jdbcTemplate;
+    }
+
+    /**
+     * Get all Pre-Sales Officers with their assigned Sales Officer, outlet count, and order stats.
+     */
+    @GetMapping("/all")
+    public ResponseEntity<List<PreSalesOfficer>> getAllPsrs() {
+        List<PreSalesOfficer> psrs = psrRepository.findAll();
+        enrichPsrs(psrs);
+        return ResponseEntity.ok(psrs);
+    }
+
+    /**
+     * Get PSRs assigned under a specific Sales Officer.
+     */
+    @GetMapping("/by-so/{salesOfficerId}")
+    public ResponseEntity<List<PreSalesOfficer>> getPsrsBySalesOfficer(@PathVariable Long salesOfficerId) {
+        List<PreSalesOfficer> psrs = psrRepository.findBySalesOfficerId(salesOfficerId);
+        enrichPsrs(psrs);
+        return ResponseEntity.ok(psrs);
+    }
+
+    /**
+     * Provision or create a new Pre-Sales Officer (PSR).
+     */
+    @PostMapping
+    public ResponseEntity<?> createPsr(@RequestBody Map<String, Object> req) {
+        try {
+            String name = (String) req.get("name");
+            String phone = (String) req.get("phone");
+            String email = (String) req.get("email");
+            Long salesOfficerId = Long.parseLong(req.get("sales_officer_id").toString());
+            String subRoute = (String) req.get("sub_route");
+            String assignedArea = (String) req.get("assigned_area");
+            String notes = (String) req.get("notes");
+
+            String psrCode = req.containsKey("psr_code") && req.get("psr_code") != null
+                    ? req.get("psr_code").toString().trim().toUpperCase()
+                    : "PSR-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+
+            PreSalesOfficer psr = new PreSalesOfficer(psrCode, name, phone, email, salesOfficerId, subRoute, assignedArea);
+            psr.setNotes(notes);
+            psrRepository.save(psr);
+
+            return ResponseEntity.status(HttpStatus.CREATED).body(psr);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("Failed to create PSR: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Comprehensive Dashboard endpoint for a Pre-Sales Officer.
+     */
+    @GetMapping("/dashboard")
+    public ResponseEntity<?> getDashboard(
+            @RequestParam(required = false) Long psrId,
+            @RequestParam(required = false) String psrCode,
+            @RequestParam(required = false) String email) {
+
+        Optional<PreSalesOfficer> psrOpt = Optional.empty();
+        if (psrId != null) {
+            psrOpt = psrRepository.findById(psrId);
+        } else if (email != null && !email.trim().isEmpty()) {
+            psrOpt = psrRepository.findByEmailIgnoreCase(email.trim());
+        } else if (psrCode != null && !psrCode.trim().isEmpty()) {
+            psrOpt = psrRepository.findByPsrCode(psrCode.trim());
+        }
+
+        if (psrOpt.isEmpty()) {
+            List<PreSalesOfficer> all = psrRepository.findAll();
+            if (!all.isEmpty()) psrOpt = Optional.of(all.get(0));
+        }
+
+        if (psrOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail("No Pre-Sales Officer found."));
+        }
+
+        PreSalesOfficer psr = psrOpt.get();
+        enrichPsrs(List.of(psr));
+
+        // Get Sales Officer
+        SalesOfficer so = salesOfficerRepository.findById(psr.getSalesOfficerId()).orElse(null);
+
+        // Fetch outlets on this sub-route or assigned to this PSR
+        List<Map<String, Object>> routeOutlets = getOutletsForPsr(psr);
+
+        // Fetch all products
+        List<Product> products = productRepository.findAll();
+
+        // Fetch PSR Orders
+        List<Map<String, Object>> orders = jdbcTemplate.queryForList(
+                "SELECT id, order_code, psr_id, psr_name, sales_officer_id, outlet_id, outlet_name, sub_route, " +
+                "product_id, product_name, quantity, unit_price, total_amount, urgency, status, outlet_remarks, psr_notes, created_at, updated_at " +
+                "FROM psr_orders WHERE psr_id = ? ORDER BY id DESC LIMIT 50",
+                psr.getId()
+        );
+
+        // Fetch PSR Refund Requests
+        List<Map<String, Object>> refunds = jdbcTemplate.queryForList(
+                "SELECT id, refund_code, psr_id, psr_name, sales_officer_id, outlet_id, outlet_name, sub_route, " +
+                "product_id, product_name, quantity, unit_price, refund_amount, reason, status, outlet_remarks, psr_notes, so_remarks, created_at, updated_at " +
+                "FROM psr_refund_requests WHERE psr_id = ? ORDER BY id DESC LIMIT 50",
+                psr.getId()
+        );
+
+        // Fetch visit logs
+        List<Map<String, Object>> visits = jdbcTemplate.queryForList(
+                "SELECT id, psr_id, sales_officer_id, outlet_id, outlet_name, visit_type, notes, created_at " +
+                "FROM psr_visit_logs WHERE psr_id = ? ORDER BY id DESC LIMIT 30",
+                psr.getId()
+        );
+
+        // Calculate Route Stats
+        int totalOutlets = routeOutlets.size();
+        int activeOrdersCount = 0;
+        BigDecimal todayOrdersValue = BigDecimal.ZERO;
+        int pendingRefundsCount = 0;
+        int settledRefundsCount = 0;
+
+        for (Map<String, Object> ord : orders) {
+            String st = (String) ord.get("status");
+            if ("SUBMITTED_TO_SO".equals(st) || "APPROVED_BY_SO".equals(st) || "DRAFT".equals(st)) {
+                activeOrdersCount++;
+            }
+            if (ord.get("total_amount") != null) {
+                try {
+                    todayOrdersValue = todayOrdersValue.add(new BigDecimal(ord.get("total_amount").toString()));
+                } catch (Exception ignored) {}
+            }
+        }
+
+        for (Map<String, Object> ref : refunds) {
+            String st = (String) ref.get("status");
+            if ("SUBMITTED_TO_SO".equals(st) || "PENDING".equals(st)) {
+                pendingRefundsCount++;
+            } else if ("SETTLED".equals(st) || "APPROVED_BY_SO".equals(st)) {
+                settledRefundsCount++;
+            }
+        }
+
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("total_outlets", totalOutlets);
+        stats.put("total_orders", orders.size());
+        stats.put("active_orders_count", activeOrdersCount);
+        stats.put("today_orders_value", todayOrdersValue);
+        stats.put("pending_refunds_count", pendingRefundsCount);
+        stats.put("settled_refunds_count", settledRefundsCount);
+
+        Map<String, Object> res = new HashMap<>();
+        res.put("psr", psr);
+        res.put("sales_officer", so);
+        res.put("sub_route", psr.getSubRoute());
+        res.put("assigned_area", psr.getAssignedArea());
+        res.put("outlets", routeOutlets);
+        res.put("products", products);
+        res.put("orders", orders);
+        res.put("refunds", refunds);
+        res.put("visits", visits);
+        res.put("stats", stats);
+
+        return ResponseEntity.ok(res);
+    }
+
+    /**
+     * PSR Takes an Outlet Product Order and queues / submits it to the Sales Officer.
+     */
+    @PostMapping("/orders")
+    public ResponseEntity<?> createOutletOrder(@RequestBody Map<String, Object> req) {
+        try {
+            Long psrId = Long.parseLong(req.get("psr_id").toString());
+            PreSalesOfficer psr = psrRepository.findById(psrId)
+                    .orElseThrow(() -> new RuntimeException("Pre-Sales Officer with ID " + psrId + " not found."));
+
+            Long outletId = Long.parseLong(req.get("outlet_id").toString());
+            Outlet outlet = outletRepository.findById(outletId)
+                    .orElseThrow(() -> new RuntimeException("Outlet with ID " + outletId + " not found."));
+
+            Long productId = Long.parseLong(req.get("product_id").toString());
+            Product product = productRepository.findById(productId)
+                    .orElseThrow(() -> new RuntimeException("Product with ID " + productId + " not found."));
+
+            int quantity = Integer.parseInt(req.get("quantity").toString());
+            if (quantity <= 0) {
+                return ResponseEntity.badRequest().body(ApiResponse.fail("Order quantity must be at least 1."));
+            }
+
+            BigDecimal unitPrice = product.getOutletPrice() != null ? product.getOutletPrice() : product.getBasePrice();
+            if (req.containsKey("unit_price") && req.get("unit_price") != null) {
+                try {
+                    unitPrice = new BigDecimal(req.get("unit_price").toString());
+                } catch (Exception ignored) {}
+            }
+
+            BigDecimal totalAmount = unitPrice.multiply(BigDecimal.valueOf(quantity));
+            String urgency = req.getOrDefault("urgency", "NORMAL").toString();
+            String outletRemarks = (String) req.get("outlet_remarks");
+            String psrNotes = (String) req.get("psr_notes");
+            String status = req.getOrDefault("status", "SUBMITTED_TO_SO").toString();
+
+            String orderCode = "PSR-ORD-" + (1000 + (int)(Math.random() * 9000));
+            String outletName = (outlet.getFranchiseName() != null ? outlet.getFranchiseName() : "") + " " +
+                                (outlet.getBranchName() != null ? outlet.getBranchName() : "");
+            String productName = product.getBrand() + " " + (product.getFlavorVariant() != null ? product.getFlavorVariant() : "");
+
+            jdbcTemplate.update(
+                    "INSERT INTO psr_orders (order_code, psr_id, psr_name, sales_officer_id, outlet_id, outlet_name, sub_route, " +
+                    "product_id, product_name, quantity, unit_price, total_amount, urgency, status, outlet_remarks, psr_notes, created_at, updated_at) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())",
+                    orderCode, psr.getId(), psr.getName(), psr.getSalesOfficerId(), outlet.getOutletId(),
+                    outletName.trim(), psr.getSubRoute(), product.getProductId(), productName.trim(),
+                    quantity, unitPrice, totalAmount, urgency, status, outletRemarks, psrNotes
+            );
+
+            // Log visit
+            try {
+                jdbcTemplate.update(
+                        "INSERT INTO psr_visit_logs (psr_id, sales_officer_id, outlet_id, outlet_name, visit_type, notes, created_at) " +
+                        "VALUES (?, ?, ?, ?, 'ORDER_COLLECTION', ?, NOW())",
+                        psr.getId(), psr.getSalesOfficerId(), outlet.getOutletId(), outletName.trim(),
+                        "Collected order " + orderCode + " (" + quantity + " units " + productName.trim() + ")"
+                );
+            } catch (Exception ignored) {}
+
+            // Send notification to Sales Officer
+            try {
+                SalesOfficer so = salesOfficerRepository.findById(psr.getSalesOfficerId()).orElse(null);
+                Long soUserId = (so != null && so.getUserId() != null) ? so.getUserId() : 100L + psr.getSalesOfficerId();
+
+                AppNotification notif = new AppNotification();
+                notif.setRecipientRole("SALES_OFFICER");
+                notif.setRecipientUserId(soUserId);
+                notif.setTitle("New Route Order from PSR " + psr.getName());
+                notif.setMessage("PSR " + psr.getName() + " booked " + quantity + " cases of " + productName.trim() +
+                                " (৳" + totalAmount + ") for " + outletName.trim() + " on route " + psr.getSubRoute() + ".");
+                notif.setType("NEW_PSR_ORDER");
+                notif.setReferenceCode(orderCode);
+                notificationRepository.save(notif);
+            } catch (Exception ignored) {}
+
+            Map<String, Object> resp = new HashMap<>();
+            resp.put("success", true);
+            resp.put("order_code", orderCode);
+            resp.put("message", "Order " + orderCode + " collected and submitted to Sales Officer!");
+            resp.put("total_amount", totalAmount);
+
+            return ResponseEntity.ok(resp);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("Failed to place PSR order: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Submit batch orders to Sales Officer.
+     */
+    @PostMapping("/orders/submit-batch")
+    public ResponseEntity<?> submitBatchOrders(@RequestBody Map<String, Object> req) {
+        try {
+            Long psrId = Long.parseLong(req.get("psr_id").toString());
+            PreSalesOfficer psr = psrRepository.findById(psrId)
+                    .orElseThrow(() -> new RuntimeException("Pre-Sales Officer not found."));
+
+            int updated = jdbcTemplate.update(
+                    "UPDATE psr_orders SET status = 'SUBMITTED_TO_SO', updated_at = NOW() WHERE psr_id = ? AND status = 'DRAFT'",
+                    psrId
+            );
+
+            // Notify Sales Officer
+            try {
+                SalesOfficer so = salesOfficerRepository.findById(psr.getSalesOfficerId()).orElse(null);
+                Long soUserId = (so != null && so.getUserId() != null) ? so.getUserId() : 100L + psr.getSalesOfficerId();
+
+                AppNotification notif = new AppNotification();
+                notif.setRecipientRole("SALES_OFFICER");
+                notif.setRecipientUserId(soUserId);
+                notif.setTitle("Batch Orders Submitted by PSR " + psr.getName());
+                notif.setMessage("PSR " + psr.getName() + " finalized and submitted " + updated + " field orders from " + psr.getSubRoute() + ".");
+                notif.setType("NEW_PSR_ORDER");
+                notificationRepository.save(notif);
+            } catch (Exception ignored) {}
+
+            return ResponseEntity.ok(Map.of("success", true, "submitted_count", updated));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("Failed to submit batch: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Update PSR Order Status (e.g. Sales Officer approves, marks dispatched/delivered).
+     */
+    @PutMapping("/orders/{id}/status")
+    public ResponseEntity<?> updateOrderStatus(@PathVariable Long id, @RequestBody Map<String, Object> req) {
+        try {
+            String status = (String) req.get("status");
+            String notes = (String) req.get("psr_notes");
+
+            List<Map<String, Object>> ordList = jdbcTemplate.queryForList("SELECT * FROM psr_orders WHERE id = ?", id);
+            if (ordList.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail("Order not found."));
+            }
+            Map<String, Object> ord = ordList.get(0);
+
+            jdbcTemplate.update(
+                    "UPDATE psr_orders SET status = ?, updated_at = NOW() WHERE id = ?",
+                    status, id
+            );
+
+            // Notify PSR if approved or delivered
+            try {
+                Long psrId = Long.parseLong(ord.get("psr_id").toString());
+                psrRepository.findById(psrId).ifPresent(p -> {
+                    AppNotification notif = new AppNotification();
+                    notif.setRecipientRole("PSR");
+                    notif.setRecipientUserId(p.getUserId() != null ? p.getUserId() : 200L + p.getId());
+                    notif.setTitle("Order " + ord.get("order_code") + " Updated: " + status);
+                    notif.setMessage("Sales Officer marked order for " + ord.get("outlet_name") + " as " + status + ".");
+                    notif.setType("PSR_ORDER_STATUS_UPDATE");
+                    notif.setReferenceCode((String) ord.get("order_code"));
+                    notificationRepository.save(notif);
+                });
+            } catch (Exception ignored) {}
+
+            return ResponseEntity.ok(Map.of("success", true, "status", status));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("Failed to update status: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * PSR Logs an Outlet Product Refund / Return Request.
+     */
+    @PostMapping("/refunds")
+    public ResponseEntity<?> createRefundRequest(@RequestBody Map<String, Object> req) {
+        try {
+            Long psrId = Long.parseLong(req.get("psr_id").toString());
+            PreSalesOfficer psr = psrRepository.findById(psrId)
+                    .orElseThrow(() -> new RuntimeException("Pre-Sales Officer with ID " + psrId + " not found."));
+
+            Long outletId = Long.parseLong(req.get("outlet_id").toString());
+            Outlet outlet = outletRepository.findById(outletId)
+                    .orElseThrow(() -> new RuntimeException("Outlet with ID " + outletId + " not found."));
+
+            Long productId = Long.parseLong(req.get("product_id").toString());
+            Product product = productRepository.findById(productId)
+                    .orElseThrow(() -> new RuntimeException("Product with ID " + productId + " not found."));
+
+            int quantity = Integer.parseInt(req.get("quantity").toString());
+            if (quantity <= 0) {
+                return ResponseEntity.badRequest().body(ApiResponse.fail("Refund quantity must be at least 1."));
+            }
+
+            BigDecimal unitPrice = product.getOutletPrice() != null ? product.getOutletPrice() : product.getBasePrice();
+            if (req.containsKey("unit_price") && req.get("unit_price") != null) {
+                try {
+                    unitPrice = new BigDecimal(req.get("unit_price").toString());
+                } catch (Exception ignored) {}
+            }
+
+            BigDecimal refundAmount = unitPrice.multiply(BigDecimal.valueOf(quantity));
+            String reason = (String) req.getOrDefault("reason", "DAMAGED_LEAKAGE");
+            String outletRemarks = (String) req.get("outlet_remarks");
+            String psrNotes = (String) req.get("psr_notes");
+
+            String refundCode = "PSR-REF-" + (1000 + (int)(Math.random() * 9000));
+            String outletName = (outlet.getFranchiseName() != null ? outlet.getFranchiseName() : "") + " " +
+                                (outlet.getBranchName() != null ? outlet.getBranchName() : "");
+            String productName = product.getBrand() + " " + (product.getFlavorVariant() != null ? product.getFlavorVariant() : "");
+
+            jdbcTemplate.update(
+                    "INSERT INTO psr_refund_requests (refund_code, psr_id, psr_name, sales_officer_id, outlet_id, outlet_name, sub_route, " +
+                    "product_id, product_name, quantity, unit_price, refund_amount, reason, status, outlet_remarks, psr_notes, created_at, updated_at) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'SUBMITTED_TO_SO', ?, ?, NOW(), NOW())",
+                    refundCode, psr.getId(), psr.getName(), psr.getSalesOfficerId(), outlet.getOutletId(),
+                    outletName.trim(), psr.getSubRoute(), product.getProductId(), productName.trim(),
+                    quantity, unitPrice, refundAmount, reason, outletRemarks, psrNotes
+            );
+
+            // Log visit
+            try {
+                jdbcTemplate.update(
+                        "INSERT INTO psr_visit_logs (psr_id, sales_officer_id, outlet_id, outlet_name, visit_type, notes, created_at) " +
+                        "VALUES (?, ?, ?, ?, 'REFUND_INSPECTION', ?, NOW())",
+                        psr.getId(), psr.getSalesOfficerId(), outlet.getOutletId(), outletName.trim(),
+                        "Logged refund " + refundCode + " (" + quantity + " units " + productName.trim() + " - " + reason + ")"
+                );
+            } catch (Exception ignored) {}
+
+            // Send notification to Sales Officer
+            try {
+                SalesOfficer so = salesOfficerRepository.findById(psr.getSalesOfficerId()).orElse(null);
+                Long soUserId = (so != null && so.getUserId() != null) ? so.getUserId() : 100L + psr.getSalesOfficerId();
+
+                AppNotification notif = new AppNotification();
+                notif.setRecipientRole("SALES_OFFICER");
+                notif.setRecipientUserId(soUserId);
+                notif.setTitle("New Field Refund Claim from PSR " + psr.getName());
+                notif.setMessage("PSR " + psr.getName() + " recorded a return claim for " + quantity + " units of " +
+                                productName.trim() + " (Reason: " + reason + ") from " + outletName.trim() + ".");
+                notif.setType("NEW_PSR_REFUND");
+                notif.setReferenceCode(refundCode);
+                notificationRepository.save(notif);
+            } catch (Exception ignored) {}
+
+            Map<String, Object> resp = new HashMap<>();
+            resp.put("success", true);
+            resp.put("refund_code", refundCode);
+            resp.put("message", "Refund request " + refundCode + " submitted to Sales Officer for approval.");
+            resp.put("refund_amount", refundAmount);
+
+            return ResponseEntity.ok(resp);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("Failed to submit refund request: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Sales Officer Updates Refund Status (e.g. APPROVED_BY_SO, REJECTED, SETTLED).
+     */
+    @PutMapping("/refunds/{id}/status")
+    public ResponseEntity<?> updateRefundStatus(@PathVariable Long id, @RequestBody Map<String, Object> req) {
+        try {
+            String status = (String) req.get("status");
+            String soRemarks = (String) req.get("so_remarks");
+
+            List<Map<String, Object>> refList = jdbcTemplate.queryForList("SELECT * FROM psr_refund_requests WHERE id = ?", id);
+            if (refList.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail("Refund request not found."));
+            }
+            Map<String, Object> ref = refList.get(0);
+
+            jdbcTemplate.update(
+                    "UPDATE psr_refund_requests SET status = ?, so_remarks = ?, updated_at = NOW() WHERE id = ?",
+                    status, soRemarks, id
+            );
+
+            // Notify PSR
+            try {
+                Long psrId = Long.parseLong(ref.get("psr_id").toString());
+                psrRepository.findById(psrId).ifPresent(p -> {
+                    AppNotification notif = new AppNotification();
+                    notif.setRecipientRole("PSR");
+                    notif.setRecipientUserId(p.getUserId() != null ? p.getUserId() : 200L + p.getId());
+                    notif.setTitle("Refund " + ref.get("refund_code") + ": " + status);
+                    notif.setMessage("Sales Officer updated refund for " + ref.get("outlet_name") + " to " + status + ".");
+                    notif.setType("PSR_REFUND_STATUS_UPDATE");
+                    notif.setReferenceCode((String) ref.get("refund_code"));
+                    notificationRepository.save(notif);
+                });
+            } catch (Exception ignored) {}
+
+            return ResponseEntity.ok(Map.of("success", true, "status", status));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("Failed to update refund status: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Log a Field Visit (e.g. Routine check, stock audit).
+     */
+    @PostMapping("/visit-log")
+    public ResponseEntity<?> logVisit(@RequestBody Map<String, Object> req) {
+        try {
+            Long psrId = Long.parseLong(req.get("psr_id").toString());
+            PreSalesOfficer psr = psrRepository.findById(psrId).orElseThrow(() -> new RuntimeException("PSR not found"));
+
+            Long outletId = Long.parseLong(req.get("outlet_id").toString());
+            Outlet outlet = outletRepository.findById(outletId).orElseThrow(() -> new RuntimeException("Outlet not found"));
+
+            String visitType = req.getOrDefault("visit_type", "ROUTINE_CHECK").toString();
+            String notes = (String) req.get("notes");
+
+            String outletName = (outlet.getFranchiseName() != null ? outlet.getFranchiseName() : "") + " " +
+                                (outlet.getBranchName() != null ? outlet.getBranchName() : "");
+
+            jdbcTemplate.update(
+                    "INSERT INTO psr_visit_logs (psr_id, sales_officer_id, outlet_id, outlet_name, visit_type, notes, created_at) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, NOW())",
+                    psr.getId(), psr.getSalesOfficerId(), outlet.getOutletId(), outletName.trim(), visitType, notes
+            );
+
+            return ResponseEntity.ok(Map.of("success", true, "message", "Field visit logged successfully."));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("Failed to log visit: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Sales Officer Summary: Aggregate all PSRs, route orders, and refund requests under a specific Sales Officer.
+     */
+    @GetMapping("/so-summary/{salesOfficerId}")
+    public ResponseEntity<?> getSalesOfficerSummary(@PathVariable Long salesOfficerId) {
+        List<PreSalesOfficer> psrs = psrRepository.findBySalesOfficerId(salesOfficerId);
+        enrichPsrs(psrs);
+
+        List<Map<String, Object>> orders = jdbcTemplate.queryForList(
+                "SELECT * FROM psr_orders WHERE sales_officer_id = ? ORDER BY id DESC LIMIT 100",
+                salesOfficerId
+        );
+
+        List<Map<String, Object>> refunds = jdbcTemplate.queryForList(
+                "SELECT * FROM psr_refund_requests WHERE sales_officer_id = ? ORDER BY id DESC LIMIT 100",
+                salesOfficerId
+        );
+
+        int pendingOrdersCount = 0;
+        BigDecimal pendingOrdersValue = BigDecimal.ZERO;
+        int pendingRefundsCount = 0;
+        BigDecimal pendingRefundsValue = BigDecimal.ZERO;
+
+        for (Map<String, Object> o : orders) {
+            String st = (String) o.get("status");
+            if ("SUBMITTED_TO_SO".equals(st) || "PENDING".equals(st)) {
+                pendingOrdersCount++;
+                if (o.get("total_amount") != null) {
+                    try {
+                        pendingOrdersValue = pendingOrdersValue.add(new BigDecimal(o.get("total_amount").toString()));
+                    } catch (Exception ignored) {}
+                }
+            }
+        }
+
+        for (Map<String, Object> r : refunds) {
+            String st = (String) r.get("status");
+            if ("SUBMITTED_TO_SO".equals(st) || "PENDING".equals(st)) {
+                pendingRefundsCount++;
+                if (r.get("refund_amount") != null) {
+                    try {
+                        pendingRefundsValue = pendingRefundsValue.add(new BigDecimal(r.get("refund_amount").toString()));
+                    } catch (Exception ignored) {}
+                }
+            }
+        }
+
+        Map<String, Object> res = new HashMap<>();
+        res.put("psrs", psrs);
+        res.put("orders", orders);
+        res.put("refunds", refunds);
+        res.put("pending_orders_count", pendingOrdersCount);
+        res.put("pending_orders_value", pendingOrdersValue);
+        res.put("pending_refunds_count", pendingRefundsCount);
+        res.put("pending_refunds_value", pendingRefundsValue);
+
+        return ResponseEntity.ok(res);
+    }
+
+    private void enrichPsrs(List<PreSalesOfficer> psrs) {
+        if (psrs == null || psrs.isEmpty()) return;
+
+        Map<Long, SalesOfficer> soMap = new HashMap<>();
+        salesOfficerRepository.findAll().forEach(so -> soMap.put(so.getId(), so));
+
+        for (PreSalesOfficer psr : psrs) {
+            if (psr.getSalesOfficerId() != null && soMap.containsKey(psr.getSalesOfficerId())) {
+                SalesOfficer so = soMap.get(psr.getSalesOfficerId());
+                psr.setSalesOfficerName(so.getName());
+                psr.setSalesOfficerCode(so.getOfficerCode());
+            }
+
+            try {
+                Integer outletCount = jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM outlets WHERE assigned_psr_id = ? OR sub_route = ?",
+                        Integer.class,
+                        psr.getId(), psr.getSubRoute()
+                );
+                psr.setOutletCount(outletCount != null ? outletCount : 0);
+            } catch (Exception ignored) {
+                psr.setOutletCount(0);
+            }
+
+            try {
+                Integer activeOrd = jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM psr_orders WHERE psr_id = ? AND status IN ('SUBMITTED_TO_SO', 'DRAFT')",
+                        Integer.class,
+                        psr.getId()
+                );
+                psr.setActiveOrdersCount(activeOrd != null ? activeOrd : 0);
+            } catch (Exception ignored) {
+                psr.setActiveOrdersCount(0);
+            }
+
+            try {
+                Integer pendingRef = jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM psr_refund_requests WHERE psr_id = ? AND status = 'SUBMITTED_TO_SO'",
+                        Integer.class,
+                        psr.getId()
+                );
+                psr.setPendingRefundsCount(pendingRef != null ? pendingRef : 0);
+            } catch (Exception ignored) {
+                psr.setPendingRefundsCount(0);
+            }
+        }
+    }
+
+    private List<Map<String, Object>> getOutletsForPsr(PreSalesOfficer psr) {
+        List<Map<String, Object>> list = jdbcTemplate.queryForList(
+                "SELECT outlet_id, franchise_name, branch_name, outlet_name, location_address AS address, contact_phone AS phone_number, district_id, sub_route, assigned_psr_id " +
+                "FROM outlets WHERE assigned_psr_id = ? OR sub_route = ?",
+                psr.getId(), psr.getSubRoute()
+        );
+
+        if (list.isEmpty()) {
+            // Fallback: outlets in same area or territory
+            SalesOfficer so = salesOfficerRepository.findById(psr.getSalesOfficerId()).orElse(null);
+            if (so != null && so.getAssignedArea() != null) {
+                list = jdbcTemplate.queryForList(
+                        "SELECT outlet_id, franchise_name, branch_name, outlet_name, location_address AS address, contact_phone AS phone_number, district_id, sub_route, assigned_psr_id " +
+                        "FROM outlets WHERE location_address LIKE ? OR franchise_name LIKE ?",
+                        "%" + so.getAssignedArea() + "%", "%" + so.getAssignedArea() + "%"
+                );
+            }
+        }
+
+        if (list.isEmpty()) {
+            list = jdbcTemplate.queryForList(
+                    "SELECT outlet_id, franchise_name, branch_name, outlet_name, location_address AS address, contact_phone AS phone_number, district_id, sub_route, assigned_psr_id FROM outlets LIMIT 10"
+            );
+        }
+
+        return list;
+    }
+}

@@ -1,10 +1,10 @@
 export interface AppNotification {
   id: number;
-  recipient_role: 'SUPERADMIN' | 'SUPPLIER' | 'OUTLET' | 'SALES_OFFICER' | string;
+  recipient_role: 'SUPERADMIN' | 'SUPPLIER' | 'OUTLET' | 'SALES_OFFICER' | 'PSR' | string;
   recipient_user_id?: number | null;
   title: string;
   message: string;
-  type: 'NEW_REQUISITION' | 'APPROVED' | 'PARTIALLY_APPROVED' | 'REJECTED' | 'SALES_OFFICER_REQUISITION' | 'SALES_OFFICER_PURCHASE_CONFIRMED' | string;
+  type: 'NEW_REQUISITION' | 'APPROVED' | 'PARTIALLY_APPROVED' | 'REJECTED' | 'SALES_OFFICER_REQUISITION' | 'SALES_OFFICER_PURCHASE_CONFIRMED' | 'NEW_PSR_ORDER' | 'NEW_PSR_REFUND' | 'PSR_ORDER_STATUS_UPDATE' | 'PSR_REFUND_STATUS_UPDATE' | string;
   reference_code?: string;
   reference_id?: number;
   is_read: boolean;
@@ -12,8 +12,8 @@ export interface AppNotification {
 }
 
 export interface RealtimeEventPayload {
-  type: 'NEW_REQUISITION' | 'REQUISITION_ACTION' | 'SALES_OFFICER_REQUISITION' | 'SALES_OFFICER_PURCHASE_CONFIRMED' | string;
-  recipientRole: 'SUPERADMIN' | 'SUPPLIER' | 'OUTLET' | 'SALES_OFFICER' | string;
+  type: 'NEW_REQUISITION' | 'REQUISITION_ACTION' | 'SALES_OFFICER_REQUISITION' | 'SALES_OFFICER_PURCHASE_CONFIRMED' | 'NEW_PSR_ORDER' | 'NEW_PSR_REFUND' | 'PSR_ORDER_STATUS_UPDATE' | 'PSR_REFUND_STATUS_UPDATE' | string;
+  recipientRole: 'SUPERADMIN' | 'SUPPLIER' | 'OUTLET' | 'SALES_OFFICER' | 'PSR' | string;
   recipientUserId?: number | null;
   title: string;
   message: string;
