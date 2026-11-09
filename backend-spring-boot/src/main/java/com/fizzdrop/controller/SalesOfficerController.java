@@ -626,6 +626,26 @@ public class SalesOfficerController {
                 System.err.println("Failed to insert sales_officer_distributions: " + ex.getMessage());
             }
 
+            // Notify Supplier that stock has been dispatched from their depot
+            try {
+                SupplierProfile supplier = supplierProfileRepository.findAll().stream().findFirst().orElse(null);
+                Long supplierUserId = (supplier != null && supplier.getUserId() != null) ? supplier.getUserId() : 1L;
+                SalesOfficer so = salesOfficerRepository.findById(officerId).orElse(null);
+                String soName = so != null ? so.getName() : "Sales Officer";
+
+                AppNotification supNotif = new AppNotification();
+                supNotif.setRecipientRole("SUPPLIER");
+                supNotif.setRecipientUserId(supplierUserId);
+                supNotif.setTitle("Stock Dispatched: " + quantity + " units of " + prod.getBrand() + " " + prod.getFlavorVariant());
+                supNotif.setMessage("Sales Officer " + soName + " dispatched " + quantity + " units of " +
+                        prod.getBrand() + " " + prod.getFlavorVariant() + " to " + outletOpt.get().getOutletName() +
+                        ". Deducted from your depot stock.");
+                supNotif.setType("STOCK_DISPATCHED");
+                supNotif.setReferenceId(productId);
+                supNotif.setReferenceCode("SO-DIST-" + System.currentTimeMillis());
+                notificationRepository.save(supNotif);
+            } catch (Exception ignored) {}
+
             return ResponseEntity.ok(Map.of(
                     "success", true,
                     "message", "Successfully distributed " + quantity + " units of " + prod.getBrand() + " " + prod.getFlavorVariant() + " to " + outletOpt.get().getOutletName() + "! (Profit earned: ৳" + String.format("%.2f", profitEarned) + ")",

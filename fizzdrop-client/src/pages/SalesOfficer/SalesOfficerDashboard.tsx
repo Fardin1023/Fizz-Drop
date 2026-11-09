@@ -348,9 +348,18 @@ export const SalesOfficerDashboard: React.FC = () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || data.message || 'Failed to dispatch stock');
 
-      // Realtime broadcast to PSR and Outlet portals
+      // Realtime broadcast to Supplier, PSR and Outlet portals
       try {
         const bc = new BroadcastChannel('fizzdrop_realtime_events');
+        bc.postMessage({
+          recipientRole: 'SUPPLIER',
+          recipientUserId: 1,
+          title: `Stock Dispatched: ${order.quantity} cases of ${order.product_name}`,
+          message: `Sales Officer ${officer?.name || 'Tariq Rahman'} dispatched ${order.quantity} cases of ${order.product_name} to ${order.outlet_name}. Deducted from your depot stock.`,
+          type: 'STOCK_DISPATCHED',
+          referenceCode: order.order_code,
+          status: 'INFO',
+        });
         bc.postMessage({
           type: 'SO_ORDER_DISPATCHED',
           order_code: order.order_code,

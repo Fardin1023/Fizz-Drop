@@ -28,6 +28,7 @@ import com.fizzdrop.entity.AppNotification;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/inventory")
@@ -939,5 +940,242 @@ public class InventoryController {
         supplyReq.setNotes(body != null && body.containsKey("notes") && body.get("notes") != null ? body.get("notes").toString() : "Fulfilling requisition " + reqRow.get("requisition_code"));
 
         return supplyStockToOutlet(supplyReq);
+    }
+
+    /**
+     * Endpoint for Supplier to track:
+     * 1. Total wholesale stock sold by Supplier (to Sales Officers & Outlets)
+     * 2. Specific quantity from that sold stock that has been dispatched to Outlets
+     * 3. Remaining field buffer / in-custody pending final outlet dispatch
+     * 4. Product-wise and Sales Officer breakdowns
+     */
+    @GetMapping("/supplier/sold-vs-dispatched")
+    public ResponseEntity<?> getSupplierSoldVsDispatched(
+            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) Long supplierId) {
+        try {
+            // 1. Resolve Supplier & District
+            SupplierProfile supplier = null;
+            if (userId != null) {
+                supplier = supplierProfileRepository.findByUserId(userId).orElse(null);
+            }
+            if (supplier == null && supplierId != null) {
+                supplier = supplierProfileRepository.findById(supplierId).orElse(null);
+            }
+            if (supplier == null) {
+                supplier = supplierProfileRepository.findAll().stream().findFirst().orElse(null);
+            }
+            Long districtId = (supplier != null && supplier.getPrimaryDistrictId() != null) ? supplier.getPrimaryDistrictId() : 1L;
+
+            // 2. Fetch all products
+            List<Product> products = productRepository.findAll();
+
+            // 3. Fetch all Sales Officers
+            List<SalesOfficer> officers = salesOfficerRepository.findAll();
+
+            // 4. Query sold requisitions (fulfilled by supplier to SO / outlets)
+            List<Map<String, Object>> soldRequisitions = jdbcTemplate.queryForList(
+                "SELECT r.id, r.requisition_code, r.product_id, r.product_name, r.quantity, r.unit_price, r.total_amount, " +
+                "r.sales_officer_id, r.outlet_id, r.status, r.created_date, r.updated_date, " +
+                "o.outlet_name, o.branch_name, o.area, o.sub_route " +
+                "FROM outlet_requisitions r " +
+                "LEFT JOIN outlets o ON r.outlet_id = o.outlet_id " +
+                "WHERE r.status IN ('DISPATCHED', 'FULFILLED', 'DELIVERED', 'COMPLETED') " +
+                "ORDER BY r.updated_date DESC, r.created_date DESC"
+            );
+
+            // 5. Query all outlet distributions (dispatched from SO to Outlets)
+            List<Map<String, Object>> distributions = jdbcTemplate.queryForList(
+                "SELECT d.id, d.sales_officer_id, d.outlet_id, d.product_id, d.quantity, " +
+                "d.cost_price, d.sale_price, d.total_cost, d.total_revenue, d.profit_earned, " +
+                "d.notes, d.distribution_date, " +
+                "o.outlet_name, o.branch_name, o.area, o.sub_route, " +
+                "p.brand, p.flavor_variant, p.sku " +
+                "FROM sales_officer_distributions d " +
+                "LEFT JOIN outlets o ON d.outlet_id = o.outlet_id " +
+                "LEFT JOIN products p ON d.product_id = p.product_id " +
+                "ORDER BY d.distribution_date DESC"
+            );
+
+            // 6. Query dispatched PSR orders
+            List<Map<String, Object>> psrDispatchedOrders = jdbcTemplate.queryForList(
+                "SELECT id, order_code, psr_id, psr_name, sales_officer_id, outlet_id, outlet_name, sub_route, " +
+                "product_id, product_name, quantity, unit_price, total_amount, urgency, status, updated_at " +
+                "FROM psr_orders WHERE status = 'DISPATCHED' " +
+                "ORDER BY updated_at DESC"
+            );
+
+            // 7. Calculate Aggregates
+            int totalSoldUnits = 0;
+            BigDecimal totalSoldValue = BigDecimal.ZERO;
+            for (Map<String, Object> req : soldRequisitions) {
+                int q = req.get("quantity") != null ? ((Number) req.get("quantity")).intValue() : 0;
+                totalSoldUnits += q;
+                if (req.get("total_amount") != null) {
+                    totalSoldValue = totalSoldValue.add(new BigDecimal(req.get("total_amount").toString()));
+                }
+            }
+
+            int totalDispatchedUnits = 0;
+            BigDecimal totalDispatchedValue = BigDecimal.ZERO;
+            for (Map<String, Object> d : distributions) {
+                int q = d.get("quantity") != null ? ((Number) d.get("quantity")).intValue() : 0;
+                totalDispatchedUnits += q;
+                if (d.get("total_revenue") != null) {
+                    totalDispatchedValue = totalDispatchedValue.add(new BigDecimal(d.get("total_revenue").toString()));
+                }
+            }
+
+            int pendingOutletDispatchUnits = Math.max(0, totalSoldUnits - totalDispatchedUnits);
+            double fulfillmentRate = totalSoldUnits > 0 
+                ? Math.min(100.0, ((double) totalDispatchedUnits / totalSoldUnits) * 100.0) 
+                : 0.0;
+
+            // 8. Product-wise Sold vs Dispatched
+            Map<Long, Map<String, Object>> prodStats = new LinkedHashMap<>();
+            for (Product p : products) {
+                Map<String, Object> pm = new HashMap<>();
+                pm.put("product_id", p.getProductId());
+                pm.put("brand", p.getBrand());
+                pm.put("flavor_variant", p.getFlavorVariant());
+                pm.put("product_name", p.getBrand() + " " + (p.getFlavorVariant() != null ? p.getFlavorVariant() : ""));
+                pm.put("sku", p.getSku());
+                pm.put("image_url", p.getImageUrl());
+                pm.put("sold_quantity", 0);
+                pm.put("sold_value", BigDecimal.ZERO);
+                pm.put("dispatched_quantity", 0);
+                pm.put("dispatched_value", BigDecimal.ZERO);
+                pm.put("remaining_quantity", 0);
+                pm.put("fulfillment_pct", 0.0);
+
+                var diOpt = districtInventoryRepository.findByDistrictIdAndProductId(districtId, p.getProductId());
+                pm.put("depot_stock", diOpt.map(DistrictInventory::getCurrentStock).orElse(0));
+
+                prodStats.put(p.getProductId(), pm);
+            }
+
+            for (Map<String, Object> req : soldRequisitions) {
+                if (req.get("product_id") != null) {
+                    Long pid = ((Number) req.get("product_id")).longValue();
+                    Map<String, Object> pm = prodStats.get(pid);
+                    if (pm != null) {
+                        int q = req.get("quantity") != null ? ((Number) req.get("quantity")).intValue() : 0;
+                        int prevQ = (int) pm.get("sold_quantity");
+                        pm.put("sold_quantity", prevQ + q);
+                        if (req.get("total_amount") != null) {
+                            BigDecimal prevVal = (BigDecimal) pm.get("sold_value");
+                            pm.put("sold_value", prevVal.add(new BigDecimal(req.get("total_amount").toString())));
+                        }
+                    }
+                }
+            }
+
+            for (Map<String, Object> d : distributions) {
+                if (d.get("product_id") != null) {
+                    Long pid = ((Number) d.get("product_id")).longValue();
+                    Map<String, Object> pm = prodStats.get(pid);
+                    if (pm != null) {
+                        int q = d.get("quantity") != null ? ((Number) d.get("quantity")).intValue() : 0;
+                        int prevQ = (int) pm.get("dispatched_quantity");
+                        pm.put("dispatched_quantity", prevQ + q);
+                        if (d.get("total_revenue") != null) {
+                            BigDecimal prevVal = (BigDecimal) pm.get("dispatched_value");
+                            pm.put("dispatched_value", prevVal.add(new BigDecimal(d.get("total_revenue").toString())));
+                        }
+                    }
+                }
+            }
+
+            List<Map<String, Object>> productBreakdown = new ArrayList<>();
+            for (Map<String, Object> pm : prodStats.values()) {
+                int sold = (int) pm.get("sold_quantity");
+                int dispatched = (int) pm.get("dispatched_quantity");
+                int rem = Math.max(0, sold - dispatched);
+                double pct = sold > 0 ? Math.min(100.0, ((double) dispatched / sold) * 100.0) : 0.0;
+                pm.put("remaining_quantity", rem);
+                pm.put("fulfillment_pct", Math.round(pct * 10.0) / 10.0);
+                if (sold > 0 || dispatched > 0 || ((int) pm.get("depot_stock")) > 0) {
+                    productBreakdown.add(pm);
+                }
+            }
+
+            // 9. Sales Officer Sold vs Dispatched Breakdown
+            Map<Long, Map<String, Object>> soStats = new LinkedHashMap<>();
+            for (SalesOfficer so : officers) {
+                Map<String, Object> som = new HashMap<>();
+                som.put("sales_officer_id", so.getId());
+                som.put("name", so.getName());
+                som.put("code", so.getOfficerCode());
+                som.put("assigned_area", so.getAssignedArea());
+                som.put("phone", so.getPhone());
+                som.put("sold_quantity", 0);
+                som.put("sold_value", BigDecimal.ZERO);
+                som.put("dispatched_quantity", 0);
+                som.put("dispatched_value", BigDecimal.ZERO);
+                som.put("remaining_quantity", 0);
+                som.put("fulfillment_pct", 0.0);
+                soStats.put(so.getId(), som);
+            }
+
+            for (Map<String, Object> req : soldRequisitions) {
+                if (req.get("sales_officer_id") != null) {
+                    Long soId = ((Number) req.get("sales_officer_id")).longValue();
+                    Map<String, Object> som = soStats.get(soId);
+                    if (som != null) {
+                        int q = req.get("quantity") != null ? ((Number) req.get("quantity")).intValue() : 0;
+                        som.put("sold_quantity", ((int) som.get("sold_quantity")) + q);
+                        if (req.get("total_amount") != null) {
+                            som.put("sold_value", ((BigDecimal) som.get("sold_value")).add(new BigDecimal(req.get("total_amount").toString())));
+                        }
+                    }
+                }
+            }
+
+            for (Map<String, Object> d : distributions) {
+                if (d.get("sales_officer_id") != null) {
+                    Long soId = ((Number) d.get("sales_officer_id")).longValue();
+                    Map<String, Object> som = soStats.get(soId);
+                    if (som != null) {
+                        int q = d.get("quantity") != null ? ((Number) d.get("quantity")).intValue() : 0;
+                        som.put("dispatched_quantity", ((int) som.get("dispatched_quantity")) + q);
+                        if (d.get("total_revenue") != null) {
+                            som.put("dispatched_value", ((BigDecimal) som.get("dispatched_value")).add(new BigDecimal(d.get("total_revenue").toString())));
+                        }
+                    }
+                }
+            }
+
+            List<Map<String, Object>> officerBreakdown = new ArrayList<>();
+            for (Map<String, Object> som : soStats.values()) {
+                int sold = (int) som.get("sold_quantity");
+                int dispatched = (int) som.get("dispatched_quantity");
+                int rem = Math.max(0, sold - dispatched);
+                double pct = sold > 0 ? Math.min(100.0, ((double) dispatched / sold) * 100.0) : 0.0;
+                som.put("remaining_quantity", rem);
+                som.put("fulfillment_pct", Math.round(pct * 10.0) / 10.0);
+                officerBreakdown.add(som);
+            }
+
+            // Summary Map
+            Map<String, Object> summary = new HashMap<>();
+            summary.put("total_sold_units", totalSoldUnits);
+            summary.put("total_sold_value", totalSoldValue);
+            summary.put("total_dispatched_units", totalDispatchedUnits);
+            summary.put("total_dispatched_value", totalDispatchedValue);
+            summary.put("pending_outlet_dispatch_units", pendingOutletDispatchUnits);
+            summary.put("fulfillment_rate_pct", Math.round(fulfillmentRate * 10.0) / 10.0);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("summary", summary);
+            response.put("product_breakdown", productBreakdown);
+            response.put("officer_breakdown", officerBreakdown);
+            response.put("recent_dispatches", distributions);
+            response.put("dispatched_psr_orders", psrDispatchedOrders);
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body(ApiResponse.fail("Failed to retrieve sold vs dispatched stats: " + e.getMessage()));
+        }
     }
 }

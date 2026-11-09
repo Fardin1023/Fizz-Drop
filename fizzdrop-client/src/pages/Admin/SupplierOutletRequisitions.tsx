@@ -60,11 +60,13 @@ export interface OutletRequisitionItem {
 interface SupplierOutletRequisitionsProps {
   userId?: number;
   onRequestRestockFromSuperadmin?: (productId?: number) => void;
+  onNavigateToTracking?: () => void;
 }
 
 export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProps> = ({
   userId = 4,
   onRequestRestockFromSuperadmin,
+  onNavigateToTracking,
 }) => {
   const [requisitions, setRequisitions] = useState<OutletRequisitionItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -325,6 +327,32 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
             className="text-rose-700 hover:text-rose-900 font-bold ml-3"
           >
             ✕
+          </button>
+        </div>
+      )}
+
+      {/* Quick Access to Stock Sales & Outlet Dispatch Tracking */}
+      {onNavigateToTracking && (
+        <div className="p-3.5 rounded-2xl bg-gradient-to-r from-blue-600/10 via-indigo-600/10 to-purple-600/10 border border-indigo-200/80 flex items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <Truck className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <span className="font-bold text-xs text-slate-900 block truncate">
+                Stock Sales & Outlet Dispatch Tracking
+              </span>
+              <span className="text-[11px] text-slate-500 block truncate">
+                Monitor wholesale stock sold vs actual quantities dispatched to retail outlets
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={onNavigateToTracking}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shrink-0 transition-colors cursor-pointer shadow-xs"
+          >
+            <span>View Sold vs Dispatched</span>
+            <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
       )}

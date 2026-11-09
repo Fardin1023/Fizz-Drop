@@ -668,6 +668,23 @@ public class PsrController {
             outNotif.setReferenceCode(orderCode);
             notificationRepository.save(outNotif);
 
+            // 8. Notify Supplier that stock has been dispatched from their depot
+            try {
+                SupplierProfile supplier = supplierProfileRepository.findAll().stream().findFirst().orElse(null);
+                Long supplierUserId = (supplier != null && supplier.getUserId() != null) ? supplier.getUserId() : 1L;
+
+                AppNotification supNotif = new AppNotification();
+                supNotif.setRecipientRole("SUPPLIER");
+                supNotif.setRecipientUserId(supplierUserId);
+                supNotif.setTitle("Stock Dispatched: " + quantity + " cases of " + productName);
+                supNotif.setMessage("Sales Officer " + soName + " dispatched " + quantity + " cases of " + productName +
+                        " to outlet " + outletName + ". Deducted from your depot stock (Depot Remaining: " + remainingSupplierStock + " cases).");
+                supNotif.setType("STOCK_DISPATCHED");
+                supNotif.setReferenceCode(orderCode);
+                supNotif.setReferenceId(productId);
+                notificationRepository.save(supNotif);
+            } catch (Exception ignored) {}
+
             Map<String, Object> resp = new HashMap<>();
             resp.put("success", true);
             resp.put("message", "Products dispatched from supplier stock successfully! Outlet shelf replenished.");

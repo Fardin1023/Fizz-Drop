@@ -8,6 +8,7 @@ import { SupplierProfileView } from './SupplierProfileView';
 import { SupplierTransactionsView } from './SupplierTransactionsView';
 import { SupplierAllocatedOutlets } from './SupplierAllocatedOutlets';
 import { SupplierOutletRequisitions } from './SupplierOutletRequisitions';
+import { SupplierStockSalesTracking } from './SupplierStockSalesTracking';
 import { SupplierWalletModal } from './SupplierWalletModal';
 import {
   Package,
@@ -23,6 +24,8 @@ import {
   Receipt,
   Warehouse,
   Store,
+  Boxes,
+  TrendingUp,
   Wallet,
   Users,
 } from 'lucide-react';
@@ -33,7 +36,7 @@ import { NotificationPopup } from '../../components/Notifications/NotificationPo
 
 export const AdminDashboard: React.FC = () => {
   const { user, isSupplier, isSuperadmin, isAuthenticated, logout, isLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<'catalog' | 'outlet-requests' | 'request' | 'history' | 'outlets' | 'profile' | 'transactions'>('catalog');
+  const [activeTab, setActiveTab] = useState<'catalog' | 'outlet-requests' | 'stock-sales-dispatch' | 'request' | 'history' | 'outlets' | 'profile' | 'transactions'>('catalog');
   const [selectedProductId, setSelectedProductId] = useState<number | undefined>(undefined);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [walletBalance, setWalletBalance] = useState<number>(() => {
@@ -125,6 +128,15 @@ export const AdminDashboard: React.FC = () => {
       gradient: 'from-emerald-600 via-teal-600 to-cyan-600',
       badge: 'Area Demands',
       badgeHighlight: notifications.some((n) => (n.type === 'SALES_OFFICER_REQUISITION' || n.type === 'NEW_REQUISITION') && !n.is_read),
+    },
+    {
+      id: 'stock-sales-dispatch' as const,
+      label: 'Stock Sales & Outlet Dispatch Tracking',
+      shortLabel: 'Sold vs Dispatched',
+      desc: 'Monitor wholesale stock sold vs quantities dispatched to outlets',
+      icon: TrendingUp,
+      gradient: 'from-blue-600 via-indigo-600 to-purple-600',
+      badge: 'Fulfillment',
     },
     {
       id: 'request' as const,
@@ -407,6 +419,13 @@ export const AdminDashboard: React.FC = () => {
                 setSelectedProductId(prodId);
                 setActiveTab('request');
               }}
+              onNavigateToTracking={() => setActiveTab('stock-sales-dispatch')}
+            />
+          )}
+          {activeTab === 'stock-sales-dispatch' && (
+            <SupplierStockSalesTracking
+              userId={user?.user_id || 4}
+              onNavigateToRequisitions={() => setActiveTab('outlet-requests')}
             />
           )}
           {activeTab === 'request' && (
