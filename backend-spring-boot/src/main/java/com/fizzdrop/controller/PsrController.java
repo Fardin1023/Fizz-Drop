@@ -701,7 +701,8 @@ public class PsrController {
 
     /**
      * PSR Dispatches / Delivers stock directly to Outlet.
-     * Replenishes the outlet's shelf inventory and sends a realtime notification to the outlet.
+     * Replenishes the outlet's shelf inventory, updates supplier depot stock & sales officer distribution,
+     * and sends realtime notifications to the Outlet, Sales Officer, and Supplier.
      */
     @PostMapping("/orders/{id}/dispatch")
     public ResponseEntity<?> dispatchOrderToOutlet(@PathVariable Long id, @RequestBody(required = false) Map<String, Object> req) {
@@ -717,6 +718,8 @@ public class PsrController {
             String orderCode = (String) ord.get("order_code");
             String psrName = ord.get("psr_name") != null ? ord.get("psr_name").toString() : "Pre-Sales Officer";
             String productName = ord.get("product_name") != null ? ord.get("product_name").toString() : "Beverage Product";
+            Long soId = ord.get("sales_officer_id") != null ? Long.parseLong(ord.get("sales_officer_id").toString()) : 1L;
+            String outletName = ord.get("outlet_name") != null ? ord.get("outlet_name").toString() : "Outlet";
 
             // 1. Update order status to DISPATCHED
             jdbcTemplate.update(
@@ -724,16 +727,55 @@ public class PsrController {
                     id
             );
 
-            // 2. Also update corresponding outlet_requisitions row if any
+            // 2. Resolve product pricing for distribution ledger
+            Product prod = productRepository.findById(productId).orElse(null);
+            BigDecimal costPrice = (prod != null && prod.getSupplierPrice() != null) ? prod.getSupplierPrice() : BigDecimal.valueOf(35);
+            BigDecimal salePrice = (prod != null && prod.getOutletPrice() != null) ? prod.getOutletPrice() : costPrice.multiply(BigDecimal.valueOf(1.15));
+            if (ord.get("unit_price") != null) {
+                try {
+                    salePrice = new BigDecimal(ord.get("unit_price").toString());
+                } catch (Exception ignored) {}
+            }
+            BigDecimal totalCost = costPrice.multiply(BigDecimal.valueOf(quantity));
+            BigDecimal totalRevenue = salePrice.multiply(BigDecimal.valueOf(quantity));
+            BigDecimal profitEarned = totalRevenue.subtract(totalCost);
+
+            // 3. Update or ensure outlet_requisitions row is marked FULFILLED and linked to soId
             try {
-                jdbcTemplate.update(
-                        "UPDATE outlet_requisitions SET status = 'FULFILLED', admin_supplier_notes = ?, updated_date = NOW() " +
-                        "WHERE requisition_code = ? OR (outlet_id = ? AND product_id = ? AND status IN ('PENDING', 'PENDING_PSR', 'SUBMITTED_TO_PSR'))",
-                        "Stock delivered by PSR " + psrName, orderCode, outletId, productId
-                );
+                List<Map<String, Object>> existingReq = jdbcTemplate.queryForList("SELECT id FROM outlet_requisitions WHERE requisition_code = ?", orderCode);
+                if (existingReq.isEmpty()) {
+                    jdbcTemplate.update(
+                            "INSERT INTO outlet_requisitions (requisition_code, outlet_id, product_id, product_name, quantity, unit_price, total_amount, urgency, status, outlet_remarks, admin_supplier_notes, sales_officer_id, created_date, updated_date) " +
+                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'FULFILLED', ?, ?, ?, NOW(), NOW())",
+                            orderCode, outletId, productId, productName, quantity, salePrice, totalRevenue,
+                            ord.get("urgency") != null ? ord.get("urgency") : "NORMAL",
+                            ord.get("outlet_remarks") != null ? ord.get("outlet_remarks") : "Dispatched by PSR",
+                            "Stock delivered by PSR " + psrName,
+                            soId
+                    );
+                } else {
+                    jdbcTemplate.update(
+                            "UPDATE outlet_requisitions SET status = 'FULFILLED', sales_officer_id = COALESCE(sales_officer_id, ?), admin_supplier_notes = ?, updated_date = NOW() " +
+                            "WHERE requisition_code = ? OR (outlet_id = ? AND product_id = ? AND status IN ('PENDING', 'PENDING_PSR', 'SUBMITTED_TO_PSR', 'SUBMITTED_TO_SO', 'APPROVED_BY_SO'))",
+                            soId, "Stock delivered by PSR " + psrName, orderCode, outletId, productId
+                    );
+                }
             } catch (Exception ignored) {}
 
-            // 3. Replenish outlet shop_inventory
+            // 4. Deduct from Supplier depot stock (district_inventory) since stocks are with the supplier
+            Outlet outlet = outletRepository.findById(outletId).orElse(null);
+            Long districtId = (outlet != null && outlet.getDistrictId() != null) ? outlet.getDistrictId() : 1L;
+            int remainingSupplierStock = 0;
+
+            var distInvOpt = districtInventoryRepository.findByDistrictIdAndProductId(districtId, productId);
+            if (distInvOpt.isPresent()) {
+                DistrictInventory di = distInvOpt.get();
+                remainingSupplierStock = Math.max(0, di.getCurrentStock() - quantity);
+                di.setCurrentStock(remainingSupplierStock);
+                districtInventoryRepository.save(di);
+            }
+
+            // 5. Replenish outlet shop_inventory
             Optional<ShopInventory> invOpt = inventoryRepository.findByBranchIdAndProductId(outletId, productId);
             ShopInventory inv;
             if (invOpt.isPresent()) {
@@ -746,22 +788,29 @@ public class PsrController {
             }
             inventoryRepository.save(inv);
 
-            // 4. Log visit / delivery in psr_visit_logs
+            // 6. Record in sales_officer_distributions so Supplier Sold vs Dispatched tracking updates immediately
+            try {
+                jdbcTemplate.update(
+                        "INSERT INTO sales_officer_distributions (sales_officer_id, outlet_id, product_id, quantity, cost_price, sale_price, total_cost, total_revenue, profit_earned, notes, distribution_date) " +
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())",
+                        soId, outletId, productId, quantity, costPrice, salePrice, totalCost, totalRevenue, profitEarned,
+                        "Dispatched and delivered by PSR " + psrName + " for order " + orderCode
+                );
+            } catch (Exception ignored) {}
+
+            // 7. Log visit / delivery in psr_visit_logs
             try {
                 Long psrId = Long.parseLong(ord.get("psr_id").toString());
-                Long soId = ord.get("sales_officer_id") != null ? Long.parseLong(ord.get("sales_officer_id").toString()) : null;
                 jdbcTemplate.update(
                         "INSERT INTO psr_visit_logs (psr_id, sales_officer_id, outlet_id, outlet_name, visit_type, notes, created_at) " +
                         "VALUES (?, ?, ?, ?, 'STOCK_DELIVERY', ?, NOW())",
-                        psrId, soId, outletId, ord.get("outlet_name"),
+                        psrId, soId, outletId, outletName,
                         "Delivered " + quantity + " units of " + productName + " for order " + orderCode
                 );
             } catch (Exception ignored) {}
 
-            // 5. Send Notification to Outlet
-            Outlet outlet = outletRepository.findById(outletId).orElse(null);
+            // 8. Send Notification to Outlet
             Long outletUserId = (outlet != null && outlet.getOutletId() != null) ? outlet.getOutletId() : outletId;
-
             AppNotification notif = new AppNotification();
             notif.setRecipientRole("OUTLET");
             notif.setRecipientUserId(outletUserId);
@@ -773,12 +822,46 @@ public class PsrController {
             notif.setReferenceId(outletId);
             notificationRepository.save(notif);
 
+            // 9. Send Notification to Sales Officer
+            SalesOfficer so = salesOfficerRepository.findById(soId).orElse(null);
+            String soName = so != null ? so.getName() : "Sales Officer";
+            if (so != null) {
+                AppNotification soNotif = new AppNotification();
+                soNotif.setRecipientRole("SALES_OFFICER");
+                soNotif.setRecipientUserId(so.getUserId() != null ? so.getUserId() : so.getId());
+                soNotif.setReferenceId(so.getId());
+                soNotif.setTitle("Order Delivered by PSR " + psrName);
+                soNotif.setMessage("PSR " + psrName + " delivered " + quantity + " cases of " + productName +
+                        " to " + outletName + " (" + orderCode + "). Dispatched from supplier stock.");
+                soNotif.setType("PSR_STOCK_DISPATCHED");
+                soNotif.setReferenceCode(orderCode);
+                notificationRepository.save(soNotif);
+            }
+
+            // 10. Send Notification to Supplier that stock has been dispatched from their depot
+            try {
+                SupplierProfile supplier = supplierProfileRepository.findAll().stream().findFirst().orElse(null);
+                Long supplierUserId = (supplier != null && supplier.getUserId() != null) ? supplier.getUserId() : 1L;
+
+                AppNotification supNotif = new AppNotification();
+                supNotif.setRecipientRole("SUPPLIER");
+                supNotif.setRecipientUserId(supplierUserId);
+                supNotif.setTitle("Stock Dispatched: " + quantity + " cases of " + productName);
+                supNotif.setMessage("PSR " + psrName + " dispatched " + quantity + " cases of " + productName +
+                        " to outlet " + outletName + ". Deducted from your depot stock (Depot Remaining: " + remainingSupplierStock + " cases).");
+                supNotif.setType("STOCK_DISPATCHED");
+                supNotif.setReferenceCode(orderCode);
+                supNotif.setReferenceId(productId);
+                notificationRepository.save(supNotif);
+            } catch (Exception ignored) {}
+
             Map<String, Object> resp = new HashMap<>();
             resp.put("success", true);
-            resp.put("message", "Stock dispatched to outlet successfully! Inventory replenished.");
+            resp.put("message", "Stock dispatched to outlet successfully! Inventory replenished and supplier stock updated.");
             resp.put("order_id", id);
             resp.put("order_code", orderCode);
-            resp.put("new_stock", inv.getStockQuantity());
+            resp.put("outlet_shelf_stock", inv.getStockQuantity());
+            resp.put("supplier_depot_stock", remainingSupplierStock);
 
             return ResponseEntity.ok(resp);
         } catch (Exception e) {

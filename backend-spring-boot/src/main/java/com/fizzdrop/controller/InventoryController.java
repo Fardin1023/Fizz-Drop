@@ -754,9 +754,9 @@ public class InventoryController {
         // 2. Also keep in outlet_requisitions for ledger compatibility
         try {
             jdbcTemplate.update(
-                "INSERT INTO outlet_requisitions (requisition_code, outlet_id, product_id, product_name, quantity, unit_price, total_amount, urgency, status, outlet_remarks, admin_supplier_notes, created_date, updated_date) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING_PSR', ?, ?, NOW(), NOW())",
-                reqCode, outletId, productId, prodName, qty, unitPrice, totalAmount, urgency, remarks, "Assigned to PSR: " + psrName + " (" + (assignedPsr != null ? assignedPsr.getPsrCode() : "PSR") + ")"
+                "INSERT INTO outlet_requisitions (requisition_code, outlet_id, product_id, product_name, quantity, unit_price, total_amount, urgency, status, outlet_remarks, admin_supplier_notes, sales_officer_id, created_date, updated_date) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING_PSR', ?, ?, ?, NOW(), NOW())",
+                reqCode, outletId, productId, prodName, qty, unitPrice, totalAmount, urgency, remarks, "Assigned to PSR: " + psrName + " (" + (assignedPsr != null ? assignedPsr.getPsrCode() : "PSR") + ")", soId
             );
         } catch (Exception ignored) {}
 

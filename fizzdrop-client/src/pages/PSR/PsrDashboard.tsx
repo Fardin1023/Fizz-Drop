@@ -846,51 +846,40 @@ export default function PsrDashboard() {
                                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                                   Stock Delivered
                                 </span>
-                              ) : ord.status === 'SUBMITTED_TO_PSR' ? (
-                                <>
-                                  <button
-                                    onClick={() => handleSubmitOrderToSo(ord)}
-                                    disabled={submittingToSoId === ord.id}
-                                    className="px-2.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-1 shadow-sm transition cursor-pointer disabled:opacity-50 whitespace-nowrap active:scale-95"
-                                    title="Request stock approval from Sales Officer"
-                                  >
-                                    {submittingToSoId === ord.id ? (
-                                      <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                    ) : (
-                                      <>
-                                        <Send className="w-3 h-3" />
-                                        <span>Request to SO</span>
-                                      </>
-                                    )}
-                                  </button>
-                                  <button
-                                    onClick={() => handleDispatchOrderToOutlet(ord)}
-                                    disabled={dispatchingId === ord.id}
-                                    className="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white font-bold text-xs flex items-center justify-center gap-1 shadow-sm transition cursor-pointer disabled:opacity-50 whitespace-nowrap active:scale-95"
-                                    title="Send stock to outlet directly"
-                                  >
-                                    {dispatchingId === ord.id ? (
-                                      <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                    ) : (
-                                      <>
-                                        <Truck className="w-3 h-3" />
-                                        <span>Send Stock</span>
-                                      </>
-                                    )}
-                                  </button>
-                                </>
-                              ) : (
+                              ) : ord.status === 'APPROVED_BY_SO' ? (
                                 <button
                                   onClick={() => handleDispatchOrderToOutlet(ord)}
                                   disabled={dispatchingId === ord.id}
-                                  className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm shadow-orange-600/20 transition-all cursor-pointer disabled:opacity-50 whitespace-nowrap active:scale-95"
+                                  className="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white font-bold text-xs flex items-center justify-center gap-1 shadow-sm transition cursor-pointer disabled:opacity-50 whitespace-nowrap active:scale-95"
+                                  title="Send stock to outlet"
                                 >
                                   {dispatchingId === ord.id ? (
-                                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                   ) : (
                                     <>
-                                      <Truck className="w-3.5 h-3.5" />
-                                      <span>Send Stock to Outlet</span>
+                                      <Truck className="w-3 h-3" />
+                                      <span>Send Stock</span>
+                                    </>
+                                  )}
+                                </button>
+                              ) : ord.status === 'SUBMITTED_TO_SO' ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 text-xs font-bold border border-amber-200 dark:border-amber-800">
+                                  <Clock className="w-3.5 h-3.5 text-amber-600" />
+                                  Pending SO Approval
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={() => handleSubmitOrderToSo(ord)}
+                                  disabled={submittingToSoId === ord.id}
+                                  className="px-2.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-1 shadow-sm transition cursor-pointer disabled:opacity-50 whitespace-nowrap active:scale-95"
+                                  title="Request stock approval from Sales Officer"
+                                >
+                                  {submittingToSoId === ord.id ? (
+                                    <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                  ) : (
+                                    <>
+                                      <Send className="w-3 h-3" />
+                                      <span>Request to SO</span>
                                     </>
                                   )}
                                 </button>
