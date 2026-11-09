@@ -177,13 +177,6 @@ export const SalesOfficerDashboard: React.FC = () => {
     }
   }, [popupNotification, officer?.id]);
 
-  // Distribution Modal State
-  const [isDistributeModalOpen, setIsDistributeModalOpen] = useState(false);
-  const [selectedOutletForDist, setSelectedOutletForDist] = useState<number | string>('');
-  const [selectedProductForDist, setSelectedProductForDist] = useState<number | string>('');
-  const [distQuantity, setDistQuantity] = useState<number>(20);
-  const [distNotes, setDistNotes] = useState<string>('');
-  const [distSubmitting, setDistSubmitting] = useState(false);
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
   const [actionErrorMsg, setActionErrorMsg] = useState<string | null>(null);
 
@@ -217,13 +210,6 @@ export const SalesOfficerDashboard: React.FC = () => {
         setRequisitions(data.requisitions || []);
         setFinancialTarget(data.financial_target || null);
         setDistributions(data.distributions || []);
-
-        if (data.outlets && data.outlets.length > 0 && !selectedOutletForDist) {
-          setSelectedOutletForDist(data.outlets[0].outlet_id);
-        }
-        if (data.products && data.products.length > 0 && !selectedProductForDist) {
-          setSelectedProductForDist(data.products[0].product_id);
-        }
 
         if (data.sales_officer?.id) {
           fetchPsrData(data.sales_officer.id);
@@ -423,45 +409,6 @@ export const SalesOfficerDashboard: React.FC = () => {
   const handleSwitchOfficer = async (off: OfficerProfile) => {
     await loginAsSalesOfficer(off.id, off.email);
     fetchDashboardData(off.id);
-  };
-
-  const handleDistributeStock = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedOutletForDist || !selectedProductForDist || distQuantity <= 0) {
-      setActionErrorMsg('Please select an outlet, beverage product, and valid quantity');
-      return;
-    }
-
-    setDistSubmitting(true);
-    setActionErrorMsg(null);
-    setActionSuccessMsg(null);
-
-    try {
-      const res = await fetch('http://localhost:8080/api/v1/sales-officer/distribute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          outlet_id: Number(selectedOutletForDist),
-          product_id: Number(selectedProductForDist),
-          sales_officer_id: officer?.id,
-          quantity: distQuantity,
-          notes: distNotes || `Territory stock allocation by Sales Officer ${officer?.name}`,
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.message || data.error || 'Distribution failed');
-      }
-
-      setActionSuccessMsg(data.message || `Successfully distributed ${distQuantity} cases to outlet!`);
-      setIsDistributeModalOpen(false);
-      fetchDashboardData(officer?.id);
-    } catch (err: any) {
-      setActionErrorMsg(err.message || 'Error communicating with server');
-    } finally {
-      setDistSubmitting(false);
-    }
   };
 
   const handleRequestStockFromSupplier = async (e: React.FormEvent) => {
@@ -1002,15 +949,6 @@ export const SalesOfficerDashboard: React.FC = () => {
               <Truck className="w-3.5 h-3.5" />
               <span>Request Products from Supplier</span>
             </button>
-
-            {/* Quick Distribute Stock Trigger */}
-            <button
-              onClick={() => setIsDistributeModalOpen(true)}
-            className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs shadow-md shadow-emerald-600/20 flex items-center gap-2 transition-all cursor-pointer active:scale-95 shrink-0"
-          >
-            <Send className="w-3.5 h-3.5" />
-            <span>Distribute Stock to Outlet</span>
-          </button>
           </div>
         </div>
 
@@ -1026,7 +964,7 @@ export const SalesOfficerDashboard: React.FC = () => {
                       Wholesale Beverage Inventory Buffer ({officer?.assigned_area})
                     </h3>
                     <p className="text-xs text-slate-500">
-                      Depot beverage cases supplied by {supplier?.business_name || 'Supplier'} to your territory. Distribute directly to branches in your zone.
+                      Depot beverage cases supplied by {supplier?.business_name || 'Supplier'} to your territory. Outlets restock via designated Pre-Sales Officers.
                     </p>
                   </div>
                 </div>
@@ -1082,13 +1020,13 @@ export const SalesOfficerDashboard: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => {
-                        setSelectedProductForDist(p.product_id);
-                        setIsDistributeModalOpen(true);
+                        setReqProductId(p.product_id);
+                        setIsRequestModalOpen(true);
                       }}
                       className="mt-3.5 w-full py-2 px-3 rounded-xl bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                     >
-                      <Send className="w-3.5 h-3.5" />
-                      <span>Distribute to Branch</span>
+                      <Truck className="w-3.5 h-3.5" />
+                      <span>Request from Supplier</span>
                     </button>
                   </div>
                 ))}
@@ -1551,13 +1489,6 @@ export const SalesOfficerDashboard: React.FC = () => {
                   <span className="font-mono text-xs px-3 py-1 rounded-xl bg-emerald-100 text-emerald-800 font-black border border-emerald-300">
                     Total Profit: +৳{Number(financialTarget?.total_profit_gained ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </span>
-                  <button
-                    onClick={() => setIsDistributeModalOpen(true)}
-                    className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                    <span>Distribute Stock</span>
-                  </button>
                 </div>
               </div>
 
@@ -1567,14 +1498,8 @@ export const SalesOfficerDashboard: React.FC = () => {
                   <TrendingUp className="w-10 h-10 mx-auto mb-2 text-slate-300" />
                   <p className="font-bold text-slate-700 text-sm">No Outlet Distributions Logged Yet</p>
                   <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
-                    When you distribute beverage cases from your territory stock buffer to physical retail stores, the exact wholesale revenue, purchase cost, and net profit will be recorded here permanently.
+                    When PSRs fulfill outlet orders in your territory, the exact wholesale revenue, purchase cost, and net profit will be recorded here permanently.
                   </p>
-                  <button
-                    onClick={() => setIsDistributeModalOpen(true)}
-                    className="mt-3 px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 cursor-pointer"
-                  >
-                    Make First Store Distribution
-                  </button>
                 </div>
               ) : (
                 <div className="overflow-x-auto rounded-2xl border border-slate-200/80">
@@ -1832,19 +1757,9 @@ export const SalesOfficerDashboard: React.FC = () => {
 
                       <div className="flex items-center gap-2 shrink-0">
                         {req.status === 'PENDING' ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedOutletForDist(req.outlet_id);
-                              setSelectedProductForDist(req.product_id);
-                              setDistQuantity(req.quantity);
-                              setIsDistributeModalOpen(true);
-                            }}
-                            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
-                          >
-                            <Send className="w-3.5 h-3.5" />
-                            <span>Fulfill Demand</span>
-                          </button>
+                          <span className="text-xs font-semibold text-amber-700 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200">
+                            Dispatched via PSR Route
+                          </span>
                         ) : (
                           <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
                             Completed & Dispatched
@@ -1906,169 +1821,7 @@ export const SalesOfficerDashboard: React.FC = () => {
         )}
       </main>
 
-      {/* 9. DISTRIBUTE STOCK MODAL */}
-      {isDistributeModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden animate-scale-up">
-            <div className="px-6 py-5 bg-gradient-to-r from-emerald-700 to-teal-800 text-white flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center">
-                  <Send className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h3 className="font-oswald text-lg font-bold uppercase tracking-wide">
-                    Distribute Stock to Branch
-                  </h3>
-                  <p className="text-xs text-emerald-100">
-                    Direct dispatch from {officer?.assigned_area} buffer
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsDistributeModalOpen(false)}
-                className="p-1.5 rounded-xl text-emerald-200 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleDistributeStock} className="p-6 space-y-4">
-              {/* Target Outlet */}
-              <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
-                  Target Retail Store in {officer?.assigned_area} *
-                </label>
-                <select
-                  value={selectedOutletForDist}
-                  onChange={(e) => setSelectedOutletForDist(e.target.value)}
-                  required
-                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
-                >
-                  {outlets.map((o) => (
-                    <option key={o.outlet_id} value={o.outlet_id}>
-                      {o.branch_name || o.outlet_name} ({o.franchise_name})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Product */}
-              <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
-                  Beverage Product *
-                </label>
-                <select
-                  value={selectedProductForDist}
-                  onChange={(e) => setSelectedProductForDist(e.target.value)}
-                  required
-                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
-                >
-                  {products.map((p) => (
-                    <option key={p.product_id} value={p.product_id}>
-                      {p.brand} {p.flavor_variant} (Buffer: {p.depot_buffer_stock ?? 50} cases)
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Quantity */}
-              <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
-                  Quantity Cases to Supply *
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  required
-                  value={distQuantity}
-                  onChange={(e) => setDistQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 font-mono font-black text-emerald-800 text-base focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
-                />
-              </div>
-
-              {/* Notes */}
-              <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
-                  Delivery Receipt Notes
-                </label>
-                <input
-                  type="text"
-                  value={distNotes}
-                  onChange={(e) => setDistNotes(e.target.value)}
-                  placeholder="e.g. Regular weekly store replenishment"
-                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
-                />
-              </div>
-
-              {/* Dynamic Wholesale Profit Calculation Box */}
-              {(() => {
-                const prod = products.find((p) => p.product_id === Number(selectedProductForDist));
-                const unitBuy = Number(prod?.supplier_price || prod?.base_price || 35);
-                const unitSell = Number(prod?.outlet_price || (unitBuy * 1.15));
-                const totalCost = unitBuy * distQuantity;
-                const totalRev = unitSell * distQuantity;
-                const estProfit = totalRev - totalCost;
-
-                return (
-                  <div className="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200 space-y-2 text-xs animate-scale-up">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-emerald-950 flex items-center gap-1.5">
-                        <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
-                        Wholesale Margin Preview
-                      </span>
-                      <span className="font-mono font-black text-emerald-800 bg-white px-2 py-0.5 rounded-md border border-emerald-300">
-                        +৳{estProfit.toFixed(2)} Profit Gained
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
-                      <div>
-                        <span className="text-slate-500 block">Buy Rate (Supplier):</span>
-                        <strong className="text-slate-700">৳{unitBuy.toFixed(2)} / case</strong>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 block">Sell Rate (Outlet):</span>
-                        <strong className="text-indigo-700">৳{unitSell.toFixed(2)} / case</strong>
-                      </div>
-                    </div>
-
-                    <div className="pt-2 border-t border-emerald-200/80 flex items-center justify-between text-[11px]">
-                      <span className="text-slate-600">Total Delivery Revenue:</span>
-                      <span className="font-bold font-mono text-zinc-900">৳{totalRev.toFixed(2)}</span>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsDistributeModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={distSubmitting}
-                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-600/20 flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50"
-                >
-                  {distSubmitting ? (
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    <>
-                      <Send className="w-3.5 h-3.5" />
-                      <span>Dispatch {distQuantity} Cases</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* 10. REQUEST STOCK FROM SUPPLIER MODAL */}
+      {/* REQUEST STOCK FROM SUPPLIER MODAL */}
       {isRequestModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-3xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden animate-scale-up">
