@@ -22,6 +22,7 @@ public class PsrController {
     private final OutletRepository outletRepository;
     private final ProductRepository productRepository;
     private final AppNotificationRepository notificationRepository;
+    private final ShopInventoryRepository inventoryRepository;
     private final JdbcTemplate jdbcTemplate;
 
     public PsrController(PreSalesOfficerRepository psrRepository,
@@ -29,12 +30,14 @@ public class PsrController {
                          OutletRepository outletRepository,
                          ProductRepository productRepository,
                          AppNotificationRepository notificationRepository,
+                         ShopInventoryRepository inventoryRepository,
                          JdbcTemplate jdbcTemplate) {
         this.psrRepository = psrRepository;
         this.salesOfficerRepository = salesOfficerRepository;
         this.outletRepository = outletRepository;
         this.productRepository = productRepository;
         this.notificationRepository = notificationRepository;
+        this.inventoryRepository = inventoryRepository;
         this.jdbcTemplate = jdbcTemplate;
     }
 
@@ -462,6 +465,93 @@ public class PsrController {
             return ResponseEntity.ok(Map.of("success", true, "status", status));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(ApiResponse.fail("Failed to update status: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * PSR Dispatches / Delivers stock directly to Outlet.
+     * Replenishes the outlet's shelf inventory and sends a realtime notification to the outlet.
+     */
+    @PostMapping("/orders/{id}/dispatch")
+    public ResponseEntity<?> dispatchOrderToOutlet(@PathVariable Long id, @RequestBody(required = false) Map<String, Object> req) {
+        try {
+            List<Map<String, Object>> ordList = jdbcTemplate.queryForList("SELECT * FROM psr_orders WHERE id = ?", id);
+            if (ordList.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail("Order not found."));
+            }
+            Map<String, Object> ord = ordList.get(0);
+            Long outletId = Long.parseLong(ord.get("outlet_id").toString());
+            Long productId = Long.parseLong(ord.get("product_id").toString());
+            int quantity = Integer.parseInt(ord.get("quantity").toString());
+            String orderCode = (String) ord.get("order_code");
+            String psrName = ord.get("psr_name") != null ? ord.get("psr_name").toString() : "Pre-Sales Officer";
+            String productName = ord.get("product_name") != null ? ord.get("product_name").toString() : "Beverage Product";
+
+            // 1. Update order status to DISPATCHED
+            jdbcTemplate.update(
+                    "UPDATE psr_orders SET status = 'DISPATCHED', updated_at = NOW() WHERE id = ?",
+                    id
+            );
+
+            // 2. Also update corresponding outlet_requisitions row if any
+            try {
+                jdbcTemplate.update(
+                        "UPDATE outlet_requisitions SET status = 'FULFILLED', admin_supplier_notes = ?, updated_date = NOW() " +
+                        "WHERE requisition_code = ? OR (outlet_id = ? AND product_id = ? AND status IN ('PENDING', 'PENDING_PSR', 'SUBMITTED_TO_PSR'))",
+                        "Stock delivered by PSR " + psrName, orderCode, outletId, productId
+                );
+            } catch (Exception ignored) {}
+
+            // 3. Replenish outlet shop_inventory
+            Optional<ShopInventory> invOpt = inventoryRepository.findByBranchIdAndProductId(outletId, productId);
+            ShopInventory inv;
+            if (invOpt.isPresent()) {
+                inv = invOpt.get();
+                inv.setStockQuantity(inv.getStockQuantity() + quantity);
+                inv.setUpdatedDate(LocalDateTime.now());
+            } else {
+                inv = new ShopInventory(outletId, productId, quantity);
+                inv.setUpdatedDate(LocalDateTime.now());
+            }
+            inventoryRepository.save(inv);
+
+            // 4. Log visit / delivery in psr_visit_logs
+            try {
+                Long psrId = Long.parseLong(ord.get("psr_id").toString());
+                Long soId = ord.get("sales_officer_id") != null ? Long.parseLong(ord.get("sales_officer_id").toString()) : null;
+                jdbcTemplate.update(
+                        "INSERT INTO psr_visit_logs (psr_id, sales_officer_id, outlet_id, outlet_name, visit_type, notes, created_at) " +
+                        "VALUES (?, ?, ?, ?, 'STOCK_DELIVERY', ?, NOW())",
+                        psrId, soId, outletId, ord.get("outlet_name"),
+                        "Delivered " + quantity + " units of " + productName + " for order " + orderCode
+                );
+            } catch (Exception ignored) {}
+
+            // 5. Send Notification to Outlet
+            Outlet outlet = outletRepository.findById(outletId).orElse(null);
+            Long outletUserId = (outlet != null && outlet.getOutletId() != null) ? outlet.getOutletId() : outletId;
+
+            AppNotification notif = new AppNotification();
+            notif.setRecipientRole("OUTLET");
+            notif.setRecipientUserId(outletUserId);
+            notif.setTitle("Stock Delivered by PSR " + psrName);
+            notif.setMessage("Pre-Sales Officer " + psrName + " has dispatched and delivered " + quantity + " units of " +
+                    productName + " to your outlet shelf. Your inventory has been replenished!");
+            notif.setType("PSR_STOCK_DISPATCHED");
+            notif.setReferenceCode(orderCode);
+            notif.setReferenceId(outletId);
+            notificationRepository.save(notif);
+
+            Map<String, Object> resp = new HashMap<>();
+            resp.put("success", true);
+            resp.put("message", "Stock dispatched to outlet successfully! Inventory replenished.");
+            resp.put("order_id", id);
+            resp.put("order_code", orderCode);
+            resp.put("new_stock", inv.getStockQuantity());
+
+            return ResponseEntity.ok(resp);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("Failed to dispatch stock: " + e.getMessage()));
         }
     }
 

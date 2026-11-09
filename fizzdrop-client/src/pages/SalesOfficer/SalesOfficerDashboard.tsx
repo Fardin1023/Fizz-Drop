@@ -51,6 +51,11 @@ interface TerritoryOutlet {
   contact_phone?: string;
   status: string;
   total_shelf_stock?: number;
+  sub_route?: string;
+  assigned_psr_id?: number;
+  assigned_psr_name?: string;
+  assigned_psr_code?: string;
+  assigned_psr_phone?: string;
 }
 
 interface ProductItem {
@@ -809,11 +814,11 @@ export const SalesOfficerDashboard: React.FC = () => {
               </button>
 
               <button
-                onClick={() => setIsDistributeModalOpen(true)}
-                className="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs cursor-pointer transition-all active:scale-95"
+                onClick={() => setActiveTab('psr-team')}
+                className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs cursor-pointer transition-all active:scale-95"
               >
-                <Send className="w-3.5 h-3.5" />
-                <span>Distribute to Outlet & Earn Profit</span>
+                <UserCheck className="w-3.5 h-3.5" />
+                <span>Review PSR Field Demands ({psrs.length} Active PSRs)</span>
               </button>
             </div>
           </div>
@@ -827,16 +832,16 @@ export const SalesOfficerDashboard: React.FC = () => {
               <span className="text-2xl font-black text-blue-700 font-mono">{outlets.length}</span>
               <span className="text-xs text-slate-500 font-medium">stores</span>
             </div>
-            <p className="text-[10px] text-slate-400 mt-0.5">Physical retail branches</p>
+            <p className="text-[10px] text-slate-400 mt-0.5">Serviced via PSR Sub-Routes</p>
           </div>
 
           <div className="p-4 rounded-3xl bg-white border border-slate-200/90 shadow-2xs">
-            <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Pending Outlet Demands</p>
+            <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Pre-Sales Field Officers</p>
             <div className="flex items-baseline gap-2 mt-1">
-              <span className="text-2xl font-black text-amber-600 font-mono">{pendingDemandsCount}</span>
-              <span className="text-xs text-slate-500 font-medium">orders</span>
+              <span className="text-2xl font-black text-orange-600 font-mono">{psrs.length}</span>
+              <span className="text-xs text-slate-500 font-medium">PSRs</span>
             </div>
-            <p className="text-[10px] text-slate-400 mt-0.5">Awaiting fulfillment</p>
+            <p className="text-[10px] text-slate-400 mt-0.5">Covering sub-route stores</p>
           </div>
 
           <div className="p-4 rounded-3xl bg-white border border-slate-200/90 shadow-2xs">
@@ -866,7 +871,6 @@ export const SalesOfficerDashboard: React.FC = () => {
               { id: 'psr-team', label: `Pre-Sales (PSR) Team & Sub-Routes (${psrs.length})`, icon: UserCheck },
               { id: 'profit-ledger', label: `Wholesale Profit & Target (${distributions.length})`, icon: TrendingUp },
               { id: 'outlets', label: `Retail Stores (${outlets.length})`, icon: Store },
-              { id: 'demands', label: `Branch Demands (${pendingDemandsCount})`, icon: Clock },
               { id: 'supplier-link', label: 'Supplier Depot & Logistics', icon: Building2 },
             ].map((tab) => {
               const Icon = tab.icon;
@@ -1605,6 +1609,17 @@ export const SalesOfficerDashboard: React.FC = () => {
                           </span>
                         </div>
 
+                        {/* Assigned Route PSR & Sub-Route */}
+                        <div className="mt-2.5 p-2 rounded-xl bg-orange-50/70 border border-orange-200/60 text-xs flex items-center justify-between">
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-orange-800 block">Route Pre-Sales Officer</span>
+                            <span className="font-semibold text-slate-800 text-[11px]">{o.assigned_psr_name || 'Assigned Route PSR'}</span>
+                          </div>
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-orange-100 text-orange-800 font-bold">
+                            {o.sub_route || 'Sub-Route'}
+                          </span>
+                        </div>
+
                         <div className="space-y-1 text-xs text-slate-600 pt-3 border-t border-slate-100 mt-2.5">
                           <p className="flex items-start gap-1.5 leading-snug">
                             <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
@@ -1619,17 +1634,10 @@ export const SalesOfficerDashboard: React.FC = () => {
                         </div>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedOutletForDist(o.outlet_id);
-                          setIsDistributeModalOpen(true);
-                        }}
-                        className="mt-3.5 w-full py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs"
-                      >
-                        <Send className="w-3.5 h-3.5" />
-                        <span>Supply Stock to this Store</span>
-                      </button>
+                      <div className="mt-3.5 w-full py-2 px-3 rounded-xl bg-slate-100 border border-slate-200 text-slate-600 font-semibold text-xs flex items-center justify-center gap-1.5 text-center">
+                        <UserCheck className="w-3.5 h-3.5 text-orange-600" />
+                        <span>Orders Managed via Route PSR</span>
+                      </div>
                     </div>
                   ))}
                 </div>

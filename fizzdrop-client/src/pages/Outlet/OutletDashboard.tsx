@@ -56,6 +56,7 @@ export const OutletDashboard: React.FC = () => {
   // Active Outlet Data
   const effectiveOutletId = authOutlet?.outlet_id || user?.branch_id || 2;
   const [outlet, setOutlet] = useState<any>(authOutlet || null);
+  const [preSalesOfficer, setPreSalesOfficer] = useState<any | null>(null);
   const [allOutlets, setAllOutlets] = useState<any[]>([]);
   const [products, setProducts] = useState<OutletProductItem[]>([]);
   const [kpi, setKpi] = useState<any>({
@@ -116,6 +117,11 @@ export const OutletDashboard: React.FC = () => {
           const currentId = Number(outlet?.outlet_id || effectiveOutletId);
           if (Number(event.data.outlet_id) === currentId) {
             setCustomerOrderAlert(event.data);
+            fetchDashboardData(currentId, true);
+          }
+        } else if (event.data?.type === 'PSR_STOCK_DISPATCHED') {
+          const currentId = Number(outlet?.outlet_id || effectiveOutletId);
+          if (!event.data.outlet_id || Number(event.data.outlet_id) === currentId) {
             fetchDashboardData(currentId, true);
           }
         }
@@ -186,6 +192,16 @@ export const OutletDashboard: React.FC = () => {
         const invData = await invRes.json();
         setOutlet(invData.outlet);
         setProducts(invData.products || []);
+        if (invData.pre_sales_officer) {
+          setPreSalesOfficer(invData.pre_sales_officer);
+        } else if (invData.outlet?.assigned_psr_name) {
+          setPreSalesOfficer({
+            name: invData.outlet.assigned_psr_name,
+            code: invData.outlet.assigned_psr_code,
+            phone: invData.outlet.assigned_psr_phone,
+            sub_route: invData.outlet.sub_route,
+          });
+        }
         if (invData.kpi) setKpi(invData.kpi);
       }
 
@@ -386,16 +402,16 @@ export const OutletDashboard: React.FC = () => {
       id: 'request' as const,
       label: 'Request Stock Requisition',
       shortLabel: 'Order Restock',
-      desc: 'Order cases from Regional Supplier',
+      desc: 'Order cases via Route Pre-Sales Officer (PSR)',
       icon: Truck,
-      gradient: 'from-blue-600 via-indigo-600 to-cyan-600',
-      badge: 'Order',
+      gradient: 'from-orange-600 via-amber-600 to-emerald-600',
+      badge: 'PSR Route',
     },
     {
       id: 'deliveries' as const,
       label: 'Inbound Deliveries & Orders',
       shortLabel: 'Deliveries Tracker',
-      desc: 'Status of orders & supplier dispatches',
+      desc: 'Status of orders & PSR field deliveries',
       icon: ClipboardList,
       gradient: 'from-cyan-600 via-teal-600 to-blue-600',
       badge: `${requisitions.length} Orders`,
@@ -568,6 +584,56 @@ export const OutletDashboard: React.FC = () => {
           </div>
         </div>
       </section>
+
+      {/* Assigned Route Pre-Sales Officer (PSR) Banner */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
+        <div className="p-4 rounded-3xl bg-gradient-to-r from-orange-50 via-amber-50 to-emerald-50 border border-orange-200/90 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-orange-500 to-amber-600 text-white font-black flex items-center justify-center text-xs shadow-md shadow-orange-500/20 shrink-0">
+              PSR
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black uppercase tracking-wider text-orange-950">
+                  Exclusive Route Pre-Sales Officer (PSR)
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-800 border border-orange-200">
+                  Primary Contact
+                </span>
+              </div>
+              <p className="text-sm font-bold text-slate-900 mt-0.5">
+                {preSalesOfficer?.name || outlet?.assigned_psr_name || 'Assigned Territory Officer'}
+                {(preSalesOfficer?.code || outlet?.assigned_psr_code) && (
+                  <span className="text-xs font-mono text-orange-700 font-semibold ml-1.5">
+                    ({preSalesOfficer?.code || outlet?.assigned_psr_code})
+                  </span>
+                )}
+                <span className="text-xs text-slate-500 font-normal ml-2">
+                  • Sub-Route: <strong className="font-semibold text-slate-700">{preSalesOfficer?.sub_route || outlet?.sub_route || 'Territory Sub-Route'}</strong>
+                </span>
+                {(preSalesOfficer?.phone || outlet?.assigned_psr_phone) && (
+                  <span className="text-xs text-slate-500 font-normal ml-2">
+                    • 📞 <strong className="font-semibold text-slate-700">{preSalesOfficer?.phone || outlet?.assigned_psr_phone}</strong>
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                if (products.length > 0) setSelectedProductIdForReq(products[0].product_id);
+                setIsRequisitionModalOpen(true);
+              }}
+              className="px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer active:scale-95"
+            >
+              <Truck className="w-3.5 h-3.5" />
+              <span>Order Stock via PSR</span>
+            </button>
+          </div>
+        </div>
+      </div>
 
       {/* MAIN CONTENT AREA WITH SIDEBAR */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full flex-1">
@@ -1110,18 +1176,21 @@ export const OutletDashboard: React.FC = () => {
                     </div>
                     <div>
                       <h3 className="text-lg font-black text-slate-900 tracking-tight">
-                        ORDER RESTOCK FROM REGIONAL SUPPLIER
+                        ORDER RESTOCK VIA ROUTE PRE-SALES OFFICER (PSR)
                       </h3>
                       <p className="text-xs text-slate-500">
-                        Orders are dispatched directly from the regional warehouse depot to your outlet.
+                        Orders are placed exclusively with your assigned Route Pre-Sales Officer for sub-route delivery.
                       </p>
                     </div>
                   </div>
 
-                  <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-200/60 text-xs text-blue-900 space-y-1">
-                    <p className="font-bold">Allocated Regional Depot: {outlet?.city || 'Dhaka'} Hub</p>
-                    <p className="text-blue-700">
-                      Orders placed before 2:00 PM are delivered same-day. You will receive real-time notifications on approval.
+                  <div className="p-4 rounded-2xl bg-orange-50/70 border border-orange-200/60 text-xs text-orange-950 space-y-1">
+                    <p className="font-bold">
+                      Assigned Officer: {preSalesOfficer?.name || outlet?.assigned_psr_name || 'Territory PSR'} 
+                      {(preSalesOfficer?.code || outlet?.assigned_psr_code) && ` (${preSalesOfficer?.code || outlet?.assigned_psr_code})`}
+                    </p>
+                    <p className="text-orange-800">
+                      Sub-Route: {preSalesOfficer?.sub_route || outlet?.sub_route || 'Local Sub-Route'}. Your Route Officer verifies stock orders and personally executes or coordinates delivery replenishment to your shop.
                     </p>
                   </div>
 
@@ -1131,10 +1200,10 @@ export const OutletDashboard: React.FC = () => {
                       setSelectedProductIdForReq(null);
                       setIsRequisitionModalOpen(true);
                     }}
-                    className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-blue-600/25 transition-all cursor-pointer"
+                    className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-orange-600 via-amber-600 to-emerald-600 hover:from-orange-700 hover:to-emerald-700 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-orange-600/25 transition-all cursor-pointer"
                   >
                     <Plus className="w-5 h-5" />
-                    <span>Open New Stock Requisition Form</span>
+                    <span>Open New Order to Pre-Sales Officer</span>
                   </button>
                 </div>
               </div>
@@ -1439,13 +1508,14 @@ export const OutletDashboard: React.FC = () => {
         onUpdated={() => fetchDashboardData(outlet?.outlet_id || effectiveOutletId)}
       />
 
-      {/* MODAL 3: Requisition to Supplier Modal */}
+      {/* MODAL 3: Requisition via Route Pre-Sales Officer Modal */}
       <OutletRequisitionModal
         isOpen={isRequisitionModalOpen}
         onClose={() => setIsRequisitionModalOpen(false)}
         outletId={outlet?.outlet_id || effectiveOutletId}
         outletName={outlet?.outlet_name || 'Outlet Branch'}
         products={products}
+        preSalesOfficer={preSalesOfficer}
         initialProductId={selectedProductIdForReq}
         onSubmitted={() => fetchDashboardData(outlet?.outlet_id || effectiveOutletId)}
       />

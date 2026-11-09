@@ -16,6 +16,8 @@ import com.fizzdrop.entity.SupplierTransaction;
 import com.fizzdrop.repository.SupplierTransactionRepository;
 import com.fizzdrop.entity.SalesOfficer;
 import com.fizzdrop.repository.SalesOfficerRepository;
+import com.fizzdrop.entity.PreSalesOfficer;
+import com.fizzdrop.repository.PreSalesOfficerRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -40,6 +42,7 @@ public class InventoryController {
     private final AppNotificationRepository notificationRepository;
     private final SupplierTransactionRepository supplierTransactionRepository;
     private final SalesOfficerRepository salesOfficerRepository;
+    private final PreSalesOfficerRepository psrRepository;
 
     public InventoryController(ShopInventoryRepository inventoryRepository,
                                ProductRepository productRepository,
@@ -49,7 +52,8 @@ public class InventoryController {
                                JdbcTemplate jdbcTemplate,
                                AppNotificationRepository notificationRepository,
                                SupplierTransactionRepository supplierTransactionRepository,
-                               SalesOfficerRepository salesOfficerRepository) {
+                               SalesOfficerRepository salesOfficerRepository,
+                               PreSalesOfficerRepository psrRepository) {
         this.inventoryRepository = inventoryRepository;
         this.productRepository = productRepository;
         this.outletRepository = outletRepository;
@@ -59,6 +63,7 @@ public class InventoryController {
         this.notificationRepository = notificationRepository;
         this.supplierTransactionRepository = supplierTransactionRepository;
         this.salesOfficerRepository = salesOfficerRepository;
+        this.psrRepository = psrRepository;
     }
 
     /**
@@ -484,8 +489,52 @@ public class InventoryController {
         kpi.put("today_sales_revenue", todaySalesRevenue);
         kpi.put("today_sales_count", todaySalesCount);
 
+        // Resolve and enrich assigned Pre-Sales Officer for this outlet
+        PreSalesOfficer assignedPsr = null;
+        if (outlet.getAssignedPsrId() != null) {
+            assignedPsr = psrRepository.findById(outlet.getAssignedPsrId()).orElse(null);
+        }
+        if (assignedPsr == null && outlet.getSubRoute() != null && !outlet.getSubRoute().trim().isEmpty()) {
+            assignedPsr = psrRepository.findAll().stream()
+                    .filter(p -> p.getSubRoute() != null && p.getSubRoute().equalsIgnoreCase(outlet.getSubRoute()))
+                    .findFirst().orElse(null);
+        }
+        if (assignedPsr == null && outlet.getArea() != null) {
+            assignedPsr = psrRepository.findAll().stream()
+                    .filter(p -> p.getAssignedArea() != null && p.getAssignedArea().equalsIgnoreCase(outlet.getArea()))
+                    .findFirst().orElse(null);
+        }
+        if (assignedPsr == null) {
+            List<PreSalesOfficer> allPsrs = psrRepository.findAll();
+            if (!allPsrs.isEmpty()) {
+                assignedPsr = allPsrs.get(0);
+                outlet.setAssignedPsrId(assignedPsr.getId());
+                outlet.setSubRoute(assignedPsr.getSubRoute());
+                try {
+                    outletRepository.save(outlet);
+                } catch (Exception ignored) {}
+            }
+        }
+
+        if (assignedPsr != null) {
+            outlet.setAssignedPsrName(assignedPsr.getName());
+            outlet.setAssignedPsrCode(assignedPsr.getPsrCode());
+            outlet.setAssignedPsrPhone(assignedPsr.getPhone());
+        }
+
         Map<String, Object> res = new HashMap<>();
         res.put("outlet", outlet);
+        if (assignedPsr != null) {
+            Map<String, Object> psrMap = new HashMap<>();
+            psrMap.put("id", assignedPsr.getId());
+            psrMap.put("name", assignedPsr.getName());
+            psrMap.put("code", assignedPsr.getPsrCode());
+            psrMap.put("phone", assignedPsr.getPhone());
+            psrMap.put("email", assignedPsr.getEmail());
+            psrMap.put("sub_route", assignedPsr.getSubRoute());
+            psrMap.put("sales_officer_id", assignedPsr.getSalesOfficerId());
+            res.put("pre_sales_officer", psrMap);
+        }
         res.put("products", productList);
         res.put("kpi", kpi);
 
@@ -628,7 +677,8 @@ public class InventoryController {
     }
 
     /**
-     * Outlet requests stock requisition from regional supplier
+     * Outlet requests stock requisition via designated Route Pre-Sales Officer (PSR)
+     * Direct connection to Sales Officer is removed - Outlet deals exclusively with PSR.
      */
     @PostMapping("/outlet/{outletId}/requisitions")
     public ResponseEntity<?> createOutletRequisition(@PathVariable Long outletId, @RequestBody Map<String, Object> req) {
@@ -657,22 +707,85 @@ public class InventoryController {
         BigDecimal unitPrice = product.getOutletPrice() != null ? product.getOutletPrice() : product.getBasePrice();
         BigDecimal totalAmount = unitPrice != null ? unitPrice.multiply(BigDecimal.valueOf(qty)) : BigDecimal.ZERO;
 
+        // Resolve assigned Pre-Sales Officer
+        PreSalesOfficer assignedPsr = null;
+        if (outlet.getAssignedPsrId() != null) {
+            assignedPsr = psrRepository.findById(outlet.getAssignedPsrId()).orElse(null);
+        }
+        if (assignedPsr == null && outlet.getSubRoute() != null && !outlet.getSubRoute().trim().isEmpty()) {
+            assignedPsr = psrRepository.findAll().stream()
+                    .filter(p -> p.getSubRoute() != null && p.getSubRoute().equalsIgnoreCase(outlet.getSubRoute()))
+                    .findFirst().orElse(null);
+        }
+        if (assignedPsr == null && outlet.getArea() != null) {
+            assignedPsr = psrRepository.findAll().stream()
+                    .filter(p -> p.getAssignedArea() != null && p.getAssignedArea().equalsIgnoreCase(outlet.getArea()))
+                    .findFirst().orElse(null);
+        }
+        if (assignedPsr == null) {
+            List<PreSalesOfficer> allPsrs = psrRepository.findAll();
+            if (!allPsrs.isEmpty()) {
+                assignedPsr = allPsrs.get(0);
+                outlet.setAssignedPsrId(assignedPsr.getId());
+                outlet.setSubRoute(assignedPsr.getSubRoute());
+                try {
+                    outletRepository.save(outlet);
+                } catch (Exception ignored) {}
+            }
+        }
+
+        String psrName = assignedPsr != null ? assignedPsr.getName() : "Route Pre-Sales Officer";
+        Long psrId = assignedPsr != null ? assignedPsr.getId() : 1L;
+        Long soId = assignedPsr != null ? assignedPsr.getSalesOfficerId() : 1L;
+        String subRoute = assignedPsr != null && assignedPsr.getSubRoute() != null ? assignedPsr.getSubRoute() : (outlet.getSubRoute() != null ? outlet.getSubRoute() : "Route-Default");
+
+        // 1. Insert into psr_orders table (exclusive order channel)
         try {
             jdbcTemplate.update(
-                "INSERT INTO outlet_requisitions (requisition_code, outlet_id, product_id, product_name, quantity, unit_price, total_amount, urgency, status, outlet_remarks, created_date, updated_date) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, NOW(), NOW())",
-                reqCode, outletId, productId, prodName, qty, unitPrice, totalAmount, urgency, remarks
+                "INSERT INTO psr_orders (order_code, psr_id, psr_name, sales_officer_id, outlet_id, outlet_name, sub_route, product_id, product_name, quantity, unit_price, total_amount, urgency, status, outlet_remarks, psr_notes, created_at, updated_at) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'SUBMITTED_TO_PSR', ?, ?, NOW(), NOW())",
+                reqCode, psrId, psrName, soId, outletId, outlet.getOutletName(), subRoute, productId, prodName, qty, unitPrice, totalAmount, urgency, remarks, "Direct restock order from outlet branch"
+            );
+        } catch (Exception e) {
+            System.err.println("[InventoryController] Failed to insert psr_orders: " + e.getMessage());
+        }
+
+        // 2. Also keep in outlet_requisitions for ledger compatibility
+        try {
+            jdbcTemplate.update(
+                "INSERT INTO outlet_requisitions (requisition_code, outlet_id, product_id, product_name, quantity, unit_price, total_amount, urgency, status, outlet_remarks, admin_supplier_notes, created_date, updated_date) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING_PSR', ?, ?, NOW(), NOW())",
+                reqCode, outletId, productId, prodName, qty, unitPrice, totalAmount, urgency, remarks, "Assigned to PSR: " + psrName + " (" + (assignedPsr != null ? assignedPsr.getPsrCode() : "PSR") + ")"
             );
         } catch (Exception ignored) {}
 
+        // 3. Send Notification to Pre-Sales Officer (PSR)
+        if (assignedPsr != null) {
+            try {
+                Long psrUserId = assignedPsr.getUserId() != null ? assignedPsr.getUserId() : (200L + assignedPsr.getId());
+                AppNotification psrNotif = new AppNotification();
+                psrNotif.setRecipientRole("PSR");
+                psrNotif.setRecipientUserId(psrUserId);
+                psrNotif.setTitle("New Restock Order from " + outlet.getOutletName());
+                psrNotif.setMessage("Outlet " + outlet.getOutletName() + " on route " + subRoute + " placed an order for " + qty + " cases of " + prodName + " (৳" + totalAmount + ").");
+                psrNotif.setType("OUTLET_ORDER_TO_PSR");
+                psrNotif.setReferenceCode(reqCode);
+                psrNotif.setReferenceId(outletId);
+                notificationRepository.save(psrNotif);
+            } catch (Exception ignored) {}
+        }
+
         Map<String, Object> res = new HashMap<>();
         res.put("success", true);
-        res.put("message", "Requisition " + reqCode + " submitted to Regional Supplier!");
+        res.put("message", "Order " + reqCode + " placed with Route Pre-Sales Officer " + psrName + "!");
         res.put("requisition_code", reqCode);
         res.put("outlet_name", outlet.getOutletName());
         res.put("product_name", prodName);
         res.put("quantity", qty);
         res.put("urgency", urgency);
+        res.put("psr_name", psrName);
+        res.put("psr_code", assignedPsr != null ? assignedPsr.getPsrCode() : null);
+        res.put("sub_route", subRoute);
 
         return ResponseEntity.ok(res);
     }

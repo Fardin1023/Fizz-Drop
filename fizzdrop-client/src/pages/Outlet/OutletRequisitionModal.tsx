@@ -8,6 +8,13 @@ interface OutletRequisitionModalProps {
   outletId: number;
   outletName: string;
   products: OutletProductItem[];
+  preSalesOfficer?: {
+    id: number;
+    name: string;
+    code: string;
+    phone?: string;
+    sub_route?: string;
+  } | null;
   initialProductId?: number | null;
   onSubmitted?: () => void;
 }
@@ -18,6 +25,7 @@ export const OutletRequisitionModal: React.FC<OutletRequisitionModalProps> = ({
   outletId,
   outletName,
   products,
+  preSalesOfficer = null,
   initialProductId = null,
   onSubmitted,
 }) => {
@@ -74,7 +82,7 @@ export const OutletRequisitionModal: React.FC<OutletRequisitionModalProps> = ({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to submit requisition');
 
-      setSuccessMsg(data.message || 'Requisition submitted to Regional Supplier!');
+      setSuccessMsg(data.message || 'Order placed with Route Pre-Sales Officer!');
       setTimeout(() => {
         if (onSubmitted) onSubmitted();
         onClose();
@@ -95,7 +103,7 @@ export const OutletRequisitionModal: React.FC<OutletRequisitionModalProps> = ({
         onClick={(e) => e.stopPropagation()}
         className="relative w-full max-w-lg bg-white rounded-3xl border border-slate-200 shadow-2xl overflow-hidden animate-scale-up"
       >
-        <div className="h-2 w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500" />
+        <div className="h-2 w-full bg-gradient-to-r from-orange-500 via-amber-500 to-blue-600" />
 
         <button
           onClick={onClose}
@@ -106,16 +114,37 @@ export const OutletRequisitionModal: React.FC<OutletRequisitionModalProps> = ({
 
         <form onSubmit={handleSubmit} className="p-6 sm:p-7 space-y-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/20">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-orange-500 to-amber-600 text-white flex items-center justify-center shadow-lg shadow-orange-500/20">
               <Truck className="w-6 h-6" />
             </div>
             <div>
               <h3 className="text-xl font-black text-slate-900 tracking-tight">ORDER BEVERAGE STOCK</h3>
               <p className="text-xs text-slate-500">
-                Submit restock requisition to supplier for <span className="font-semibold text-slate-700">{outletName}</span>
+                Order stock via Route Pre-Sales Officer (PSR) for <span className="font-semibold text-slate-700">{outletName}</span>
               </p>
             </div>
           </div>
+
+          {preSalesOfficer && (
+            <div className="p-3 rounded-2xl bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200/80 text-xs flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-orange-600 text-white font-bold flex items-center justify-center text-[11px] shadow-sm">
+                  PSR
+                </div>
+                <div>
+                  <p className="font-bold text-slate-900">
+                    Route Officer: <span className="text-orange-700">{preSalesOfficer.name}</span> ({preSalesOfficer.code})
+                  </p>
+                  <p className="text-[11px] text-slate-500">
+                    Sub-Route: <span className="font-medium text-slate-700">{preSalesOfficer.sub_route || 'Territory Sub-Route'}</span> {preSalesOfficer.phone ? `• 📞 ${preSalesOfficer.phone}` : ''}
+                  </p>
+                </div>
+              </div>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-800 border border-orange-200">
+                Exclusive Field Link
+              </span>
+            </div>
+          )}
 
           {error && (
             <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
@@ -231,14 +260,14 @@ export const OutletRequisitionModal: React.FC<OutletRequisitionModalProps> = ({
           {/* Remarks */}
           <div className="space-y-1">
             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              Notes for Regional Supplier (Optional)
+              Notes for Route Pre-Sales Officer (Optional)
             </label>
             <textarea
               rows={2}
-              placeholder="E.g., Weekend stock replenishment, high foot-traffic demand..."
+              placeholder="E.g., Weekend shelf restock, urgent shop replenishment..."
               value={remarks}
               onChange={(e) => setRemarks(e.target.value)}
-              className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none"
+              className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-orange-500/20 resize-none"
             />
           </div>
 
@@ -253,14 +282,14 @@ export const OutletRequisitionModal: React.FC<OutletRequisitionModalProps> = ({
             <button
               type="submit"
               disabled={submitting}
-              className="flex-1 py-3 px-5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25 cursor-pointer"
+              className="flex-1 py-3 px-5 rounded-xl bg-gradient-to-r from-orange-600 via-amber-600 to-emerald-600 hover:from-orange-700 hover:to-emerald-700 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-orange-500/25 cursor-pointer"
             >
               {submitting ? (
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
                 <>
                   <Check className="w-4 h-4" />
-                  <span>Send Requisition to Supplier</span>
+                  <span>Send Order to Pre-Sales Officer</span>
                 </>
               )}
             </button>

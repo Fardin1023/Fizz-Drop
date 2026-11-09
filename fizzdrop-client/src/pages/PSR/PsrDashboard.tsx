@@ -24,7 +24,8 @@ import {
   Calendar,
   Sparkles,
   ChevronRight,
-  ClipboardList
+  ClipboardList,
+  Truck
 } from 'lucide-react';
 
 interface PsrData {
@@ -110,6 +111,59 @@ export default function PsrDashboard() {
       setLoading(false);
     }
   }, [psrId]);
+
+  const [dispatchingId, setDispatchingId] = useState<number | null>(null);
+
+  // Real-time listener for incoming Outlet Orders via BroadcastChannel
+  useEffect(() => {
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel('fizzdrop_realtime_events');
+      channel.onmessage = (event) => {
+        if (event.data?.type === 'OUTLET_ORDER_TO_PSR') {
+          loadDashboard();
+        }
+      };
+    } catch (ignored) {}
+
+    return () => {
+      if (channel) channel.close();
+    };
+  }, [loadDashboard]);
+
+  // Dispatch and deliver stock to outlet
+  const handleDispatchOrderToOutlet = async (order: any) => {
+    if (!order || !order.id) return;
+    setDispatchingId(order.id);
+    try {
+      const res = await fetch(`http://localhost:8080/api/v1/psr/orders/${order.id}/dispatch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const resData = await res.json();
+      if (!res.ok) throw new Error(resData.error || resData.message || 'Failed to dispatch stock');
+
+      // Broadcast to other tabs so Outlet immediately refreshes shelf inventory and shows chime
+      try {
+        const bc = new BroadcastChannel('fizzdrop_realtime_events');
+        bc.postMessage({
+          type: 'PSR_STOCK_DISPATCHED',
+          order_code: order.order_code,
+          outlet_id: order.outlet_id,
+          quantity: order.quantity,
+          product_name: order.product_name,
+        });
+        bc.close();
+      } catch (ignored) {}
+
+      alert(`Stock successfully dispatched to ${order.outlet_name}! The outlet has received a realtime notification and shelf stock is replenished.`);
+      loadDashboard();
+    } catch (err: any) {
+      alert(err.message || 'Failed to dispatch order');
+    } finally {
+      setDispatchingId(null);
+    }
+  };
 
   useEffect(() => {
     loadDashboard();
@@ -661,13 +715,14 @@ export default function PsrDashboard() {
                       <th className="p-3 text-center">Urgency</th>
                       <th className="p-3 text-center">Status</th>
                       <th className="p-3">Time</th>
+                      <th className="p-3 text-center">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-zinc-800">
                     {data.orders.map((ord: any) => {
-                      const isSubmitted = ord.status === 'SUBMITTED_TO_SO';
+                      const isSubmitted = ord.status === 'SUBMITTED_TO_SO' || ord.status === 'SUBMITTED_TO_PSR';
                       const isApproved = ord.status === 'APPROVED_BY_SO' || ord.status === 'REQUISITIONED_FROM_SUPPLIER';
-                      const isDelivered = ord.status === 'DELIVERED';
+                      const isDispatched = ord.status === 'DISPATCHED' || ord.status === 'DELIVERED';
                       return (
                         <tr key={ord.id} className="hover:bg-slate-50/50 dark:hover:bg-zinc-800/40 transition">
                           <td className="p-3 font-mono font-semibold text-orange-600 dark:text-orange-400">
@@ -698,7 +753,7 @@ export default function PsrDashboard() {
                           <td className="p-3 text-center">
                             <span
                               className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold inline-flex items-center gap-1 ${
-                                isDelivered
+                                isDispatched
                                   ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
                                   : isApproved
                                   ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300'
@@ -707,7 +762,7 @@ export default function PsrDashboard() {
                                   : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'
                               }`}
                             >
-                              {isDelivered && <CheckCircle2 className="h-3 w-3" />}
+                              {isDispatched && <CheckCircle2 className="h-3 w-3" />}
                               {isApproved && <Send className="h-3 w-3" />}
                               {isSubmitted && <Clock className="h-3 w-3" />}
                               {ord.status}
@@ -715,6 +770,29 @@ export default function PsrDashboard() {
                           </td>
                           <td className="p-3 text-xs text-slate-400">
                             {ord.created_at ? new Date(ord.created_at).toLocaleString() : 'Just now'}
+                          </td>
+                          <td className="p-3 text-center">
+                            {isDispatched ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 text-xs font-bold border border-emerald-200 dark:border-emerald-800">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                Stock Sent
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => handleDispatchOrderToOutlet(ord)}
+                                disabled={dispatchingId === ord.id}
+                                className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm shadow-orange-600/20 transition-all cursor-pointer disabled:opacity-50 whitespace-nowrap active:scale-95"
+                              >
+                                {dispatchingId === ord.id ? (
+                                  <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                ) : (
+                                  <>
+                                    <Truck className="w-3.5 h-3.5" />
+                                    <span>Send Stock to Outlet</span>
+                                  </>
+                                )}
+                              </button>
+                            )}
                           </td>
                         </tr>
                       );

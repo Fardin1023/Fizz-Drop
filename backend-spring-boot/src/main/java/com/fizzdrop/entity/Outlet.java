@@ -89,6 +89,28 @@ public class Outlet {
     @JsonAlias({"updated_date", "updatedDate"})
     private LocalDateTime updatedDate;
 
+    @Column(name = "sub_route", length = 255)
+    @JsonProperty("sub_route")
+    @JsonAlias({"sub_route", "subRoute"})
+    private String subRoute;
+
+    @Column(name = "assigned_psr_id")
+    @JsonProperty("assigned_psr_id")
+    @JsonAlias({"assigned_psr_id", "assignedPsrId"})
+    private Long assignedPsrId;
+
+    @Transient
+    @JsonProperty("assigned_psr_name")
+    private String assignedPsrName;
+
+    @Transient
+    @JsonProperty("assigned_psr_code")
+    private String assignedPsrCode;
+
+    @Transient
+    @JsonProperty("assigned_psr_phone")
+    private String assignedPsrPhone;
+
     public Outlet() {
         this.createdDate = LocalDateTime.now();
         this.updatedDate = LocalDateTime.now();
@@ -167,4 +189,19 @@ public class Outlet {
 
     public LocalDateTime getUpdatedDate() { return updatedDate; }
     public void setUpdatedDate(LocalDateTime updatedDate) { this.updatedDate = updatedDate; }
+
+    public String getSubRoute() { return subRoute; }
+    public void setSubRoute(String subRoute) { this.subRoute = subRoute; }
+
+    public Long getAssignedPsrId() { return assignedPsrId; }
+    public void setAssignedPsrId(Long assignedPsrId) { this.assignedPsrId = assignedPsrId; }
+
+    public String getAssignedPsrName() { return assignedPsrName; }
+    public void setAssignedPsrName(String assignedPsrName) { this.assignedPsrName = assignedPsrName; }
+
+    public String getAssignedPsrCode() { return assignedPsrCode; }
+    public void setAssignedPsrCode(String assignedPsrCode) { this.assignedPsrCode = assignedPsrCode; }
+
+    public String getAssignedPsrPhone() { return assignedPsrPhone; }
+    public void setAssignedPsrPhone(String assignedPsrPhone) { this.assignedPsrPhone = assignedPsrPhone; }
 }
