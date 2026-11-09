@@ -19,6 +19,7 @@ import {
   Send,
   UserCheck,
   Phone,
+  X,
 } from 'lucide-react';
 import { SupplyStockModal, type ProductOption, type OutletOption } from './SupplyStockModal';
 import { ZeroStockAlertModal, type ZeroStockAlertData } from '../../components/Alerts/ZeroStockAlertModal';
@@ -87,6 +88,7 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
   const [fulfillModalReq, setFulfillModalReq] = useState<OutletRequisitionItem | null>(null);
   const [fulfillQty, setFulfillQty] = useState<number>(0);
   const [fulfillPrice, setFulfillPrice] = useState<number>(0);
+  const [fulfillNotes, setFulfillNotes] = useState<string>('');
   const [fulfillSubmitting, setFulfillSubmitting] = useState<boolean>(false);
 
   // Fetch incoming requisitions
@@ -123,6 +125,7 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
     setFulfillModalReq(req);
     setFulfillQty(Math.min(req.quantity, req.supplier_available_stock));
     setFulfillPrice(Number(req.unit_price || 35));
+    setFulfillNotes(`Wholesale delivery to Sales Officer ${req.sales_officer_name || ''} for ${req.outlet_name}`);
   };
 
   const handleFulfillSubmit = async (e: React.FormEvent) => {
@@ -134,8 +137,8 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
       setActionErrorMsg("Cannot dispatch: Depot stock is 0 cases. Please request stock from Superadmin first.");
       return;
     }
-    if (fulfillModalReq.supplier_available_stock < 5) {
-      setActionErrorMsg(`Cannot dispatch: Depot stock is critically low (${fulfillModalReq.supplier_available_stock} cases). Minimum reserve is 5 cases. Please restock from Superadmin central catalog first.`);
+    if (fulfillQty <= 0) {
+      setActionErrorMsg("Dispatch quantity must be at least 1 case.");
       return;
     }
     if (fulfillQty > fulfillModalReq.supplier_available_stock) {
@@ -156,7 +159,7 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
           unit_price: fulfillPrice,
           user_id: userId,
           sales_officer_id: fulfillModalReq.sales_officer_id,
-          notes: `Wholesale fulfillment to Sales Officer ${fulfillModalReq.sales_officer_name || ''} (${fulfillModalReq.sales_officer_code || 'Territory'})`,
+          notes: fulfillNotes || `Wholesale fulfillment to Sales Officer ${fulfillModalReq.sales_officer_name || ''} (${fulfillModalReq.sales_officer_code || 'Territory'})`,
         }),
       });
 
@@ -654,13 +657,13 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
                           onClick={() => openFulfillModal(req)}
                           disabled={dispatchingId === req.id}
                           className={`py-3 px-4 rounded-2xl font-black text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md ${
-                            hasDepotStock && req.supplier_available_stock >= 5
+                            hasDepotStock
                               ? 'bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-emerald-600/20 active:scale-95'
                               : 'bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700'
                           }`}
                           title={
                             hasDepotStock
-                              ? 'Review, adjust quantity/price & fulfill request'
+                              ? 'Review, adjust quantity/price & fulfill request to Sales Officer'
                               : '0 stock in depot — click for restock alert'
                           }
                         >
@@ -668,11 +671,6 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
                             <>
                               <ShieldAlert className="w-3.5 h-3.5 text-rose-600" />
                               <span>0 Stock in Depot</span>
-                            </>
-                          ) : req.supplier_available_stock < 5 ? (
-                            <>
-                              <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
-                              <span>Low Depot Stock ({req.supplier_available_stock})</span>
                             </>
                           ) : (
                             <>
@@ -708,6 +706,208 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
           }
         }}
       />
+
+      {/* MODAL: Adjust & Dispatch to Sales Officer Modal */}
+      {fulfillModalReq && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-zinc-800 w-full max-w-lg overflow-hidden flex flex-col max-h-[92vh]">
+            
+            {/* Modal Header */}
+            <div className="p-5 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between bg-gradient-to-r from-slate-900 via-zinc-900 to-slate-900 text-white">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white shadow-md shadow-emerald-500/20">
+                  <Send className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-black text-base tracking-tight text-white flex items-center gap-2">
+                    Adjust & Dispatch Stock
+                  </h3>
+                  <p className="text-xs text-slate-300 font-mono">
+                    Requisition #{fulfillModalReq.requisition_code}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFulfillModalReq(null)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body / Form */}
+            <form onSubmit={handleFulfillSubmit} className="p-6 overflow-y-auto space-y-4 text-slate-800 dark:text-zinc-100">
+              
+              {/* Product & Outlet Overview Card */}
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-800/60 border border-slate-200/80 dark:border-zinc-700/80 space-y-2.5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400">Beverage Item</span>
+                    <h4 className="font-black text-base text-slate-900 dark:text-white">{fulfillModalReq.product_name}</h4>
+                  </div>
+                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${
+                    fulfillModalReq.urgency === 'HIGH' || fulfillModalReq.urgency === 'CRITICAL'
+                      ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300'
+                      : 'bg-slate-200 text-slate-700 dark:bg-zinc-700 dark:text-zinc-300'
+                  }`}>
+                    {fulfillModalReq.urgency || 'NORMAL'} Priority
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200/60 dark:border-zinc-700/60 text-xs">
+                  <div>
+                    <span className="text-[10px] text-slate-400 block">Sales Officer (Channel):</span>
+                    <strong className="text-slate-800 dark:text-zinc-200 font-bold block truncate">
+                      {fulfillModalReq.sales_officer_name || 'Assigned Sales Officer'}
+                    </strong>
+                    <span className="text-[10px] text-slate-500 font-mono">{fulfillModalReq.sales_officer_code || fulfillModalReq.area}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 block">Destination Outlet:</span>
+                    <strong className="text-slate-800 dark:text-zinc-200 font-bold block truncate">
+                      {fulfillModalReq.outlet_name}
+                    </strong>
+                    <span className="text-[10px] text-slate-500 truncate block">{fulfillModalReq.location_address || fulfillModalReq.area}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-zinc-700/60 text-xs">
+                  <span className="text-slate-500">Requested: <strong className="text-slate-900 dark:text-white">{fulfillModalReq.quantity} cases</strong></span>
+                  <span className="text-teal-600 dark:text-teal-400 font-bold">
+                    Depot Available: <strong className="font-mono text-sm">{fulfillModalReq.supplier_available_stock}</strong> cases
+                  </span>
+                </div>
+              </div>
+
+              {/* Input 1: Adjustable Quantity */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-zinc-300">
+                    Dispatch Quantity (Cases)
+                  </label>
+                  <span className="text-xs text-slate-400">
+                    Max: <strong className="text-teal-600">{fulfillModalReq.supplier_available_stock} cases</strong>
+                  </span>
+                </div>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="1"
+                    max={fulfillModalReq.supplier_available_stock}
+                    value={fulfillQty}
+                    onChange={(e) => setFulfillQty(Math.max(1, parseInt(e.target.value) || 0))}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-900 dark:text-white font-bold text-base focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                    required
+                  />
+                  <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setFulfillQty(Math.min(fulfillModalReq.quantity, fulfillModalReq.supplier_available_stock))}
+                      className="px-2 py-1 text-[11px] font-bold rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-zinc-700 text-slate-700 dark:text-zinc-200 transition cursor-pointer"
+                    >
+                      Requested ({fulfillModalReq.quantity})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFulfillQty(fulfillModalReq.supplier_available_stock)}
+                      className="px-2 py-1 text-[11px] font-bold rounded-lg bg-teal-50 hover:bg-teal-100 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 transition cursor-pointer"
+                    >
+                      Max Depot
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Input 2: Adjustable Wholesale Case Price */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-zinc-300">
+                    Wholesale Unit Price (৳ per Case)
+                  </label>
+                  <span className="text-xs text-slate-400">
+                    Original: ৳{Number(fulfillModalReq.unit_price || 35).toFixed(2)}
+                  </span>
+                </div>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-slate-400">৳</span>
+                  <input
+                    type="number"
+                    step="0.50"
+                    min="1"
+                    value={fulfillPrice}
+                    onChange={(e) => setFulfillPrice(parseFloat(e.target.value) || 0)}
+                    className="w-full pl-8 pr-4 py-3 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-900 dark:text-white font-bold text-base focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Fulfillment Notes */}
+              <div>
+                <label className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-zinc-300 block mb-1.5">
+                  Fulfillment Notes / Dispatch Remarks
+                </label>
+                <input
+                  type="text"
+                  value={fulfillNotes}
+                  onChange={(e) => setFulfillNotes(e.target.value)}
+                  placeholder="e.g. Batch 402 dispatched to Sales Officer for route distribution"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-900 dark:text-white text-xs focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                />
+              </div>
+
+              {/* Financial Calculation Summary Box */}
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-teal-50 via-emerald-50 to-cyan-50 dark:from-teal-950/40 dark:via-emerald-950/40 dark:to-cyan-950/40 border border-teal-200 dark:border-teal-800/60">
+                <div className="flex items-center justify-between text-xs text-slate-600 dark:text-zinc-400 mb-1">
+                  <span>Calculation:</span>
+                  <span className="font-mono">{fulfillQty} cases × ৳{Number(fulfillPrice).toFixed(2)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] uppercase font-black tracking-wider text-teal-700 dark:text-teal-300 block">
+                      Total Wholesale Invoice
+                    </span>
+                    <span className="text-xs text-slate-500">Credited directly to Supplier Wallet</span>
+                  </div>
+                  <strong className="text-2xl font-black text-teal-700 dark:text-teal-300">
+                    ৳{Number(fulfillQty * fulfillPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </strong>
+                </div>
+              </div>
+
+              {/* Submit Buttons */}
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-zinc-800">
+                <button
+                  type="button"
+                  onClick={() => setFulfillModalReq(null)}
+                  disabled={fulfillSubmitting}
+                  className="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-300 text-xs font-bold hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={fulfillSubmitting || fulfillQty <= 0 || fulfillQty > fulfillModalReq.supplier_available_stock}
+                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 via-emerald-600 to-cyan-600 hover:from-teal-700 hover:to-emerald-700 text-white text-xs font-black shadow-lg shadow-teal-600/25 flex items-center gap-2 transition cursor-pointer disabled:opacity-50 active:scale-95"
+                >
+                  {fulfillSubmitting ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Dispatching...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Truck className="w-4 h-4" />
+                      <span>Confirm & Dispatch to Sales Officer</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

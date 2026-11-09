@@ -115,13 +115,28 @@ public class InventoryController {
         }
         Product product = prodOpt.get();
 
-        // Verify outlet exists in database
-        Optional<Outlet> outletOpt = outletRepository.findById(req.getOutletId());
-        if (outletOpt.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(ApiResponse.fail("Outlet with ID " + req.getOutletId() + " not found in database"));
+        // Verify outlet exists in database or fallback to territory outlet
+        Optional<Outlet> outletOpt = req.getOutletId() != null ? outletRepository.findById(req.getOutletId()) : Optional.empty();
+        Outlet outlet = null;
+        if (outletOpt.isPresent()) {
+            outlet = outletOpt.get();
+        } else if (targetOfficer != null) {
+            String soArea = targetOfficer.getAssignedArea().toLowerCase().trim();
+            outlet = outletRepository.findAll().stream()
+                    .filter(o -> {
+                        String oArea = o.getArea() != null ? o.getArea().toLowerCase().trim() : "";
+                        return !soArea.isEmpty() && (oArea.contains(soArea) || soArea.contains(oArea));
+                    })
+                    .findFirst()
+                    .orElse(outletRepository.findAll().stream().findFirst().orElse(null));
+        } else {
+            outlet = outletRepository.findAll().stream().findFirst().orElse(null);
         }
-        Outlet outlet = outletOpt.get();
+        if (outlet == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.fail("Outlet destination not found in database"));
+        }
+        req.setOutletId(outlet.getOutletId());
 
         // Enforce supplier depot stock validation: reject if 0 stock or insufficient stock
         Long resolvedUserId = (req.getUserId() != null && req.getUserId() > 0) ? req.getUserId() : 4L;
@@ -149,14 +164,11 @@ public class InventoryController {
                 availableDepotStock += distInv.map(DistrictInventory::getCurrentStock).orElse(0);
             }
 
-            // 1. Low stock logic: If depot stock is 0 or low (< 5), reject dispatch
+            // 1. Depot stock validation: reject if out of stock
             if (availableDepotStock <= 0) {
                 return ResponseEntity.badRequest().body(ApiResponse.fail("Cannot dispatch: Supplier depot stock is 0 cases (out of stock). Please request stock from Superadmin first."));
             }
-            if (availableDepotStock < 5) {
-                return ResponseEntity.badRequest().body(ApiResponse.fail("Cannot dispatch: Supplier depot stock is critically low (" + availableDepotStock + " cases remaining). Minimum reserve is 5 cases. Please restock from Superadmin central catalog first."));
-            }
-            // 2. Beyond stock limit logic: Cannot give products beyond stock limit
+            // 2. Beyond stock limit logic: Cannot give products beyond available depot stock
             if (req.getQuantity() > availableDepotStock) {
                 return ResponseEntity.badRequest().body(ApiResponse.fail("Cannot dispatch beyond stock limit: You attempted to supply " + req.getQuantity() + " cases, but your depot only holds " + availableDepotStock + " cases. Adjust the quantity to at most " + availableDepotStock + " cases."));
             }
@@ -279,6 +291,7 @@ public class InventoryController {
         // Record Wholesale Transaction for Supplier (Tier 2: Supplier sells to Sales Officer at outlet_price)
         final String finalRefCode = dispatchRefCode;
         final SalesOfficer finalOfficer = targetOfficer;
+        final Outlet finalOutlet = outlet;
         if (sp != null) {
             try {
                 BigDecimal buyPrice = product.getSupplierPrice() != null ? product.getSupplierPrice() : (product.getBasePrice() != null ? product.getBasePrice() : BigDecimal.ZERO);
@@ -290,19 +303,19 @@ public class InventoryController {
                 String recipientDesc;
                 if (finalOfficer != null) {
                     recipientDesc = "Sales Officer " + finalOfficer.getName() + " (" + finalOfficer.getOfficerCode() + ", Area: " + finalOfficer.getAssignedArea() + ")";
-                } else if (outlet.getArea() != null && !outlet.getArea().trim().isEmpty()) {
+                } else if (finalOutlet.getArea() != null && !finalOutlet.getArea().trim().isEmpty()) {
                     List<SalesOfficer> officers = salesOfficerRepository.findBySupplierId(sp.getId());
                     SalesOfficer found = officers.stream()
-                            .filter(so -> so.getAssignedArea().equalsIgnoreCase(outlet.getArea().trim()))
+                            .filter(so -> so.getAssignedArea().equalsIgnoreCase(finalOutlet.getArea().trim()))
                             .findFirst()
                             .orElse(null);
                     if (found != null) {
                         recipientDesc = "Sales Officer " + found.getName() + " (" + found.getOfficerCode() + ", Area: " + found.getAssignedArea() + ")";
                     } else {
-                        recipientDesc = "Area Sales Officer (" + outlet.getArea() + ")";
+                        recipientDesc = "Area Sales Officer (" + finalOutlet.getArea() + ")";
                     }
                 } else {
-                    recipientDesc = "Area Sales Officer (" + outlet.getOutletName() + ")";
+                    recipientDesc = "Area Sales Officer (" + finalOutlet.getOutletName() + ")";
                 }
 
                 SupplierTransaction saleTx = new SupplierTransaction(
@@ -863,12 +876,19 @@ public class InventoryController {
             map.put("supplier_available_stock", availableStock);
             map.put("can_dispatch", availableStock > 0);
 
-            // Associate with Superadmin-assigned Sales Officer for this area
-            String oArea = row.get("area") != null ? row.get("area").toString().toLowerCase().trim() : "";
-            SalesOfficer matchedSO = officers.stream()
-                    .filter(so -> !oArea.isEmpty() && (oArea.contains(so.getAssignedArea().toLowerCase().trim()) || so.getAssignedArea().toLowerCase().trim().contains(oArea)))
-                    .findFirst()
-                    .orElse(officers.isEmpty() ? null : officers.get(0));
+            // Associate with Superadmin-assigned Sales Officer for this area or requisition
+            Long existingSoId = row.get("sales_officer_id") != null ? ((Number) row.get("sales_officer_id")).longValue() : null;
+            SalesOfficer matchedSO = null;
+            if (existingSoId != null) {
+                matchedSO = salesOfficerRepository.findById(existingSoId).orElse(null);
+            }
+            if (matchedSO == null) {
+                String oArea = row.get("area") != null ? row.get("area").toString().toLowerCase().trim() : "";
+                matchedSO = officers.stream()
+                        .filter(so -> !oArea.isEmpty() && (oArea.contains(so.getAssignedArea().toLowerCase().trim()) || so.getAssignedArea().toLowerCase().trim().contains(oArea)))
+                        .findFirst()
+                        .orElse(officers.isEmpty() ? null : officers.get(0));
+            }
 
             if (matchedSO != null) {
                 map.put("sales_officer_id", matchedSO.getId());
