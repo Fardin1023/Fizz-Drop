@@ -586,6 +586,13 @@ public class SalesOfficerController {
             }
             shopInventoryRepository.save(inv);
 
+            // Deduct dispatched stock from supplier depot stock (since stocks are with the supplier)
+            Long targetDistrictId = outletOpt.get().getDistrictId() != null ? outletOpt.get().getDistrictId() : 1L;
+            districtInventoryRepository.findByDistrictIdAndProductId(targetDistrictId, productId).ifPresent(di -> {
+                di.setCurrentStock(Math.max(0, di.getCurrentStock() - quantity));
+                districtInventoryRepository.save(di);
+            });
+
             // Determine Sales Officer ID
             Long officerId = null;
             if (payload.get("sales_officer_id") != null) {

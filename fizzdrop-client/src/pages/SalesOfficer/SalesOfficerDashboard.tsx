@@ -155,6 +155,7 @@ export const SalesOfficerDashboard: React.FC = () => {
   const [psrSummary, setPsrSummary] = useState<any | null>(null);
 
   // Real-time Notifications for Sales Officer
+  const soUserId = officer?.user_id || (officer?.id ? 100 + officer.id : (user?.user_id || (user?.sales_officer?.id ? 100 + user.sales_officer.id : 101)));
   const {
     notifications,
     unreadCount,
@@ -164,7 +165,17 @@ export const SalesOfficerDashboard: React.FC = () => {
     markAllAsRead,
     deleteNotification,
     clearOldNotifications,
-  } = useNotifications('SALES_OFFICER', officer?.user_id || officer?.id);
+  } = useNotifications('SALES_OFFICER', soUserId);
+
+  // Auto-refresh when notification arrives
+  useEffect(() => {
+    if (popupNotification && popupNotification.recipient_role === 'SALES_OFFICER') {
+      if (officer?.id) {
+        fetchDashboardData(officer.id);
+        fetchPsrData(officer.id);
+      }
+    }
+  }, [popupNotification, officer?.id]);
 
   // Distribution Modal State
   const [isDistributeModalOpen, setIsDistributeModalOpen] = useState(false);
@@ -292,30 +303,104 @@ export const SalesOfficerDashboard: React.FC = () => {
     setIsRequestModalOpen(true);
   };
 
-  const handleUpdatePsrOrderStatus = async (orderId: number, status: string) => {
+  const [dispatchingOrderId, setDispatchingOrderId] = useState<number | null>(null);
+
+  const handleUpdatePsrOrderStatus = async (orderOrId: any, status: string) => {
+    const orderId = typeof orderOrId === 'object' ? orderOrId.id : orderOrId;
+    const psrId = typeof orderOrId === 'object' ? orderOrId.psr_id : null;
+    const orderCode = typeof orderOrId === 'object' ? orderOrId.order_code : null;
     try {
       const res = await fetch(`http://localhost:8080/api/v1/psr/orders/${orderId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
       });
-      if (res.ok && officer?.id) {
-        fetchPsrData(officer.id);
+      if (res.ok) {
+        try {
+          const bc = new BroadcastChannel('fizzdrop_realtime_events');
+          bc.postMessage({
+            type: 'SO_ORDER_APPROVED',
+            order_code: orderCode,
+            order_id: orderId,
+            psr_id: psrId,
+            status,
+          });
+          bc.close();
+        } catch (ignored) {}
+
+        if (officer?.id) {
+          fetchPsrData(officer.id);
+        }
       }
     } catch (e) {
       console.error(e);
     }
   };
 
-  const handleUpdatePsrRefundStatus = async (refundId: number, status: string, soRemarks: string) => {
+  const handleSoDispatchOrder = async (order: any) => {
+    if (!order || !order.id) return;
+    setDispatchingOrderId(order.id);
+    try {
+      const res = await fetch(`http://localhost:8080/api/v1/psr/orders/${order.id}/so-dispatch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || data.message || 'Failed to dispatch stock');
+
+      // Realtime broadcast to PSR and Outlet portals
+      try {
+        const bc = new BroadcastChannel('fizzdrop_realtime_events');
+        bc.postMessage({
+          type: 'SO_ORDER_DISPATCHED',
+          order_code: order.order_code,
+          order_id: order.id,
+          outlet_id: order.outlet_id,
+          psr_id: order.psr_id,
+          quantity: order.quantity,
+          product_name: order.product_name,
+        });
+        bc.close();
+      } catch (ignored) {}
+
+      alert(`Products successfully dispatched! Stock deducted from supplier depot and delivered to ${order.outlet_name} shelf.`);
+      if (officer?.id) {
+        fetchDashboardData(officer.id);
+        fetchPsrData(officer.id);
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to dispatch products');
+    } finally {
+      setDispatchingOrderId(null);
+    }
+  };
+
+  const handleUpdatePsrRefundStatus = async (refundOrId: any, status: string, soRemarks: string) => {
+    const refundId = typeof refundOrId === 'object' ? refundOrId.id : refundOrId;
+    const psrId = typeof refundOrId === 'object' ? refundOrId.psr_id : null;
+    const refundCode = typeof refundOrId === 'object' ? refundOrId.refund_code : null;
     try {
       const res = await fetch(`http://localhost:8080/api/v1/psr/refunds/${refundId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status, so_remarks: soRemarks }),
       });
-      if (res.ok && officer?.id) {
-        fetchPsrData(officer.id);
+      if (res.ok) {
+        try {
+          const bc = new BroadcastChannel('fizzdrop_realtime_events');
+          bc.postMessage({
+            type: 'SO_REFUND_APPROVED',
+            refund_code: refundCode,
+            refund_id: refundId,
+            psr_id: psrId,
+            status,
+          });
+          bc.close();
+        } catch (ignored) {}
+
+        if (officer?.id) {
+          fetchPsrData(officer.id);
+        }
       }
     } catch (e) {
       console.error(e);
@@ -1179,24 +1264,42 @@ export const SalesOfficerDashboard: React.FC = () => {
                             </td>
                             <td className="p-3 text-right">
                               <div className="flex items-center justify-end gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() => handleConsolidateOrderToSupplier(ord)}
-                                  className="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-[11px] shadow-xs flex items-center gap-1 transition cursor-pointer"
-                                  title="Consolidate demand and request stock from Supplier"
-                                >
-                                  <Truck className="w-3 h-3" />
-                                  <span>Request from Supplier</span>
-                                </button>
-                                {isPending && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleUpdatePsrOrderStatus(ord.id, 'APPROVED_BY_SO')}
-                                    className="px-2 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-[11px] transition"
-                                    title="Approve field order"
-                                  >
-                                    Approve
-                                  </button>
+                                {ord.status === 'DISPATCHED' || ord.status === 'DELIVERED' ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-[11px] font-bold border border-emerald-200">
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                    Dispatched from Supplier
+                                  </span>
+                                ) : (
+                                  <>
+                                    {isPending && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleUpdatePsrOrderStatus(ord, 'APPROVED_BY_SO')}
+                                        className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] transition shadow-xs cursor-pointer flex items-center gap-1 active:scale-95 whitespace-nowrap"
+                                        title="Accept & approve PSR field order"
+                                      >
+                                        <CheckCircle2 className="w-3 h-3" />
+                                        <span>Accept Request</span>
+                                      </button>
+                                    )}
+
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSoDispatchOrder(ord)}
+                                      disabled={dispatchingOrderId === ord.id}
+                                      className="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-[11px] shadow-xs flex items-center gap-1 transition cursor-pointer disabled:opacity-50 active:scale-95 whitespace-nowrap"
+                                      title="Dispatch products to outlet (deducted from Supplier stock)"
+                                    >
+                                      {dispatchingOrderId === ord.id ? (
+                                        <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                      ) : (
+                                        <>
+                                          <Truck className="w-3 h-3" />
+                                          <span>Dispatch (Supplier Stock)</span>
+                                        </>
+                                      )}
+                                    </button>
+                                  </>
                                 )}
                               </div>
                             </td>

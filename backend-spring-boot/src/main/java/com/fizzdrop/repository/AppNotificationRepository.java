@@ -17,12 +17,16 @@ public interface AppNotificationRepository extends JpaRepository<AppNotification
 
     @Query("SELECT n FROM AppNotification n WHERE UPPER(n.recipientRole) = UPPER(:role) AND (" +
            ":userId IS NULL OR n.recipientUserId IS NULL OR n.recipientUserId = :userId " +
+           "OR n.recipientUserId = (:userId + 100) OR n.recipientUserId = (:userId - 100) " +
+           "OR n.recipientUserId = (:userId + 200) OR n.recipientUserId = (:userId - 200) " +
            "OR n.recipientUserId = (:userId + 1000) OR n.recipientUserId = (:userId - 1000) " +
            "OR n.referenceId = :userId) ORDER BY n.createdAt DESC")
     List<AppNotification> findForRecipient(@Param("role") String role, @Param("userId") Long userId);
 
     @Query("SELECT n FROM AppNotification n WHERE UPPER(n.recipientRole) = UPPER(:role) AND (" +
            ":userId IS NULL OR n.recipientUserId IS NULL OR n.recipientUserId = :userId " +
+           "OR n.recipientUserId = (:userId + 100) OR n.recipientUserId = (:userId - 100) " +
+           "OR n.recipientUserId = (:userId + 200) OR n.recipientUserId = (:userId - 200) " +
            "OR n.recipientUserId = (:userId + 1000) OR n.recipientUserId = (:userId - 1000) " +
            "OR n.referenceId = :userId) AND n.isRead = false ORDER BY n.createdAt DESC")
     List<AppNotification> findUnreadForRecipient(@Param("role") String role, @Param("userId") Long userId);
@@ -31,6 +35,8 @@ public interface AppNotificationRepository extends JpaRepository<AppNotification
     @Modifying
     @Query("UPDATE AppNotification n SET n.isRead = true WHERE UPPER(n.recipientRole) = UPPER(:role) AND (" +
            ":userId IS NULL OR n.recipientUserId IS NULL OR n.recipientUserId = :userId " +
+           "OR n.recipientUserId = (:userId + 100) OR n.recipientUserId = (:userId - 100) " +
+           "OR n.recipientUserId = (:userId + 200) OR n.recipientUserId = (:userId - 200) " +
            "OR n.recipientUserId = (:userId + 1000) OR n.recipientUserId = (:userId - 1000) " +
            "OR n.referenceId = :userId)")
     void markAllAsRead(@Param("role") String role, @Param("userId") Long userId);
@@ -39,6 +45,8 @@ public interface AppNotificationRepository extends JpaRepository<AppNotification
     @Modifying
     @Query("DELETE FROM AppNotification n WHERE UPPER(n.recipientRole) = UPPER(:role) AND (" +
            ":userId IS NULL OR n.recipientUserId IS NULL OR n.recipientUserId = :userId " +
+           "OR n.recipientUserId = (:userId + 100) OR n.recipientUserId = (:userId - 100) " +
+           "OR n.recipientUserId = (:userId + 200) OR n.recipientUserId = (:userId - 200) " +
            "OR n.recipientUserId = (:userId + 1000) OR n.recipientUserId = (:userId - 1000) " +
            "OR n.referenceId = :userId) AND (:readOnly = false OR n.isRead = true)")
     void deleteOldNotifications(@Param("role") String role, @Param("userId") Long userId, @Param("readOnly") boolean readOnly);

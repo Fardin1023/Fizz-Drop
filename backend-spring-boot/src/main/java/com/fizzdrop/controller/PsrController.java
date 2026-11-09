@@ -23,6 +23,8 @@ public class PsrController {
     private final ProductRepository productRepository;
     private final AppNotificationRepository notificationRepository;
     private final ShopInventoryRepository inventoryRepository;
+    private final DistrictInventoryRepository districtInventoryRepository;
+    private final SupplierProfileRepository supplierProfileRepository;
     private final JdbcTemplate jdbcTemplate;
 
     public PsrController(PreSalesOfficerRepository psrRepository,
@@ -31,6 +33,8 @@ public class PsrController {
                          ProductRepository productRepository,
                          AppNotificationRepository notificationRepository,
                          ShopInventoryRepository inventoryRepository,
+                         DistrictInventoryRepository districtInventoryRepository,
+                         SupplierProfileRepository supplierProfileRepository,
                          JdbcTemplate jdbcTemplate) {
         this.psrRepository = psrRepository;
         this.salesOfficerRepository = salesOfficerRepository;
@@ -38,6 +42,8 @@ public class PsrController {
         this.productRepository = productRepository;
         this.notificationRepository = notificationRepository;
         this.inventoryRepository = inventoryRepository;
+        this.districtInventoryRepository = districtInventoryRepository;
+        this.supplierProfileRepository = supplierProfileRepository;
         this.jdbcTemplate = jdbcTemplate;
     }
 
@@ -403,7 +409,7 @@ public class PsrController {
                     .orElseThrow(() -> new RuntimeException("Pre-Sales Officer not found."));
 
             int updated = jdbcTemplate.update(
-                    "UPDATE psr_orders SET status = 'SUBMITTED_TO_SO', updated_at = NOW() WHERE psr_id = ? AND status = 'DRAFT'",
+                    "UPDATE psr_orders SET status = 'SUBMITTED_TO_SO', updated_at = NOW() WHERE psr_id = ? AND status IN ('DRAFT', 'SUBMITTED_TO_PSR')",
                     psrId
             );
 
@@ -415,8 +421,9 @@ public class PsrController {
                 AppNotification notif = new AppNotification();
                 notif.setRecipientRole("SALES_OFFICER");
                 notif.setRecipientUserId(soUserId);
-                notif.setTitle("Batch Orders Submitted by PSR " + psr.getName());
-                notif.setMessage("PSR " + psr.getName() + " finalized and submitted " + updated + " field orders from " + psr.getSubRoute() + ".");
+                notif.setReferenceId(psr.getSalesOfficerId());
+                notif.setTitle("Batch Restock Orders from PSR " + psr.getName());
+                notif.setMessage("PSR " + psr.getName() + " submitted " + updated + " store orders from route " + psr.getSubRoute() + " for your review and approval.");
                 notif.setType("NEW_PSR_ORDER");
                 notificationRepository.save(notif);
             } catch (Exception ignored) {}
@@ -428,7 +435,62 @@ public class PsrController {
     }
 
     /**
-     * Update PSR Order Status (e.g. Sales Officer approves, marks dispatched/delivered).
+     * PSR forwards or requests an individual order to the Sales Officer.
+     * The Sales Officer receives an instant notification from the PSR.
+     */
+    @PostMapping("/orders/{id}/submit-to-so")
+    public ResponseEntity<?> submitOrderToSalesOfficer(@PathVariable Long id, @RequestBody(required = false) Map<String, Object> req) {
+        try {
+            List<Map<String, Object>> ordList = jdbcTemplate.queryForList("SELECT * FROM psr_orders WHERE id = ?", id);
+            if (ordList.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail("Order not found."));
+            }
+            Map<String, Object> ord = ordList.get(0);
+            Long psrId = Long.parseLong(ord.get("psr_id").toString());
+            PreSalesOfficer psr = psrRepository.findById(psrId).orElse(null);
+            String psrName = psr != null ? psr.getName() : (ord.get("psr_name") != null ? ord.get("psr_name").toString() : "Pre-Sales Officer");
+            String orderCode = (String) ord.get("order_code");
+            String outletName = (String) ord.get("outlet_name");
+            String productName = (String) ord.get("product_name");
+            int quantity = Integer.parseInt(ord.get("quantity").toString());
+            Object totalAmount = ord.get("total_amount");
+
+            jdbcTemplate.update(
+                    "UPDATE psr_orders SET status = 'SUBMITTED_TO_SO', updated_at = NOW() WHERE id = ?",
+                    id
+            );
+
+            // Notify Sales Officer
+            Long soId = ord.get("sales_officer_id") != null ? Long.parseLong(ord.get("sales_officer_id").toString()) : (psr != null ? psr.getSalesOfficerId() : null);
+            if (soId != null) {
+                SalesOfficer so = salesOfficerRepository.findById(soId).orElse(null);
+                Long soUserId = (so != null && so.getUserId() != null) ? so.getUserId() : 100L + soId;
+
+                AppNotification notif = new AppNotification();
+                notif.setRecipientRole("SALES_OFFICER");
+                notif.setRecipientUserId(soUserId);
+                notif.setReferenceId(soId);
+                notif.setTitle("Restock Order Requested by PSR " + psrName);
+                notif.setMessage("PSR " + psrName + " requested stock approval for " + quantity + " cases of " +
+                        productName + " (৳" + totalAmount + ") for " + outletName + ".");
+                notif.setType("NEW_PSR_ORDER");
+                notif.setReferenceCode(orderCode);
+                notificationRepository.save(notif);
+            }
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Order " + orderCode + " submitted to Sales Officer for approval!",
+                    "status", "SUBMITTED_TO_SO"
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("Failed to submit order to Sales Officer: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Update PSR Order Status (e.g. Sales Officer approves/accepts or modifies order).
+     * The PSR receives a notification when the Sales Officer accepts the request.
      */
     @PutMapping("/orders/{id}/status")
     public ResponseEntity<?> updateOrderStatus(@PathVariable Long id, @RequestBody Map<String, Object> req) {
@@ -447,16 +509,42 @@ public class PsrController {
                     status, id
             );
 
-            // Notify PSR if approved or delivered
+            // Notify PSR when Sales Officer accepts/approves
             try {
                 Long psrId = Long.parseLong(ord.get("psr_id").toString());
                 psrRepository.findById(psrId).ifPresent(p -> {
+                    SalesOfficer so = null;
+                    if (ord.get("sales_officer_id") != null) {
+                        so = salesOfficerRepository.findById(Long.parseLong(ord.get("sales_officer_id").toString())).orElse(null);
+                    }
+                    String soName = so != null ? so.getName() : "Sales Officer";
+
+                    String title;
+                    String message;
+                    String notifType;
+
+                    if ("APPROVED_BY_SO".equalsIgnoreCase(status) || "ACCEPTED".equalsIgnoreCase(status)) {
+                        title = "Order " + ord.get("order_code") + " Accepted by Sales Officer";
+                        message = "Sales Officer " + soName + " accepted and approved your stock order for " +
+                                ord.get("outlet_name") + " (" + ord.get("quantity") + " cases of " + ord.get("product_name") + ").";
+                        notifType = "SO_ORDER_APPROVED";
+                    } else if ("REJECTED".equalsIgnoreCase(status)) {
+                        title = "Order " + ord.get("order_code") + " Declined by Sales Officer";
+                        message = "Sales Officer " + soName + " declined your order for " + ord.get("outlet_name") + ".";
+                        notifType = "SO_ORDER_REJECTED";
+                    } else {
+                        title = "Order " + ord.get("order_code") + " Updated: " + status;
+                        message = "Sales Officer " + soName + " updated order for " + ord.get("outlet_name") + " to " + status + ".";
+                        notifType = "PSR_ORDER_STATUS_UPDATE";
+                    }
+
                     AppNotification notif = new AppNotification();
                     notif.setRecipientRole("PSR");
                     notif.setRecipientUserId(p.getUserId() != null ? p.getUserId() : 200L + p.getId());
-                    notif.setTitle("Order " + ord.get("order_code") + " Updated: " + status);
-                    notif.setMessage("Sales Officer marked order for " + ord.get("outlet_name") + " as " + status + ".");
-                    notif.setType("PSR_ORDER_STATUS_UPDATE");
+                    notif.setReferenceId(p.getId());
+                    notif.setTitle(title);
+                    notif.setMessage(message);
+                    notif.setType(notifType);
                     notif.setReferenceCode((String) ord.get("order_code"));
                     notificationRepository.save(notif);
                 });
@@ -465,6 +553,132 @@ public class PsrController {
             return ResponseEntity.ok(Map.of("success", true, "status", status));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(ApiResponse.fail("Failed to update status: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Sales Officer Dispatches Products for a PSR Order.
+     * Crucial: Deducts products directly from the Supplier's depot stock (since stocks are with the supplier),
+     * replenishes the outlet shelf, and notifies both PSR and Outlet.
+     */
+    @PostMapping("/orders/{id}/so-dispatch")
+    public ResponseEntity<?> soDispatchOrder(@PathVariable Long id, @RequestBody(required = false) Map<String, Object> req) {
+        try {
+            List<Map<String, Object>> ordList = jdbcTemplate.queryForList("SELECT * FROM psr_orders WHERE id = ?", id);
+            if (ordList.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail("Order not found."));
+            }
+            Map<String, Object> ord = ordList.get(0);
+            Long outletId = Long.parseLong(ord.get("outlet_id").toString());
+            Long productId = Long.parseLong(ord.get("product_id").toString());
+            int quantity = Integer.parseInt(ord.get("quantity").toString());
+            Long psrId = Long.parseLong(ord.get("psr_id").toString());
+            Long soId = ord.get("sales_officer_id") != null ? Long.parseLong(ord.get("sales_officer_id").toString()) : 1L;
+            String orderCode = (String) ord.get("order_code");
+            String psrName = ord.get("psr_name") != null ? ord.get("psr_name").toString() : "PSR";
+            String outletName = (String) ord.get("outlet_name");
+            String productName = (String) ord.get("product_name");
+
+            // 1. Update order status to DISPATCHED
+            jdbcTemplate.update(
+                    "UPDATE psr_orders SET status = 'DISPATCHED', updated_at = NOW() WHERE id = ?",
+                    id
+            );
+
+            // 2. Also update corresponding outlet_requisitions row if any
+            try {
+                jdbcTemplate.update(
+                        "UPDATE outlet_requisitions SET status = 'FULFILLED', admin_supplier_notes = 'Dispatched from Supplier Depot by Sales Officer', updated_date = NOW() " +
+                        "WHERE requisition_code = ? OR (outlet_id = ? AND product_id = ? AND status IN ('PENDING', 'PENDING_PSR', 'SUBMITTED_TO_PSR'))",
+                        orderCode, outletId, productId
+                );
+            } catch (Exception ignored) {}
+
+            // 3. Deduct from Supplier depot stock (district_inventory) since stocks are with the supplier
+            Outlet outlet = outletRepository.findById(outletId).orElse(null);
+            Long districtId = (outlet != null && outlet.getDistrictId() != null) ? outlet.getDistrictId() : 1L;
+            int remainingSupplierStock = 0;
+
+            var distInvOpt = districtInventoryRepository.findByDistrictIdAndProductId(districtId, productId);
+            if (distInvOpt.isPresent()) {
+                DistrictInventory di = distInvOpt.get();
+                remainingSupplierStock = Math.max(0, di.getCurrentStock() - quantity);
+                di.setCurrentStock(remainingSupplierStock);
+                districtInventoryRepository.save(di);
+            }
+
+            // 4. Replenish outlet shop_inventory
+            Optional<ShopInventory> invOpt = inventoryRepository.findByBranchIdAndProductId(outletId, productId);
+            ShopInventory inv;
+            if (invOpt.isPresent()) {
+                inv = invOpt.get();
+                inv.setStockQuantity(inv.getStockQuantity() + quantity);
+                inv.setUpdatedDate(LocalDateTime.now());
+            } else {
+                inv = new ShopInventory(outletId, productId, quantity);
+                inv.setUpdatedDate(LocalDateTime.now());
+            }
+            inventoryRepository.save(inv);
+
+            // 5. Record Sales Officer Distribution & Financial Profit Ledger
+            Product prod = productRepository.findById(productId).orElse(null);
+            BigDecimal costPrice = (prod != null && prod.getSupplierPrice() != null) ? prod.getSupplierPrice() : BigDecimal.valueOf(35);
+            BigDecimal salePrice = (prod != null && prod.getOutletPrice() != null) ? prod.getOutletPrice() : costPrice.multiply(BigDecimal.valueOf(1.15));
+            BigDecimal totalCost = costPrice.multiply(BigDecimal.valueOf(quantity));
+            BigDecimal totalRevenue = salePrice.multiply(BigDecimal.valueOf(quantity));
+            BigDecimal profitEarned = totalRevenue.subtract(totalCost);
+
+            try {
+                jdbcTemplate.update(
+                        "INSERT INTO sales_officer_distributions (sales_officer_id, outlet_id, product_id, quantity, cost_price, sale_price, total_cost, total_revenue, profit_earned, notes, distribution_date) " +
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())",
+                        soId, outletId, productId, quantity, costPrice, salePrice, totalCost, totalRevenue, profitEarned,
+                        "Dispatched from Supplier Depot for PSR order " + orderCode
+                );
+            } catch (Exception ignored) {}
+
+            SalesOfficer so = salesOfficerRepository.findById(soId).orElse(null);
+            String soName = so != null ? so.getName() : "Sales Officer";
+
+            // 6. Notify PSR that SO accepted and dispatched the products from supplier stock
+            PreSalesOfficer psr = psrRepository.findById(psrId).orElse(null);
+            if (psr != null) {
+                AppNotification psrNotif = new AppNotification();
+                psrNotif.setRecipientRole("PSR");
+                psrNotif.setRecipientUserId(psr.getUserId() != null ? psr.getUserId() : 200L + psr.getId());
+                psrNotif.setReferenceId(psr.getId());
+                psrNotif.setTitle("Products Dispatched by Sales Officer " + soName);
+                psrNotif.setMessage("Sales Officer " + soName + " dispatched " + quantity + " cases of " + productName +
+                        " for " + outletName + ". Deducted from supplier depot stock (Depot Remaining: " + remainingSupplierStock + " cases).");
+                psrNotif.setType("SO_ORDER_DISPATCHED");
+                psrNotif.setReferenceCode(orderCode);
+                notificationRepository.save(psrNotif);
+            }
+
+            // 7. Notify Outlet
+            Long outletUserId = (outlet != null && outlet.getOutletId() != null) ? outlet.getOutletId() : outletId;
+            AppNotification outNotif = new AppNotification();
+            outNotif.setRecipientRole("OUTLET");
+            outNotif.setRecipientUserId(outletUserId);
+            outNotif.setReferenceId(outletId);
+            outNotif.setTitle("Stock Dispatched & Delivered");
+            outNotif.setMessage("Stock shipment of " + quantity + " units of " + productName +
+                    " has been dispatched from supplier depot by Sales Officer " + soName + " and delivered to your outlet shelf. Inventory replenished!");
+            outNotif.setType("PSR_STOCK_DISPATCHED");
+            outNotif.setReferenceCode(orderCode);
+            notificationRepository.save(outNotif);
+
+            Map<String, Object> resp = new HashMap<>();
+            resp.put("success", true);
+            resp.put("message", "Products dispatched from supplier stock successfully! Outlet shelf replenished.");
+            resp.put("order_id", id);
+            resp.put("order_code", orderCode);
+            resp.put("outlet_shelf_stock", inv.getStockQuantity());
+            resp.put("supplier_depot_stock", remainingSupplierStock);
+
+            return ResponseEntity.ok(resp);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("Failed to dispatch stock: " + e.getMessage()));
         }
     }
 
@@ -662,16 +876,25 @@ public class PsrController {
                     status, soRemarks, id
             );
 
-            // Notify PSR
+            // Notify PSR when Sales Officer accepts/approves refund
             try {
                 Long psrId = Long.parseLong(ref.get("psr_id").toString());
                 psrRepository.findById(psrId).ifPresent(p -> {
+                    String title = "APPROVED_BY_SO".equalsIgnoreCase(status)
+                            ? "Refund Claim " + ref.get("refund_code") + " Accepted by Sales Officer"
+                            : "Refund " + ref.get("refund_code") + ": " + status;
+                    String message = "APPROVED_BY_SO".equalsIgnoreCase(status)
+                            ? "Sales Officer accepted and approved your return claim for " + ref.get("outlet_name") + " (" + ref.get("product_name") + ")." + (soRemarks != null && !soRemarks.trim().isEmpty() ? " Note: " + soRemarks : "")
+                            : "Sales Officer updated refund for " + ref.get("outlet_name") + " to " + status + ".";
+                    String notifType = "APPROVED_BY_SO".equalsIgnoreCase(status) ? "SO_REFUND_APPROVED" : "PSR_REFUND_STATUS_UPDATE";
+
                     AppNotification notif = new AppNotification();
                     notif.setRecipientRole("PSR");
                     notif.setRecipientUserId(p.getUserId() != null ? p.getUserId() : 200L + p.getId());
-                    notif.setTitle("Refund " + ref.get("refund_code") + ": " + status);
-                    notif.setMessage("Sales Officer updated refund for " + ref.get("outlet_name") + " to " + status + ".");
-                    notif.setType("PSR_REFUND_STATUS_UPDATE");
+                    notif.setReferenceId(p.getId());
+                    notif.setTitle(title);
+                    notif.setMessage(message);
+                    notif.setType(notifType);
                     notif.setReferenceCode((String) ref.get("refund_code"));
                     notificationRepository.save(notif);
                 });

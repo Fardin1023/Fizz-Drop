@@ -113,14 +113,20 @@ export default function PsrDashboard() {
   }, [psrId]);
 
   const [dispatchingId, setDispatchingId] = useState<number | null>(null);
+  const [submittingToSoId, setSubmittingToSoId] = useState<number | null>(null);
 
-  // Real-time listener for incoming Outlet Orders via BroadcastChannel
+  // Real-time listener for incoming Outlet Orders & Sales Officer Responses via BroadcastChannel
   useEffect(() => {
     let channel: BroadcastChannel | null = null;
     try {
       channel = new BroadcastChannel('fizzdrop_realtime_events');
       channel.onmessage = (event) => {
-        if (event.data?.type === 'OUTLET_ORDER_TO_PSR') {
+        if (
+          event.data?.type === 'OUTLET_ORDER_TO_PSR' ||
+          event.data?.type === 'SO_ORDER_APPROVED' ||
+          event.data?.type === 'SO_ORDER_DISPATCHED' ||
+          event.data?.type === 'SO_REFUND_APPROVED'
+        ) {
           loadDashboard();
         }
       };
@@ -130,6 +136,48 @@ export default function PsrDashboard() {
       if (channel) channel.close();
     };
   }, [loadDashboard]);
+
+  // Auto-refresh when popup notification arrives for this PSR
+  useEffect(() => {
+    if (popupNotification && popupNotification.recipient_role === 'PSR') {
+      loadDashboard();
+    }
+  }, [popupNotification, loadDashboard]);
+
+  // PSR submits / requests an order to the Sales Officer
+  const handleSubmitOrderToSo = async (order: any) => {
+    if (!order || !order.id) return;
+    setSubmittingToSoId(order.id);
+    try {
+      const res = await fetch(`http://localhost:8080/api/v1/psr/orders/${order.id}/submit-to-so`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || data.message || 'Failed to submit order to Sales Officer');
+
+      // Realtime broadcast to Sales Officer portal
+      try {
+        const bc = new BroadcastChannel('fizzdrop_realtime_events');
+        bc.postMessage({
+          type: 'NEW_PSR_ORDER',
+          order_code: order.order_code,
+          psr_id: order.psr_id,
+          outlet_name: order.outlet_name,
+          quantity: order.quantity,
+          product_name: order.product_name,
+        });
+        bc.close();
+      } catch (ignored) {}
+
+      alert(`Order ${order.order_code} requested to Sales Officer! Your Sales Officer has received the notification.`);
+      loadDashboard();
+    } catch (err: any) {
+      alert(err.message || 'Failed to submit order');
+    } finally {
+      setSubmittingToSoId(null);
+    }
+  };
 
   // Dispatch and deliver stock to outlet
   const handleDispatchOrderToOutlet = async (order: any) => {
@@ -301,6 +349,17 @@ export default function PsrDashboard() {
         body: JSON.stringify({ psr_id: data.psr.id }),
       });
       if (res.ok) {
+        try {
+          const channel = new BroadcastChannel('fizzdrop_realtime_events');
+          channel.postMessage({
+            type: 'NEW_PSR_ORDER',
+            recipientRole: 'SALES_OFFICER',
+            title: `Batch Field Orders from PSR ${data?.psr?.name}`,
+            message: `PSR ${data?.psr?.name} submitted batch orders for your review and approval.`,
+          });
+          channel.close();
+        } catch (err) {}
+
         alert('All pending draft orders have been submitted to your Sales Officer!');
         loadDashboard();
       }
@@ -755,44 +814,88 @@ export default function PsrDashboard() {
                               className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold inline-flex items-center gap-1 ${
                                 isDispatched
                                   ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
-                                  : isApproved
+                                  : ord.status === 'APPROVED_BY_SO'
                                   ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300'
-                                  : isSubmitted
+                                  : ord.status === 'SUBMITTED_TO_SO'
                                   ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+                                  : ord.status === 'SUBMITTED_TO_PSR'
+                                  ? 'bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300'
                                   : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'
                               }`}
                             >
                               {isDispatched && <CheckCircle2 className="h-3 w-3" />}
-                              {isApproved && <Send className="h-3 w-3" />}
-                              {isSubmitted && <Clock className="h-3 w-3" />}
-                              {ord.status}
+                              {ord.status === 'APPROVED_BY_SO' && <CheckCircle2 className="h-3 w-3 text-blue-600" />}
+                              {ord.status === 'SUBMITTED_TO_SO' && <Clock className="h-3 w-3" />}
+                              {ord.status === 'SUBMITTED_TO_PSR' && <Store className="h-3 w-3 text-purple-600" />}
+                              {ord.status === 'APPROVED_BY_SO'
+                                ? 'Accepted by SO'
+                                : ord.status === 'SUBMITTED_TO_SO'
+                                ? 'Requested to SO'
+                                : ord.status === 'SUBMITTED_TO_PSR'
+                                ? 'Outlet Request'
+                                : ord.status}
                             </span>
                           </td>
                           <td className="p-3 text-xs text-slate-400">
                             {ord.created_at ? new Date(ord.created_at).toLocaleString() : 'Just now'}
                           </td>
                           <td className="p-3 text-center">
-                            {isDispatched ? (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 text-xs font-bold border border-emerald-200 dark:border-emerald-800">
-                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                                Stock Sent
-                              </span>
-                            ) : (
-                              <button
-                                onClick={() => handleDispatchOrderToOutlet(ord)}
-                                disabled={dispatchingId === ord.id}
-                                className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm shadow-orange-600/20 transition-all cursor-pointer disabled:opacity-50 whitespace-nowrap active:scale-95"
-                              >
-                                {dispatchingId === ord.id ? (
-                                  <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                ) : (
-                                  <>
-                                    <Truck className="w-3.5 h-3.5" />
-                                    <span>Send Stock to Outlet</span>
-                                  </>
-                                )}
-                              </button>
-                            )}
+                            <div className="flex items-center justify-center gap-1.5">
+                              {isDispatched ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 text-xs font-bold border border-emerald-200 dark:border-emerald-800">
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                  Stock Delivered
+                                </span>
+                              ) : ord.status === 'SUBMITTED_TO_PSR' ? (
+                                <>
+                                  <button
+                                    onClick={() => handleSubmitOrderToSo(ord)}
+                                    disabled={submittingToSoId === ord.id}
+                                    className="px-2.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-1 shadow-sm transition cursor-pointer disabled:opacity-50 whitespace-nowrap active:scale-95"
+                                    title="Request stock approval from Sales Officer"
+                                  >
+                                    {submittingToSoId === ord.id ? (
+                                      <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    ) : (
+                                      <>
+                                        <Send className="w-3 h-3" />
+                                        <span>Request to SO</span>
+                                      </>
+                                    )}
+                                  </button>
+                                  <button
+                                    onClick={() => handleDispatchOrderToOutlet(ord)}
+                                    disabled={dispatchingId === ord.id}
+                                    className="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white font-bold text-xs flex items-center justify-center gap-1 shadow-sm transition cursor-pointer disabled:opacity-50 whitespace-nowrap active:scale-95"
+                                    title="Send stock to outlet directly"
+                                  >
+                                    {dispatchingId === ord.id ? (
+                                      <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    ) : (
+                                      <>
+                                        <Truck className="w-3 h-3" />
+                                        <span>Send Stock</span>
+                                      </>
+                                    )}
+                                  </button>
+                                </>
+                              ) : (
+                                <button
+                                  onClick={() => handleDispatchOrderToOutlet(ord)}
+                                  disabled={dispatchingId === ord.id}
+                                  className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm shadow-orange-600/20 transition-all cursor-pointer disabled:opacity-50 whitespace-nowrap active:scale-95"
+                                >
+                                  {dispatchingId === ord.id ? (
+                                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                  ) : (
+                                    <>
+                                      <Truck className="w-3.5 h-3.5" />
+                                      <span>Send Stock to Outlet</span>
+                                    </>
+                                  )}
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );
