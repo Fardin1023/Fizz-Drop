@@ -272,7 +272,9 @@ export const SalesOfficerDashboard: React.FC = () => {
           payload?.type === 'REQUISITION_ACTION' ||
           payload?.type === 'PRICE_UPDATED' ||
           payload?.type === 'NEW_PSR_ORDER' ||
-          payload?.type === 'NEW_PSR_REFUND'
+          payload?.type === 'NEW_PSR_REFUND' ||
+          payload?.type === 'SO_ORDER_APPROVED' ||
+          payload?.type === 'PSR_STOCK_DISPATCHED'
         ) {
           if (
             !payload.recipientUserId ||
@@ -329,6 +331,7 @@ export const SalesOfficerDashboard: React.FC = () => {
         } catch (ignored) {}
 
         if (officer?.id) {
+          fetchDashboardData(officer.id);
           fetchPsrData(officer.id);
         }
       }
@@ -408,6 +411,7 @@ export const SalesOfficerDashboard: React.FC = () => {
         } catch (ignored) {}
 
         if (officer?.id) {
+          fetchDashboardData(officer.id);
           fetchPsrData(officer.id);
         }
       }
@@ -1276,39 +1280,27 @@ export const SalesOfficerDashboard: React.FC = () => {
                                 {ord.status === 'DISPATCHED' || ord.status === 'DELIVERED' ? (
                                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-[11px] font-bold border border-emerald-200">
                                     <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                    Dispatched from Supplier
+                                    Delivered to Outlet
                                   </span>
+                                ) : ord.status === 'APPROVED_BY_SO' ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 text-[11px] font-bold border border-blue-200">
+                                    <CheckCircle2 className="w-3 h-3 text-blue-600" />
+                                    Request Accepted
+                                  </span>
+                                ) : isPending ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdatePsrOrderStatus(ord, 'APPROVED_BY_SO')}
+                                    className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] transition shadow-xs cursor-pointer flex items-center gap-1 active:scale-95 whitespace-nowrap"
+                                    title="Accept & approve PSR field order (updates Wholesale Profit)"
+                                  >
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    <span>Accept Request</span>
+                                  </button>
                                 ) : (
-                                  <>
-                                    {isPending && (
-                                      <button
-                                        type="button"
-                                        onClick={() => handleUpdatePsrOrderStatus(ord, 'APPROVED_BY_SO')}
-                                        className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] transition shadow-xs cursor-pointer flex items-center gap-1 active:scale-95 whitespace-nowrap"
-                                        title="Accept & approve PSR field order"
-                                      >
-                                        <CheckCircle2 className="w-3 h-3" />
-                                        <span>Accept Request</span>
-                                      </button>
-                                    )}
-
-                                    <button
-                                      type="button"
-                                      onClick={() => handleSoDispatchOrder(ord)}
-                                      disabled={dispatchingOrderId === ord.id}
-                                      className="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-[11px] shadow-xs flex items-center gap-1 transition cursor-pointer disabled:opacity-50 active:scale-95 whitespace-nowrap"
-                                      title="Dispatch products to outlet (deducted from Supplier stock)"
-                                    >
-                                      {dispatchingOrderId === ord.id ? (
-                                        <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                      ) : (
-                                        <>
-                                          <Truck className="w-3 h-3" />
-                                          <span>Dispatch (Supplier Stock)</span>
-                                        </>
-                                      )}
-                                    </button>
-                                  </>
+                                  <span className="text-xs text-slate-400 font-medium">
+                                    {ord.status}
+                                  </span>
                                 )}
                               </div>
                             </td>

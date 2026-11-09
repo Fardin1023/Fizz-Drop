@@ -504,10 +504,51 @@ public class PsrController {
             }
             Map<String, Object> ord = ordList.get(0);
 
+            // 1. Update order status
             jdbcTemplate.update(
                     "UPDATE psr_orders SET status = ?, updated_at = NOW() WHERE id = ?",
                     status, id
             );
+
+            // 2. If Sales Officer accepts/approves order, record wholesale profit into sales_officer_distributions
+            if ("APPROVED_BY_SO".equalsIgnoreCase(status) || "ACCEPTED".equalsIgnoreCase(status)) {
+                try {
+                    Long outletId = Long.parseLong(ord.get("outlet_id").toString());
+                    Long productId = Long.parseLong(ord.get("product_id").toString());
+                    int quantity = Integer.parseInt(ord.get("quantity").toString());
+                    Long soId = ord.get("sales_officer_id") != null ? Long.parseLong(ord.get("sales_officer_id").toString()) : 1L;
+                    String orderCode = (String) ord.get("order_code");
+                    String psrName = ord.get("psr_name") != null ? ord.get("psr_name").toString() : "PSR";
+
+                    Product prod = productRepository.findById(productId).orElse(null);
+                    BigDecimal costPrice = (prod != null && prod.getSupplierPrice() != null) ? prod.getSupplierPrice() : BigDecimal.valueOf(35);
+                    BigDecimal salePrice = (prod != null && prod.getOutletPrice() != null) ? prod.getOutletPrice() : costPrice.multiply(BigDecimal.valueOf(1.15));
+                    if (ord.get("unit_price") != null) {
+                        try {
+                            salePrice = new BigDecimal(ord.get("unit_price").toString());
+                        } catch (Exception ignored) {}
+                    }
+                    BigDecimal totalCost = costPrice.multiply(BigDecimal.valueOf(quantity));
+                    BigDecimal totalRevenue = salePrice.multiply(BigDecimal.valueOf(quantity));
+                    BigDecimal profitEarned = totalRevenue.subtract(totalCost);
+
+                    // Check if distribution record already exists for this order
+                    List<Map<String, Object>> existingDist = jdbcTemplate.queryForList(
+                            "SELECT id FROM sales_officer_distributions WHERE notes LIKE ?",
+                            "%" + orderCode + "%"
+                    );
+                    if (existingDist.isEmpty()) {
+                        jdbcTemplate.update(
+                                "INSERT INTO sales_officer_distributions (sales_officer_id, outlet_id, product_id, quantity, cost_price, sale_price, total_cost, total_revenue, profit_earned, notes, distribution_date) " +
+                                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())",
+                                soId, outletId, productId, quantity, costPrice, salePrice, totalCost, totalRevenue, profitEarned,
+                                "Accepted PSR field order " + orderCode + " (PSR: " + psrName + ")"
+                        );
+                    }
+                } catch (Exception ex) {
+                    System.err.println("[updateOrderStatus] Failed to record profit in sales_officer_distributions: " + ex.getMessage());
+                }
+            }
 
             // Notify PSR when Sales Officer accepts/approves
             try {
@@ -788,14 +829,25 @@ public class PsrController {
             }
             inventoryRepository.save(inv);
 
-            // 6. Record in sales_officer_distributions so Supplier Sold vs Dispatched tracking updates immediately
+            // 6. Record or update sales_officer_distributions so Supplier Sold vs Dispatched tracking updates immediately
             try {
-                jdbcTemplate.update(
-                        "INSERT INTO sales_officer_distributions (sales_officer_id, outlet_id, product_id, quantity, cost_price, sale_price, total_cost, total_revenue, profit_earned, notes, distribution_date) " +
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())",
-                        soId, outletId, productId, quantity, costPrice, salePrice, totalCost, totalRevenue, profitEarned,
-                        "Dispatched and delivered by PSR " + psrName + " for order " + orderCode
+                List<Map<String, Object>> existingDist = jdbcTemplate.queryForList(
+                        "SELECT id FROM sales_officer_distributions WHERE notes LIKE ?",
+                        "%" + orderCode + "%"
                 );
+                if (existingDist.isEmpty()) {
+                    jdbcTemplate.update(
+                            "INSERT INTO sales_officer_distributions (sales_officer_id, outlet_id, product_id, quantity, cost_price, sale_price, total_cost, total_revenue, profit_earned, notes, distribution_date) " +
+                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())",
+                            soId, outletId, productId, quantity, costPrice, salePrice, totalCost, totalRevenue, profitEarned,
+                            "Dispatched and delivered by PSR " + psrName + " for order " + orderCode
+                    );
+                } else {
+                    jdbcTemplate.update(
+                            "UPDATE sales_officer_distributions SET notes = CONCAT(notes, ' - Delivered to Outlet') WHERE id = ?",
+                            existingDist.get(0).get("id")
+                    );
+                }
             } catch (Exception ignored) {}
 
             // 7. Log visit / delivery in psr_visit_logs
