@@ -23,6 +23,8 @@ public class AdminController {
     private final CentralInventoryRepository centralInventoryRepository;
     private final DistrictInventoryRepository districtInventoryRepository;
     private final DistrictRepository districtRepository;
+    private final SalesOfficerRepository salesOfficerRepository;
+    private final PreSalesOfficerRepository preSalesOfficerRepository;
     private final JdbcTemplate jdbcTemplate;
 
     public AdminController(ProductRepository productRepository,
@@ -33,6 +35,8 @@ public class AdminController {
                            CentralInventoryRepository centralInventoryRepository,
                            DistrictInventoryRepository districtInventoryRepository,
                            DistrictRepository districtRepository,
+                           SalesOfficerRepository salesOfficerRepository,
+                           PreSalesOfficerRepository preSalesOfficerRepository,
                            JdbcTemplate jdbcTemplate) {
         this.productRepository = productRepository;
         this.outletRepository = outletRepository;
@@ -42,6 +46,8 @@ public class AdminController {
         this.centralInventoryRepository = centralInventoryRepository;
         this.districtInventoryRepository = districtInventoryRepository;
         this.districtRepository = districtRepository;
+        this.salesOfficerRepository = salesOfficerRepository;
+        this.preSalesOfficerRepository = preSalesOfficerRepository;
         this.jdbcTemplate = jdbcTemplate;
     }
 
@@ -74,11 +80,13 @@ public class AdminController {
 
     /**
      * Comprehensive Commercial, Stock, Pricing & Profit Logs for Superadmin
-     * Supports filtering by Supplier, Outlet under that supplier, Product, and Date Range.
+     * Supports filtering by Supplier, Sales Officer, PSR, Outlet, Product, and Date Range.
      */
     @GetMapping("/commercial-logs")
     public ResponseEntity<Map<String, Object>> getCommercialLogs(
             @RequestParam(required = false) Long supplierId,
+            @RequestParam(required = false) Long salesOfficerId,
+            @RequestParam(required = false) Long psrId,
             @RequestParam(required = false) Long outletId,
             @RequestParam(required = false) Long productId,
             @RequestParam(required = false) String startDate,
@@ -87,6 +95,8 @@ public class AdminController {
         List<Product> allProducts = productRepository.findAll();
         List<Outlet> allOutlets = outletRepository.findAll();
         List<SupplierProfile> allSuppliers = supplierProfileRepository.findAll();
+        List<SalesOfficer> allSalesOfficers = salesOfficerRepository.findAll();
+        List<PreSalesOfficer> allPsrs = preSalesOfficerRepository.findAll();
 
         // Map outlets to suppliers based on covered_district_ids
         Map<Long, Long> outletToSupplierMap = new HashMap<>();
@@ -130,7 +140,168 @@ public class AdminController {
             }
         }
 
-        // 1. Build Suppliers list with their designated Outlets
+        // 1b. Build Enriched PSR list with product sales breakdown
+        List<Map<String, Object>> enrichedPsrs = new ArrayList<>();
+        int grandPsrCasesSold = 0;
+        double grandPsrRevenue = 0.0;
+
+        for (PreSalesOfficer psr : allPsrs) {
+            Map<String, Object> psrMap = new HashMap<>();
+            psrMap.put("id", psr.getId());
+            psrMap.put("psr_code", psr.getPsrCode());
+            psrMap.put("name", psr.getName());
+            psrMap.put("phone", psr.getPhone());
+            psrMap.put("email", psr.getEmail());
+            psrMap.put("sales_officer_id", psr.getSalesOfficerId());
+            psrMap.put("sub_route", psr.getSubRoute());
+            psrMap.put("assigned_area", psr.getAssignedArea());
+            psrMap.put("status", psr.getStatus());
+            psrMap.put("target_cases", psr.getTargetCases() != null ? psr.getTargetCases() : 0);
+            psrMap.put("target_sku_ounces", psr.getTargetSkuOunces());
+            psrMap.put("target_product_id", psr.getTargetProductId());
+            psrMap.put("target_notes", psr.getTargetNotes());
+
+            SalesOfficer so = allSalesOfficers.stream()
+                    .filter(s -> s.getId().equals(psr.getSalesOfficerId()))
+                    .findFirst()
+                    .orElse(null);
+            psrMap.put("sales_officer_name", so != null ? so.getName() : "Unassigned");
+            psrMap.put("sales_officer_code", so != null ? so.getOfficerCode() : "N/A");
+            Long supId = so != null ? so.getSupplierId() : 1L;
+            psrMap.put("supplier_id", supId);
+            SupplierProfile sp = allSuppliers.stream().filter(s -> s.getId().equals(supId)).findFirst().orElse(null);
+            psrMap.put("supplier_name", sp != null ? sp.getBusinessName() : "Regional Supplier Hub");
+
+            // Assigned Outlets
+            List<Map<String, Object>> assignedShops = allOutlets.stream()
+                    .filter(o -> Objects.equals(o.getAssignedPsrId(), psr.getId()))
+                    .map(o -> {
+                        Map<String, Object> sm = new HashMap<>();
+                        sm.put("outlet_id", o.getOutletId());
+                        sm.put("outlet_name", o.getOutletName());
+                        sm.put("branch_name", o.getBranchName());
+                        sm.put("franchise_name", o.getFranchiseName());
+                        sm.put("city", o.getCity());
+                        sm.put("sub_route", o.getSubRoute());
+                        return sm;
+                    }).collect(Collectors.toList());
+            psrMap.put("assigned_outlets", assignedShops);
+            psrMap.put("assigned_outlets_count", assignedShops.size());
+
+            // Query product sales by this PSR from psr_orders
+            StringBuilder psrSalesSql = new StringBuilder(
+                "SELECT po.product_id, po.product_name, " +
+                "  COALESCE(SUM(po.quantity), 0) AS total_cases_sold, " +
+                "  COALESCE(SUM(po.total_amount), 0.0) AS total_amount, " +
+                "  COUNT(*) AS orders_count " +
+                "FROM psr_orders po " +
+                "WHERE po.psr_id = ? AND po.status != 'CANCELLED'"
+            );
+            List<Object> pspParams = new ArrayList<>();
+            pspParams.add(psr.getId());
+            if (productId != null) {
+                psrSalesSql.append(" AND po.product_id = ?");
+                pspParams.add(productId);
+            }
+            if (outletId != null) {
+                psrSalesSql.append(" AND po.outlet_id = ?");
+                pspParams.add(outletId);
+            }
+            if (startDate != null && !startDate.trim().isEmpty()) {
+                psrSalesSql.append(" AND DATE(po.created_at) >= ?");
+                pspParams.add(startDate.trim());
+            }
+            if (endDate != null && !endDate.trim().isEmpty()) {
+                psrSalesSql.append(" AND DATE(po.created_at) <= ?");
+                pspParams.add(endDate.trim());
+            }
+            psrSalesSql.append(" GROUP BY po.product_id, po.product_name ORDER BY total_cases_sold DESC");
+
+            List<Map<String, Object>> productSales = new ArrayList<>();
+            int totalCases = 0;
+            double totalRev = 0.0;
+            int totalOrders = 0;
+            try {
+                productSales = jdbcTemplate.queryForList(psrSalesSql.toString(), pspParams.toArray());
+                for (Map<String, Object> psRow : productSales) {
+                    totalCases += ((Number) psRow.getOrDefault("total_cases_sold", 0)).intValue();
+                    totalRev += ((Number) psRow.getOrDefault("total_amount", 0.0)).doubleValue();
+                    totalOrders += ((Number) psRow.getOrDefault("orders_count", 0)).intValue();
+                }
+            } catch (Exception ignored) {}
+
+            psrMap.put("product_sales", productSales);
+            psrMap.put("total_cases_sold", totalCases);
+            psrMap.put("total_revenue", totalRev);
+            psrMap.put("total_orders_count", totalOrders);
+
+            // Calculate achieved target cases
+            int achieved = 0;
+            if (psr.getTargetProductId() != null && psr.getTargetProductId() > 0) {
+                for (Map<String, Object> ps : productSales) {
+                    if (Objects.equals(ps.get("product_id"), psr.getTargetProductId())) {
+                        achieved = ((Number) ps.getOrDefault("total_cases_sold", 0)).intValue();
+                        break;
+                    }
+                }
+            } else {
+                achieved = totalCases;
+            }
+            psrMap.put("achieved_cases", achieved);
+            int targetCases = psr.getTargetCases() != null ? psr.getTargetCases() : 0;
+            double progressPct = targetCases > 0 ? Math.min(100.0, Math.round((achieved * 100.0 / targetCases) * 10.0) / 10.0) : 0.0;
+            psrMap.put("target_progress_pct", progressPct);
+
+            enrichedPsrs.add(psrMap);
+            grandPsrCasesSold += totalCases;
+            grandPsrRevenue += totalRev;
+        }
+
+        // 1c. Build Enriched Sales Officers list
+        List<Map<String, Object>> enrichedSalesOfficers = new ArrayList<>();
+        for (SalesOfficer so : allSalesOfficers) {
+            Map<String, Object> soMap = new HashMap<>();
+            soMap.put("id", so.getId());
+            soMap.put("officer_code", so.getOfficerCode());
+            soMap.put("name", so.getName());
+            soMap.put("phone", so.getPhone());
+            soMap.put("email", so.getEmail());
+            soMap.put("supplier_id", so.getSupplierId());
+            SupplierProfile sp = allSuppliers.stream().filter(s -> s.getId().equals(so.getSupplierId())).findFirst().orElse(null);
+            soMap.put("supplier_name", sp != null ? sp.getBusinessName() : "Regional Supplier Hub");
+            soMap.put("district_id", so.getDistrictId());
+            soMap.put("city", so.getCity());
+            soMap.put("assigned_area", so.getAssignedArea());
+            soMap.put("status", so.getStatus());
+            soMap.put("monthly_target", so.getMonthlyTarget());
+
+            // PSRs under this Sales Officer
+            List<Map<String, Object>> soPsrs = enrichedPsrs.stream()
+                    .filter(p -> Objects.equals(p.get("sales_officer_id"), so.getId()))
+                    .collect(Collectors.toList());
+            soMap.put("psrs", soPsrs);
+            soMap.put("psr_count", soPsrs.size());
+
+            int soCasesSold = soPsrs.stream().mapToInt(p -> ((Number) p.getOrDefault("total_cases_sold", 0)).intValue()).sum();
+            double soRev = soPsrs.stream().mapToDouble(p -> ((Number) p.getOrDefault("total_revenue", 0.0)).doubleValue()).sum();
+            int soOrders = soPsrs.stream().mapToInt(p -> ((Number) p.getOrDefault("total_orders_count", 0)).intValue()).sum();
+            soMap.put("total_cases_sold", soCasesSold);
+            soMap.put("total_revenue", soRev);
+            soMap.put("total_orders_count", soOrders);
+
+            // Outlets under this SO's area or assigned to this SO's PSRs
+            Set<Long> soPsrIdSet = soPsrs.stream().map(p -> ((Number) p.get("id")).longValue()).collect(Collectors.toSet());
+            List<Outlet> soOutlets = allOutlets.stream().filter(o -> {
+                if (o.getAssignedPsrId() != null && soPsrIdSet.contains(o.getAssignedPsrId())) return true;
+                if (so.getAssignedArea() != null && o.getArea() != null && o.getArea().equalsIgnoreCase(so.getAssignedArea())) return true;
+                return false;
+            }).collect(Collectors.toList());
+            soMap.put("outlets_count", soOutlets.size());
+
+            enrichedSalesOfficers.add(soMap);
+        }
+
+        // 1. Build Suppliers list with their designated Outlets, SOs and PSRs
         List<Map<String, Object>> supplierList = new ArrayList<>();
         for (SupplierProfile sp : allSuppliers) {
             Map<String, Object> sMap = new HashMap<>();
@@ -266,6 +437,24 @@ public class AdminController {
             } catch (Exception ignored) {}
             sMap.put("available_stocks", supplierStocks);
 
+            // Attach Sales Officers & PSRs to Supplier
+            List<Map<String, Object>> supOfficers = enrichedSalesOfficers.stream()
+                    .filter(o -> Objects.equals(o.get("supplier_id"), sp.getId()))
+                    .collect(Collectors.toList());
+            sMap.put("sales_officers", supOfficers);
+            sMap.put("sales_officers_count", supOfficers.size());
+
+            List<Map<String, Object>> supPsrs = enrichedPsrs.stream()
+                    .filter(p -> Objects.equals(p.get("supplier_id"), sp.getId()))
+                    .collect(Collectors.toList());
+            sMap.put("psrs", supPsrs);
+            sMap.put("psrs_count", supPsrs.size());
+
+            int supPsrCases = supPsrs.stream().mapToInt(p -> ((Number) p.getOrDefault("total_cases_sold", 0)).intValue()).sum();
+            double supPsrRev = supPsrs.stream().mapToDouble(p -> ((Number) p.getOrDefault("total_revenue", 0.0)).doubleValue()).sum();
+            sMap.put("total_psr_cases_sold", supPsrCases);
+            sMap.put("total_psr_revenue", supPsrRev);
+
             supplierList.add(sMap);
         }
 
@@ -281,6 +470,8 @@ public class AdminController {
             oMap.put("city", o.getCity());
             oMap.put("area", o.getArea());
             oMap.put("district_id", o.getDistrictId());
+            oMap.put("sub_route", o.getSubRoute());
+            oMap.put("assigned_psr_id", o.getAssignedPsrId());
             oMap.put("contact_phone", o.getContactPhone());
             oMap.put("status", o.getStatus());
             oMap.put("supplier_id", outletToSupplierMap.get(o.getOutletId()));
@@ -292,6 +483,17 @@ public class AdminController {
         List<Outlet> targetOutlets = allOutlets.stream().filter(o -> {
             if (outletId != null && !o.getOutletId().equals(outletId)) return false;
             if (supplierId != null && !Objects.equals(outletToSupplierMap.get(o.getOutletId()), supplierId)) return false;
+            if (psrId != null && !Objects.equals(o.getAssignedPsrId(), psrId)) return false;
+            if (salesOfficerId != null) {
+                Set<Long> soPsrIds = allPsrs.stream()
+                        .filter(p -> Objects.equals(p.getSalesOfficerId(), salesOfficerId))
+                        .map(PreSalesOfficer::getId)
+                        .collect(Collectors.toSet());
+                boolean assignedToSoPsr = o.getAssignedPsrId() != null && soPsrIds.contains(o.getAssignedPsrId());
+                SalesOfficer so = allSalesOfficers.stream().filter(s -> s.getId().equals(salesOfficerId)).findFirst().orElse(null);
+                boolean areaMatches = so != null && so.getAssignedArea() != null && o.getArea() != null && o.getArea().equalsIgnoreCase(so.getAssignedArea());
+                if (!assignedToSoPsr && !areaMatches) return false;
+            }
             return true;
         }).collect(Collectors.toList());
 
@@ -538,6 +740,61 @@ public class AdminController {
             if (ds != null) totalSupplierDepotStock = ds;
         } catch (Exception ignored) {}
 
+        // 6b. Query Detailed PSR Field Orders Log
+        StringBuilder poSql = new StringBuilder(
+            "SELECT po.id, po.order_code, po.psr_id, po.psr_name, po.sales_officer_id, " +
+            "  so.name AS sales_officer_name, so.officer_code AS sales_officer_code, " +
+            "  so.supplier_id, sp.business_name AS supplier_name, " +
+            "  po.outlet_id, po.outlet_name, po.sub_route, po.product_id, po.product_name, " +
+            "  po.quantity, po.unit_price, po.total_amount, po.urgency, po.status, " +
+            "  po.outlet_remarks, po.psr_notes, po.created_at, po.updated_at " +
+            "FROM psr_orders po " +
+            "LEFT JOIN sales_officers so ON po.sales_officer_id = so.id " +
+            "LEFT JOIN supplier_profiles sp ON so.supplier_id = sp.id " +
+            "WHERE 1=1"
+        );
+        List<Object> poParams = new ArrayList<>();
+        if (supplierId != null) {
+            poSql.append(" AND so.supplier_id = ?");
+            poParams.add(supplierId);
+        }
+        if (salesOfficerId != null) {
+            poSql.append(" AND po.sales_officer_id = ?");
+            poParams.add(salesOfficerId);
+        }
+        if (psrId != null) {
+            poSql.append(" AND po.psr_id = ?");
+            poParams.add(psrId);
+        }
+        if (outletId != null) {
+            poSql.append(" AND po.outlet_id = ?");
+            poParams.add(outletId);
+        }
+        if (productId != null) {
+            poSql.append(" AND po.product_id = ?");
+            poParams.add(productId);
+        }
+        if (startDate != null && !startDate.trim().isEmpty()) {
+            poSql.append(" AND DATE(po.created_at) >= ?");
+            poParams.add(startDate.trim());
+        }
+        if (endDate != null && !endDate.trim().isEmpty()) {
+            poSql.append(" AND DATE(po.created_at) <= ?");
+            poParams.add(endDate.trim());
+        }
+        poSql.append(" ORDER BY po.id DESC LIMIT 300");
+
+        List<Map<String, Object>> psrOrdersList = new ArrayList<>();
+        int filteredPsrCases = 0;
+        double filteredPsrRev = 0.0;
+        try {
+            psrOrdersList = jdbcTemplate.queryForList(poSql.toString(), poParams.toArray());
+            for (Map<String, Object> pol : psrOrdersList) {
+                filteredPsrCases += ((Number) pol.getOrDefault("quantity", 0)).intValue();
+                filteredPsrRev += ((Number) pol.getOrDefault("total_amount", 0.0)).doubleValue();
+            }
+        } catch (Exception ignored) {}
+
         // 7. Overall Summary Telemetry
         Map<String, Object> summary = new HashMap<>();
         summary.put("total_retail_revenue", grandOutletRevenue);
@@ -550,6 +807,11 @@ public class AdminController {
         summary.put("total_central_depot_stock", totalCentralStock);
         summary.put("active_outlets_count", targetOutlets.size());
         summary.put("active_suppliers_count", supplierList.size());
+        summary.put("total_psr_cases_sold", filteredPsrCases > 0 ? filteredPsrCases : grandPsrCasesSold);
+        summary.put("total_psr_revenue", filteredPsrRev > 0 ? filteredPsrRev : grandPsrRevenue);
+        summary.put("total_sales_officers_count", allSalesOfficers.size());
+        summary.put("total_psrs_count", allPsrs.size());
+        summary.put("total_psr_orders_count", psrOrdersList.size());
 
         // Query Products Purchased by Suppliers from Superadmin (Stock Requisitions)
         List<Map<String, Object>> supplierPurchasedProducts = new ArrayList<>();
@@ -603,6 +865,9 @@ public class AdminController {
         Map<String, Object> response = new HashMap<>();
         response.put("summary", summary);
         response.put("suppliers", supplierList);
+        response.put("sales_officers", enrichedSalesOfficers);
+        response.put("psrs", enrichedPsrs);
+        response.put("psr_orders", psrOrdersList);
         response.put("outlets", enrichedOutlets);
         response.put("products", allProducts);
         response.put("outlet_product_ledger", outletProductLedger);
