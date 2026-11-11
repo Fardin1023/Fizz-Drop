@@ -68,6 +68,18 @@ public class DataInitializer {
             try {
                 jdbcTemplate.execute("ALTER TABLE outlets ADD COLUMN assigned_psr_id BIGINT NULL");
             } catch (Exception ignored) {}
+            try {
+                jdbcTemplate.execute("ALTER TABLE pre_sales_officers ADD COLUMN target_cases INT DEFAULT 0");
+            } catch (Exception ignored) {}
+            try {
+                jdbcTemplate.execute("ALTER TABLE pre_sales_officers ADD COLUMN target_sku_ounces VARCHAR(150) NULL");
+            } catch (Exception ignored) {}
+            try {
+                jdbcTemplate.execute("ALTER TABLE pre_sales_officers ADD COLUMN target_product_id BIGINT NULL");
+            } catch (Exception ignored) {}
+            try {
+                jdbcTemplate.execute("ALTER TABLE pre_sales_officers ADD COLUMN target_notes VARCHAR(255) NULL");
+            } catch (Exception ignored) {}
 
             try {
                 jdbcTemplate.execute(

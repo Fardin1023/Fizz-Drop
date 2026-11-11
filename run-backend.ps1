@@ -1,14 +1,15 @@
-$defaultJdk = "C:\Users\intern1.it\.vscode\extensions\redhat.java-1.58.0-win32-x64\jre\25.0.4.1-win32-x86_64"
 if (-not $env:JAVA_HOME) {
-    if (Test-Path $defaultJdk) {
-        $env:JAVA_HOME = $defaultJdk
-        $env:Path = "$defaultJdk\bin;" + $env:Path
-        Write-Host "Auto-configured JAVA_HOME: $env:JAVA_HOME" -ForegroundColor DarkCyan
-    } else {
-        throw "Set JAVA_HOME to a Java 17+ JDK before starting FizzDrop."
-    }
-} else {
-    $env:Path = "$env:JAVA_HOME\bin;" + $env:Path
+    throw "Set JAVA_HOME to a JDK 25 or newer before starting FizzDrop."
+}
+
+$env:Path = "$env:JAVA_HOME\bin;" + $env:Path
+$javaCommand = Get-Command "$env:JAVA_HOME\bin\java.exe" -ErrorAction Stop
+$javaVersionOutput = (& $javaCommand.Source -version 2>&1 | Out-String)
+if ($javaVersionOutput -notmatch 'version\s+"?(\d+)') {
+    throw "Unable to determine the Java version from JAVA_HOME. Configure a JDK 25 or newer."
+}
+if ([int]$matches[1] -lt 25) {
+    throw "FizzDrop requires JDK 25 or newer. Configure JAVA_HOME to use a supported JDK."
 }
 
 # Auto-load .env file if present

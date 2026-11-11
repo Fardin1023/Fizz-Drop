@@ -25,8 +25,33 @@ import {
   Sparkles,
   ChevronRight,
   ClipboardList,
-  Truck
+  Truck,
+  Target,
+  Boxes,
+  ClipboardCheck,
+  Eye,
 } from 'lucide-react';
+
+export const formatOunces = (sizeVolume?: string): string => {
+  if (!sizeVolume) return '12 oz';
+  const clean = sizeVolume.toLowerCase().trim();
+  if (clean.includes('oz')) return sizeVolume;
+  if (clean === '250ml') return '8.45 oz (250ml)';
+  if (clean === '330ml') return '11.16 oz (330ml)';
+  if (clean === '355ml') return '12 oz (355ml)';
+  if (clean === '400ml') return '13.5 oz (400ml)';
+  if (clean === '500ml') return '16.9 oz (500ml)';
+  if (clean === '1l' || clean === '1000ml') return '33.8 oz (1L)';
+  if (clean === '1.5l') return '50.7 oz (1.5L)';
+  if (clean === '2l') return '67.6 oz (2L)';
+  const match = clean.match(/(\d+(\.\d+)?)\s*ml/);
+  if (match) {
+    const ml = parseFloat(match[1]);
+    const oz = (ml * 0.033814).toFixed(1);
+    return `${oz} oz (${sizeVolume})`;
+  }
+  return sizeVolume;
+};
 
 interface PsrData {
   psr: any;
@@ -68,6 +93,12 @@ export default function PsrDashboard() {
   const [actionLoading, setActionLoading] = useState<boolean>(false);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  // Shop Visit & Inventory Audit Modal State
+  const [visitModalOutlet, setVisitModalOutlet] = useState<any | null>(null);
+  const [visitType, setVisitType] = useState<string>('STOCK_AUDIT');
+  const [visitNotes, setVisitNotes] = useState<string>('');
+  const [visitSubmitting, setVisitSubmitting] = useState<boolean>(false);
 
   const psrId = user?.pre_sales_officer?.id || 1;
   const psrUserId = user?.user_id || (user?.pre_sales_officer?.id ? 200 + user.pre_sales_officer.id : 201);
@@ -216,6 +247,45 @@ export default function PsrDashboard() {
   useEffect(() => {
     loadDashboard();
   }, [loadDashboard]);
+
+  // Handle Log Shop Visit & Inventory Audit
+  const handleLogVisit = async (proceedToOrder: boolean = false) => {
+    if (!visitModalOutlet || !data?.psr?.id) return;
+    setVisitSubmitting(true);
+    setActionError(null);
+    try {
+      const res = await fetch('http://localhost:8080/api/v1/psr/visit-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          psr_id: data.psr.id,
+          outlet_id: visitModalOutlet.outlet_id,
+          visit_type: visitType,
+          notes: visitNotes || `Physical store visit & shelf inventory audit conducted at ${visitModalOutlet.outlet_name || visitModalOutlet.branch_name}.`,
+        }),
+      });
+      const resJson = await res.json();
+      if (!res.ok) throw new Error(resJson.message || 'Failed to log visit');
+
+      setActionSuccess(`Shop visit recorded for ${visitModalOutlet.franchise_name || ''} ${visitModalOutlet.branch_name || visitModalOutlet.outlet_name}`);
+      const targetOutlet = visitModalOutlet;
+      setVisitModalOutlet(null);
+      loadDashboard();
+
+      if (proceedToOrder) {
+        setOrderModalOutlet(targetOutlet);
+        if (data.psr?.target_product_id) {
+          setSelectedProductId(String(data.psr.target_product_id));
+        } else if (data.products && data.products.length > 0) {
+          setSelectedProductId(String(data.products[0].product_id));
+        }
+      }
+    } catch (err: any) {
+      setActionError(err.message || 'Error recording shop visit');
+    } finally {
+      setVisitSubmitting(false);
+    }
+  };
 
   // Handle Create Order
   const handleCreateOrder = async (e: React.FormEvent) => {
@@ -648,11 +718,71 @@ export default function PsrDashboard() {
         {/* Tab 1: Sub-Route Outlets */}
         {activeTab === 'outlets' && (
           <div className="space-y-4">
+            {/* Sales Officer Allotted Target Card */}
+            {data?.psr?.target_cases > 0 && (
+              <div className="bg-gradient-to-r from-amber-500 via-orange-600 to-amber-600 text-white rounded-2xl p-4 sm:p-5 shadow-sm space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
+                      <Target className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] uppercase font-black tracking-wider bg-white/25 px-2.5 py-0.5 rounded-full">
+                          Sales Officer Assigned Target
+                        </span>
+                        <span className="text-xs bg-black/20 px-2 py-0.5 rounded-full font-mono font-bold">
+                          {data?.sub_route || 'Allotted Sub-Route'}
+                        </span>
+                      </div>
+                      <h4 className="font-black text-base sm:text-lg tracking-tight mt-0.5">
+                        Target: {data.psr.target_cases} Cases Allotted
+                      </h4>
+                    </div>
+                  </div>
+
+                  <div className="bg-white/20 backdrop-blur-xs px-3.5 py-1.5 rounded-xl self-start sm:self-auto text-right">
+                    <span className="text-[10px] uppercase block font-semibold text-orange-100">Progress</span>
+                    <span className="font-mono font-black text-sm sm:text-base">
+                      {data.psr.achieved_cases || 0} / {data.psr.target_cases} Cases
+                    </span>
+                  </div>
+                </div>
+
+                {data.psr.target_sku_ounces && (
+                  <p className="text-xs text-orange-100 flex flex-wrap items-center gap-1.5">
+                    <span>Target Beverage SKU:</span>
+                    <strong className="text-white font-mono bg-black/20 px-2 py-0.5 rounded">
+                      {data.psr.target_sku_ounces}
+                    </strong>
+                  </p>
+                )}
+
+                {/* Progress bar */}
+                <div className="space-y-1">
+                  <div className="w-full h-2 rounded-full bg-black/25 overflow-hidden">
+                    <div
+                      className="h-full bg-white rounded-full transition-all duration-500"
+                      style={{
+                        width: `${Math.min(100, Math.round(((data.psr.achieved_cases || 0) / data.psr.target_cases) * 100))}%`,
+                      }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-orange-100 font-medium">
+                    <span>{Math.min(100, Math.round(((data.psr.achieved_cases || 0) / data.psr.target_cases) * 100))}% Achieved</span>
+                    <span>
+                      {Math.max(0, data.psr.target_cases - (data.psr.achieved_cases || 0))} Cases Remaining to Target
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 rounded-xl p-3.5 text-xs text-amber-800 dark:text-amber-300 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Store className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
                 <span>
-                  <strong>Field Operating Rule:</strong> As Pre-Sales Representative, visit each retail store on this sub-route to collect new batch product orders and process damaged/expired refund claims. All collected demands are reviewed by your Sales Officer for bulk supplier requisitioning.
+                  <strong>Field Operating Rule:</strong> Conduct in-person visits to check cooler & shelf inventory at each shop on your sub-route before taking new replenishment orders.
                 </span>
               </div>
             </div>
@@ -699,32 +829,57 @@ export default function PsrDashboard() {
                           </p>
                         )}
 
-                        <div className="pt-1">
+                        <div className="pt-1 flex items-center justify-between">
                           <span className="inline-block px-2 py-0.5 rounded text-[11px] bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 font-medium">
                             Route: {outlet.sub_route || data?.sub_route || 'Standard sub-route'}
                           </span>
+                          {outlet.total_shelf_stock !== undefined && (
+                            <span className="text-[11px] font-mono font-bold text-slate-500">
+                              Shelf Stock: <strong className="text-slate-900 dark:text-white">{outlet.total_shelf_stock}</strong>
+                            </span>
+                          )}
                         </div>
                       </div>
 
                       {/* Action buttons */}
-                      <div className="pt-3 border-t border-slate-100 dark:border-zinc-800/80 flex items-center gap-2">
+                      <div className="pt-3 border-t border-slate-100 dark:border-zinc-800/80 flex flex-wrap items-center gap-2">
                         <button
+                          type="button"
+                          onClick={() => {
+                            setVisitModalOutlet(outlet);
+                            setVisitType('STOCK_AUDIT');
+                            setVisitNotes(`Physical cooler & shelf stock audit at ${outlet.branch_name || outlet.outlet_name}`);
+                          }}
+                          className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 transition cursor-pointer"
+                          title="Visit store and inspect shelf stock"
+                        >
+                          <ClipboardCheck className="h-3.5 w-3.5" />
+                          <span>Visit & Check Inventory</span>
+                        </button>
+
+                        <button
+                          type="button"
                           onClick={() => {
                             setOrderModalOutlet(outlet);
-                            setSelectedProductId(data?.products?.[0]?.product_id ? String(data.products[0].product_id) : '');
+                            if (data?.psr?.target_product_id) {
+                              setSelectedProductId(String(data.psr.target_product_id));
+                            } else if (data?.products?.[0]?.product_id) {
+                              setSelectedProductId(String(data.products[0].product_id));
+                            }
                           }}
-                          className="flex-1 flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-xs font-semibold bg-orange-600 hover:bg-orange-700 text-white shadow-sm transition"
+                          className="flex-1 flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-xs font-semibold bg-orange-600 hover:bg-orange-700 text-white shadow-sm transition cursor-pointer"
                         >
                           <PlusCircle className="h-3.5 w-3.5" />
                           <span>Take Order</span>
                         </button>
 
                         <button
+                          type="button"
                           onClick={() => {
                             setRefundModalOutlet(outlet);
                             setSelectedProductId(data?.products?.[0]?.product_id ? String(data.products[0].product_id) : '');
                           }}
-                          className="flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-xs font-semibold bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-900/50 text-red-600 dark:text-red-300 border border-red-200 dark:border-red-900 transition"
+                          className="flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-xs font-semibold bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-900/50 text-red-600 dark:text-red-300 border border-red-200 dark:border-red-900 transition cursor-pointer"
                           title="Log defective / expired return"
                         >
                           <RotateCcw className="h-3.5 w-3.5" />
@@ -1312,6 +1467,183 @@ export default function PsrDashboard() {
         </div>
       )}
 
+      {/* SHOP VISIT & INVENTORY AUDIT MODAL */}
+      {visitModalOutlet && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl max-w-xl w-full border border-slate-200 dark:border-zinc-800 shadow-2xl overflow-hidden animate-scale-up my-8 max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="px-6 py-5 bg-gradient-to-r from-blue-700 via-indigo-700 to-cyan-700 text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
+                  <ClipboardCheck className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base sm:text-lg">
+                    Shop Visit & Shelf Stock Audit
+                  </h3>
+                  <p className="text-xs text-blue-100">
+                    {visitModalOutlet.franchise_name || ''} {visitModalOutlet.branch_name || visitModalOutlet.outlet_name}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setVisitModalOutlet(null)}
+                className="p-1.5 rounded-xl text-blue-100 hover:text-white hover:bg-white/10 transition cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-4 overflow-y-auto flex-1 text-xs">
+              {/* Outlet details bar */}
+              <div className="p-3 rounded-2xl bg-slate-50 dark:bg-zinc-800/50 border border-slate-200 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 text-slate-600 dark:text-zinc-300">
+                  <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                  <span className="truncate max-w-xs">{visitModalOutlet.address || 'Sub-route Location'}</span>
+                </div>
+                <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300">
+                  Route: {visitModalOutlet.sub_route || data?.sub_route}
+                </span>
+              </div>
+
+              {/* Shelf Inventory Table */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                    <Boxes className="w-4 h-4 text-blue-600" />
+                    <span>Current Store Shelf Inventory</span>
+                  </h4>
+                  <span className="text-[11px] text-slate-500 dark:text-zinc-400">
+                    Audit before taking replenishment order
+                  </span>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 dark:border-zinc-800 overflow-hidden">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 dark:bg-zinc-800 text-[10px] uppercase font-bold text-slate-500 dark:text-zinc-400 border-b border-slate-200 dark:border-zinc-800">
+                      <tr>
+                        <th className="p-2.5">Beverage Product</th>
+                        <th className="p-2.5">SKU / Size (oz)</th>
+                        <th className="p-2.5 text-center">Shelf Stock</th>
+                        <th className="p-2.5 text-right">Stock Health</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-zinc-800">
+                      {(visitModalOutlet.inventory || data?.products || []).map((prod: any) => {
+                        const stock = prod.stock_quantity ?? prod.branch_stock ?? 0;
+                        const isTargetSku = data?.psr?.target_sku_ounces && 
+                          (prod.sku && data.psr.target_sku_ounces.includes(prod.sku));
+                        return (
+                          <tr key={prod.product_id} className={`hover:bg-slate-50/50 dark:hover:bg-zinc-800/50 ${isTargetSku ? 'bg-amber-50/40 dark:bg-amber-950/20' : ''}`}>
+                            <td className="p-2.5">
+                              <span className="font-bold text-slate-900 dark:text-white block">
+                                {prod.brand} {prod.flavor_variant}
+                              </span>
+                              {isTargetSku && (
+                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                                  ★ Target Product
+                                </span>
+                              )}
+                            </td>
+                            <td className="p-2.5 font-mono text-[11px] text-slate-600 dark:text-zinc-400">
+                              {prod.sku} • {formatOunces(prod.size_volume)}
+                            </td>
+                            <td className="p-2.5 text-center font-mono font-bold text-sm">
+                              <span className={stock === 0 ? 'text-rose-600' : stock < 10 ? 'text-amber-600' : 'text-emerald-700'}>
+                                {stock}
+                              </span>
+                            </td>
+                            <td className="p-2.5 text-right">
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  stock === 0
+                                    ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
+                                    : stock < 10
+                                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+                                    : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                                }`}
+                              >
+                                {stock === 0 ? 'Out of Stock' : stock < 10 ? 'Low Stock' : 'In Stock'}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Log Visit Form */}
+              <div className="space-y-3 pt-3 border-t border-slate-100 dark:border-zinc-800">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-zinc-400 mb-1">
+                      Visit Nature
+                    </label>
+                    <select
+                      value={visitType}
+                      onChange={(e) => setVisitType(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-800 font-bold focus:outline-none"
+                    >
+                      <option value="STOCK_AUDIT">Physical Stock Audit</option>
+                      <option value="ROUTINE_CHECK">Routine Store Visit</option>
+                      <option value="RESTOCK_RECOMMENDATION">Restock Order Consultation</option>
+                      <option value="COOLER_MAINTENANCE">Beverage Display / Cooler Check</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-zinc-400 mb-1">
+                      Visit Observation Notes
+                    </label>
+                    <input
+                      type="text"
+                      value={visitNotes}
+                      onChange={(e) => setVisitNotes(e.target.value)}
+                      placeholder="e.g. Shelves running low on 330ml cans, recommended 20 cases"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-800 focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-3 border-t border-slate-100 dark:border-zinc-800 flex flex-col sm:flex-row items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleLogVisit(false)}
+                  disabled={visitSubmitting}
+                  className="w-full sm:w-auto px-4 py-2 rounded-xl border border-slate-300 dark:border-zinc-700 text-slate-700 dark:text-zinc-300 font-bold hover:bg-slate-50 dark:hover:bg-zinc-800 transition cursor-pointer"
+                >
+                  {visitSubmitting ? 'Recording...' : 'Record Visit Log Only'}
+                </button>
+
+                <div className="w-full sm:w-auto flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setVisitModalOutlet(null)}
+                    className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 text-slate-600 dark:text-zinc-400 font-bold transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleLogVisit(true)}
+                    disabled={visitSubmitting}
+                    className="flex-1 sm:flex-initial px-5 py-2 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white font-bold shadow-md shadow-orange-600/20 flex items-center justify-center gap-2 transition cursor-pointer"
+                  >
+                    <PlusCircle className="w-4 h-4" />
+                    <span>Proceed to Take Order</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

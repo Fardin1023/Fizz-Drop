@@ -57,6 +57,26 @@ public class PreSalesOfficer {
     @JsonAlias({"user_id", "userId"})
     private Long userId;
 
+    @Column(name = "target_cases")
+    @JsonProperty("target_cases")
+    @JsonAlias({"target_cases", "targetCases"})
+    private Integer targetCases = 0;
+
+    @Column(name = "target_sku_ounces", length = 150)
+    @JsonProperty("target_sku_ounces")
+    @JsonAlias({"target_sku_ounces", "targetSkuOunces"})
+    private String targetSkuOunces;
+
+    @Column(name = "target_product_id")
+    @JsonProperty("target_product_id")
+    @JsonAlias({"target_product_id", "targetProductId"})
+    private Long targetProductId;
+
+    @Column(name = "target_notes", length = 255)
+    @JsonProperty("target_notes")
+    @JsonAlias({"target_notes", "targetNotes"})
+    private String targetNotes;
+
     @Column(name = "created_at", nullable = false)
     @JsonProperty("created_at")
     @JsonAlias({"created_at", "createdAt"})
@@ -86,6 +106,10 @@ public class PreSalesOfficer {
     @Transient
     @JsonProperty("pending_refunds_count")
     private Integer pendingRefundsCount = 0;
+
+    @Transient
+    @JsonProperty("achieved_cases")
+    private Integer achievedCases = 0;
 
     public PreSalesOfficer() {
     }
@@ -159,4 +183,19 @@ public class PreSalesOfficer {
 
     public Integer getPendingRefundsCount() { return pendingRefundsCount; }
     public void setPendingRefundsCount(Integer pendingRefundsCount) { this.pendingRefundsCount = pendingRefundsCount; }
+
+    public Integer getTargetCases() { return targetCases != null ? targetCases : 0; }
+    public void setTargetCases(Integer targetCases) { this.targetCases = targetCases; }
+
+    public String getTargetSkuOunces() { return targetSkuOunces; }
+    public void setTargetSkuOunces(String targetSkuOunces) { this.targetSkuOunces = targetSkuOunces; }
+
+    public Long getTargetProductId() { return targetProductId; }
+    public void setTargetProductId(Long targetProductId) { this.targetProductId = targetProductId; }
+
+    public String getTargetNotes() { return targetNotes; }
+    public void setTargetNotes(String targetNotes) { this.targetNotes = targetNotes; }
+
+    public Integer getAchievedCases() { return achievedCases != null ? achievedCases : 0; }
+    public void setAchievedCases(Integer achievedCases) { this.achievedCases = achievedCases; }
 }

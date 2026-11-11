@@ -70,7 +70,29 @@ interface ProductItem {
   retail_price?: number;
   image_url?: string;
   depot_buffer_stock?: number;
+  size_volume?: string;
 }
+
+export const formatOunces = (sizeVolume?: string): string => {
+  if (!sizeVolume) return '12 oz';
+  const clean = sizeVolume.toLowerCase().trim();
+  if (clean.includes('oz')) return sizeVolume;
+  if (clean === '250ml') return '8.45 oz (250ml)';
+  if (clean === '330ml') return '11.16 oz (330ml)';
+  if (clean === '355ml') return '12 oz (355ml)';
+  if (clean === '400ml') return '13.5 oz (400ml)';
+  if (clean === '500ml') return '16.9 oz (500ml)';
+  if (clean === '1l' || clean === '1000ml') return '33.8 oz (1L)';
+  if (clean === '1.5l') return '50.7 oz (1.5L)';
+  if (clean === '2l') return '67.6 oz (2L)';
+  const match = clean.match(/(\d+(\.\d+)?)\s*ml/);
+  if (match) {
+    const ml = parseFloat(match[1]);
+    const oz = (ml * 0.033814).toFixed(1);
+    return `${oz} oz (${sizeVolume})`;
+  }
+  return sizeVolume;
+};
 
 interface OfficerProfile {
   id: number;
@@ -179,6 +201,22 @@ export const SalesOfficerDashboard: React.FC = () => {
 
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
   const [actionErrorMsg, setActionErrorMsg] = useState<string | null>(null);
+
+  // PSR Allotment & Target Modal State
+  const [isAllotModalOpen, setIsAllotModalOpen] = useState(false);
+  const [allotPsr, setAllotPsr] = useState<any | null>(null);
+  const [allotSubRoute, setAllotSubRoute] = useState<string>('');
+  const [allotCustomSubRoute, setAllotCustomSubRoute] = useState<string>('');
+  const [availableSubRoutes, setAvailableSubRoutes] = useState<string[]>([]);
+  const [allAreaShops, setAllAreaShops] = useState<any[]>([]);
+  const [subRouteShops, setSubRouteShops] = useState<any[]>([]);
+  const [allotSelectedOutletIds, setAllotSelectedOutletIds] = useState<number[]>([]);
+  const [allotTargetCases, setAllotTargetCases] = useState<number>(50);
+  const [allotTargetProductId, setAllotTargetProductId] = useState<number | string>('');
+  const [allotTargetSkuOunces, setAllotTargetSkuOunces] = useState<string>('');
+  const [allotTargetNotes, setAllotTargetNotes] = useState<string>('');
+  const [allotLoadingShops, setAllotLoadingShops] = useState(false);
+  const [allotSubmitting, setAllotSubmitting] = useState(false);
 
   // Request Products from Supplier Modal State
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
@@ -409,6 +447,138 @@ export const SalesOfficerDashboard: React.FC = () => {
   const handleSwitchOfficer = async (off: OfficerProfile) => {
     await loginAsSalesOfficer(off.id, off.email);
     fetchDashboardData(off.id);
+  };
+
+  const openAllotModal = async (psr: any) => {
+    setAllotPsr(psr);
+    const initialRoute = psr.sub_route || '';
+    setAllotSubRoute(initialRoute);
+    setAllotCustomSubRoute('');
+    setAllotTargetCases(psr.target_cases && psr.target_cases > 0 ? psr.target_cases : 50);
+    setAllotTargetNotes(psr.target_notes || 'Monthly outlet distribution target');
+
+    if (psr.target_product_id) {
+      setAllotTargetProductId(psr.target_product_id);
+      setAllotTargetSkuOunces(psr.target_sku_ounces || '');
+    } else if (products.length > 0) {
+      const p = products[0];
+      setAllotTargetProductId(p.product_id);
+      setAllotTargetSkuOunces(`${p.sku} — ${p.brand} ${p.flavor_variant} (${formatOunces(p.size_volume)})`);
+    }
+
+    setIsAllotModalOpen(true);
+    setAllotLoadingShops(true);
+
+    try {
+      const soId = officer?.id || 1;
+      const srParam = initialRoute ? `&subRoute=${encodeURIComponent(initialRoute)}` : '';
+      const res = await fetch(`http://localhost:8080/api/v1/psr/subroute-shops?salesOfficerId=${soId}${srParam}`);
+      if (res.ok) {
+        const data = await res.json();
+        setAvailableSubRoutes(data.sub_routes || []);
+        setAllAreaShops(data.all_shops || []);
+        setSubRouteShops(data.subroute_shops || []);
+
+        const preSelected = (data.all_shops || [])
+          .filter((s: any) => s.assigned_psr_id === psr.id)
+          .map((s: any) => s.outlet_id);
+
+        if (preSelected.length === 0 && data.subroute_shops && data.subroute_shops.length > 0) {
+          setAllotSelectedOutletIds(data.subroute_shops.map((s: any) => s.outlet_id));
+        } else {
+          setAllotSelectedOutletIds(preSelected);
+        }
+      }
+    } catch (err) {
+      console.error('Error loading sub-route shops:', err);
+    } finally {
+      setAllotLoadingShops(false);
+    }
+  };
+
+  const handleSubRouteChange = async (selectedRoute: string) => {
+    setAllotSubRoute(selectedRoute);
+    if (selectedRoute === '__CUSTOM__') {
+      setSubRouteShops([]);
+      return;
+    }
+    setAllotLoadingShops(true);
+    try {
+      const soId = officer?.id || 1;
+      const res = await fetch(`http://localhost:8080/api/v1/psr/subroute-shops?salesOfficerId=${soId}&subRoute=${encodeURIComponent(selectedRoute)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSubRouteShops(data.subroute_shops || []);
+        // Automatically check shops that belong to this sub-route
+        if (data.subroute_shops && data.subroute_shops.length > 0) {
+          const ids = data.subroute_shops.map((s: any) => s.outlet_id);
+          setAllotSelectedOutletIds((prev) => Array.from(new Set([...prev, ...ids])));
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching shops for route:', err);
+    } finally {
+      setAllotLoadingShops(false);
+    }
+  };
+
+  const handleTargetProductChange = (prodId: string | number) => {
+    setAllotTargetProductId(prodId);
+    const prod = products.find((p) => String(p.product_id) === String(prodId));
+    if (prod) {
+      setAllotTargetSkuOunces(`${prod.sku} — ${prod.brand} ${prod.flavor_variant} (${formatOunces(prod.size_volume)})`);
+    }
+  };
+
+  const toggleOutletAllotment = (outletId: number) => {
+    setAllotSelectedOutletIds((prev) =>
+      prev.includes(outletId) ? prev.filter((id) => id !== outletId) : [...prev, outletId]
+    );
+  };
+
+  const handleAllotSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!allotPsr?.id) return;
+    const finalRoute = allotSubRoute === '__CUSTOM__' ? allotCustomSubRoute.trim() : allotSubRoute.trim();
+    if (!finalRoute) {
+      setActionErrorMsg('Please specify a designated sub-route');
+      return;
+    }
+
+    setAllotSubmitting(true);
+    setActionErrorMsg(null);
+    setActionSuccessMsg(null);
+
+    try {
+      const res = await fetch(`http://localhost:8080/api/v1/psr/${allotPsr.id}/allot-outlets-target`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sub_route: finalRoute,
+          outlet_ids: allotSelectedOutletIds,
+          target_cases: allotTargetCases,
+          target_sku_ounces: allotTargetSkuOunces,
+          target_product_id: allotTargetProductId ? Number(allotTargetProductId) : null,
+          target_notes: allotTargetNotes,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || data.error || 'Failed to allot shops and target');
+      }
+
+      setActionSuccessMsg(data.message || `Successfully allotted ${allotSelectedOutletIds.length} shops and target to ${allotPsr.name}`);
+      setIsAllotModalOpen(false);
+      if (officer?.id) {
+        fetchPsrData(officer.id);
+        fetchDashboardData(officer.id);
+      }
+    } catch (err: any) {
+      setActionErrorMsg(err.message || 'Error allotting shops and target');
+    } finally {
+      setAllotSubmitting(false);
+    }
   };
 
   const handleRequestStockFromSupplier = async (e: React.FormEvent) => {
@@ -1080,17 +1250,29 @@ export const SalesOfficerDashboard: React.FC = () => {
                     Assigned Field Representatives ({psrs.length})
                   </h4>
                   <p className="text-xs text-slate-500">
-                    PSRs deployed across sub-routes in {officer?.assigned_area || 'your area'}.
+                    PSRs deployed across sub-routes in {officer?.assigned_area || 'your area'}. Allot shops and assign SKU targets.
                   </p>
                 </div>
-                <button
-                  onClick={() => officer?.id && fetchPsrData(officer.id)}
-                  className="p-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-500 text-xs flex items-center gap-1 transition"
-                  title="Refresh PSR team status"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Sync Routes</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  {psrs.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => openAllotModal(psrs[0])}
+                      className="px-3.5 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-xs cursor-pointer active:scale-95"
+                    >
+                      <Target className="w-3.5 h-3.5" />
+                      <span>Allot Shops & Target</span>
+                    </button>
+                  )}
+                  <button
+                    onClick={() => officer?.id && fetchPsrData(officer.id)}
+                    className="p-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-500 text-xs flex items-center gap-1 transition"
+                    title="Refresh PSR team status"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>Sync Routes</span>
+                  </button>
+                </div>
               </div>
 
               {psrs.length === 0 ? (
@@ -1128,10 +1310,55 @@ export const SalesOfficerDashboard: React.FC = () => {
                             {psr.sub_route}
                           </p>
                         </div>
+
+                        {/* Allotted Sales Target Card */}
+                        <div className="p-2.5 rounded-xl bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 space-y-1.5 text-xs">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] uppercase font-black text-amber-900 flex items-center gap-1">
+                              <Target className="w-3 h-3 text-amber-600" />
+                              Allotted Sales Target
+                            </span>
+                            <span className="font-mono font-bold text-xs text-orange-700 bg-white px-2 py-0.5 rounded border border-amber-200">
+                              {psr.target_cases > 0 ? `${psr.target_cases} Cases` : 'No Target Set'}
+                            </span>
+                          </div>
+
+                          {psr.target_sku_ounces ? (
+                            <p className="text-[11px] font-medium text-slate-700 truncate" title={psr.target_sku_ounces}>
+                              SKU (oz): <strong className="text-orange-950">{psr.target_sku_ounces}</strong>
+                            </p>
+                          ) : (
+                            <p className="text-[11px] text-slate-400 italic">No SKU target assigned</p>
+                          )}
+
+                          {psr.target_cases > 0 && (
+                            <div className="space-y-1 pt-1 border-t border-amber-200/60">
+                              <div className="flex items-center justify-between text-[10px] font-medium text-slate-600">
+                                <span>Achieved: <strong>{psr.achieved_cases || 0}</strong> Cases</span>
+                                <span>{Math.min(100, Math.round(((psr.achieved_cases || 0) / psr.target_cases) * 100))}%</span>
+                              </div>
+                              <div className="w-full h-1.5 rounded-full bg-amber-200/70 overflow-hidden">
+                                <div
+                                  className="h-full bg-gradient-to-r from-orange-500 to-amber-500 rounded-full transition-all"
+                                  style={{ width: `${Math.min(100, Math.round(((psr.achieved_cases || 0) / psr.target_cases) * 100))}%` }}
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => openAllotModal(psr)}
+                          className="w-full mt-1 py-2 px-3 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition active:scale-95 cursor-pointer"
+                        >
+                          <Target className="w-3.5 h-3.5" />
+                          <span>Allot Shops & Set Target</span>
+                        </button>
                       </div>
 
                       <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                        <span><strong>{psr.outlet_count ?? 2}</strong> outlets covered</span>
+                        <span><strong>{psr.outlet_count ?? 0}</strong> outlets allotted</span>
                         <span>•</span>
                         <span><strong className="text-orange-600">{psr.active_orders_count ?? 0}</strong> active orders</span>
                       </div>
@@ -1948,6 +2175,336 @@ export const SalesOfficerDashboard: React.FC = () => {
                     <>
                       <Send className="w-3.5 h-3.5" />
                       <span>Send Request to Supplier</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* ALLOT SUB-ROUTE SHOPS & TARGET MODAL */}
+      {isAllotModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-xl w-full border border-slate-200 shadow-2xl overflow-hidden animate-scale-up my-8 max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="px-6 py-5 bg-gradient-to-r from-orange-600 via-amber-600 to-yellow-600 text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center">
+                  <Target className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-oswald text-lg font-bold uppercase tracking-wide">
+                    Allot Sub-Route Shops & Assign Target
+                  </h3>
+                  <p className="text-xs text-orange-100">
+                    Field Representative: <span className="font-bold underline">{allotPsr?.name}</span> ({allotPsr?.psr_code})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAllotModalOpen(false)}
+                className="p-1.5 rounded-xl text-orange-100 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <form onSubmit={handleAllotSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
+              {/* 1. Sub-Route Selection */}
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1">
+                  <Compass className="w-3.5 h-3.5 text-orange-600" />
+                  <span>1. Select Field Sub-Route *</span>
+                </label>
+                <select
+                  value={allotSubRoute}
+                  onChange={(e) => handleSubRouteChange(e.target.value)}
+                  required
+                  className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/30"
+                >
+                  <option value="" disabled>-- Select a Designated Sub-Route --</option>
+                  {availableSubRoutes.map((sr) => (
+                    <option key={sr} value={sr}>
+                      {sr}
+                    </option>
+                  ))}
+                  <option value="__CUSTOM__">➕ Enter Custom Sub-Route...</option>
+                </select>
+
+                {allotSubRoute === '__CUSTOM__' && (
+                  <input
+                    type="text"
+                    required
+                    value={allotCustomSubRoute}
+                    onChange={(e) => setAllotCustomSubRoute(e.target.value)}
+                    placeholder="e.g. Gulshan2-Circle North Route"
+                    className="mt-2 w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 bg-white font-medium focus:outline-none focus:ring-2 focus:ring-orange-500/30"
+                  />
+                )}
+                <p className="text-[10px] text-slate-500">
+                  Selecting a sub-route automatically filters shops and store counters located on that route.
+                </p>
+              </div>
+
+              {/* 2. Shops Under Selected Sub-Route (Dropdown List & Allotment) */}
+              <div className="space-y-2 pt-2 border-t border-slate-100">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1">
+                    <Store className="w-3.5 h-3.5 text-orange-600" />
+                    <span>2. Available Shops Under Sub-Route ({allotSelectedOutletIds.length} Allotted) *</span>
+                  </label>
+                  <div className="flex items-center gap-1.5 text-[10px]">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const targetList = subRouteShops.length > 0 ? subRouteShops : allAreaShops;
+                        setAllotSelectedOutletIds(targetList.map((s: any) => s.outlet_id));
+                      }}
+                      className="px-2 py-0.5 rounded bg-orange-50 text-orange-700 font-bold hover:bg-orange-100 transition cursor-pointer"
+                    >
+                      Select All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAllotSelectedOutletIds([])}
+                      className="px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 transition cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+
+                {/* Dropdown list to select shops as required */}
+                <select
+                  value=""
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      toggleOutletAllotment(Number(e.target.value));
+                    }
+                  }}
+                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/30"
+                >
+                  <option value="">-- Choose shop from dropdown to add/toggle allotment --</option>
+                  {subRouteShops.length > 0 && (
+                    <optgroup label={`📍 Shops Under '${allotSubRoute}' (${subRouteShops.length})`}>
+                      {subRouteShops.map((shop) => {
+                        const isSelected = allotSelectedOutletIds.includes(shop.outlet_id);
+                        return (
+                          <option key={`sub-${shop.outlet_id}`} value={shop.outlet_id}>
+                            {isSelected ? '✓ ' : '+ '} {shop.franchise_name || ''} {shop.branch_name || shop.outlet_name} — {shop.address}
+                          </option>
+                        );
+                      })}
+                    </optgroup>
+                  )}
+                  <optgroup label={`🏢 Other Shops in ${officer?.assigned_area || 'Territory'} (${allAreaShops.length})`}>
+                    {allAreaShops
+                      .filter((shop) => !subRouteShops.some((s) => s.outlet_id === shop.outlet_id))
+                      .map((shop) => {
+                        const isSelected = allotSelectedOutletIds.includes(shop.outlet_id);
+                        return (
+                          <option key={`area-${shop.outlet_id}`} value={shop.outlet_id}>
+                            {isSelected ? '✓ ' : '+ '} {shop.franchise_name || ''} {shop.branch_name || shop.outlet_name} — {shop.address}
+                          </option>
+                        );
+                      })}
+                  </optgroup>
+                </select>
+
+                {/* Interactive Allotted Shops Checklist */}
+                <div className="max-h-40 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50/50 p-2 space-y-1.5 divide-y divide-slate-100">
+                  {allotLoadingShops ? (
+                    <div className="py-4 text-center text-xs text-slate-400">Loading sub-route shops...</div>
+                  ) : (subRouteShops.length === 0 && allAreaShops.length === 0) ? (
+                    <div className="py-4 text-center text-xs text-slate-400">No shops found in this territory.</div>
+                  ) : (
+                    <>
+                      {/* Sub-route shops shown first */}
+                      {subRouteShops.map((shop) => {
+                        const isSelected = allotSelectedOutletIds.includes(shop.outlet_id);
+                        return (
+                          <label
+                            key={shop.outlet_id}
+                            className={`pt-1.5 first:pt-0 flex items-start gap-2.5 p-2 rounded-lg cursor-pointer transition ${
+                              isSelected ? 'bg-orange-50/90 border border-orange-200' : 'hover:bg-white'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleOutletAllotment(shop.outlet_id)}
+                              className="mt-0.5 rounded text-orange-600 focus:ring-orange-500 cursor-pointer"
+                            />
+                            <div className="flex-1 min-w-0 text-xs">
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="font-bold text-slate-900 truncate">
+                                  {shop.franchise_name ? `${shop.franchise_name} — ` : ''}
+                                  {shop.branch_name || shop.outlet_name}
+                                </span>
+                                <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold bg-orange-100 text-orange-800 shrink-0">
+                                  Sub-Route Shop
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-500 truncate mt-0.5">{shop.address}</p>
+                            </div>
+                          </label>
+                        );
+                      })}
+
+                      {/* Other area shops */}
+                      {allAreaShops
+                        .filter((shop) => !subRouteShops.some((s) => s.outlet_id === shop.outlet_id))
+                        .map((shop) => {
+                          const isSelected = allotSelectedOutletIds.includes(shop.outlet_id);
+                          return (
+                            <label
+                              key={shop.outlet_id}
+                              className={`pt-1.5 flex items-start gap-2.5 p-2 rounded-lg cursor-pointer transition ${
+                                isSelected ? 'bg-orange-50/90 border border-orange-200' : 'hover:bg-white'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleOutletAllotment(shop.outlet_id)}
+                                className="mt-0.5 rounded text-orange-600 focus:ring-orange-500 cursor-pointer"
+                              />
+                              <div className="flex-1 min-w-0 text-xs">
+                                <div className="flex items-center justify-between gap-1">
+                                  <span className="font-bold text-slate-900 truncate">
+                                    {shop.franchise_name ? `${shop.franchise_name} — ` : ''}
+                                    {shop.branch_name || shop.outlet_name}
+                                  </span>
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-semibold bg-slate-100 text-slate-600 shrink-0">
+                                    Area Shop
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-slate-500 truncate mt-0.5">{shop.address}</p>
+                              </div>
+                            </label>
+                          );
+                        })}
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* 3. Target Allocation (Fixed Cases & Product SKU in Ounces) */}
+              <div className="space-y-3 pt-2 border-t border-slate-100">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1">
+                  <Target className="w-3.5 h-3.5 text-orange-600" />
+                  <span>3. PSR Sales Target (Cases + SKU in Ounces) *</span>
+                </label>
+
+                {/* Product SKU Selector with Ounces */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                    Product SKU (with Bottle/Can Size in Ounces) *
+                  </label>
+                  <select
+                    value={allotTargetProductId}
+                    onChange={(e) => handleTargetProductChange(e.target.value)}
+                    required
+                    className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/30"
+                  >
+                    <option value="" disabled>-- Select Product SKU in Ounces --</option>
+                    {products.map((p) => {
+                      const ozText = formatOunces(p.size_volume);
+                      return (
+                        <option key={p.product_id} value={p.product_id}>
+                          {p.brand} {p.flavor_variant} — {p.sku} ({ozText})
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                {/* SKU in Ounces Spec */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                    Assigned Target SKU Description
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={allotTargetSkuOunces}
+                    onChange={(e) => setAllotTargetSkuOunces(e.target.value)}
+                    placeholder="e.g. PEP-REG-CAN-330 (11.16 oz / 330ml Can)"
+                    className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 font-mono font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/30"
+                  />
+                </div>
+
+                {/* Fixed Cases Allotted */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[10px] font-bold uppercase text-slate-500">
+                      Fixed Amount of Cases Allotted *
+                    </label>
+                    <div className="flex items-center gap-1">
+                      {[25, 50, 100, 200].map((preset) => (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => setAllotTargetCases(preset)}
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold transition cursor-pointer ${
+                            allotTargetCases === preset
+                              ? 'bg-orange-600 text-white'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          {preset} Cases
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <input
+                    type="number"
+                    min={1}
+                    required
+                    value={allotTargetCases}
+                    onChange={(e) => setAllotTargetCases(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 font-mono font-black text-orange-700 text-base focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/30"
+                  />
+                </div>
+
+                {/* Target Notes */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                    Route Operating Notes / Directive
+                  </label>
+                  <input
+                    type="text"
+                    value={allotTargetNotes}
+                    onChange={(e) => setAllotTargetNotes(e.target.value)}
+                    placeholder="e.g. Conduct shop visits and check cooler inventory before booking"
+                    className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/30"
+                  />
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsAllotModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={allotSubmitting}
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white font-bold text-xs shadow-md shadow-orange-600/20 flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {allotSubmitting ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Save Allotment & Assign Target</span>
                     </>
                   )}
                 </button>

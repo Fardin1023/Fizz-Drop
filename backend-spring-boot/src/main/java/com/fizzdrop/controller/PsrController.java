@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/psr")
@@ -1192,6 +1193,27 @@ public class PsrController {
             } catch (Exception ignored) {
                 psr.setPendingRefundsCount(0);
             }
+
+            // Calculate achieved target cases
+            try {
+                Integer achieved = 0;
+                if (psr.getTargetProductId() != null && psr.getTargetProductId() > 0) {
+                    achieved = jdbcTemplate.queryForObject(
+                            "SELECT COALESCE(SUM(quantity), 0) FROM psr_orders WHERE psr_id = ? AND product_id = ? AND status != 'CANCELLED'",
+                            Integer.class,
+                            psr.getId(), psr.getTargetProductId()
+                    );
+                } else {
+                    achieved = jdbcTemplate.queryForObject(
+                            "SELECT COALESCE(SUM(quantity), 0) FROM psr_orders WHERE psr_id = ? AND status != 'CANCELLED'",
+                            Integer.class,
+                            psr.getId()
+                    );
+                }
+                psr.setAchievedCases(achieved != null ? achieved : 0);
+            } catch (Exception ignored) {
+                psr.setAchievedCases(0);
+            }
         }
     }
 
@@ -1220,6 +1242,239 @@ public class PsrController {
             );
         }
 
+        // Enrich outlets with real-time shop inventory for visits
+        List<Product> allProds = productRepository.findAll();
+        for (Map<String, Object> o : list) {
+            Long outId = o.get("outlet_id") != null ? Long.parseLong(o.get("outlet_id").toString()) : null;
+            if (outId != null) {
+                List<Map<String, Object>> inv = jdbcTemplate.queryForList(
+                        "SELECT si.product_id, si.stock_quantity, p.brand, p.flavor_variant, p.size_volume, p.packaging, p.sku, p.outlet_price, p.base_price " +
+                        "FROM shop_inventory si JOIN products p ON si.product_id = p.product_id " +
+                        "WHERE si.branch_id = ?",
+                        outId
+                );
+                Set<Long> foundProductIds = new HashSet<>();
+                for (Map<String, Object> row : inv) {
+                    if (row.get("product_id") != null) {
+                        foundProductIds.add(Long.parseLong(row.get("product_id").toString()));
+                    }
+                }
+                for (Product prod : allProds) {
+                    if (!foundProductIds.contains(prod.getProductId())) {
+                        Map<String, Object> defRow = new HashMap<>();
+                        defRow.put("product_id", prod.getProductId());
+                        defRow.put("stock_quantity", 0);
+                        defRow.put("brand", prod.getBrand());
+                        defRow.put("flavor_variant", prod.getFlavorVariant());
+                        defRow.put("size_volume", prod.getSizeVolume());
+                        defRow.put("packaging", prod.getPackaging());
+                        defRow.put("sku", prod.getSku());
+                        defRow.put("outlet_price", prod.getOutletPrice());
+                        defRow.put("base_price", prod.getBasePrice());
+                        inv.add(defRow);
+                    }
+                }
+                o.put("inventory", inv);
+                int totalStock = 0;
+                for (Map<String, Object> row : inv) {
+                    if (row.get("stock_quantity") != null) {
+                        try {
+                            totalStock += Integer.parseInt(row.get("stock_quantity").toString());
+                        } catch (Exception ignored) {}
+                    }
+                }
+                o.put("total_shelf_stock", totalStock);
+            }
+        }
+
         return list;
+    }
+
+    /**
+     * Get sub-routes and shops available in the Sales Officer's territory.
+     * When selecting a sub-route, filters shops under that sub-route and shows all area shops.
+     */
+    @GetMapping("/subroute-shops")
+    public ResponseEntity<?> getSubrouteShops(
+            @RequestParam(required = false) Long salesOfficerId,
+            @RequestParam(required = false) String subRoute) {
+
+        SalesOfficer so = null;
+        if (salesOfficerId != null) {
+            so = salesOfficerRepository.findById(salesOfficerId).orElse(null);
+        }
+
+        String area = so != null && so.getAssignedArea() != null ? so.getAssignedArea() : "";
+
+        // 1. Gather all sub-routes in this territory
+        Set<String> subRoutes = new LinkedHashSet<>();
+        if (!area.isEmpty()) {
+            subRoutes.add(area + "-Circle North Route");
+            subRoutes.add(area + "-Avenue South Route");
+            subRoutes.add(area + "-Commercial Center Route");
+            subRoutes.add(area + "-Retail Market Route");
+        }
+        try {
+            List<String> outletRoutes = jdbcTemplate.queryForList(
+                    "SELECT DISTINCT sub_route FROM outlets WHERE sub_route IS NOT NULL AND sub_route != ''",
+                    String.class
+            );
+            subRoutes.addAll(outletRoutes);
+        } catch (Exception ignored) {}
+
+        try {
+            List<String> psrRoutes = jdbcTemplate.queryForList(
+                    "SELECT DISTINCT sub_route FROM pre_sales_officers WHERE sub_route IS NOT NULL AND sub_route != ''",
+                    String.class
+            );
+            subRoutes.addAll(psrRoutes);
+        } catch (Exception ignored) {}
+
+        // 2. Fetch all shops in this territory/area
+        List<Map<String, Object>> allShops;
+        if (!area.isEmpty()) {
+            allShops = jdbcTemplate.queryForList(
+                    "SELECT o.outlet_id, o.franchise_name, o.branch_name, o.outlet_name, o.location_address AS address, " +
+                    "o.contact_phone AS phone_number, o.district_id, o.sub_route, o.assigned_psr_id, " +
+                    "p.name AS assigned_psr_name, p.psr_code AS assigned_psr_code " +
+                    "FROM outlets o LEFT JOIN pre_sales_officers p ON o.assigned_psr_id = p.id " +
+                    "WHERE o.location_address LIKE ? OR o.area LIKE ? OR o.sub_route IS NOT NULL ORDER BY o.outlet_id ASC",
+                    "%" + area + "%", "%" + area + "%"
+            );
+            if (allShops.isEmpty()) {
+                allShops = jdbcTemplate.queryForList(
+                        "SELECT o.outlet_id, o.franchise_name, o.branch_name, o.outlet_name, o.location_address AS address, " +
+                        "o.contact_phone AS phone_number, o.district_id, o.sub_route, o.assigned_psr_id, " +
+                        "p.name AS assigned_psr_name, p.psr_code AS assigned_psr_code " +
+                        "FROM outlets o LEFT JOIN pre_sales_officers p ON o.assigned_psr_id = p.id ORDER BY o.outlet_id ASC"
+                );
+            }
+        } else {
+            allShops = jdbcTemplate.queryForList(
+                    "SELECT o.outlet_id, o.franchise_name, o.branch_name, o.outlet_name, o.location_address AS address, " +
+                    "o.contact_phone AS phone_number, o.district_id, o.sub_route, o.assigned_psr_id, " +
+                    "p.name AS assigned_psr_name, p.psr_code AS assigned_psr_code " +
+                    "FROM outlets o LEFT JOIN pre_sales_officers p ON o.assigned_psr_id = p.id ORDER BY o.outlet_id ASC"
+            );
+        }
+
+        // 3. Filter shops under the requested subRoute if provided
+        List<Map<String, Object>> subrouteShops = new ArrayList<>();
+        if (subRoute != null && !subRoute.trim().isEmpty()) {
+            for (Map<String, Object> shop : allShops) {
+                String sr = (String) shop.get("sub_route");
+                if (subRoute.equalsIgnoreCase(sr)) {
+                    subrouteShops.add(shop);
+                }
+            }
+        }
+
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("assigned_area", area);
+        resp.put("sub_routes", new ArrayList<>(subRoutes));
+        resp.put("all_shops", allShops);
+        resp.put("subroute_shops", subrouteShops);
+        return ResponseEntity.ok(resp);
+    }
+
+    /**
+     * Sales Officer action: Allot shops under a sub-route to a PSR and set target (fixed cases + product SKU in ounces).
+     */
+    @PostMapping("/{id}/allot-outlets-target")
+    public ResponseEntity<?> allotOutletsAndTarget(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> req) {
+        try {
+            PreSalesOfficer psr = psrRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Pre-Sales Officer with ID " + id + " not found."));
+
+            String subRoute = req.get("sub_route") != null ? req.get("sub_route").toString().trim() : psr.getSubRoute();
+            if (subRoute != null && !subRoute.isEmpty()) {
+                psr.setSubRoute(subRoute);
+            }
+
+            if (req.containsKey("target_cases")) {
+                try {
+                    int cases = Integer.parseInt(req.get("target_cases").toString());
+                    psr.setTargetCases(cases);
+                } catch (Exception ignored) {}
+            }
+            if (req.containsKey("target_sku_ounces") && req.get("target_sku_ounces") != null) {
+                psr.setTargetSkuOunces(req.get("target_sku_ounces").toString().trim());
+            }
+            if (req.containsKey("target_product_id") && req.get("target_product_id") != null && !req.get("target_product_id").toString().isEmpty()) {
+                try {
+                    psr.setTargetProductId(Long.parseLong(req.get("target_product_id").toString()));
+                } catch (Exception ignored) {}
+            }
+            if (req.containsKey("target_notes") && req.get("target_notes") != null) {
+                psr.setTargetNotes(req.get("target_notes").toString().trim());
+            }
+
+            psr.setUpdatedAt(LocalDateTime.now());
+            psrRepository.save(psr);
+
+            // Process outlet allotments
+            List<Long> outletIds = new ArrayList<>();
+            if (req.containsKey("outlet_ids") && req.get("outlet_ids") instanceof List<?>) {
+                List<?> rawList = (List<?>) req.get("outlet_ids");
+                for (Object item : rawList) {
+                    if (item != null) {
+                        try {
+                            outletIds.add(Long.parseLong(item.toString()));
+                        } catch (Exception ignored) {}
+                    }
+                }
+            }
+
+            // Update outlets
+            if (outletIds.isEmpty()) {
+                jdbcTemplate.update(
+                        "UPDATE outlets SET assigned_psr_id = NULL WHERE assigned_psr_id = ?",
+                        psr.getId()
+                );
+            } else {
+                String inSql = outletIds.stream().map(String::valueOf).collect(Collectors.joining(","));
+                jdbcTemplate.update(
+                        "UPDATE outlets SET assigned_psr_id = NULL WHERE assigned_psr_id = ? AND outlet_id NOT IN (" + inSql + ")",
+                        psr.getId()
+                );
+                for (Long outId : outletIds) {
+                    jdbcTemplate.update(
+                            "UPDATE outlets SET assigned_psr_id = ?, sub_route = ?, updated_date = NOW() WHERE outlet_id = ?",
+                            psr.getId(), subRoute, outId
+                    );
+                }
+            }
+
+            // Send notification to PSR
+            try {
+                SalesOfficer so = salesOfficerRepository.findById(psr.getSalesOfficerId()).orElse(null);
+                AppNotification notif = new AppNotification();
+                notif.setRecipientRole("PRE_SALES_OFFICER");
+                notif.setRecipientUserId(psr.getUserId() != null ? psr.getUserId() : psr.getId());
+                notif.setReferenceId(psr.getId());
+                notif.setTitle("Route Allotment & Target Assigned");
+                notif.setMessage("Sales Officer has allotted " + outletIds.size() + " shop(s) along sub-route '" +
+                        subRoute + "'. Target: " + psr.getTargetCases() + " cases of " +
+                        (psr.getTargetSkuOunces() != null ? psr.getTargetSkuOunces() : "Assigned SKU") + ".");
+                notif.setType("PSR_TARGET_ALLOTTED");
+                notif.setReferenceCode("TGT-" + psr.getPsrCode());
+                notificationRepository.save(notif);
+            } catch (Exception ignored) {}
+
+            enrichPsrs(List.of(psr));
+            List<Map<String, Object>> updatedOutlets = getOutletsForPsr(psr);
+
+            Map<String, Object> resp = new HashMap<>();
+            resp.put("success", true);
+            resp.put("message", "Successfully allotted " + outletIds.size() + " shops and set target of " + psr.getTargetCases() + " cases to " + psr.getName() + ".");
+            resp.put("psr", psr);
+            resp.put("outlets", updatedOutlets);
+
+            return ResponseEntity.ok(resp);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("Failed to allot outlets and target: " + e.getMessage()));
+        }
     }
 }
