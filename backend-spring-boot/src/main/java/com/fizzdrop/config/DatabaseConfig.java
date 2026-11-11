@@ -115,9 +115,11 @@ public class DatabaseConfig {
             config.setDriverClassName("com.mysql.cj.jdbc.Driver");
             config.setMaximumPoolSize(25);
             config.setMinimumIdle(5);
-            config.setConnectionTimeout(20000);
-            config.setIdleTimeout(300000);
-            config.setMaxLifetime(1200000);
+            config.setConnectionTimeout(30000);
+            config.setIdleTimeout(120000);
+            config.setMaxLifetime(600000);
+            config.setKeepaliveTime(30000);
+            config.setValidationTimeout(5000);
             config.setPoolName("FizzDropHikariPool");
         } else {
             // Persistent file-backed relational database in MySQL mode (consistent directory location)

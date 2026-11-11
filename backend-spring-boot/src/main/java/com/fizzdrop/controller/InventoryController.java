@@ -516,6 +516,11 @@ public class InventoryController {
     public ResponseEntity<List<Map<String, Object>>> getStockDistribution() {
         List<Product> products = productRepository.findAll();
         List<Outlet> outlets = outletRepository.findAll();
+        List<ShopInventory> allShopInvs = inventoryRepository.findAll();
+        Map<String, ShopInventory> invMap = new HashMap<>();
+        for (ShopInventory si : allShopInvs) {
+            invMap.put(si.getBranchId() + "_" + si.getProductId(), si);
+        }
         List<Map<String, Object>> response = new ArrayList<>();
 
         for (Product p : products) {
@@ -535,8 +540,8 @@ public class InventoryController {
             int totalStock = 0;
 
             for (Outlet o : outlets) {
-                var invOpt = inventoryRepository.findByBranchIdAndProductId(o.getOutletId(), p.getProductId());
-                int stock = invOpt.map(ShopInventory::getStockQuantity).orElse(0);
+                ShopInventory si = invMap.get(o.getOutletId() + "_" + p.getProductId());
+                int stock = si != null ? si.getStockQuantity() : 0;
                 totalStock += stock;
 
                 Map<String, Object> outMap = new HashMap<>();
@@ -546,7 +551,7 @@ public class InventoryController {
                 outMap.put("contact_phone", o.getContactPhone());
                 outMap.put("stock_quantity", stock);
                 outMap.put("status", o.getStatus());
-                outMap.put("last_updated", invOpt.map(i -> i.getUpdatedDate().toString()).orElse("N/A"));
+                outMap.put("last_updated", (si != null && si.getUpdatedDate() != null) ? si.getUpdatedDate().toString() : "N/A");
                 outletAllocations.add(outMap);
             }
 
@@ -570,14 +575,20 @@ public class InventoryController {
         Outlet outlet = outletOpt.get();
 
         List<Product> products = productRepository.findAll();
+        List<ShopInventory> outletInvs = inventoryRepository.findByBranchId(outletId);
+        Map<Long, ShopInventory> invMap = new HashMap<>();
+        for (ShopInventory si : outletInvs) {
+            invMap.put(si.getProductId(), si);
+        }
+
         List<Map<String, Object>> productList = new ArrayList<>();
         int totalUnits = 0;
         int lowStockCount = 0;
         int outOfStockCount = 0;
 
         for (Product p : products) {
-            var invOpt = inventoryRepository.findByBranchIdAndProductId(outletId, p.getProductId());
-            int stock = invOpt.map(ShopInventory::getStockQuantity).orElse(0);
+            ShopInventory si = invMap.get(p.getProductId());
+            int stock = si != null ? si.getStockQuantity() : 0;
             totalUnits += stock;
             if (stock == 0) outOfStockCount++;
             else if (stock <= 15) lowStockCount++;
@@ -598,7 +609,7 @@ public class InventoryController {
             pMap.put("stock_quantity", stock);
             pMap.put("in_stock", stock > 0);
             pMap.put("status", stock == 0 ? "OUT_OF_STOCK" : (stock <= 15 ? "LOW_STOCK" : "IN_STOCK"));
-            pMap.put("last_updated", invOpt.map(i -> i.getUpdatedDate().toString()).orElse(null));
+            pMap.put("last_updated", (si != null && si.getUpdatedDate() != null) ? si.getUpdatedDate().toString() : null);
             productList.add(pMap);
         }
 

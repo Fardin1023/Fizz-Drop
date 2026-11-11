@@ -510,13 +510,35 @@ public class AdminController {
         int grandUnitsSold = 0;
         int grandShelfStock = 0;
 
+        Map<String, Integer> shopStockMap = inventoryRepository.findAll().stream()
+                .collect(Collectors.toMap(si -> si.getBranchId() + "_" + si.getProductId(), ShopInventory::getStockQuantity, (a, b) -> a));
+
+        StringBuilder sqlSalesAll = new StringBuilder("SELECT outlet_id, product_id, COALESCE(SUM(quantity), 0) AS units_sold, COALESCE(SUM(total_amount), 0.0) AS total_revenue FROM outlet_sales WHERE 1=1");
+        List<Object> allParams = new ArrayList<>();
+        if (startDate != null && !startDate.trim().isEmpty()) {
+            sqlSalesAll.append(" AND DATE(sale_date) >= ?");
+            allParams.add(startDate.trim());
+        }
+        if (endDate != null && !endDate.trim().isEmpty()) {
+            sqlSalesAll.append(" AND DATE(sale_date) <= ?");
+            allParams.add(endDate.trim());
+        }
+        sqlSalesAll.append(" GROUP BY outlet_id, product_id");
+        Map<String, Map<String, Object>> salesByOutletAndProduct = new HashMap<>();
+        try {
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(sqlSalesAll.toString(), allParams.toArray());
+            for (Map<String, Object> row : rows) {
+                String key = row.get("outlet_id") + "_" + row.get("product_id");
+                salesByOutletAndProduct.put(key, row);
+            }
+        } catch (Exception ignored) {}
+
         for (Outlet o : targetOutlets) {
             Long sId = outletToSupplierMap.get(o.getOutletId());
             String sName = outletToSupplierNameMap.getOrDefault(o.getOutletId(), "Regional Supplier Depot");
 
             for (Product p : targetProducts) {
-                var invOpt = inventoryRepository.findByBranchIdAndProductId(o.getOutletId(), p.getProductId());
-                int stock = invOpt.map(ShopInventory::getStockQuantity).orElse(0);
+                int stock = shopStockMap.getOrDefault(o.getOutletId() + "_" + p.getProductId(), 0);
                 grandShelfStock += stock;
 
                 // 3-Tier Prices
@@ -531,27 +553,9 @@ public class AdminController {
                         : 0.0;
 
                 // Sales stats for this outlet + product
-                StringBuilder sqlSales = new StringBuilder("SELECT COALESCE(SUM(quantity), 0) AS units_sold, COALESCE(SUM(total_amount), 0.0) AS total_revenue FROM outlet_sales WHERE outlet_id = ? AND product_id = ?");
-                List<Object> params = new ArrayList<>();
-                params.add(o.getOutletId());
-                params.add(p.getProductId());
-
-                if (startDate != null && !startDate.trim().isEmpty()) {
-                    sqlSales.append(" AND DATE(sale_date) >= ?");
-                    params.add(startDate.trim());
-                }
-                if (endDate != null && !endDate.trim().isEmpty()) {
-                    sqlSales.append(" AND DATE(sale_date) <= ?");
-                    params.add(endDate.trim());
-                }
-
-                int unitsSold = 0;
-                double revenue = 0.0;
-                try {
-                    Map<String, Object> resMap = jdbcTemplate.queryForMap(sqlSales.toString(), params.toArray());
-                    if (resMap.get("units_sold") != null) unitsSold = ((Number) resMap.get("units_sold")).intValue();
-                    if (resMap.get("total_revenue") != null) revenue = ((Number) resMap.get("total_revenue")).doubleValue();
-                } catch (Exception ignored) {}
+                Map<String, Object> resMap = salesByOutletAndProduct.get(o.getOutletId() + "_" + p.getProductId());
+                int unitsSold = (resMap != null && resMap.get("units_sold") != null) ? ((Number) resMap.get("units_sold")).intValue() : 0;
+                double revenue = (resMap != null && resMap.get("total_revenue") != null) ? ((Number) resMap.get("total_revenue")).doubleValue() : 0.0;
 
                 double outletProfit = outletUnitMargin.multiply(BigDecimal.valueOf(unitsSold)).doubleValue();
                 grandUnitsSold += unitsSold;

@@ -1239,15 +1239,34 @@ public class PsrController {
 
         // Enrich outlets with real-time shop inventory for visits
         List<Product> allProds = productRepository.findAll();
+        List<Long> outIds = new ArrayList<>();
+        for (Map<String, Object> o : list) {
+            if (o.get("outlet_id") != null) {
+                try {
+                    outIds.add(Long.parseLong(o.get("outlet_id").toString()));
+                } catch (Exception ignored) {}
+            }
+        }
+
+        Map<Long, List<Map<String, Object>>> invByOutlet = new HashMap<>();
+        if (!outIds.isEmpty()) {
+            String inSql = String.join(",", Collections.nCopies(outIds.size(), "?"));
+            List<Map<String, Object>> allInvs = jdbcTemplate.queryForList(
+                    "SELECT si.branch_id, si.product_id, si.stock_quantity, p.brand, p.flavor_variant, p.size_volume, p.packaging, p.sku, p.outlet_price, p.base_price " +
+                    "FROM shop_inventory si JOIN products p ON si.product_id = p.product_id " +
+                    "WHERE si.branch_id IN (" + inSql + ")",
+                    outIds.toArray()
+            );
+            for (Map<String, Object> row : allInvs) {
+                Long bId = Long.parseLong(row.get("branch_id").toString());
+                invByOutlet.computeIfAbsent(bId, k -> new ArrayList<>()).add(row);
+            }
+        }
+
         for (Map<String, Object> o : list) {
             Long outId = o.get("outlet_id") != null ? Long.parseLong(o.get("outlet_id").toString()) : null;
             if (outId != null) {
-                List<Map<String, Object>> inv = jdbcTemplate.queryForList(
-                        "SELECT si.product_id, si.stock_quantity, p.brand, p.flavor_variant, p.size_volume, p.packaging, p.sku, p.outlet_price, p.base_price " +
-                        "FROM shop_inventory si JOIN products p ON si.product_id = p.product_id " +
-                        "WHERE si.branch_id = ?",
-                        outId
-                );
+                List<Map<String, Object>> inv = new ArrayList<>(invByOutlet.getOrDefault(outId, Collections.emptyList()));
                 Set<Long> foundProductIds = new HashSet<>();
                 for (Map<String, Object> row : inv) {
                     if (row.get("product_id") != null) {

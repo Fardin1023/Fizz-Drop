@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class RequisitionProcessingService {
@@ -237,8 +238,59 @@ public class RequisitionProcessingService {
 
     public List<SupplierProfile> getAllSupplierProfiles() {
         List<SupplierProfile> all = supplierProfileRepository.findAll();
-        for (SupplierProfile sp : all) {
-            enrichProfile(sp);
+        Map<Long, District> distMap = districtRepository.findAll().stream()
+                .collect(Collectors.toMap(District::getId, d -> d, (a, b) -> a));
+        Map<Long, User> userMap = userRepository.findAll().stream()
+                .collect(Collectors.toMap(User::getUserId, u -> u, (a, b) -> a));
+
+        for (SupplierProfile profile : all) {
+            if (profile.getPrimaryDistrictId() != null) {
+                District d = distMap.get(profile.getPrimaryDistrictId());
+                if (d != null) {
+                    profile.setDistrictName(d.getName());
+                    if (profile.getDivisionName() == null || profile.getDivisionName().trim().isEmpty()) {
+                        profile.setDivisionName(d.getDivision());
+                    }
+                }
+            }
+
+            String coveredIdsStr = profile.getCoveredDistrictIds();
+            List<Long> idList = new ArrayList<>();
+            if (coveredIdsStr != null && !coveredIdsStr.trim().isEmpty()) {
+                for (String s : coveredIdsStr.split(",")) {
+                    String trimmed = s.trim();
+                    if (!trimmed.isEmpty()) {
+                        try {
+                            idList.add(Long.parseLong(trimmed));
+                        } catch (NumberFormatException ignored) {}
+                    }
+                }
+            }
+            if (idList.isEmpty() && profile.getPrimaryDistrictId() != null) {
+                idList.add(profile.getPrimaryDistrictId());
+            }
+
+            List<Map<String, Object>> assignedDistricts = new ArrayList<>();
+            for (Long dId : idList) {
+                District d = distMap.get(dId);
+                if (d != null) {
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("id", d.getId());
+                    map.put("name", d.getName());
+                    map.put("division", d.getDivision());
+                    assignedDistricts.add(map);
+                }
+            }
+
+            profile.setCoveredDistrictIdsList(idList);
+            profile.setAssignedDistricts(assignedDistricts);
+
+            if (profile.getUserId() != null) {
+                User u = userMap.get(profile.getUserId());
+                if (u != null) {
+                    profile.setUserEmail(u.getEmail());
+                }
+            }
         }
         return all;
     }
@@ -710,9 +762,7 @@ public class RequisitionProcessingService {
     public List<StockRequisition> getSupplierRequisitions(Long userId) {
         SupplierProfile profile = getSupplierProfile(userId);
         List<StockRequisition> list = requisitionRepository.findBySupplierIdOrderByCreatedAtDesc(profile.getId());
-        for (StockRequisition r : list) {
-            enrichRequisition(r, profile);
-        }
+        batchEnrichRequisitions(list);
         return list;
     }
 
@@ -728,10 +778,7 @@ public class RequisitionProcessingService {
             list = requisitionRepository.findAllByOrderByCreatedAtDesc();
         }
 
-        for (StockRequisition r : list) {
-            SupplierProfile sp = supplierProfileRepository.findById(r.getSupplierId()).orElse(null);
-            enrichRequisition(r, sp);
-        }
+        batchEnrichRequisitions(list);
         return list;
     }
 
@@ -1096,15 +1143,106 @@ public class RequisitionProcessingService {
 
     public List<CentralInventory> getCentralInventory() {
         List<CentralInventory> list = centralInventoryRepository.findAll();
+        Map<Long, Product> prodMap = productRepository.findAll().stream()
+                .collect(Collectors.toMap(Product::getProductId, p -> p, (a, b) -> a));
         for (CentralInventory ci : list) {
-            productRepository.findById(ci.getProductId()).ifPresent(p -> {
+            Product p = prodMap.get(ci.getProductId());
+            if (p != null) {
                 ci.setBrand(p.getBrand());
                 ci.setFlavorVariant(p.getFlavorVariant());
                 ci.setSku(p.getSku());
                 if (p.getCategory() != null) ci.setCategory(p.getCategory());
-            });
+            }
         }
         return list;
+    }
+
+    private void batchEnrichRequisitions(List<StockRequisition> requisitions) {
+        if (requisitions == null || requisitions.isEmpty()) return;
+
+        Map<Long, SupplierProfile> supMap = supplierProfileRepository.findAll().stream()
+                .collect(Collectors.toMap(SupplierProfile::getId, s -> s, (a, b) -> a));
+        Map<Long, District> distMap = districtRepository.findAll().stream()
+                .collect(Collectors.toMap(District::getId, d -> d, (a, b) -> a));
+        Map<Long, Product> prodMap = productRepository.findAll().stream()
+                .collect(Collectors.toMap(Product::getProductId, p -> p, (a, b) -> a));
+        List<StockRequisitionItem> allItems = requisitionItemRepository.findAll();
+        Map<Long, List<StockRequisitionItem>> itemsByReq = allItems.stream()
+                .collect(Collectors.groupingBy(StockRequisitionItem::getRequisitionId));
+
+        for (StockRequisition req : requisitions) {
+            SupplierProfile sp = supMap.get(req.getSupplierId());
+            if (sp != null) {
+                req.setSupplierName(sp.getBusinessName());
+            }
+            if (req.getDistrictId() != null) {
+                District d = distMap.get(req.getDistrictId());
+                if (d != null) {
+                    req.setDistrictName(d.getName());
+                    req.setDivisionName(d.getDivision());
+                }
+            }
+
+            List<StockRequisitionItem> items = itemsByReq.getOrDefault(req.getId(), new ArrayList<>());
+            req.setItems(items);
+            int reqCases = 0;
+            int appCases = 0;
+            java.math.BigDecimal originalSubtotal = java.math.BigDecimal.ZERO;
+            java.math.BigDecimal fulfilledSubtotal = java.math.BigDecimal.ZERO;
+
+            for (StockRequisitionItem i : items) {
+                int rQty = (i.getRequestedQuantity() != null ? i.getRequestedQuantity() : 0);
+                int aQty = (i.getApprovedQuantity() != null ? i.getApprovedQuantity() : 0);
+                reqCases += rQty;
+                appCases += aQty;
+
+                Product p = prodMap.get(i.getProductId());
+                if (p != null) {
+                    i.setBrand(p.getBrand());
+                    i.setFlavorVariant(p.getFlavorVariant());
+                    i.setPackaging(p.getPackaging());
+                    i.setSizeVolume(p.getSizeVolume());
+                    i.setSku(p.getSku());
+                    java.math.BigDecimal supplierRate = p.getSupplierPrice() != null ? p.getSupplierPrice() : p.getBasePrice();
+                    i.setBasePrice(supplierRate);
+
+                    java.math.BigDecimal price = supplierRate != null ? supplierRate : java.math.BigDecimal.valueOf(48.0);
+                    originalSubtotal = originalSubtotal.add(price.multiply(java.math.BigDecimal.valueOf(rQty)));
+                    fulfilledSubtotal = fulfilledSubtotal.add(price.multiply(java.math.BigDecimal.valueOf(aQty)));
+                }
+            }
+            req.setTotalRequestedCases(reqCases);
+            req.setTotalApprovedCases(appCases);
+
+            java.math.BigDecimal vatMultiplier = java.math.BigDecimal.valueOf(1.05);
+            java.math.BigDecimal calcOriginalWithVat = originalSubtotal.multiply(vatMultiplier).setScale(2, java.math.RoundingMode.HALF_UP);
+            java.math.BigDecimal calcFulfilledWithVat = fulfilledSubtotal.multiply(vatMultiplier).setScale(2, java.math.RoundingMode.HALF_UP);
+
+            if (req.getTotalAmount() == null || req.getTotalAmount().compareTo(java.math.BigDecimal.ZERO) == 0) {
+                req.setTotalAmount(calcOriginalWithVat);
+            }
+
+            if (req.getFulfilledAmount() == null) {
+                if ("APPROVED".equalsIgnoreCase(req.getStatus())) {
+                    req.setFulfilledAmount(req.getTotalAmount());
+                } else if ("REJECTED".equalsIgnoreCase(req.getStatus())) {
+                    req.setFulfilledAmount(java.math.BigDecimal.ZERO);
+                } else if ("PARTIALLY_APPROVED".equalsIgnoreCase(req.getStatus())) {
+                    req.setFulfilledAmount(calcFulfilledWithVat);
+                }
+            }
+
+            if (req.getRefundAmount() == null) {
+                if ("REJECTED".equalsIgnoreCase(req.getStatus())) {
+                    req.setRefundAmount(req.getTotalAmount());
+                } else if ("PARTIALLY_APPROVED".equalsIgnoreCase(req.getStatus())) {
+                    java.math.BigDecimal diff = req.getTotalAmount().subtract(req.getFulfilledAmount() != null ? req.getFulfilledAmount() : calcFulfilledWithVat);
+                    req.setRefundAmount(diff.compareTo(java.math.BigDecimal.ZERO) > 0 ? diff : java.math.BigDecimal.ZERO);
+                } else {
+                    req.setRefundAmount(java.math.BigDecimal.ZERO);
+                }
+            }
+        }
     }
 
     private void enrichProfile(SupplierProfile profile) {

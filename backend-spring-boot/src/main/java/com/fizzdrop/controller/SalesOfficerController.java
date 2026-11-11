@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @RestController
 @CrossOrigin(origins = "*")
@@ -371,6 +372,9 @@ public class SalesOfficerController {
         List<Map<String, Object>> territoryOutlets = new ArrayList<>();
         String targetArea = officer.getAssignedArea().toLowerCase();
 
+        Map<Long, Integer> shelfStockByOutlet = shopInventoryRepository.findAll().stream()
+                .collect(Collectors.groupingBy(ShopInventory::getBranchId, Collectors.summingInt(ShopInventory::getStockQuantity)));
+
         for (Outlet o : allOutlets) {
             String oArea = o.getArea() != null ? o.getArea().toLowerCase() : "";
             if (oArea.contains(targetArea) || targetArea.contains(oArea)) {
@@ -385,9 +389,7 @@ public class SalesOfficerController {
                 om.put("contact_phone", o.getContactPhone());
                 om.put("status", o.getStatus());
 
-                // Fetch outlet stock counts
-                List<ShopInventory> invList = shopInventoryRepository.findByBranchId(o.getOutletId());
-                int totalShelfStock = invList.stream().mapToInt(ShopInventory::getStockQuantity).sum();
+                int totalShelfStock = shelfStockByOutlet.getOrDefault(o.getOutletId(), 0);
                 om.put("total_shelf_stock", totalShelfStock);
                 territoryOutlets.add(om);
             }
@@ -397,6 +399,42 @@ public class SalesOfficerController {
         List<Product> products = productRepository.findAll();
         List<Map<String, Object>> productCatalog = new ArrayList<>();
         Long districtId = officer.getDistrictId() != null ? officer.getDistrictId() : 1L;
+
+        Map<Long, Integer> depotStockMap = districtInventoryRepository.findByDistrictId(districtId).stream()
+                .collect(Collectors.toMap(DistrictInventory::getProductId, DistrictInventory::getCurrentStock, (a, b) -> a));
+
+        Map<Long, Integer> soInvMap = new HashMap<>();
+        try {
+            jdbcTemplate.query(
+                "SELECT product_id, current_stock FROM sales_officer_inventory WHERE sales_officer_id = ?",
+                (rs) -> {
+                    soInvMap.put(rs.getLong("product_id"), rs.getInt("current_stock"));
+                },
+                officer.getId()
+            );
+        } catch (Exception ignored) {}
+
+        Map<Long, Integer> purchasedMap = new HashMap<>();
+        try {
+            jdbcTemplate.query(
+                "SELECT product_id, COALESCE(SUM(quantity), 0) as qty FROM outlet_requisitions WHERE sales_officer_id = ? AND requisition_code LIKE 'SO-REQ-%' AND status IN ('DISPATCHED', 'COMPLETED') GROUP BY product_id",
+                (rs) -> {
+                    purchasedMap.put(rs.getLong("product_id"), rs.getInt("qty"));
+                },
+                officer.getId()
+            );
+        } catch (Exception ignored) {}
+
+        Map<Long, Integer> distributedMap = new HashMap<>();
+        try {
+            jdbcTemplate.query(
+                "SELECT product_id, COALESCE(SUM(quantity), 0) as qty FROM outlet_requisitions WHERE sales_officer_id = ? AND requisition_code NOT LIKE 'SO-REQ-%' AND status IN ('DISPATCHED', 'COMPLETED') GROUP BY product_id",
+                (rs) -> {
+                    distributedMap.put(rs.getLong("product_id"), rs.getInt("qty"));
+                },
+                officer.getId()
+            );
+        } catch (Exception ignored) {}
 
         for (Product p : products) {
             Map<String, Object> pm = new HashMap<>();
@@ -412,33 +450,17 @@ public class SalesOfficerController {
             pm.put("image_url", p.getImageUrl());
 
             // District buffer stock
-            var distInv = districtInventoryRepository.findByDistrictIdAndProductId(districtId, p.getProductId());
-            pm.put("depot_buffer_stock", distInv.map(DistrictInventory::getCurrentStock).orElse(50));
+            pm.put("depot_buffer_stock", depotStockMap.getOrDefault(p.getProductId(), 50));
 
             // Sales Officer's own live purchased buffer stock
             int soPurchasedStock = 0;
-            try {
-                List<Integer> list = jdbcTemplate.query(
-                    "SELECT current_stock FROM sales_officer_inventory WHERE sales_officer_id = ? AND product_id = ?",
-                    (rs, rowNum) -> rs.getInt("current_stock"),
-                    officer.getId(), p.getProductId()
-                );
-                if (!list.isEmpty()) {
-                    soPurchasedStock = Math.max(0, list.get(0));
-                } else {
-                    Integer purchased = jdbcTemplate.queryForObject(
-                        "SELECT COALESCE(SUM(quantity), 0) FROM outlet_requisitions " +
-                        "WHERE sales_officer_id = ? AND product_id = ? AND requisition_code LIKE 'SO-REQ-%' AND status IN ('DISPATCHED', 'COMPLETED')",
-                        Integer.class, officer.getId(), p.getProductId()
-                    );
-                    Integer distributed = jdbcTemplate.queryForObject(
-                        "SELECT COALESCE(SUM(quantity), 0) FROM outlet_requisitions " +
-                        "WHERE sales_officer_id = ? AND product_id = ? AND requisition_code NOT LIKE 'SO-REQ-%' AND status IN ('DISPATCHED', 'COMPLETED')",
-                        Integer.class, officer.getId(), p.getProductId()
-                    );
-                    soPurchasedStock = Math.max(0, (purchased != null ? purchased : 0) - (distributed != null ? distributed : 0));
-                }
-            } catch (Exception ignored) {}
+            if (soInvMap.containsKey(p.getProductId())) {
+                soPurchasedStock = Math.max(0, soInvMap.get(p.getProductId()));
+            } else {
+                int pur = purchasedMap.getOrDefault(p.getProductId(), 0);
+                int dist = distributedMap.getOrDefault(p.getProductId(), 0);
+                soPurchasedStock = Math.max(0, pur - dist);
+            }
             pm.put("so_purchased_stock", soPurchasedStock);
             productCatalog.add(pm);
         }

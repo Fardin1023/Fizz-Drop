@@ -52,53 +52,29 @@ public class ProductController {
     }
 
     private void populateProductMetadata(Product p, Long branchId, Long userId, List<Outlet> outlets) {
-        populateProductMetadata(p, branchId, userId, null, outlets);
+        batchPopulateProductMetadata(Collections.singletonList(p), branchId, userId, null);
     }
 
     private void populateProductMetadata(Product p, Long branchId, Long userId, Long supplierId, List<Outlet> outlets) {
-        List<Map<String, Object>> outletList = new ArrayList<>();
-        int calculatedTotalStock = 0;
+        batchPopulateProductMetadata(Collections.singletonList(p), branchId, userId, supplierId);
+    }
 
-        if (outlets != null && !outlets.isEmpty()) {
-            for (Outlet o : outlets) {
-                var invOpt = inventoryRepository.findByBranchIdAndProductId(o.getOutletId(), p.getProductId());
-                int stock;
-                if (invOpt.isEmpty()) {
-                    stock = 0; // Default to 0 until supplier allocates stock
-                    inventoryRepository.save(new ShopInventory(o.getOutletId(), p.getProductId(), stock));
-                } else {
-                    stock = invOpt.get().getStockQuantity();
-                }
+    private void batchPopulateProductMetadata(List<Product> products, Long branchId, Long userId, Long supplierId) {
+        if (products == null || products.isEmpty()) return;
 
-                calculatedTotalStock += stock;
-
-                Map<String, Object> outMap = new HashMap<>();
-                outMap.put("outlet_id", o.getOutletId());
-                outMap.put("outlet_name", o.getOutletName());
-                outMap.put("location_address", o.getLocationAddress());
-                outMap.put("contact_phone", o.getContactPhone());
-                outMap.put("status", o.getStatus());
-                outMap.put("stock_quantity", stock);
-                outMap.put("in_stock", stock > 0);
-                outletList.add(outMap);
-            }
-        } else {
-            calculatedTotalStock = 0;
+        List<Outlet> outlets = outletRepository.findAll();
+        List<ShopInventory> allShopInv = inventoryRepository.findAll();
+        Map<String, Integer> shopStockMap = new HashMap<>();
+        for (ShopInventory si : allShopInv) {
+            shopStockMap.put(si.getBranchId() + "_" + si.getProductId(), si.getStockQuantity());
         }
 
-        p.setTotalStock(calculatedTotalStock);
-        var centralOpt = centralInventoryRepository.findByProductId(p.getProductId());
-        p.setCentralStock(centralOpt.map(CentralInventory::getAvailableStock).orElse(0));
-
-        if (branchId != null) {
-            var inv = inventoryRepository.findByBranchIdAndProductId(branchId, p.getProductId());
-            p.setBranchStock(inv.map(ShopInventory::getStockQuantity).orElse(0));
-        } else {
-            p.setBranchStock(calculatedTotalStock);
+        List<CentralInventory> allCentral = centralInventoryRepository.findAll();
+        Map<Long, Integer> centralStockMap = new HashMap<>();
+        for (CentralInventory ci : allCentral) {
+            centralStockMap.put(ci.getProductId(), ci.getAvailableStock());
         }
-        p.setAvailableOutlets(outletList);
 
-        // Supplier Depot Stock Calculation
         SupplierProfile sp = null;
         if (supplierId != null && supplierId > 0) {
             sp = supplierProfileRepository.findById(supplierId).orElse(null);
@@ -107,18 +83,14 @@ public class ProductController {
             sp = supplierProfileRepository.findByUserId(userId).orElse(null);
         }
         if (sp == null) {
-            // Robust fallback to primary active supplier (e.g. when superadmin views supplier portal or userId is generic)
             List<SupplierProfile> allSuppliers = supplierProfileRepository.findAll();
             if (!allSuppliers.isEmpty()) {
                 sp = allSuppliers.get(0);
             }
         }
 
-        int totalSupplierDepotStock = 0;
-        List<Map<String, Object>> depotBreakdown = new ArrayList<>();
-
+        List<Long> districtIds = new ArrayList<>();
         if (sp != null) {
-            List<Long> districtIds = new ArrayList<>();
             if (sp.getPrimaryDistrictId() != null) {
                 districtIds.add(sp.getPrimaryDistrictId());
             }
@@ -132,22 +104,73 @@ public class ProductController {
                     } catch (NumberFormatException ignored) {}
                 }
             }
+        }
+
+        Map<Long, String> districtNameMap = new HashMap<>();
+        if (!districtIds.isEmpty()) {
+            List<District> dists = districtRepository.findAllById(districtIds);
+            for (District d : dists) {
+                districtNameMap.put(d.getId(), d.getName());
+            }
+        }
+
+        List<DistrictInventory> allDistInv = districtInventoryRepository.findAll();
+        Map<String, Integer> distStockMap = new HashMap<>();
+        for (DistrictInventory di : allDistInv) {
+            distStockMap.put(di.getDistrictId() + "_" + di.getProductId(), di.getCurrentStock());
+        }
+
+        for (Product p : products) {
+            List<Map<String, Object>> outletList = new ArrayList<>();
+            int calculatedTotalStock = 0;
+
+            if (outlets != null && !outlets.isEmpty()) {
+                for (Outlet o : outlets) {
+                    Integer stock = shopStockMap.get(o.getOutletId() + "_" + p.getProductId());
+                    if (stock == null) {
+                        stock = 0;
+                    }
+                    calculatedTotalStock += stock;
+
+                    Map<String, Object> outMap = new HashMap<>();
+                    outMap.put("outlet_id", o.getOutletId());
+                    outMap.put("outlet_name", o.getOutletName());
+                    outMap.put("location_address", o.getLocationAddress());
+                    outMap.put("contact_phone", o.getContactPhone());
+                    outMap.put("status", o.getStatus());
+                    outMap.put("stock_quantity", stock);
+                    outMap.put("in_stock", stock > 0);
+                    outletList.add(outMap);
+                }
+            }
+
+            p.setTotalStock(calculatedTotalStock);
+            p.setCentralStock(centralStockMap.getOrDefault(p.getProductId(), 0));
+
+            if (branchId != null) {
+                p.setBranchStock(shopStockMap.getOrDefault(branchId + "_" + p.getProductId(), 0));
+            } else {
+                p.setBranchStock(calculatedTotalStock);
+            }
+            p.setAvailableOutlets(outletList);
+
+            int totalSupplierDepotStock = 0;
+            List<Map<String, Object>> depotBreakdown = new ArrayList<>();
 
             for (Long distId : districtIds) {
-                var distInv = districtInventoryRepository.findByDistrictIdAndProductId(distId, p.getProductId());
-                int st = distInv.map(DistrictInventory::getCurrentStock).orElse(0);
+                int st = distStockMap.getOrDefault(distId + "_" + p.getProductId(), 0);
                 totalSupplierDepotStock += st;
 
-                String distName = districtRepository.findById(distId).map(District::getName).orElse("District #" + distId);
+                String distName = districtNameMap.getOrDefault(distId, "District #" + distId);
                 Map<String, Object> dm = new HashMap<>();
                 dm.put("district_id", distId);
                 dm.put("district_name", distName);
                 dm.put("stock", st);
                 depotBreakdown.add(dm);
             }
+            p.setSupplierStock(totalSupplierDepotStock);
+            p.setDepotBreakdown(depotBreakdown);
         }
-        p.setSupplierStock(totalSupplierDepotStock);
-        p.setDepotBreakdown(depotBreakdown);
     }
 
     @GetMapping
@@ -170,10 +193,7 @@ public class ProductController {
             products = productRepository.findAll();
         }
 
-        List<Outlet> outlets = outletRepository.findAll();
-        for (Product p : products) {
-            populateProductMetadata(p, branchId, userId, supplierId, outlets);
-        }
+        batchPopulateProductMetadata(products, branchId, userId, supplierId);
 
         return ResponseEntity.ok(products);
     }
@@ -187,10 +207,7 @@ public class ProductController {
         if (list.size() > 8) {
             list = list.subList(0, 8);
         }
-        List<Outlet> outlets = outletRepository.findAll();
-        for (Product p : list) {
-            populateProductMetadata(p, branchId, userId, supplierId, outlets);
-        }
+        batchPopulateProductMetadata(list, branchId, userId, supplierId);
         return ResponseEntity.ok(list);
     }
 
