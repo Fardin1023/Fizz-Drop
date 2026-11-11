@@ -33,7 +33,8 @@ import {
   Calendar,
   Percent,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { getNotificationDestination } from '../../utils/notificationRouter';
 import { useAuth } from '../../context/AuthContext';
 import AdminLogin from '../Admin/AdminLogin';
 import { useNotifications } from '../../hooks/useNotifications';
@@ -157,7 +158,37 @@ export interface DistributionRecord {
 
 export const SalesOfficerDashboard: React.FC = () => {
   const { user, isAuthenticated, logout, loginAsSalesOfficer, isSalesOfficer, isSuperadmin } = useAuth();
-  const [activeTab, setActiveTab] = useState<'overview' | 'psr-team' | 'profit-ledger' | 'outlets' | 'demands' | 'supplier-link'>('overview');
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const validTabs = ['overview', 'psr-team', 'profit-ledger', 'outlets', 'demands', 'supplier-link'];
+  const initialTab = (searchParams.get('tab') as any) || 'overview';
+  const [activeTab, setActiveTab] = useState<'overview' | 'psr-team' | 'profit-ledger' | 'outlets' | 'demands' | 'supplier-link'>(
+    validTabs.includes(initialTab) ? initialTab : 'overview'
+  );
+
+  useEffect(() => {
+    const t = searchParams.get('tab') as any;
+    if (t && validTabs.includes(t) && t !== activeTab) {
+      setActiveTab(t);
+    }
+  }, [searchParams]);
+
+  const handleTabChange = (newTab: any) => {
+    setActiveTab(newTab);
+    setSearchParams({ tab: newTab }, { replace: true });
+  };
+
+  const handleNotificationClick = (n: any) => {
+    if (!n) return;
+    if (n.id) markAsRead(n.id);
+    const dest = getNotificationDestination(n, 'SALES_OFFICER');
+    if (dest.path === '/sales-officer' && validTabs.includes(dest.tab)) {
+      handleTabChange(dest.tab);
+    } else {
+      navigate(dest.fullUrl);
+    }
+  };
+  
   
   // Dashboard Data State
   const [officer, setOfficer] = useState<OfficerProfile | null>(null);
@@ -685,7 +716,7 @@ export const SalesOfficerDashboard: React.FC = () => {
       <NotificationPopup
         notification={popupNotification}
         onDismiss={dismissPopup}
-        onAction={() => setActiveTab('demands')}
+        onAction={handleNotificationClick}
       />
 
       {/* 1. Top Navbar Fixed Subheader */}
@@ -769,7 +800,7 @@ export const SalesOfficerDashboard: React.FC = () => {
                 onMarkAllAsRead={markAllAsRead}
                 onDeleteNotification={deleteNotification}
                 onClearOldNotifications={clearOldNotifications}
-                onSelectNotification={() => setActiveTab('demands')}
+                onSelectNotification={handleNotificationClick}
                 isScrolled={true}
               />
 
@@ -1104,7 +1135,7 @@ export const SalesOfficerDashboard: React.FC = () => {
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
+                  onClick={() => handleTabChange(tab.id as any)}
                   className={`px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
                     isActive
                       ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'

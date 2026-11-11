@@ -12,6 +12,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import type { AppNotification } from '../../types/notification';
+import { getNotificationDestination } from '../../utils/notificationRouter';
 
 interface NotificationDropdownProps {
   notifications: AppNotification[];
@@ -152,6 +153,7 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
                 const isRejected = n.type === 'REJECTED';
                 const isNewReq = n.type === 'NEW_REQUISITION';
                 const isSOReq = n.type === 'SALES_OFFICER_REQUISITION';
+                const target = getNotificationDestination(n);
 
                 return (
                   <div
@@ -161,7 +163,7 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
                       if (onSelectNotification) onSelectNotification(n);
                       setIsOpen(false);
                     }}
-                    className={`p-3.5 flex items-start gap-3 transition-colors cursor-pointer ${
+                    className={`group p-3.5 flex items-start gap-3 transition-all cursor-pointer ${
                       !n.is_read
                         ? 'bg-blue-50/40 hover:bg-blue-50/70'
                         : 'hover:bg-slate-50'
@@ -232,16 +234,23 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
                         {n.message}
                       </p>
 
-                      <div className="mt-1.5 flex items-center gap-2 text-[10px] text-slate-400 font-mono">
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          {formatRelativeTime(n.created_at)}
-                        </span>
-                        {n.reference_code && (
-                          <span className="px-1.5 py-0.2 rounded bg-slate-100 text-zinc-700 border border-slate-200">
-                            {n.reference_code}
+                      <div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-slate-400 font-mono">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {formatRelativeTime(n.created_at)}
                           </span>
-                        )}
+                          {n.reference_code && (
+                            <span className="px-1.5 py-0.2 rounded bg-slate-100 text-zinc-700 border border-slate-200">
+                              {n.reference_code}
+                            </span>
+                          )}
+                        </div>
+
+                        <span className="text-[10px] text-blue-600 font-bold group-hover:text-blue-700 flex items-center gap-1 bg-blue-50/80 group-hover:bg-blue-100/90 px-2 py-0.5 rounded-lg border border-blue-200/50 group-hover:border-blue-300 transition-all shrink-0">
+                          <span>{target.label}</span>
+                          <span className="group-hover:translate-x-0.5 transition-transform">&rarr;</span>
+                        </span>
                       </div>
                     </div>
                   </div>

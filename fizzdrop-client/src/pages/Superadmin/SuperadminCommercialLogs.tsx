@@ -564,7 +564,7 @@ export const SuperadminCommercialLogs: React.FC = () => {
       return outlets.filter(
         (o) =>
           (o.assigned_psr_id && soPsrIds.has(o.assigned_psr_id)) ||
-          (so?.assigned_area && o.area && o.area.toLowerCase() === so.assigned_area.toLowerCase())
+          (so?.assigned_area && (o as any).area && (o as any).area.toLowerCase() === so.assigned_area.toLowerCase())
       );
     }
     if (selectedSupplierId !== 'ALL') {

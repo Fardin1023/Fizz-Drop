@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { getNotificationDestination } from '../../utils/notificationRouter';
 import {
   Store,
   Package,
@@ -48,9 +49,38 @@ import { StripePaymentModal } from '../../components/Payment/StripePaymentModal'
 export const OutletDashboard: React.FC = () => {
   const { user, outlet: authOutlet, isAuthenticated, isOutlet, logout, isLoading } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const validTabs = ['inventory', 'pos', 'request', 'deliveries', 'ledger', 'profile'];
+  const initialTab = (searchParams.get('tab') as any) || 'inventory';
+  const [activeTab, setActiveTab] = useState<'inventory' | 'pos' | 'request' | 'deliveries' | 'ledger' | 'profile'>(
+    validTabs.includes(initialTab) ? initialTab : 'inventory'
+  );
+
+  useEffect(() => {
+    const t = searchParams.get('tab') as any;
+    if (t && validTabs.includes(t) && t !== activeTab) {
+      setActiveTab(t);
+    }
+  }, [searchParams]);
+
+  const handleTabChange = (newTab: any) => {
+    setActiveTab(newTab);
+    setSearchParams({ tab: newTab }, { replace: true });
+  };
+
+  const handleNotificationClick = (n: any) => {
+    if (!n) return;
+    if (n.id) markAsRead(n.id);
+    const dest = getNotificationDestination(n, 'OUTLET');
+    if (dest.path === '/outlet' && validTabs.includes(dest.tab)) {
+      handleTabChange(dest.tab);
+    } else {
+      navigate(dest.fullUrl);
+    }
+  };
 
   // Navigation Tabs
-  const [activeTab, setActiveTab] = useState<'inventory' | 'pos' | 'request' | 'deliveries' | 'ledger' | 'profile'>('inventory');
+  
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   // Active Outlet Data
@@ -520,7 +550,7 @@ export const OutletDashboard: React.FC = () => {
               onMarkAllAsRead={markAllAsRead}
               onDeleteNotification={deleteNotification}
               onClearOldNotifications={clearOldNotifications}
-              onSelectNotification={() => setActiveTab('deliveries')}
+              onSelectNotification={handleNotificationClick}
             />
 
             {/* Logout */}
@@ -665,7 +695,7 @@ export const OutletDashboard: React.FC = () => {
                   <button
                     key={sec.id}
                     type="button"
-                    onClick={() => setActiveTab(sec.id)}
+                    onClick={() => handleTabChange(sec.id)}
                     className={`w-full p-2.5 rounded-2xl text-left transition-all flex items-center gap-3 cursor-pointer group ${
                       isActive
                         ? `bg-gradient-to-r ${sec.gradient} text-white shadow-md shadow-emerald-900/15`
@@ -1531,10 +1561,7 @@ export const OutletDashboard: React.FC = () => {
       <NotificationPopup
         notification={popupNotification}
         onClose={dismissPopup}
-        onAction={() => {
-          dismissPopup();
-          setActiveTab('deliveries');
-        }}
+        onAction={handleNotificationClick}
       />
 
       {/* Embedded Stripe Elements Modal for Outlet Requisition Invoice Payment */}

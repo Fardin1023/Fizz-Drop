@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { getNotificationDestination } from '../../utils/notificationRouter';
 import { useNotifications } from '../../hooks/useNotifications';
 import { NotificationDropdown } from '../../components/Notifications/NotificationDropdown';
 import { NotificationPopup } from '../../components/Notifications/NotificationPopup';
@@ -75,9 +77,39 @@ interface PsrData {
 
 export default function PsrDashboard() {
   const { user, isPsr, loginAsPsr, logout } = useAuth();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const validTabs = ['outlets', 'orders', 'refunds', 'visits'];
+  const initialTab = (searchParams.get('tab') as any) || 'outlets';
+  const [activeTab, setActiveTab] = useState<'outlets' | 'orders' | 'refunds' | 'visits'>(
+    validTabs.includes(initialTab) ? initialTab : 'outlets'
+  );
+
+  useEffect(() => {
+    const t = searchParams.get('tab') as any;
+    if (t && validTabs.includes(t) && t !== activeTab) {
+      setActiveTab(t);
+    }
+  }, [searchParams]);
+
+  const handleTabChange = (newTab: any) => {
+    setActiveTab(newTab);
+    setSearchParams({ tab: newTab }, { replace: true });
+  };
+
+  const handleNotificationClick = (n: any) => {
+    if (!n) return;
+    if (n.id) markAsRead(n.id);
+    const dest = getNotificationDestination(n, 'PSR');
+    if (dest.path === '/psr' && validTabs.includes(dest.tab)) {
+      handleTabChange(dest.tab);
+    } else {
+      navigate(dest.fullUrl);
+    }
+  };
   const [data, setData] = useState<PsrData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [activeTab, setActiveTab] = useState<'outlets' | 'orders' | 'refunds' | 'visits'>('outlets');
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [allPsrs, setAllPsrs] = useState<any[]>([]);
 
@@ -424,7 +456,7 @@ export default function PsrDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-zinc-950 text-slate-800 dark:text-zinc-100 flex flex-col font-sans transition-colors">
-      <NotificationPopup notification={popupNotification} onDismiss={dismissPopup} />
+      <NotificationPopup notification={popupNotification} onDismiss={dismissPopup} onAction={handleNotificationClick} />
 
       {/* Top Navigation Bar */}
       <header className="sticky top-0 z-40 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md border-b border-slate-200 dark:border-zinc-800 px-4 sm:px-6 py-3 shadow-sm">
@@ -488,7 +520,7 @@ export default function PsrDashboard() {
               onMarkAllAsRead={markAllAsRead}
               onDeleteNotification={deleteNotification}
               onClearOldNotifications={clearOldNotifications}
-              onSelectNotification={() => setActiveTab('orders')}
+              onSelectNotification={handleNotificationClick}
               isScrolled={true}
             />
 
@@ -612,7 +644,7 @@ export default function PsrDashboard() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-zinc-800 pb-3">
           <div className="flex items-center gap-1.5 overflow-x-auto">
             <button
-              onClick={() => setActiveTab('outlets')}
+              onClick={() => handleTabChange('outlets')}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition ${
                 activeTab === 'outlets'
                   ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20'
@@ -623,7 +655,7 @@ export default function PsrDashboard() {
               Sub-Route Outlets ({data?.outlets?.length || 0})
             </button>
             <button
-              onClick={() => setActiveTab('orders')}
+              onClick={() => handleTabChange('orders')}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition ${
                 activeTab === 'orders'
                   ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20'
@@ -634,7 +666,7 @@ export default function PsrDashboard() {
               Field Orders ({data?.orders?.length || 0})
             </button>
             <button
-              onClick={() => setActiveTab('refunds')}
+              onClick={() => handleTabChange('refunds')}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition ${
                 activeTab === 'refunds'
                   ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20'
@@ -645,7 +677,7 @@ export default function PsrDashboard() {
               Refund Requests ({data?.refunds?.length || 0})
             </button>
             <button
-              onClick={() => setActiveTab('visits')}
+              onClick={() => handleTabChange('visits')}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition ${
                 activeTab === 'visits'
                   ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20'
@@ -686,7 +718,7 @@ export default function PsrDashboard() {
         {activeTab === 'outlets' && (
           <div className="space-y-4">
             {/* Sales Officer Allotted Target Card */}
-            {data?.psr?.target_cases > 0 && (
+            {Boolean(data && data.psr && (data.psr.target_cases || 0) > 0) && data && (
               <div className="bg-gradient-to-r from-amber-500 via-orange-600 to-amber-600 text-white rounded-2xl p-4 sm:p-5 shadow-sm space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex items-center gap-3">

@@ -29,14 +29,44 @@ import {
   Wallet,
   Users,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { getNotificationDestination } from '../../utils/notificationRouter';
 import { useNotifications } from '../../hooks/useNotifications';
 import { NotificationDropdown } from '../../components/Notifications/NotificationDropdown';
 import { NotificationPopup } from '../../components/Notifications/NotificationPopup';
 
 export const AdminDashboard: React.FC = () => {
   const { user, isSupplier, isSuperadmin, isAuthenticated, logout, isLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<'catalog' | 'outlet-requests' | 'stock-sales-dispatch' | 'request' | 'history' | 'outlets' | 'profile' | 'transactions'>('catalog');
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = (searchParams.get('tab') as any) || 'catalog';
+  const validTabs = ['catalog', 'outlet-requests', 'stock-sales-dispatch', 'request', 'history', 'outlets', 'profile', 'transactions'];
+  const [activeTab, setActiveTab] = useState<'catalog' | 'outlet-requests' | 'stock-sales-dispatch' | 'request' | 'history' | 'outlets' | 'profile' | 'transactions'>(
+    validTabs.includes(initialTab) ? initialTab : 'catalog'
+  );
+
+  useEffect(() => {
+    const t = searchParams.get('tab') as any;
+    if (t && validTabs.includes(t) && t !== activeTab) {
+      setActiveTab(t);
+    }
+  }, [searchParams]);
+
+  const handleTabChange = (newTab: any) => {
+    setActiveTab(newTab);
+    setSearchParams({ tab: newTab }, { replace: true });
+  };
+
+  const handleNotificationClick = (n: any) => {
+    if (!n) return;
+    if (n.id) markAsRead(n.id);
+    const dest = getNotificationDestination(n, 'SUPPLIER');
+    if (dest.path === '/admin' && validTabs.includes(dest.tab)) {
+      handleTabChange(dest.tab);
+    } else {
+      navigate(dest.fullUrl);
+    }
+  };
   const [selectedProductId, setSelectedProductId] = useState<number | undefined>(undefined);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [walletBalance, setWalletBalance] = useState<number>(() => {
@@ -193,13 +223,7 @@ export const AdminDashboard: React.FC = () => {
       <NotificationPopup
         notification={popupNotification}
         onDismiss={dismissPopup}
-        onAction={() => {
-          if (popupNotification?.type === 'SO_STOCK_REQUEST_FOR_OUTLET') {
-            setActiveTab('outlet-requests');
-          } else {
-            setActiveTab('history');
-          }
-        }}
+        onAction={handleNotificationClick}
       />
 
       {/* Top Admin Sub-Header (Ultra-Compact, Fixed at Top & Static) */}
@@ -264,7 +288,7 @@ export const AdminDashboard: React.FC = () => {
                 onMarkAllAsRead={markAllAsRead}
                 onDeleteNotification={deleteNotification}
                 onClearOldNotifications={clearOldNotifications}
-                onSelectNotification={() => setActiveTab('history')}
+                onSelectNotification={handleNotificationClick}
                 isScrolled={true}
               />
 
@@ -322,7 +346,7 @@ export const AdminDashboard: React.FC = () => {
                 return (
                   <button
                     key={item.id}
-                    onClick={() => setActiveTab(item.id)}
+                    onClick={() => handleTabChange(item.id)}
                     title={isSidebarCollapsed ? `${item.label} - ${item.desc}` : undefined}
                     className={`group relative flex items-center text-left transition-all duration-200 cursor-pointer rounded-xl ${
                       isSidebarCollapsed

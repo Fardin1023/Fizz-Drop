@@ -36,14 +36,44 @@ import {
   UserCheck,
   Store,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { getNotificationDestination } from '../../utils/notificationRouter';
 import { useNotifications } from '../../hooks/useNotifications';
 import { NotificationDropdown } from '../../components/Notifications/NotificationDropdown';
 import { NotificationPopup } from '../../components/Notifications/NotificationPopup';
 
 export const SuperadminDashboard: React.FC = () => {
   const { user, isSuperadmin, isAuthenticated, logout, isLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<'products' | 'merchandise' | 'requisitions' | 'suppliers' | 'sales-officers' | 'psr-officers' | 'logs' | 'tables' | 'outlets' | 'inventory' | 'query'>('products');
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const validTabs = ['products', 'merchandise', 'requisitions', 'suppliers', 'sales-officers', 'psr-officers', 'logs', 'tables', 'outlets', 'inventory', 'query'];
+  const initialTab = (searchParams.get('tab') as any) || 'products';
+  const [activeTab, setActiveTab] = useState<'products' | 'merchandise' | 'requisitions' | 'suppliers' | 'sales-officers' | 'psr-officers' | 'logs' | 'tables' | 'outlets' | 'inventory' | 'query'>(
+    validTabs.includes(initialTab) ? initialTab : 'products'
+  );
+
+  useEffect(() => {
+    const t = searchParams.get('tab') as any;
+    if (t && validTabs.includes(t) && t !== activeTab) {
+      setActiveTab(t);
+    }
+  }, [searchParams]);
+
+  const handleTabChange = (newTab: any) => {
+    setActiveTab(newTab);
+    setSearchParams({ tab: newTab }, { replace: true });
+  };
+
+  const handleNotificationClick = (n: any) => {
+    if (!n) return;
+    if (n.id) markAsRead(n.id);
+    const dest = getNotificationDestination(n, 'SUPERADMIN');
+    if (dest.path === '/superadmin' && validTabs.includes(dest.tab)) {
+      handleTabChange(dest.tab);
+    } else {
+      navigate(dest.fullUrl);
+    }
+  };
   const [consoleInitialQuery, setConsoleInitialQuery] = useState<string>('SELECT * FROM Outlets LIMIT 25;');
   const [isDbConfigOpen, setIsDbConfigOpen] = useState(false);
   const [dbStatus, setDbStatus] = useState<any>(null);
@@ -211,7 +241,7 @@ export const SuperadminDashboard: React.FC = () => {
       <NotificationPopup
         notification={popupNotification}
         onDismiss={dismissPopup}
-        onAction={() => setActiveTab('requisitions')}
+        onAction={handleNotificationClick}
       />
 
       {/* Security-Developer Dot-Matrix Subtle Technical Grid Background */}
@@ -308,7 +338,7 @@ export const SuperadminDashboard: React.FC = () => {
                 onMarkAllAsRead={markAllAsRead}
                 onDeleteNotification={deleteNotification}
                 onClearOldNotifications={clearOldNotifications}
-                onSelectNotification={() => setActiveTab('requisitions')}
+                onSelectNotification={handleNotificationClick}
                 isScrolled={true}
               />
 

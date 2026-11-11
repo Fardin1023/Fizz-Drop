@@ -11,6 +11,7 @@ import {
   PackageCheck,
 } from 'lucide-react';
 import type { AppNotification } from '../../types/notification';
+import { getNotificationDestination } from '../../utils/notificationRouter';
 
 interface NotificationPopupProps {
   notification: AppNotification | null;
@@ -60,6 +61,7 @@ export const NotificationPopup: React.FC<NotificationPopupProps> = ({
   const isRejected = notification.type === 'REJECTED';
   const isNewReq = notification.type === 'NEW_REQUISITION';
   const isSOReq = notification.type === 'SALES_OFFICER_REQUISITION';
+  const destination = getNotificationDestination(notification);
 
   // Format relative time
   const getTimeString = () => {
@@ -198,7 +200,7 @@ export const NotificationPopup: React.FC<NotificationPopupProps> = ({
             }}
             className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-blue-500/20 hover:opacity-95 active:scale-95 transition-all cursor-pointer"
           >
-            <span>{isSuperadminRecipient ? 'Review Ticket' : 'View Requisitions'}</span>
+            <span>Open {destination.label}</span>
             <ExternalLink className="w-3.5 h-3.5" />
           </button>
         </div>
