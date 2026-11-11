@@ -798,6 +798,7 @@ public class RequisitionProcessingService {
                 it.setPackaging(prod.getPackaging());
                 it.setSizeVolume(prod.getSizeVolume());
                 it.setSku(prod.getSku());
+                it.setCategory(prod.getCategory() != null ? prod.getCategory() : "Beverages");
                 it.setBasePrice(prod.getBasePrice());
                 it.setImageUrl(prod.getImageUrl());
             });
@@ -1203,6 +1204,7 @@ public class RequisitionProcessingService {
                     i.setPackaging(p.getPackaging());
                     i.setSizeVolume(p.getSizeVolume());
                     i.setSku(p.getSku());
+                    i.setCategory(p.getCategory() != null ? p.getCategory() : "Beverages");
                     java.math.BigDecimal supplierRate = p.getSupplierPrice() != null ? p.getSupplierPrice() : p.getBasePrice();
                     i.setBasePrice(supplierRate);
 
@@ -1323,6 +1325,7 @@ public class RequisitionProcessingService {
                 i.setPackaging(p.getPackaging());
                 i.setSizeVolume(p.getSizeVolume());
                 i.setSku(p.getSku());
+                i.setCategory(p.getCategory() != null ? p.getCategory() : "Beverages");
                 java.math.BigDecimal supplierRate = p.getSupplierPrice() != null ? p.getSupplierPrice() : p.getBasePrice();
                 i.setBasePrice(supplierRate);
 

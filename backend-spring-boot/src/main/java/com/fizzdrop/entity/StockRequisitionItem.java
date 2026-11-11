@@ -63,6 +63,10 @@ public class StockRequisitionItem {
     private String imageUrl;
 
     @Transient
+    @JsonProperty("category")
+    private String category;
+
+    @Transient
     @JsonProperty("regional_stock")
     private Integer regionalStock = 0;
 
@@ -114,6 +118,9 @@ public class StockRequisitionItem {
 
     public String getImageUrl() { return imageUrl; }
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
+
+    public String getCategory() { return category; }
+    public void setCategory(String category) { this.category = category; }
 
     public Integer getRegionalStock() { return regionalStock; }
     public void setRegionalStock(Integer regionalStock) { this.regionalStock = regionalStock; }

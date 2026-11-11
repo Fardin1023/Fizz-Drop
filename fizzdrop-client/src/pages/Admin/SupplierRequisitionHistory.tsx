@@ -30,6 +30,7 @@ export interface RequisitionItemRecord {
   approved_quantity: number;
   brand?: string;
   flavor_variant?: string;
+  category?: string;
   packaging?: string;
   size_volume?: string;
   sku?: string;
@@ -76,6 +77,7 @@ export interface OutletDispatchRecord {
   franchise_name?: string;
   product_id?: number;
   product_name?: string;
+  category?: string;
   quantity: number;
   unit_price: number;
   total_amount: number;
@@ -457,6 +459,11 @@ export const SupplierRequisitionHistory: React.FC<SupplierRequisitionHistoryProp
                           <span className="font-bold text-slate-900 block">
                             {od.product_name || 'Beverage Case'}
                           </span>
+                          {od.category && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 inline-block mt-0.5">
+                              {od.category}
+                            </span>
+                          )}
                         </td>
 
                         <td className="py-3.5 px-4 text-center">
@@ -575,6 +582,18 @@ export const SupplierRequisitionHistory: React.FC<SupplierRequisitionHistoryProp
                       <span className="font-mono font-bold text-xs text-zinc-900 block">
                         {req.items?.length || 0} lines
                       </span>
+                      {req.items && req.items.length > 0 && (
+                        <div className="flex flex-wrap gap-1 justify-center my-1">
+                          {Array.from(new Set(req.items.map((i) => i.category).filter(Boolean))).map((cat, cIdx) => (
+                            <span
+                              key={cIdx}
+                              className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200"
+                            >
+                              {cat}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                       {req.due_amount !== undefined && req.due_amount > 0 ? (
                         <div className="space-y-0.5">
                           <span className="text-[11px] font-mono font-bold text-indigo-700 block bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
@@ -803,9 +822,16 @@ export const SupplierRequisitionHistory: React.FC<SupplierRequisitionHistoryProp
                       return (
                         <tr key={item.id || idx}>
                           <td className="py-2.5 px-3">
-                            <span className="font-bold text-zinc-900 block font-oswald text-xs">
-                              {item.brand ? `${item.brand} ${item.flavor_variant || ''}` : `Product #${item.product_id}`}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-zinc-900 block font-oswald text-xs">
+                                {item.brand ? `${item.brand} ${item.flavor_variant || ''}` : `Product #${item.product_id}`}
+                              </span>
+                              {item.category && (
+                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                  {item.category}
+                                </span>
+                              )}
+                            </div>
                             <span className="text-[10px] text-slate-400 font-mono">
                               SKU: {item.sku || `FD-${item.product_id}`} • {item.packaging || 'Case'} ({item.size_volume || '500ml'})
                             </span>

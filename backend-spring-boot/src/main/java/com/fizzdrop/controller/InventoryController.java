@@ -1028,14 +1028,22 @@ public class InventoryController {
         try {
             list = jdbcTemplate.queryForList(
                 "SELECT r.id, r.requisition_code, r.outlet_id, r.product_id, r.product_name, " +
+                "COALESCE(p.category, 'Beverages') AS category, " +
                 "r.quantity, r.unit_price, r.total_amount, r.urgency, r.status, r.sales_officer_id, r.outlet_remarks, r.created_date, r.updated_date, " +
                 "o.outlet_name, o.franchise_name, o.branch_name, o.city, o.area, o.location_address, o.contact_phone, o.district_id " +
                 "FROM outlet_requisitions r " +
                 "JOIN outlets o ON r.outlet_id = o.outlet_id " +
+                "LEFT JOIN products p ON r.product_id = p.product_id " +
                 "ORDER BY r.created_date DESC LIMIT 100"
             );
         } catch (Exception e) {
             return ResponseEntity.ok(Collections.emptyList());
+        }
+
+        List<DistrictInventory> allDistInvs = districtInventoryRepository.findAll();
+        Map<String, Integer> distStockMap = new HashMap<>();
+        for (DistrictInventory di : allDistInvs) {
+            distStockMap.put(di.getDistrictId() + "_" + di.getProductId(), di.getCurrentStock());
         }
 
         List<SalesOfficer> officers = (sp != null) ? salesOfficerRepository.findBySupplierId(sp.getId()) : Collections.emptyList();
@@ -1051,8 +1059,7 @@ public class InventoryController {
             // Calculate supplier's available depot stock for this product
             int availableStock = 0;
             for (Long distId : districtIds) {
-                var di = districtInventoryRepository.findByDistrictIdAndProductId(distId, prodId);
-                availableStock += di.map(DistrictInventory::getCurrentStock).orElse(0);
+                availableStock += distStockMap.getOrDefault(distId + "_" + prodId, 0);
             }
             map.put("supplier_available_stock", availableStock);
 
@@ -1405,13 +1412,85 @@ public class InventoryController {
                 ? Math.min(100.0, ((double) totalDispatchedUnits / totalSoldUnits) * 100.0) 
                 : 0.0;
 
-            // 8. Product-wise Sold vs Dispatched
+            // 8. Superadmin Purchased Stock Calculation for Supplier
+            Map<Long, Integer> districtStockMap = districtInventoryRepository.findByDistrictId(districtId).stream()
+                    .collect(Collectors.toMap(DistrictInventory::getProductId, DistrictInventory::getCurrentStock, (a, b) -> a));
+
+            Map<Long, Integer> superadminPurchasedMap = new HashMap<>();
+            Map<Long, BigDecimal> superadminPurchasedValueMap = new HashMap<>();
+            if (supplier != null) {
+                try {
+                    List<Map<String, Object>> superadminOrders = jdbcTemplate.queryForList(
+                        "SELECT sri.product_id, " +
+                        "COALESCE(SUM(CASE WHEN sri.approved_quantity > 0 THEN sri.approved_quantity ELSE sri.requested_quantity END), 0) AS total_cases, " +
+                        "COALESCE(SUM((CASE WHEN sri.approved_quantity > 0 THEN sri.approved_quantity ELSE sri.requested_quantity END) * COALESCE(p.supplier_price, p.base_price, 35)), 0) AS total_val " +
+                        "FROM stock_requisition_items sri " +
+                        "JOIN stock_requisitions sr ON sri.requisition_id = sr.id " +
+                        "LEFT JOIN products p ON sri.product_id = p.product_id " +
+                        "WHERE sr.supplier_id = ? AND sr.status IN ('APPROVED', 'COMPLETED', 'DISPATCHED') " +
+                        "GROUP BY sri.product_id",
+                        supplier.getId()
+                    );
+                    for (Map<String, Object> row : superadminOrders) {
+                        Long pid = ((Number) row.get("product_id")).longValue();
+                        int cases = ((Number) row.get("total_cases")).intValue();
+                        BigDecimal val = new BigDecimal(row.get("total_val").toString());
+                        superadminPurchasedMap.put(pid, cases);
+                        superadminPurchasedValueMap.put(pid, val);
+                    }
+                } catch (Exception ex) {
+                    System.err.println("[InventoryController] Failed to query superadmin purchased stock: " + ex.getMessage());
+                }
+            }
+
+            // Build Superadmin Purchased Inventory breakdown
+            List<Map<String, Object>> superadminPurchasedInventory = new ArrayList<>();
+            int totalPurchasedFromSuperadminCases = 0;
+            BigDecimal totalPurchasedFromSuperadminValue = BigDecimal.ZERO;
+            int currentTotalDepotStock = 0;
+            Map<String, Integer> categoryPurchasedCases = new LinkedHashMap<>();
+            Map<String, Integer> categoryDepotStock = new LinkedHashMap<>();
+
+            for (Product p : products) {
+                int purchased = superadminPurchasedMap.getOrDefault(p.getProductId(), 0);
+                int depotStock = districtStockMap.getOrDefault(p.getProductId(), 0);
+                String cat = p.getCategory() != null && !p.getCategory().trim().isEmpty() ? p.getCategory().trim() : "Beverages";
+
+                Map<String, Object> item = new HashMap<>();
+                item.put("product_id", p.getProductId());
+                item.put("brand", p.getBrand());
+                item.put("flavor_variant", p.getFlavorVariant());
+                item.put("product_name", p.getBrand() + " " + (p.getFlavorVariant() != null ? p.getFlavorVariant() : ""));
+                item.put("category", cat);
+                item.put("sku", p.getSku());
+                item.put("packaging", p.getPackaging());
+                item.put("size_volume", p.getSizeVolume());
+                item.put("image_url", p.getImageUrl());
+                BigDecimal unitPrice = p.getSupplierPrice() != null ? p.getSupplierPrice() : (p.getBasePrice() != null ? p.getBasePrice() : BigDecimal.valueOf(35));
+                item.put("unit_price", unitPrice);
+                item.put("purchased_stock", purchased);
+                item.put("current_depot_stock", depotStock);
+                BigDecimal itemTotal = unitPrice.multiply(BigDecimal.valueOf(purchased));
+                item.put("total_purchase_value", itemTotal);
+
+                superadminPurchasedInventory.add(item);
+
+                totalPurchasedFromSuperadminCases += purchased;
+                totalPurchasedFromSuperadminValue = totalPurchasedFromSuperadminValue.add(itemTotal);
+                currentTotalDepotStock += depotStock;
+
+                categoryPurchasedCases.put(cat, categoryPurchasedCases.getOrDefault(cat, 0) + purchased);
+                categoryDepotStock.put(cat, categoryDepotStock.getOrDefault(cat, 0) + depotStock);
+            }
+
+            // 9. Product-wise Sold vs Dispatched
             Map<Long, Map<String, Object>> prodStats = new LinkedHashMap<>();
             for (Product p : products) {
                 Map<String, Object> pm = new HashMap<>();
                 pm.put("product_id", p.getProductId());
                 pm.put("brand", p.getBrand());
                 pm.put("flavor_variant", p.getFlavorVariant());
+                pm.put("category", p.getCategory() != null && !p.getCategory().trim().isEmpty() ? p.getCategory().trim() : "Beverages");
                 pm.put("product_name", p.getBrand() + " " + (p.getFlavorVariant() != null ? p.getFlavorVariant() : ""));
                 pm.put("sku", p.getSku());
                 pm.put("image_url", p.getImageUrl());
@@ -1422,8 +1501,10 @@ public class InventoryController {
                 pm.put("remaining_quantity", 0);
                 pm.put("fulfillment_pct", 0.0);
 
-                var diOpt = districtInventoryRepository.findByDistrictIdAndProductId(districtId, p.getProductId());
-                pm.put("depot_stock", diOpt.map(DistrictInventory::getCurrentStock).orElse(0));
+                int depotStock = districtStockMap.getOrDefault(p.getProductId(), 0);
+                int superadminPurchased = superadminPurchasedMap.getOrDefault(p.getProductId(), 0);
+                pm.put("depot_stock", depotStock);
+                pm.put("superadmin_purchased_stock", superadminPurchased);
 
                 prodStats.put(p.getProductId(), pm);
             }
@@ -1538,10 +1619,20 @@ public class InventoryController {
             summary.put("total_dispatched_value", totalDispatchedValue);
             summary.put("pending_outlet_dispatch_units", pendingOutletDispatchUnits);
             summary.put("fulfillment_rate_pct", Math.round(fulfillmentRate * 10.0) / 10.0);
+            summary.put("total_purchased_from_superadmin_cases", totalPurchasedFromSuperadminCases);
+            summary.put("total_purchased_from_superadmin_value", totalPurchasedFromSuperadminValue);
+            summary.put("current_total_depot_stock", currentTotalDepotStock);
+            summary.put("categories_count", categoryPurchasedCases.size());
 
             Map<String, Object> response = new HashMap<>();
             response.put("summary", summary);
             response.put("product_breakdown", productBreakdown);
+            response.put("superadmin_purchased_inventory", superadminPurchasedInventory);
+            response.put("category_breakdown", categoryPurchasedCases.entrySet().stream().map(e -> Map.of(
+                "category", e.getKey(),
+                "total_purchased_cases", e.getValue(),
+                "current_depot_stock", categoryDepotStock.getOrDefault(e.getKey(), 0)
+            )).toList());
             response.put("officer_breakdown", officerBreakdown);
             response.put("recent_dispatches", distributions);
             response.put("dispatched_psr_orders", psrDispatchedOrders);

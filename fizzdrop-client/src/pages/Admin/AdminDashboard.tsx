@@ -438,6 +438,10 @@ export const AdminDashboard: React.FC = () => {
             <SupplierStockSalesTracking
               userId={user?.user_id || 4}
               onNavigateToRequisitions={() => setActiveTab('outlet-requests')}
+              onRequestStock={(prodId) => {
+                setSelectedProductId(prodId);
+                setActiveTab('request');
+              }}
             />
           )}
           {activeTab === 'request' && (

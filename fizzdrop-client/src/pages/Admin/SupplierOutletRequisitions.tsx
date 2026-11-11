@@ -37,6 +37,7 @@ export interface OutletRequisitionItem {
   contact_phone?: string;
   product_id: number;
   product_name: string;
+  category?: string;
   quantity: number;
   urgency: string; // 'NORMAL' | 'HIGH' | 'CRITICAL'
   status: string; // 'PENDING' | 'DISPATCHED' | 'COMPLETED' | 'REJECTED'
@@ -76,6 +77,7 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
   const [loading, setLoading] = useState<boolean>(true);
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'PENDING' | 'DISPATCHED'>('ALL');
   const [filterUrgency, setFilterUrgency] = useState<string>('ALL');
+  const [filterCategory, setFilterCategory] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   // Dispatch Action Modal State
@@ -354,6 +356,11 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
     }
   };
 
+  // Unique categories
+  const categories = useMemo(() => {
+    return ['ALL', ...(Array.from(new Set(requisitions.map((r) => r.category).filter(Boolean))) as string[])];
+  }, [requisitions]);
+
   // Filtered List
   const filteredRequisitions = useMemo(() => {
     return requisitions.filter((r) => {
@@ -364,6 +371,10 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
 
       const matchesUrgency = filterUrgency === 'ALL' || r.urgency === filterUrgency;
 
+      const matchesCategory =
+        filterCategory === 'ALL' ||
+        (r.category && r.category.toLowerCase() === filterCategory.toLowerCase());
+
       const q = searchQuery.toLowerCase();
       const matchesSearch =
         searchQuery === '' ||
@@ -372,11 +383,12 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
         r.franchise_name?.toLowerCase().includes(q) ||
         r.branch_name?.toLowerCase().includes(q) ||
         r.product_name?.toLowerCase().includes(q) ||
+        r.category?.toLowerCase().includes(q) ||
         r.city?.toLowerCase().includes(q);
 
-      return matchesStatus && matchesUrgency && matchesSearch;
+      return matchesStatus && matchesUrgency && matchesCategory && matchesSearch;
     });
-  }, [requisitions, filterStatus, filterUrgency, searchQuery]);
+  }, [requisitions, filterStatus, filterUrgency, filterCategory, searchQuery]);
 
   // KPIs
   const pendingCount = requisitions.filter((r) => r.status === 'PENDING').length;
@@ -553,6 +565,27 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
             </button>
           ))}
         </div>
+
+        {/* Product Category Filter Chips */}
+        {categories.length > 1 && (
+          <div className="flex items-center flex-wrap gap-1.5 pt-2 border-t border-slate-100">
+            <span className="text-[10px] uppercase font-bold text-slate-400 mr-1">Category:</span>
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setFilterCategory(cat)}
+                className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  filterCategory === cat
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/60'
+                }`}
+              >
+                {cat === 'ALL' ? 'All Categories' : cat}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Requisitions List */}
@@ -678,9 +711,14 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-2 text-sm text-slate-800 font-bold mt-1">
+                    <div className="flex flex-wrap items-center gap-2 text-sm text-slate-800 font-bold mt-1">
                       <Package className="w-4 h-4 text-blue-600 shrink-0" />
                       <span>{req.product_name}</span>
+                      {req.category && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                          {req.category}
+                        </span>
+                      )}
                       <span className="text-slate-400 font-normal">•</span>
                       <span className="font-mono text-blue-700 font-black text-base">
                         {req.quantity} units requested
@@ -751,39 +789,60 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
                       </p>
                     </div>
                   ) : (
-                    /* For Outlet Requisitions: Dispatched strictly from SO Purchased Stock */
-                    <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 text-right min-w-[210px]">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                        SO Purchased Buffer Stock
-                      </p>
-                      <div className="flex items-baseline justify-end gap-1.5 mt-0.5">
-                        <span
-                          className={`text-2xl font-black font-mono ${
-                            (req.so_purchased_stock ?? 0) >= req.quantity
-                              ? 'text-emerald-700'
-                              : (req.so_purchased_stock ?? 0) > 0
-                              ? 'text-amber-600'
-                              : 'text-rose-600'
-                          }`}
-                        >
-                          {req.so_purchased_stock ?? 0}
-                        </span>
-                        <span className="text-xs text-slate-500 font-medium">cases</span>
+                    /* For Outlet Requisitions: Dispatched strictly from SO Purchased Stock with Depot Stock Context */
+                    <div className="flex items-center gap-2">
+                      <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 text-right min-w-[140px]">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                          Your Depot Stock
+                        </p>
+                        <div className="flex items-baseline justify-end gap-1.5 mt-0.5">
+                          <span
+                            className={`text-lg font-black font-mono ${
+                              req.supplier_available_stock <= 0
+                                ? 'text-rose-600'
+                                : 'text-slate-800'
+                            }`}
+                          >
+                            {req.supplier_available_stock}
+                          </span>
+                          <span className="text-xs text-slate-500 font-medium">cases</span>
+                        </div>
+                        <p className="text-[9px] text-slate-400">From Superadmin</p>
                       </div>
-                      {(req.so_purchased_stock ?? 0) >= req.quantity ? (
-                        <p className="text-[10px] font-bold text-emerald-700 flex items-center justify-end gap-1 mt-0.5">
-                          <CheckCircle className="w-3 h-3 text-emerald-600" />
-                          <span>Ready to Dispatch ({req.quantity} req)</span>
+
+                      <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 text-right min-w-[190px]">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                          SO Purchased Buffer Stock
                         </p>
-                      ) : (
-                        <p className="text-[10px] font-bold text-amber-700 flex items-center justify-end gap-1 mt-0.5">
-                          <AlertCircle className="w-3 h-3 text-amber-600" />
-                          <span>SO holds {req.so_purchased_stock ?? 0}/{req.quantity} cases</span>
+                        <div className="flex items-baseline justify-end gap-1.5 mt-0.5">
+                          <span
+                            className={`text-2xl font-black font-mono ${
+                              (req.so_purchased_stock ?? 0) >= req.quantity
+                                ? 'text-emerald-700'
+                                : (req.so_purchased_stock ?? 0) > 0
+                                ? 'text-amber-600'
+                                : 'text-rose-600'
+                            }`}
+                          >
+                            {req.so_purchased_stock ?? 0}
+                          </span>
+                          <span className="text-xs text-slate-500 font-medium">cases</span>
+                        </div>
+                        {(req.so_purchased_stock ?? 0) >= req.quantity ? (
+                          <p className="text-[10px] font-bold text-emerald-700 flex items-center justify-end gap-1 mt-0.5">
+                            <CheckCircle className="w-3 h-3 text-emerald-600" />
+                            <span>Ready to Dispatch ({req.quantity} req)</span>
+                          </p>
+                        ) : (
+                          <p className="text-[10px] font-bold text-amber-700 flex items-center justify-end gap-1 mt-0.5">
+                            <AlertCircle className="w-3 h-3 text-amber-600" />
+                            <span>SO holds {req.so_purchased_stock ?? 0}/{req.quantity} cases</span>
+                          </p>
+                        )}
+                        <p className="text-[9px] text-slate-400 mt-1 truncate max-w-[180px]">
+                          SO: <strong className="text-slate-600">{req.sales_officer_name || 'Assigned Officer'}</strong>
                         </p>
-                      )}
-                      <p className="text-[9px] text-slate-400 mt-1 truncate max-w-[200px]">
-                        SO: <strong className="text-slate-600">{req.sales_officer_name || 'Assigned Officer'}</strong>
-                      </p>
+                      </div>
                     </div>
                   )}
 
@@ -900,7 +959,14 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
               <div className="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-800/60 border border-slate-200/80 dark:border-zinc-700/80 space-y-2.5">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400">Beverage Item</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400">Beverage Item</span>
+                      {fulfillModalReq.category && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                          {fulfillModalReq.category}
+                        </span>
+                      )}
+                    </div>
                     <h4 className="font-black text-base text-slate-900 dark:text-white">{fulfillModalReq.product_name}</h4>
                   </div>
                   <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${
