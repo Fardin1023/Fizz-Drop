@@ -239,6 +239,16 @@ public class InventoryController {
                     "UPDATE outlet_requisitions SET status = 'DISPATCHED', quantity = ?, unit_price = ?, total_amount = ?, updated_date = NOW() WHERE id = ?",
                     req.getQuantity(), finalUnitPrice, finalTotal, req.getRequisitionId()
                 );
+
+                // Update corresponding PSR order status to DISPATCHED
+                try {
+                    jdbcTemplate.update(
+                        "UPDATE psr_orders SET status = 'DISPATCHED', updated_at = NOW() WHERE order_code = ? OR (outlet_id = ? AND product_id = ? AND status IN ('SUBMITTED_TO_SO', 'REQUESTED_FROM_SUPPLIER', 'APPROVED_BY_SO'))",
+                        dispatchRefCode, outlet.getOutletId(), product.getProductId()
+                    );
+                } catch (Exception ex) {
+                    System.err.println("[InventoryController] Failed to update psr_orders status: " + ex.getMessage());
+                }
             } catch (Exception ignored) {}
         } else {
             // Auto-log direct unrequested shipment in deliveries ledger so the outlet has a permanent audit trail
@@ -267,17 +277,64 @@ public class InventoryController {
             } catch (Exception ignored) {}
         }
 
-        // Create real-time notification for Sales Officer confirming stock purchase and monthly budget deduction
+        // Record Sales Officer Profit & Distribution Ledger when Supplier dispatches to outlet from SO purchased stock
+        BigDecimal soCostPrice = product.getSupplierPrice() != null ? product.getSupplierPrice() : BigDecimal.valueOf(35);
+        BigDecimal soSalePrice = product.getOutletPrice() != null ? product.getOutletPrice() : soCostPrice.multiply(BigDecimal.valueOf(1.15));
+        BigDecimal finalUnitPriceCalc = product.getOutletPrice() != null ? product.getOutletPrice() : (product.getBasePrice() != null ? product.getBasePrice() : BigDecimal.ZERO);
+        if (finalUnitPriceCalc.compareTo(BigDecimal.ZERO) > 0) {
+            soSalePrice = finalUnitPriceCalc;
+        }
+        BigDecimal soTotalCost = soCostPrice.multiply(BigDecimal.valueOf(req.getQuantity()));
+        BigDecimal soTotalRevenue = soSalePrice.multiply(BigDecimal.valueOf(req.getQuantity()));
+        BigDecimal soProfitEarned = soTotalRevenue.subtract(soTotalCost);
+
         if (targetOfficer != null) {
             try {
-                BigDecimal finalUnitPrice = product.getOutletPrice() != null ? product.getOutletPrice() : (product.getBasePrice() != null ? product.getBasePrice() : BigDecimal.ZERO);
-                BigDecimal totalSpent = finalUnitPrice.multiply(BigDecimal.valueOf(req.getQuantity()));
+                List<Map<String, Object>> existingDist = jdbcTemplate.queryForList(
+                    "SELECT id FROM sales_officer_distributions WHERE notes LIKE ?",
+                    "%" + dispatchRefCode + "%"
+                );
+                if (existingDist.isEmpty()) {
+                    jdbcTemplate.update(
+                        "INSERT INTO sales_officer_distributions (sales_officer_id, outlet_id, product_id, quantity, cost_price, sale_price, total_cost, total_revenue, profit_earned, notes, distribution_date) " +
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())",
+                        targetOfficer.getId(), outlet.getOutletId(), product.getProductId(), req.getQuantity(),
+                        soCostPrice, soSalePrice, soTotalCost, soTotalRevenue, soProfitEarned,
+                        "Dispatched by Supplier from SO purchased stock to " + outlet.getOutletName() + " (" + dispatchRefCode + ")"
+                    );
+                }
+            } catch (Exception ex) {
+                System.err.println("[InventoryController] Failed to record sales_officer_distributions: " + ex.getMessage());
+            }
+
+            // Real-time notification for Sales Officer confirming stock dispatched to outlet by Supplier
+            try {
+                AppNotification soDispatchedNotif = new AppNotification();
+                soDispatchedNotif.setRecipientRole("SALES_OFFICER");
+                soDispatchedNotif.setRecipientUserId(targetOfficer.getUserId() != null ? targetOfficer.getUserId() : (100L + targetOfficer.getId()));
+                soDispatchedNotif.setTitle("Stock Dispatched by Supplier to " + outlet.getOutletName());
+                soDispatchedNotif.setMessage("Supplier has dispatched " + req.getQuantity() + " cases of " 
+                        + product.getBrand() + " " + product.getFlavorVariant() 
+                        + " to " + outlet.getOutletName() 
+                        + " from your purchased stock. Profit (+৳" + String.format(Locale.US, "%.2f", soProfitEarned.doubleValue()) 
+                        + ") credited to your wholesale ledger.");
+                soDispatchedNotif.setType("SUPPLIER_DISPATCHED_TO_OUTLET");
+                soDispatchedNotif.setReferenceCode(dispatchRefCode);
+                soDispatchedNotif.setReferenceId(targetOfficer.getId());
+                notificationRepository.save(soDispatchedNotif);
+            } catch (Exception ex) {
+                System.err.println("[InventoryController] Failed to create Sales Officer dispatched notification: " + ex.getMessage());
+            }
+
+            // Create notification for Sales Officer confirming stock purchase and monthly budget deduction
+            try {
+                BigDecimal totalSpent = finalUnitPriceCalc.multiply(BigDecimal.valueOf(req.getQuantity()));
                 AppNotification soNotif = new AppNotification();
                 soNotif.setRecipientRole("SALES_OFFICER");
-                soNotif.setRecipientUserId(targetOfficer.getUserId() != null ? targetOfficer.getUserId() : targetOfficer.getId());
+                soNotif.setRecipientUserId(targetOfficer.getUserId() != null ? targetOfficer.getUserId() : (100L + targetOfficer.getId()));
                 soNotif.setTitle("Stock Purchase Confirmed by Supplier");
                 soNotif.setMessage("Supplier approved and dispatched " + req.getQuantity() + " cases of " 
-                        + product.getBrand() + " " + product.getFlavorVariant() + " @ ৳" + String.format(Locale.US, "%.2f", finalUnitPrice.doubleValue()) 
+                        + product.getBrand() + " " + product.getFlavorVariant() + " @ ৳" + String.format(Locale.US, "%.2f", finalUnitPriceCalc.doubleValue()) 
                         + "/case. ৳" + String.format(Locale.US, "%.2f", totalSpent.doubleValue()) + " has been successfully purchased and deducted from your monthly budget target.");
                 soNotif.setType("SALES_OFFICER_PURCHASE_CONFIRMED");
                 soNotif.setReferenceCode(dispatchRefCode);
@@ -287,6 +344,33 @@ public class InventoryController {
                 System.err.println("[InventoryController] Failed to create Sales Officer notification: " + ex.getMessage());
             }
         }
+
+        // Notify PSR that Supplier has dispatched the order to outlet
+        try {
+            final String psrRefCode = dispatchRefCode;
+            final String psrOutletName = outlet != null ? outlet.getOutletName() : "Outlet";
+            final String psrBrandFlavor = product.getBrand() + " " + product.getFlavorVariant();
+            final int psrDispatchQty = req.getQuantity();
+            List<Map<String, Object>> psrList = jdbcTemplate.queryForList(
+                "SELECT psr_id FROM psr_orders WHERE order_code = ? LIMIT 1", psrRefCode
+            );
+            if (!psrList.isEmpty() && psrList.get(0).get("psr_id") != null) {
+                Long psrId = Long.parseLong(psrList.get(0).get("psr_id").toString());
+                psrRepository.findById(psrId).ifPresent(p -> {
+                    AppNotification psrNotif = new AppNotification();
+                    psrNotif.setRecipientRole("PSR");
+                    psrNotif.setRecipientUserId(p.getUserId() != null ? p.getUserId() : (200L + p.getId()));
+                    psrNotif.setTitle("Order " + psrRefCode + " Dispatched by Supplier");
+                    psrNotif.setMessage("Supplier has dispatched " + psrDispatchQty + " cases of " 
+                            + psrBrandFlavor 
+                            + " to " + psrOutletName + ".");
+                    psrNotif.setType("SUPPLIER_DISPATCHED_TO_OUTLET");
+                    psrNotif.setReferenceCode(psrRefCode);
+                    psrNotif.setReferenceId(p.getId());
+                    notificationRepository.save(psrNotif);
+                });
+            }
+        } catch (Exception ignored) {}
 
         // Record Wholesale Transaction for Supplier (Tier 2: Supplier sells to Sales Officer at outlet_price)
         final String finalRefCode = dispatchRefCode;
@@ -374,6 +458,8 @@ public class InventoryController {
             BigDecimal finalUnitPrice = product.getOutletPrice() != null ? product.getOutletPrice() : (product.getBasePrice() != null ? product.getBasePrice() : BigDecimal.ZERO);
             result.put("final_unit_price", finalUnitPrice);
             result.put("final_total_amount", finalUnitPrice.multiply(BigDecimal.valueOf(req.getQuantity())));
+            result.put("profit_earned", soProfitEarned);
+            result.put("reference_code", dispatchRefCode);
         }
 
         return ResponseEntity.ok(result);
@@ -850,7 +936,7 @@ public class InventoryController {
         try {
             list = jdbcTemplate.queryForList(
                 "SELECT r.id, r.requisition_code, r.outlet_id, r.product_id, r.product_name, " +
-                "r.quantity, r.unit_price, r.total_amount, r.urgency, r.status, r.outlet_remarks, r.created_date, r.updated_date, " +
+                "r.quantity, r.unit_price, r.total_amount, r.urgency, r.status, r.sales_officer_id, r.outlet_remarks, r.created_date, r.updated_date, " +
                 "o.outlet_name, o.franchise_name, o.branch_name, o.city, o.area, o.location_address, o.contact_phone, o.district_id " +
                 "FROM outlet_requisitions r " +
                 "JOIN outlets o ON r.outlet_id = o.outlet_id " +

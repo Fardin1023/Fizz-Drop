@@ -293,6 +293,7 @@ export const SalesOfficerDashboard: React.FC = () => {
         const payload = event.data;
         if (
           payload?.type === 'SALES_OFFICER_PURCHASE_CONFIRMED' ||
+          payload?.type === 'SUPPLIER_DISPATCHED_TO_OUTLET' ||
           payload?.type === 'REQUISITION_ACTION' ||
           payload?.type === 'PRICE_UPDATED' ||
           payload?.type === 'NEW_PSR_ORDER' ||
@@ -303,11 +304,17 @@ export const SalesOfficerDashboard: React.FC = () => {
           if (
             !payload.recipientUserId ||
             payload.recipientUserId === officer?.user_id ||
-            payload.referenceId === officer?.id
+            payload.referenceId === officer?.id ||
+            payload.sales_officer_id === officer?.id
           ) {
             if (officer?.id) {
               fetchDashboardData(officer.id);
               fetchPsrData(officer.id);
+            }
+            if (payload?.type === 'SUPPLIER_DISPATCHED_TO_OUTLET') {
+              setActionSuccessMsg(
+                payload.message || `Supplier has dispatched stock to ${payload.outlet_name || 'outlet'}! Wholesale profit updated.`
+              );
             }
           }
         }
@@ -330,6 +337,58 @@ export const SalesOfficerDashboard: React.FC = () => {
   };
 
   const [dispatchingOrderId, setDispatchingOrderId] = useState<number | null>(null);
+  const [loadingActionId, setLoadingActionId] = useState<number | null>(null);
+
+  const handleTellSupplier = async (ord: any) => {
+    if (!ord || !ord.id) return;
+    setLoadingActionId(ord.id);
+    setActionErrorMsg(null);
+    setActionSuccessMsg(null);
+    try {
+      const res = await fetch(`http://localhost:8080/api/v1/psr/orders/${ord.id}/so-request-supplier`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sales_officer_id: officer?.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || data.message || 'Failed to notify supplier');
+
+      // Real-time broadcast to Supplier
+      try {
+        const bc = new BroadcastChannel('fizzdrop_realtime_events');
+        bc.postMessage({
+          type: 'SO_STOCK_REQUEST_FOR_OUTLET',
+          recipientRole: 'SUPPLIER',
+          recipientUserId: data.supplier_user_id || 4,
+          order_id: ord.id,
+          order_code: ord.order_code,
+          outlet_id: ord.outlet_id,
+          outlet_name: ord.outlet_name,
+          product_id: ord.product_id,
+          product_name: ord.product_name,
+          quantity: ord.quantity,
+          sales_officer_id: officer?.id,
+          sales_officer_name: officer?.name,
+          title: `Stock Needed: ${ord.quantity} cases in ${ord.outlet_name}`,
+          message: `Sales Officer ${officer?.name || 'Tariq Rahman'} notified you: ${ord.quantity} cases of ${ord.product_name} is needed in ${ord.outlet_name}. Please dispatch to outlet from SO purchased stock.`,
+        });
+        setTimeout(() => bc.close(), 100);
+      } catch (ignored) {}
+
+      setActionSuccessMsg(
+        `Notified Supplier: ${ord.quantity} cases of ${ord.product_name} needed at ${ord.outlet_name}. Awaiting supplier dispatch from purchased stock.`
+      );
+
+      if (officer?.id) {
+        fetchDashboardData(officer.id);
+        fetchPsrData(officer.id);
+      }
+    } catch (err: any) {
+      setActionErrorMsg(err.message || 'Error communicating with server');
+    } finally {
+      setLoadingActionId(null);
+    }
+  };
 
   const handleUpdatePsrOrderStatus = async (orderOrId: any, status: string) => {
     const orderId = typeof orderOrId === 'object' ? orderOrId.id : orderOrId;
@@ -1430,14 +1489,16 @@ export const SalesOfficerDashboard: React.FC = () => {
                             <td className="p-3 text-center">
                               <span
                                 className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                  ord.status === 'APPROVED_BY_SO'
-                                    ? 'bg-blue-100 text-blue-800'
-                                    : ord.status === 'DELIVERED'
+                                  ord.status === 'DISPATCHED' || ord.status === 'DELIVERED'
                                     ? 'bg-emerald-100 text-emerald-800'
-                                    : 'bg-amber-100 text-amber-800'
+                                    : ord.status === 'REQUESTED_FROM_SUPPLIER'
+                                    ? 'bg-amber-100 text-amber-800'
+                                    : ord.status === 'APPROVED_BY_SO'
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : 'bg-orange-100 text-orange-800'
                                 }`}
                               >
-                                {ord.status}
+                                {ord.status === 'REQUESTED_FROM_SUPPLIER' ? 'STOCK REQUESTED FROM SUPPLIER' : ord.status}
                               </span>
                             </td>
                             <td className="p-3 text-right">
@@ -1445,22 +1506,34 @@ export const SalesOfficerDashboard: React.FC = () => {
                                 {ord.status === 'DISPATCHED' || ord.status === 'DELIVERED' ? (
                                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-[11px] font-bold border border-emerald-200">
                                     <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                    Delivered to Outlet
+                                    Dispatched by Supplier to Outlet
+                                  </span>
+                                ) : ord.status === 'REQUESTED_FROM_SUPPLIER' ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 text-[11px] font-bold border border-amber-200">
+                                    <Clock className="w-3 h-3 text-amber-600 animate-pulse" />
+                                    Awaiting Supplier Dispatch
                                   </span>
                                 ) : ord.status === 'APPROVED_BY_SO' ? (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 text-[11px] font-bold border border-blue-200">
-                                    <CheckCircle2 className="w-3 h-3 text-blue-600" />
-                                    Request Accepted
-                                  </span>
+                                  <button
+                                    type="button"
+                                    disabled={loadingActionId === ord.id}
+                                    onClick={() => handleTellSupplier(ord)}
+                                    className="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white font-bold text-[11px] transition shadow-xs cursor-pointer flex items-center gap-1 active:scale-95 whitespace-nowrap disabled:opacity-50"
+                                    title="Tell Supplier stock is needed for outlet"
+                                  >
+                                    <Send className="w-3 h-3" />
+                                    <span>Tell Supplier (Stock Needed)</span>
+                                  </button>
                                 ) : isPending ? (
                                   <button
                                     type="button"
-                                    onClick={() => handleUpdatePsrOrderStatus(ord, 'APPROVED_BY_SO')}
-                                    className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] transition shadow-xs cursor-pointer flex items-center gap-1 active:scale-95 whitespace-nowrap"
-                                    title="Accept & approve PSR field order (updates Wholesale Profit)"
+                                    disabled={loadingActionId === ord.id}
+                                    onClick={() => handleTellSupplier(ord)}
+                                    className="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-[11px] transition shadow-xs cursor-pointer flex items-center gap-1 active:scale-95 whitespace-nowrap disabled:opacity-50"
+                                    title={`Tell Supplier that ${ord.quantity} cases of ${ord.product_name} is needed in ${ord.outlet_name}`}
                                   >
-                                    <CheckCircle2 className="w-3 h-3" />
-                                    <span>Accept Request</span>
+                                    <Send className="w-3 h-3" />
+                                    <span>Tell Supplier (Stock Needed)</span>
                                   </button>
                                 ) : (
                                   <span className="text-xs text-slate-400 font-medium">

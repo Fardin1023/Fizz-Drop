@@ -109,6 +109,26 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
 
   useEffect(() => {
     fetchRequisitions();
+
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel('fizzdrop_realtime_events');
+      channel.onmessage = (event) => {
+        const payload = event.data;
+        if (
+          payload?.type === 'SO_STOCK_REQUEST_FOR_OUTLET' ||
+          payload?.type === 'SO_ORDER_APPROVED' ||
+          payload?.type === 'NEW_PSR_ORDER' ||
+          payload?.type === 'REQUISITION_ACTION'
+        ) {
+          fetchRequisitions();
+        }
+      };
+    } catch (e) {}
+
+    return () => {
+      if (channel) channel.close();
+    };
   }, [userId]);
 
   const openFulfillModal = (req: OutletRequisitionItem) => {
@@ -182,9 +202,22 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
         } catch (e) {}
       }
 
-      // Broadcast stock purchase confirmation to Sales Officer tabs
+      // Broadcast stock purchase confirmation and outlet dispatch to Sales Officer tabs
       try {
         const soChannel = new BroadcastChannel('fizzdrop_realtime_events');
+        soChannel.postMessage({
+          type: 'SUPPLIER_DISPATCHED_TO_OUTLET',
+          recipientRole: 'SALES_OFFICER',
+          recipientUserId: data.sales_officer_user_id || fulfillModalReq.sales_officer_id,
+          sales_officer_id: data.sales_officer_id || fulfillModalReq.sales_officer_id,
+          referenceId: data.sales_officer_id || fulfillModalReq.sales_officer_id,
+          outlet_name: fulfillModalReq.outlet_name,
+          product_name: fulfillModalReq.product_name,
+          quantity: fulfillQty,
+          profit_earned: data.profit_earned,
+          title: `Stock Dispatched to ${fulfillModalReq.outlet_name}`,
+          message: `Supplier has dispatched ${fulfillQty} cases of ${fulfillModalReq.product_name} to ${fulfillModalReq.outlet_name} from your purchased stock. Profit has been credited to your wholesale ledger.`,
+        });
         soChannel.postMessage({
           type: 'SALES_OFFICER_PURCHASE_CONFIRMED',
           recipientRole: 'SALES_OFFICER',
@@ -198,7 +231,7 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
       } catch (e) {}
 
       setActionSuccessMsg(
-        `Successfully dispatched ${fulfillQty} units of ${fulfillModalReq.product_name} at ৳${Number(fulfillPrice).toFixed(2)}/case to Sales Officer ${fulfillModalReq.sales_officer_name || ''}!`
+        `Successfully dispatched ${fulfillQty} units of ${fulfillModalReq.product_name} to ${fulfillModalReq.outlet_name} from Sales Officer ${fulfillModalReq.sales_officer_name || ''}'s purchased stock!`
       );
       setFulfillModalReq(null);
       fetchRequisitions();
@@ -243,9 +276,22 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
         throw new Error(data.error || data.message || 'Failed to dispatch stock');
       }
 
-      // Broadcast stock purchase confirmation to Sales Officer tabs
+      // Broadcast stock purchase confirmation and outlet dispatch to Sales Officer tabs
       try {
         const soChannel = new BroadcastChannel('fizzdrop_realtime_events');
+        soChannel.postMessage({
+          type: 'SUPPLIER_DISPATCHED_TO_OUTLET',
+          recipientRole: 'SALES_OFFICER',
+          recipientUserId: data.sales_officer_user_id || req.sales_officer_id,
+          sales_officer_id: data.sales_officer_id || req.sales_officer_id,
+          referenceId: data.sales_officer_id || req.sales_officer_id,
+          outlet_name: req.outlet_name,
+          product_name: req.product_name,
+          quantity: req.quantity,
+          profit_earned: data.profit_earned,
+          title: `Stock Dispatched to ${req.outlet_name}`,
+          message: `Supplier has dispatched ${req.quantity} cases of ${req.product_name} to ${req.outlet_name} from your purchased stock. Profit has been credited to your wholesale ledger.`,
+        });
         soChannel.postMessage({
           type: 'SALES_OFFICER_PURCHASE_CONFIRMED',
           recipientRole: 'SALES_OFFICER',
@@ -259,7 +305,7 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
       } catch (e) {}
 
       setActionSuccessMsg(
-        `Successfully dispatched ${req.quantity} units of ${req.product_name} via Sales Officer ${req.sales_officer_name || ''} (${req.sales_officer_code || req.area}) for ${req.outlet_name}!`
+        `Successfully dispatched ${req.quantity} units of ${req.product_name} to ${req.outlet_name} from Sales Officer ${req.sales_officer_name || ''}'s purchased stock!`
       );
 
       fetchRequisitions();
@@ -675,7 +721,7 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
                           ) : (
                             <>
                               <Send className="w-3.5 h-3.5" />
-                              <span>Adjust & Dispatch to Sales Officer</span>
+                              <span>Adjust & Dispatch to Outlet</span>
                             </>
                           )}
                         </button>
@@ -899,7 +945,7 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
                   ) : (
                     <>
                       <Truck className="w-4 h-4" />
-                      <span>Confirm & Dispatch to Sales Officer</span>
+                      <span>Confirm & Dispatch to Outlet</span>
                     </>
                   )}
                 </button>

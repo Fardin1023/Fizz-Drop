@@ -127,7 +127,7 @@ export const AdminDashboard: React.FC = () => {
       icon: Store,
       gradient: 'from-emerald-600 via-teal-600 to-cyan-600',
       badge: 'Area Demands',
-      badgeHighlight: notifications.some((n) => (n.type === 'SALES_OFFICER_REQUISITION' || n.type === 'NEW_REQUISITION') && !n.is_read),
+      badgeHighlight: notifications.some((n) => (n.type === 'SO_STOCK_REQUEST_FOR_OUTLET' || n.type === 'SALES_OFFICER_REQUISITION' || n.type === 'NEW_REQUISITION') && !n.is_read),
     },
     {
       id: 'stock-sales-dispatch' as const,
@@ -193,7 +193,13 @@ export const AdminDashboard: React.FC = () => {
       <NotificationPopup
         notification={popupNotification}
         onDismiss={dismissPopup}
-        onAction={() => setActiveTab('history')}
+        onAction={() => {
+          if (popupNotification?.type === 'SO_STOCK_REQUEST_FOR_OUTLET') {
+            setActiveTab('outlet-requests');
+          } else {
+            setActiveTab('history');
+          }
+        }}
       />
 
       {/* Top Admin Sub-Header (Ultra-Compact, Fixed at Top & Static) */}
