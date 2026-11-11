@@ -138,14 +138,16 @@ public class InventoryController {
         }
         req.setOutletId(outlet.getOutletId());
 
-        // Enforce supplier depot stock validation: reject if 0 stock or insufficient stock
+        boolean isUnrequestedDirectSupply = (req.getRequisitionId() == null || req.getRequisitionId() <= 0);
+
+        // Enforce supplier depot stock validation ONLY for direct proactive push (outlet requisitions are dispatched from SO purchased buffer stock)
         Long resolvedUserId = (req.getUserId() != null && req.getUserId() > 0) ? req.getUserId() : 4L;
         SupplierProfile sp = supplierProfileRepository.findByUserId(resolvedUserId).orElse(null);
         if (sp == null) {
             List<SupplierProfile> all = supplierProfileRepository.findAll();
             if (!all.isEmpty()) sp = all.get(0);
         }
-        if (sp != null) {
+        if (isUnrequestedDirectSupply && sp != null) {
             List<Long> districtIds = new ArrayList<>();
             if (sp.getCoveredDistrictIds() != null && !sp.getCoveredDistrictIds().trim().isEmpty()) {
                 for (String sid : sp.getCoveredDistrictIds().split(",")) {
@@ -234,8 +236,8 @@ public class InventoryController {
 
         inventoryRepository.save(inventory);
 
-        // Deduct supplied stock from supplier's district/depot inventory if tracked
-        if (sp != null) {
+        // Deduct supplied stock from supplier's district/depot inventory ONLY for direct unrequested push (outlet requisitions are deducted from SO buffer)
+        if (isUnrequestedDirectSupply && sp != null) {
             Long targetDistId = (req.getDistrictId() != null && req.getDistrictId() > 0) ? req.getDistrictId() : sp.getPrimaryDistrictId();
             if (targetDistId != null) {
                 districtInventoryRepository.findByDistrictIdAndProductId(targetDistId, product.getProductId()).ifPresent(di -> {
@@ -246,7 +248,6 @@ public class InventoryController {
             }
         }
 
-        boolean isUnrequestedDirectSupply = (req.getRequisitionId() == null || req.getRequisitionId() <= 0);
         String dispatchRefCode = "DSP-" + System.currentTimeMillis();
 
         if (!isUnrequestedDirectSupply) {
@@ -1083,7 +1084,7 @@ public class InventoryController {
             if (isSoPurchase) {
                 map.put("can_dispatch", availableStock > 0);
             } else {
-                map.put("can_dispatch", (availableStock > 0) && (soPurchasedStock >= reqQty));
+                map.put("can_dispatch", soPurchasedStock >= reqQty);
             }
 
             response.add(map);
@@ -1112,8 +1113,11 @@ public class InventoryController {
         boolean isSoPurchase = reqCode.startsWith("SO-REQ-");
 
         int dispatchQty = requestedQty;
-        if (body != null && body.containsKey("quantity") && body.get("quantity") != null) {
+        if (isSoPurchase && body != null && body.containsKey("quantity") && body.get("quantity") != null) {
             try { dispatchQty = Integer.parseInt(body.get("quantity").toString()); } catch (Exception ignored) {}
+        } else {
+            // Outlet requisition: strictly fulfill exact requested quantity — not more or less
+            dispatchQty = requestedQty;
         }
         Long userId = (body != null && body.containsKey("user_id") && body.get("user_id") != null) ? Long.parseLong(body.get("user_id").toString()) : 4L;
 
@@ -1164,9 +1168,9 @@ public class InventoryController {
             if (!all.isEmpty()) sp = all.get(0);
         }
 
-        // Check Supplier Depot Stock
-        int availableDepotStock = 0;
-        if (sp != null) {
+        // Check Supplier Depot Stock ONLY for SO buffer purchase (SO buying directly from supplier depot)
+        if (isSoPurchase && sp != null) {
+            int availableDepotStock = 0;
             List<Long> districtIds = new ArrayList<>();
             if (sp.getCoveredDistrictIds() != null && !sp.getCoveredDistrictIds().trim().isEmpty()) {
                 for (String sid : sp.getCoveredDistrictIds().split(",")) {
@@ -1214,6 +1218,34 @@ public class InventoryController {
                 "UPDATE outlet_requisitions SET status = 'DISPATCHED', quantity = ?, unit_price = ?, total_amount = ?, updated_date = NOW() WHERE id = ?",
                 dispatchQty, unitPrice, totalAmt, id
             );
+
+            // Record transaction ledger for Supplier
+            if (sp != null) {
+                try {
+                    SupplierTransaction soTx = new SupplierTransaction(
+                        "TXN-SO-" + System.currentTimeMillis() + "-" + (100 + new Random().nextInt(900)),
+                        sp.getId(),
+                        null,
+                        null,
+                        reqCode,
+                        "SO_BUFFER_SALE",
+                        "CREDIT",
+                        totalAmt,
+                        "SALES_OFFICER_PURCHASE",
+                        String.format("Stock purchase dispatch of %d cases of %s %s to Sales Officer %s @ ৳%.2f/case. Total: ৳%.2f",
+                            dispatchQty, product.getBrand(), product.getFlavorVariant(),
+                            (targetOfficer != null ? targetOfficer.getName() : "SO"),
+                            unitPrice.doubleValue(), totalAmt.doubleValue()),
+                        "COMPLETED"
+                    );
+                    supplierTransactionRepository.saveAndFlush(soTx);
+                    BigDecimal cur = sp.getWalletBalance() != null ? sp.getWalletBalance() : BigDecimal.ZERO;
+                    sp.setWalletBalance(cur.add(totalAmt));
+                    supplierProfileRepository.saveAndFlush(sp);
+                } catch (Exception ex) {
+                    System.err.println("[InventoryController] Failed to record SO purchase txn: " + ex.getMessage());
+                }
+            }
 
             // Notify Sales Officer of approved stock purchase
             if (targetOfficer != null) {

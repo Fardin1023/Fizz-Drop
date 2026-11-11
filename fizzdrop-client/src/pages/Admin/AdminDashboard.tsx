@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import AdminLogin from './AdminLogin';
-import { SupplierAvailableProducts } from './SupplierAvailableProducts';
 import { SupplierRequestStock } from './SupplierRequestStock';
 import { SupplierRequisitionHistory } from './SupplierRequisitionHistory';
 import { SupplierProfileView } from './SupplierProfileView';
@@ -39,10 +38,10 @@ export const AdminDashboard: React.FC = () => {
   const { user, isSupplier, isSuperadmin, isAuthenticated, logout, isLoading } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialTab = (searchParams.get('tab') as any) || 'catalog';
-  const validTabs = ['catalog', 'outlet-requests', 'stock-sales-dispatch', 'request', 'history', 'outlets', 'profile', 'transactions'];
-  const [activeTab, setActiveTab] = useState<'catalog' | 'outlet-requests' | 'stock-sales-dispatch' | 'request' | 'history' | 'outlets' | 'profile' | 'transactions'>(
-    validTabs.includes(initialTab) ? initialTab : 'catalog'
+  const initialTab = (searchParams.get('tab') as any) || 'outlet-requests';
+  const validTabs = ['outlet-requests', 'stock-sales-dispatch', 'request', 'history', 'outlets', 'profile', 'transactions'];
+  const [activeTab, setActiveTab] = useState<'outlet-requests' | 'stock-sales-dispatch' | 'request' | 'history' | 'outlets' | 'profile' | 'transactions'>(
+    validTabs.includes(initialTab) ? initialTab : 'outlet-requests'
   );
 
   useEffect(() => {
@@ -140,15 +139,6 @@ export const AdminDashboard: React.FC = () => {
   }
 
   const navSections = [
-    {
-      id: 'catalog' as const,
-      label: 'Available Products Catalog',
-      shortLabel: 'Available Catalog',
-      desc: 'Master items supplied by Superadmin',
-      icon: Package,
-      gradient: 'from-blue-600 via-indigo-600 to-cyan-600',
-      badge: 'Catalog',
-    },
     {
       id: 'outlet-requests' as const,
       label: 'Area Demands & Requisitions',
@@ -434,14 +424,6 @@ export const AdminDashboard: React.FC = () => {
 
         {/* Dynamic Main Content Workspace */}
         <main className="flex-1 min-w-0 w-full">
-          {activeTab === 'catalog' && (
-            <SupplierAvailableProducts
-              onRequestStock={(prodId) => {
-                setSelectedProductId(prodId);
-                setActiveTab('request');
-              }}
-            />
-          )}
           {activeTab === 'outlet-requests' && (
             <SupplierOutletRequisitions
               userId={user?.user_id || 4}
@@ -473,7 +455,7 @@ export const AdminDashboard: React.FC = () => {
           )}
           {activeTab === 'outlets' && (
             <SupplierAllocatedOutlets
-              onNavigateToCatalog={() => setActiveTab('catalog')}
+              onNavigateToCatalog={() => setActiveTab('request')}
               onRequestStock={(prodId) => {
                 setSelectedProductId(prodId);
                 setActiveTab('request');
