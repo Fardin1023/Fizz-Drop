@@ -823,13 +823,6 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
                     )}
                   </div>
                 </div>
-                      <div className="px-4 py-2.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-1.5">
-                        <CheckCircle className="w-4 h-4 text-emerald-600" />
-                        <span>Dispatched to Outlet</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
               </div>
             );
           })}
