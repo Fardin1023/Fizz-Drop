@@ -51,6 +51,9 @@ export interface OutletRequisitionItem {
   updated_date?: string;
   supplier_available_stock: number;
   can_dispatch: boolean;
+  is_so_purchase?: boolean;
+  so_purchased_stock?: number;
+  so_has_purchased?: boolean;
   sales_officer_id?: number;
   sales_officer_name?: string;
   sales_officer_code?: string;
@@ -142,10 +145,17 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
       setIsZeroStockAlertOpen(true);
       return;
     }
+    const maxAllowed = req.is_so_purchase
+      ? req.supplier_available_stock
+      : Math.min(req.supplier_available_stock, req.so_purchased_stock ?? 0);
     setFulfillModalReq(req);
-    setFulfillQty(Math.min(req.quantity, req.supplier_available_stock));
+    setFulfillQty(Math.max(1, Math.min(req.quantity, maxAllowed > 0 ? maxAllowed : req.quantity)));
     setFulfillPrice(Number(req.unit_price || 35));
-    setFulfillNotes(`Wholesale delivery to Sales Officer ${req.sales_officer_name || ''} for ${req.outlet_name}`);
+    setFulfillNotes(
+      req.is_so_purchase
+        ? `Wholesale stock delivery to Sales Officer ${req.sales_officer_name || ''} buffer`
+        : `Dispatched from Sales Officer ${req.sales_officer_name || ''}'s purchased stock to ${req.outlet_name}`
+    );
   };
 
   const handleFulfillSubmit = async (e: React.FormEvent) => {
@@ -156,6 +166,16 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
     if (fulfillModalReq.supplier_available_stock <= 0) {
       setActionErrorMsg("Cannot dispatch: Depot stock is 0 cases. Please request stock from Superadmin first.");
       return;
+    }
+    if (!fulfillModalReq.is_so_purchase) {
+      if (!fulfillModalReq.so_has_purchased || (fulfillModalReq.so_purchased_stock ?? 0) <= 0) {
+        setActionErrorMsg(`Cannot dispatch: ${fulfillModalReq.product_name} has not been purchased by Sales Officer ${fulfillModalReq.sales_officer_name || ''}. The Sales Officer must purchase stock from the Regional Supplier first.`);
+        return;
+      }
+      if (fulfillQty > (fulfillModalReq.so_purchased_stock ?? 0)) {
+        setActionErrorMsg(`Cannot dispatch beyond SO purchased stock: Sales Officer holds only ${fulfillModalReq.so_purchased_stock ?? 0} cases in buffer, but requested ${fulfillQty} cases.`);
+        return;
+      }
     }
     if (fulfillQty <= 0) {
       setActionErrorMsg("Dispatch quantity must be at least 1 case.");
@@ -231,7 +251,9 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
       } catch (e) {}
 
       setActionSuccessMsg(
-        `Successfully dispatched ${fulfillQty} units of ${fulfillModalReq.product_name} to ${fulfillModalReq.outlet_name} from Sales Officer ${fulfillModalReq.sales_officer_name || ''}'s purchased stock!`
+        fulfillModalReq.is_so_purchase
+          ? `Successfully dispatched ${fulfillQty} cases of ${fulfillModalReq.product_name} to Sales Officer ${fulfillModalReq.sales_officer_name || ''}'s buffer stock!`
+          : `Successfully dispatched ${fulfillQty} units of ${fulfillModalReq.product_name} to ${fulfillModalReq.outlet_name} from Sales Officer ${fulfillModalReq.sales_officer_name || ''}'s purchased stock!`
       );
       setFulfillModalReq(null);
       fetchRequisitions();
@@ -255,6 +277,15 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
         outletName: req.outlet_name,
       });
       setIsZeroStockAlertOpen(true);
+      return;
+    }
+
+    if (!req.is_so_purchase && (!req.so_has_purchased || (req.so_purchased_stock ?? 0) <= 0)) {
+      setActionErrorMsg(`Cannot dispatch: ${req.product_name} has not been purchased by Sales Officer ${req.sales_officer_name || ''}. The Sales Officer must purchase stock from the Regional Supplier first.`);
+      return;
+    }
+    if (!req.is_so_purchase && req.quantity > (req.so_purchased_stock ?? 0)) {
+      setActionErrorMsg(`Cannot dispatch beyond SO purchased stock: Sales Officer holds only ${req.so_purchased_stock ?? 0} cases in buffer, but outlet requested ${req.quantity} cases.`);
       return;
     }
 
@@ -590,24 +621,43 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
                   </div>
 
                   {/* Sales Officer Assignment Banner */}
-                  <div className="flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-xl bg-indigo-50/80 border border-indigo-200/80 text-xs text-indigo-900 font-medium mb-1">
-                    <UserCheck className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                    <span>Channeled via Sales Officer:</span>
-                    <strong className="font-bold text-teal-700">{req.sales_officer_name || "Designated Sales Officer"}</strong>
-                    {req.sales_officer_code && (
-                      <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-white text-indigo-700 border border-indigo-200 font-bold">
-                        {req.sales_officer_code}
+                  {req.is_so_purchase ? (
+                    <div className="flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-50/90 border border-blue-200/90 text-xs text-blue-900 font-medium mb-1">
+                      <Truck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                      <span className="font-bold text-blue-800 uppercase tracking-wide text-[10px]">SO Stock Purchase Demand:</span>
+                      <strong className="font-bold text-blue-900">{req.sales_officer_name || "Designated Sales Officer"}</strong>
+                      {req.sales_officer_code && (
+                        <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-white text-blue-700 border border-blue-200 font-bold">
+                          {req.sales_officer_code}
+                        </span>
+                      )}
+                      <span className="text-blue-600 text-[11px] font-normal">
+                        • Territory: <strong className="text-blue-900">{req.sales_officer_area || req.area}</strong>
                       </span>
-                    )}
-                    <span className="text-slate-500 text-[11px] font-normal">
-                      • Area: <strong className="text-slate-700">{req.sales_officer_area || req.area}</strong>
-                    </span>
-                    {req.sales_officer_phone && (
-                      <span className="text-slate-500 text-[11px] font-mono flex items-center gap-1">
-                        <Phone className="w-2.5 h-2.5 text-slate-400" /> {req.sales_officer_phone}
+                      <span className="ml-auto text-[10px] bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded-full">
+                        Buffer Stock Requisition
                       </span>
-                    )}
-                  </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-xl bg-indigo-50/80 border border-indigo-200/80 text-xs text-indigo-900 font-medium mb-1">
+                      <UserCheck className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                      <span>Channeled via Sales Officer:</span>
+                      <strong className="font-bold text-teal-700">{req.sales_officer_name || "Designated Sales Officer"}</strong>
+                      {req.sales_officer_code && (
+                        <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-white text-indigo-700 border border-indigo-200 font-bold">
+                          {req.sales_officer_code}
+                        </span>
+                      )}
+                      <span className="text-slate-500 text-[11px] font-normal">
+                        • Area: <strong className="text-slate-700">{req.sales_officer_area || req.area}</strong>
+                      </span>
+                      {req.sales_officer_phone && (
+                        <span className="text-slate-500 text-[11px] font-mono flex items-center gap-1">
+                          <Phone className="w-2.5 h-2.5 text-slate-400" /> {req.sales_officer_phone}
+                        </span>
+                      )}
+                    </div>
+                  )}
 
                   {/* Outlet & Beverage Header */}
                   <div>
@@ -655,10 +705,10 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
                   </div>
                 </div>
 
-                {/* Right: Supplier Stock Health & Dispatch Actions */}
+                {/* Right: Supplier Stock Health, SO Buffer & Dispatch Actions */}
                 <div className="flex flex-col sm:flex-row sm:items-center gap-3 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100">
                   {/* Supplier Depot Stock Health Gauge */}
-                  <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 text-right min-w-[170px]">
+                  <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 text-right min-w-[190px]">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                       Your Available Depot Stock
                     </p>
@@ -688,45 +738,91 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
                       {req.supplier_available_stock <= 0
                         ? '0 Stock in Depot'
                         : hasSufficientStock
-                        ? 'Sufficient to dispatch'
+                        ? 'Depot stock sufficient'
                         : `Partial: ${req.supplier_available_stock} available`}
                     </p>
+
+                    {/* SO Purchased Buffer Status Indicator for Outlet Requisitions */}
+                    {!req.is_so_purchase && (
+                      <div className="mt-2 pt-2 border-t border-slate-200/70">
+                        <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">
+                          SO Purchased Buffer Stock
+                        </p>
+                        {req.so_has_purchased && (req.so_purchased_stock ?? 0) >= req.quantity ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 font-mono">
+                            <CheckCircle className="w-2.5 h-2.5 text-emerald-600" />
+                            Purchased: {req.so_purchased_stock} cases
+                          </span>
+                        ) : req.so_has_purchased && (req.so_purchased_stock ?? 0) > 0 ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 font-mono">
+                            <AlertCircle className="w-2.5 h-2.5 text-amber-600" />
+                            Partial Buffer: {req.so_purchased_stock} / {req.quantity}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
+                            <ShieldAlert className="w-2.5 h-2.5 text-rose-600" />
+                            Not Purchased by SO (0 cases)
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Action Buttons */}
                   <div className="flex items-center gap-2">
                     {isPending ? (
                       <>
-                        {/* Direct Fast Dispatch Button */}
-                        <button
-                          type="button"
-                          onClick={() => openFulfillModal(req)}
-                          disabled={dispatchingId === req.id}
-                          className={`py-3 px-4 rounded-2xl font-black text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md ${
-                            hasDepotStock
-                              ? 'bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-emerald-600/20 active:scale-95'
-                              : 'bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700'
-                          }`}
-                          title={
-                            hasDepotStock
-                              ? 'Review, adjust quantity/price & fulfill request to Sales Officer'
-                              : '0 stock in depot — click for restock alert'
-                          }
-                        >
-                          {req.supplier_available_stock <= 0 ? (
-                            <>
-                              <ShieldAlert className="w-3.5 h-3.5 text-rose-600" />
-                              <span>0 Stock in Depot</span>
-                            </>
-                          ) : (
-                            <>
-                              <Send className="w-3.5 h-3.5" />
-                              <span>Adjust & Dispatch to Outlet</span>
-                            </>
-                          )}
-                        </button>
+                        {/* Direct Fast Dispatch / Review Button */}
+                        {req.supplier_available_stock <= 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => openFulfillModal(req)}
+                            className="py-3 px-4 rounded-2xl font-black text-xs flex items-center justify-center gap-2 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 transition cursor-pointer shadow-xs active:scale-95"
+                            title="0 stock in depot — click for restock alert"
+                          >
+                            <ShieldAlert className="w-3.5 h-3.5 text-rose-600" />
+                            <span>0 Stock in Depot</span>
+                          </button>
+                        ) : !req.is_so_purchase && (!req.so_has_purchased || (req.so_purchased_stock ?? 0) < req.quantity) ? (
+                          <div className="flex flex-col items-end gap-1">
+                            <button
+                              type="button"
+                              disabled
+                              className="py-3 px-4 rounded-2xl font-black text-xs flex items-center justify-center gap-2 bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed shadow-none"
+                              title={`Cannot dispatch: Product has not been purchased by Sales Officer ${req.sales_officer_name || ''}. The Sales Officer must purchase stock from the Regional Supplier first.`}
+                            >
+                              <ShieldAlert className="w-3.5 h-3.5 text-amber-500" />
+                              <span>Awaiting SO Purchase</span>
+                            </button>
+                            <span className="text-[10px] text-amber-700 font-semibold">
+                              SO must purchase product first
+                            </span>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => openFulfillModal(req)}
+                            disabled={dispatchingId === req.id}
+                            className="py-3 px-4 rounded-2xl font-black text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-emerald-600/20 active:scale-95"
+                            title={
+                              req.is_so_purchase
+                                ? "Fulfill and dispatch stock directly to Sales Officer's buffer"
+                                : "Review, adjust quantity/price & fulfill request to Outlet"
+                            }
+                          >
+                            <Send className="w-3.5 h-3.5" />
+                            <span>{req.is_so_purchase ? "Confirm & Dispatch to SO" : "Adjust & Dispatch to Outlet"}</span>
+                          </button>
+                        )}
                       </>
                     ) : (
+                      <div className="px-4 py-2.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-1.5">
+                        <CheckCircle className="w-4 h-4 text-emerald-600" />
+                        <span>{req.is_so_purchase ? "Dispatched to SO" : "Dispatched to Outlet"}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
                       <div className="px-4 py-2.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-1.5">
                         <CheckCircle className="w-4 h-4 text-emerald-600" />
                         <span>Dispatched to Outlet</span>
@@ -820,10 +916,25 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
 
                 <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-zinc-700/60 text-xs">
                   <span className="text-slate-500">Requested: <strong className="text-slate-900 dark:text-white">{fulfillModalReq.quantity} cases</strong></span>
-                  <span className="text-teal-600 dark:text-teal-400 font-bold">
-                    Depot Available: <strong className="font-mono text-sm">{fulfillModalReq.supplier_available_stock}</strong> cases
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-teal-600 dark:text-teal-400 font-bold">
+                      Depot: <strong className="font-mono text-sm">{fulfillModalReq.supplier_available_stock}</strong> cases
+                    </span>
+                    {!fulfillModalReq.is_so_purchase && (
+                      <span className={`${(fulfillModalReq.so_purchased_stock ?? 0) > 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-rose-600'} font-bold`}>
+                        SO Buffer: <strong className="font-mono text-sm">{fulfillModalReq.so_purchased_stock ?? 0}</strong> cases
+                      </span>
+                    )}
+                  </div>
                 </div>
+
+                {/* Warning if unpurchased by SO */}
+                {!fulfillModalReq.is_so_purchase && (!fulfillModalReq.so_has_purchased || (fulfillModalReq.so_purchased_stock ?? 0) <= 0) && (
+                  <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2">
+                    <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0" />
+                    <span>Cannot dispatch: Product has not been purchased by Sales Officer <strong>{fulfillModalReq.sales_officer_name}</strong>. The SO must purchase stock from the Supplier first.</span>
+                  </div>
+                )}
               </div>
 
               {/* Input 1: Adjustable Quantity */}
@@ -833,14 +944,18 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
                     Dispatch Quantity (Cases)
                   </label>
                   <span className="text-xs text-slate-400">
-                    Max: <strong className="text-teal-600">{fulfillModalReq.supplier_available_stock} cases</strong>
+                    Max: <strong className="text-teal-600">
+                      {fulfillModalReq.is_so_purchase 
+                        ? fulfillModalReq.supplier_available_stock 
+                        : Math.min(fulfillModalReq.supplier_available_stock, fulfillModalReq.so_purchased_stock ?? 0)} cases
+                    </strong>
                   </span>
                 </div>
                 <div className="relative">
                   <input
                     type="number"
                     min="1"
-                    max={fulfillModalReq.supplier_available_stock}
+                    max={fulfillModalReq.is_so_purchase ? fulfillModalReq.supplier_available_stock : Math.min(fulfillModalReq.supplier_available_stock, fulfillModalReq.so_purchased_stock ?? 0)}
                     value={fulfillQty}
                     onChange={(e) => setFulfillQty(Math.max(1, parseInt(e.target.value) || 0))}
                     className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-900 dark:text-white font-bold text-base focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
@@ -849,17 +964,23 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
                   <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
                     <button
                       type="button"
-                      onClick={() => setFulfillQty(Math.min(fulfillModalReq.quantity, fulfillModalReq.supplier_available_stock))}
+                      onClick={() => {
+                        const maxLimit = fulfillModalReq.is_so_purchase ? fulfillModalReq.supplier_available_stock : Math.min(fulfillModalReq.supplier_available_stock, fulfillModalReq.so_purchased_stock ?? 0);
+                        setFulfillQty(Math.min(fulfillModalReq.quantity, maxLimit > 0 ? maxLimit : fulfillModalReq.quantity));
+                      }}
                       className="px-2 py-1 text-[11px] font-bold rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-zinc-700 text-slate-700 dark:text-zinc-200 transition cursor-pointer"
                     >
                       Requested ({fulfillModalReq.quantity})
                     </button>
                     <button
                       type="button"
-                      onClick={() => setFulfillQty(fulfillModalReq.supplier_available_stock)}
+                      onClick={() => {
+                        const maxLimit = fulfillModalReq.is_so_purchase ? fulfillModalReq.supplier_available_stock : Math.min(fulfillModalReq.supplier_available_stock, fulfillModalReq.so_purchased_stock ?? 0);
+                        setFulfillQty(maxLimit > 0 ? maxLimit : 1);
+                      }}
                       className="px-2 py-1 text-[11px] font-bold rounded-lg bg-teal-50 hover:bg-teal-100 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 transition cursor-pointer"
                     >
-                      Max Depot
+                      Max Available
                     </button>
                   </div>
                 </div>
@@ -934,7 +1055,12 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
                 </button>
                 <button
                   type="submit"
-                  disabled={fulfillSubmitting || fulfillQty <= 0 || fulfillQty > fulfillModalReq.supplier_available_stock}
+                  disabled={
+                    fulfillSubmitting ||
+                    fulfillQty <= 0 ||
+                    fulfillQty > fulfillModalReq.supplier_available_stock ||
+                    (!fulfillModalReq.is_so_purchase && (!fulfillModalReq.so_has_purchased || (fulfillModalReq.so_purchased_stock ?? 0) < fulfillQty))
+                  }
                   className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 via-emerald-600 to-cyan-600 hover:from-teal-700 hover:to-emerald-700 text-white text-xs font-black shadow-lg shadow-teal-600/25 flex items-center gap-2 transition cursor-pointer disabled:opacity-50 active:scale-95"
                 >
                   {fulfillSubmitting ? (
@@ -945,7 +1071,7 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
                   ) : (
                     <>
                       <Truck className="w-4 h-4" />
-                      <span>Confirm & Dispatch to Outlet</span>
+                      <span>{fulfillModalReq.is_so_purchase ? "Confirm & Dispatch to Sales Officer" : "Confirm & Dispatch to Outlet"}</span>
                     </>
                   )}
                 </button>

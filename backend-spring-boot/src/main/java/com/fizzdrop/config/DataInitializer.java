@@ -61,6 +61,24 @@ public class DataInitializer {
                 );
             } catch (Exception ignored) {}
 
+            try {
+                jdbcTemplate.execute(
+                    "CREATE TABLE IF NOT EXISTS sales_officer_inventory (" +
+                    "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
+                    "sales_officer_id BIGINT NOT NULL, " +
+                    "product_id BIGINT NOT NULL, " +
+                    "current_stock INT NOT NULL DEFAULT 0, " +
+                    "total_purchased INT NOT NULL DEFAULT 0, " +
+                    "total_distributed INT NOT NULL DEFAULT 0, " +
+                    "last_purchased_at DATETIME NULL, " +
+                    "updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, " +
+                    "UNIQUE KEY uk_so_product (sales_officer_id, product_id), " +
+                    "INDEX idx_so_inv_so (sales_officer_id), " +
+                    "INDEX idx_so_inv_prod (product_id)" +
+                    ")"
+                );
+            } catch (Exception ignored) {}
+
             // Pre-Sales Officer (PSR) & Sub-Routes Tables
             try {
                 jdbcTemplate.execute("ALTER TABLE outlets ADD COLUMN sub_route VARCHAR(255) NULL");

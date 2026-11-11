@@ -174,6 +174,43 @@ public class InventoryController {
             }
         }
 
+        // Ensure governing Sales Officer is identified
+        if (targetOfficer == null && outlet != null) {
+            String oArea = outlet.getArea() != null ? outlet.getArea().toLowerCase().trim() : "";
+            List<SalesOfficer> officers = salesOfficerRepository.findAll();
+            targetOfficer = officers.stream()
+                    .filter(so -> !oArea.isEmpty() && (oArea.contains(so.getAssignedArea().toLowerCase().trim()) || so.getAssignedArea().toLowerCase().trim().contains(oArea)))
+                    .findFirst()
+                    .orElse(officers.isEmpty() ? null : officers.get(0));
+        }
+
+        // ENFORCE RULE: The supplier should only dispatch the products to the outlet that has been purchased by the SO!
+        if (targetOfficer != null) {
+            int soPurchasedStock = getSalesOfficerPurchasedStock(targetOfficer.getId(), product.getProductId());
+            if (soPurchasedStock <= 0) {
+                return ResponseEntity.badRequest().body(ApiResponse.fail(
+                    "Cannot dispatch: Product '" + product.getBrand() + " " + product.getFlavorVariant() + 
+                    "' has not been purchased by territory Sales Officer (" + targetOfficer.getName() + 
+                    "). The Sales Officer must purchase stock from the Regional Supplier first."
+                ));
+            }
+            if (req.getQuantity() > soPurchasedStock) {
+                return ResponseEntity.badRequest().body(ApiResponse.fail(
+                    "Cannot dispatch beyond SO purchased stock: Territory Sales Officer " + targetOfficer.getName() + 
+                    " holds only " + soPurchasedStock + " cases of '" + product.getBrand() + " " + product.getFlavorVariant() + 
+                    "' in buffer stock, but " + req.getQuantity() + " cases were requested."
+                ));
+            }
+            // Deduct dispatched stock from SO purchased buffer
+            try {
+                jdbcTemplate.update(
+                    "UPDATE sales_officer_inventory SET current_stock = GREATEST(0, current_stock - ?), total_distributed = total_distributed + ?, updated_at = NOW() " +
+                    "WHERE sales_officer_id = ? AND product_id = ?",
+                    req.getQuantity(), req.getQuantity(), targetOfficer.getId(), product.getProductId()
+                );
+            } catch (Exception ignored) {}
+        }
+
         // Find or create inventory row
         Optional<ShopInventory> invOpt = inventoryRepository.findByBranchIdAndProductId(outlet.getOutletId(), product.getProductId());
         ShopInventory inventory;
@@ -908,6 +945,49 @@ public class InventoryController {
     }
 
     /**
+     * Helper to get live purchased buffer stock of a product held by a Sales Officer
+     */
+    public int getSalesOfficerPurchasedStock(Long salesOfficerId, Long productId) {
+        if (salesOfficerId == null || productId == null) return 0;
+        try {
+            List<Integer> list = jdbcTemplate.query(
+                "SELECT current_stock FROM sales_officer_inventory WHERE sales_officer_id = ? AND product_id = ?",
+                (rs, rowNum) -> rs.getInt("current_stock"),
+                salesOfficerId, productId
+            );
+            if (!list.isEmpty()) {
+                return Math.max(0, list.get(0));
+            }
+            // Fallback / sync from outlet_requisitions (purchased via SO-REQ) minus distributions to outlets
+            Integer purchased = jdbcTemplate.queryForObject(
+                "SELECT COALESCE(SUM(quantity), 0) FROM outlet_requisitions " +
+                "WHERE sales_officer_id = ? AND product_id = ? AND requisition_code LIKE 'SO-REQ-%' AND status IN ('DISPATCHED', 'COMPLETED')",
+                Integer.class, salesOfficerId, productId
+            );
+            Integer distributed = jdbcTemplate.queryForObject(
+                "SELECT COALESCE(SUM(quantity), 0) FROM outlet_requisitions " +
+                "WHERE sales_officer_id = ? AND product_id = ? AND requisition_code NOT LIKE 'SO-REQ-%' AND status IN ('DISPATCHED', 'COMPLETED')",
+                Integer.class, salesOfficerId, productId
+            );
+            int p = (purchased != null) ? purchased : 0;
+            int d = (distributed != null) ? distributed : 0;
+            int remaining = Math.max(0, p - d);
+
+            if (p > 0) {
+                jdbcTemplate.update(
+                    "INSERT INTO sales_officer_inventory (sales_officer_id, product_id, current_stock, total_purchased, total_distributed, updated_at) " +
+                    "VALUES (?, ?, ?, ?, ?, NOW()) " +
+                    "ON DUPLICATE KEY UPDATE current_stock = ?, total_purchased = ?, total_distributed = ?, updated_at = NOW()",
+                    salesOfficerId, productId, remaining, p, d, remaining, p, d
+                );
+            }
+            return remaining;
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    /**
      * Get all incoming outlet requisitions for regional supplier with live available depot stock
      */
     @GetMapping("/supplier/outlet-requisitions")
@@ -952,6 +1032,9 @@ public class InventoryController {
         for (Map<String, Object> row : list) {
             Map<String, Object> map = new HashMap<>(row);
             Long prodId = ((Number) row.get("product_id")).longValue();
+            String reqCode = row.get("requisition_code") != null ? row.get("requisition_code").toString() : "";
+            boolean isSoPurchase = reqCode.startsWith("SO-REQ-");
+            map.put("is_so_purchase", isSoPurchase);
 
             // Calculate supplier's available depot stock for this product
             int availableStock = 0;
@@ -960,7 +1043,6 @@ public class InventoryController {
                 availableStock += di.map(DistrictInventory::getCurrentStock).orElse(0);
             }
             map.put("supplier_available_stock", availableStock);
-            map.put("can_dispatch", availableStock > 0);
 
             // Associate with Superadmin-assigned Sales Officer for this area or requisition
             Long existingSoId = row.get("sales_officer_id") != null ? ((Number) row.get("sales_officer_id")).longValue() : null;
@@ -976,14 +1058,32 @@ public class InventoryController {
                         .orElse(officers.isEmpty() ? null : officers.get(0));
             }
 
+            int soPurchasedStock = 0;
+            boolean soHasPurchased = false;
+
             if (matchedSO != null) {
                 map.put("sales_officer_id", matchedSO.getId());
                 map.put("sales_officer_name", matchedSO.getName());
                 map.put("sales_officer_code", matchedSO.getOfficerCode());
                 map.put("sales_officer_area", matchedSO.getAssignedArea());
                 map.put("sales_officer_phone", matchedSO.getPhone());
+
+                soPurchasedStock = getSalesOfficerPurchasedStock(matchedSO.getId(), prodId);
+                soHasPurchased = soPurchasedStock > 0;
             } else {
                 map.put("sales_officer_name", "Area Sales Officer (" + (row.get("area") != null ? row.get("area") : "Assigned Zone") + ")");
+            }
+
+            map.put("so_purchased_stock", soPurchasedStock);
+            map.put("so_has_purchased", soHasPurchased);
+
+            int reqQty = ((Number) row.get("quantity")).intValue();
+
+            // The supplier should only dispatch the products to the outlet that has been purchased by the SO!
+            if (isSoPurchase) {
+                map.put("can_dispatch", availableStock > 0);
+            } else {
+                map.put("can_dispatch", (availableStock > 0) && (soPurchasedStock >= reqQty));
             }
 
             response.add(map);
@@ -1008,6 +1108,8 @@ public class InventoryController {
         Long outletId = ((Number) reqRow.get("outlet_id")).longValue();
         Long productId = ((Number) reqRow.get("product_id")).longValue();
         int requestedQty = ((Number) reqRow.get("quantity")).intValue();
+        String reqCode = reqRow.get("requisition_code") != null ? reqRow.get("requisition_code").toString() : "";
+        boolean isSoPurchase = reqCode.startsWith("SO-REQ-");
 
         int dispatchQty = requestedQty;
         if (body != null && body.containsKey("quantity") && body.get("quantity") != null) {
@@ -1032,18 +1134,141 @@ public class InventoryController {
             } catch (Exception ignored) {}
         }
 
+        // Resolve Sales Officer
+        SalesOfficer targetOfficer = null;
+        if (body != null && (body.containsKey("sales_officer_id") || body.containsKey("salesOfficerId"))) {
+            Object soObj = body.get("sales_officer_id") != null ? body.get("sales_officer_id") : body.get("salesOfficerId");
+            try { targetOfficer = salesOfficerRepository.findById(Long.parseLong(soObj.toString())).orElse(null); } catch (Exception ignored) {}
+        }
+        if (targetOfficer == null && reqRow.get("sales_officer_id") != null) {
+            try { targetOfficer = salesOfficerRepository.findById(((Number) reqRow.get("sales_officer_id")).longValue()).orElse(null); } catch (Exception ignored) {}
+        }
+        if (targetOfficer == null) {
+            Outlet o = outletRepository.findById(outletId).orElse(null);
+            String oArea = o != null && o.getArea() != null ? o.getArea().toLowerCase().trim() : "";
+            List<SalesOfficer> officers = salesOfficerRepository.findAll();
+            targetOfficer = officers.stream()
+                    .filter(so -> !oArea.isEmpty() && (oArea.contains(so.getAssignedArea().toLowerCase().trim()) || so.getAssignedArea().toLowerCase().trim().contains(oArea)))
+                    .findFirst()
+                    .orElse(officers.isEmpty() ? null : officers.get(0));
+        }
+
+        Product product = productRepository.findById(productId).orElse(null);
+        if (product == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail("Product not found."));
+        }
+
+        SupplierProfile sp = supplierProfileRepository.findByUserId(userId).orElse(null);
+        if (sp == null) {
+            List<SupplierProfile> all = supplierProfileRepository.findAll();
+            if (!all.isEmpty()) sp = all.get(0);
+        }
+
+        // Check Supplier Depot Stock
+        int availableDepotStock = 0;
+        if (sp != null) {
+            List<Long> districtIds = new ArrayList<>();
+            if (sp.getCoveredDistrictIds() != null && !sp.getCoveredDistrictIds().trim().isEmpty()) {
+                for (String sid : sp.getCoveredDistrictIds().split(",")) {
+                    try { districtIds.add(Long.parseLong(sid.trim())); } catch (Exception ignored) {}
+                }
+            }
+            if (districtIds.isEmpty() && sp.getPrimaryDistrictId() != null) districtIds.add(sp.getPrimaryDistrictId());
+            for (Long distId : districtIds) {
+                var distInv = districtInventoryRepository.findByDistrictIdAndProductId(distId, productId);
+                availableDepotStock += distInv.map(DistrictInventory::getCurrentStock).orElse(0);
+            }
+            if (availableDepotStock <= 0) {
+                return ResponseEntity.badRequest().body(ApiResponse.fail("Cannot dispatch: Supplier depot stock is 0 cases (out of stock). Please request stock from Superadmin first."));
+            }
+            if (dispatchQty > availableDepotStock) {
+                return ResponseEntity.badRequest().body(ApiResponse.fail("Cannot dispatch beyond stock limit: You attempted to supply " + dispatchQty + " cases, but your depot only holds " + availableDepotStock + " cases. Adjust the quantity to at most " + availableDepotStock + " cases."));
+            }
+        }
+
+        final int finalDispatchQty = dispatchQty;
+
+        // 1. If SO Stock Purchase (SO directly buying stock from Supplier into SO territory buffer)
+        if (isSoPurchase) {
+            // Deduct from Supplier depot stock
+            if (sp != null && sp.getPrimaryDistrictId() != null) {
+                districtInventoryRepository.findByDistrictIdAndProductId(sp.getPrimaryDistrictId(), productId).ifPresent(di -> {
+                    di.setCurrentStock(Math.max(0, di.getCurrentStock() - finalDispatchQty));
+                    districtInventoryRepository.save(di);
+                });
+            }
+
+            // Credit to Sales Officer Purchased Inventory Buffer
+            if (targetOfficer != null) {
+                jdbcTemplate.update(
+                    "INSERT INTO sales_officer_inventory (sales_officer_id, product_id, current_stock, total_purchased, total_distributed, last_purchased_at, updated_at) " +
+                    "VALUES (?, ?, ?, ?, 0, NOW(), NOW()) " +
+                    "ON DUPLICATE KEY UPDATE current_stock = current_stock + ?, total_purchased = total_purchased + ?, last_purchased_at = NOW(), updated_at = NOW()",
+                    targetOfficer.getId(), productId, dispatchQty, dispatchQty, dispatchQty, dispatchQty
+                );
+            }
+
+            BigDecimal unitPrice = reqRow.get("unit_price") != null ? new BigDecimal(reqRow.get("unit_price").toString()) : (product.getOutletPrice() != null ? product.getOutletPrice() : BigDecimal.ZERO);
+            BigDecimal totalAmt = unitPrice.multiply(BigDecimal.valueOf(dispatchQty));
+            jdbcTemplate.update(
+                "UPDATE outlet_requisitions SET status = 'DISPATCHED', quantity = ?, unit_price = ?, total_amount = ?, updated_date = NOW() WHERE id = ?",
+                dispatchQty, unitPrice, totalAmt, id
+            );
+
+            // Notify Sales Officer of approved stock purchase
+            if (targetOfficer != null) {
+                try {
+                    AppNotification soNotif = new AppNotification();
+                    soNotif.setRecipientRole("SALES_OFFICER");
+                    soNotif.setRecipientUserId(targetOfficer.getUserId() != null ? targetOfficer.getUserId() : (100L + targetOfficer.getId()));
+                    soNotif.setTitle("Stock Purchase Confirmed by Supplier");
+                    soNotif.setMessage("Supplier approved and dispatched " + dispatchQty + " cases of " 
+                            + product.getBrand() + " " + product.getFlavorVariant() + " @ ৳" + String.format(Locale.US, "%.2f", unitPrice.doubleValue()) 
+                            + "/case. ৳" + String.format(Locale.US, "%.2f", totalAmt.doubleValue()) + " has been successfully purchased and credited to your territory buffer stock.");
+                    soNotif.setType("SALES_OFFICER_PURCHASE_CONFIRMED");
+                    soNotif.setReferenceCode(reqCode);
+                    soNotif.setReferenceId(targetOfficer.getId());
+                    notificationRepository.save(soNotif);
+                } catch (Exception ignored) {}
+            }
+
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Successfully dispatched " + dispatchQty + " cases of " + product.getBrand() + " " + product.getFlavorVariant() + " to Sales Officer " + (targetOfficer != null ? targetOfficer.getName() : "") + "'s territory buffer stock!",
+                "is_so_purchase", true,
+                "sales_officer_id", targetOfficer != null ? targetOfficer.getId() : null,
+                "product_id", productId,
+                "quantity", dispatchQty
+            ));
+        }
+
+        // 2. Retail Outlet Requisition: MUST ONLY DISPATCH PRODUCTS PURCHASED BY THE SALES OFFICER!
+        if (targetOfficer == null) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("Cannot dispatch to outlet: No Sales Officer assigned to this outlet/territory."));
+        }
+
+        int soPurchasedStock = getSalesOfficerPurchasedStock(targetOfficer.getId(), productId);
+        if (soPurchasedStock <= 0) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail(
+                "Cannot dispatch: Product '" + product.getBrand() + " " + product.getFlavorVariant() + 
+                "' has not been purchased by the territory Sales Officer (" + targetOfficer.getName() + 
+                "). The Sales Officer must purchase stock from the Regional Supplier first."
+            ));
+        }
+        if (dispatchQty > soPurchasedStock) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail(
+                "Cannot dispatch beyond SO purchased stock: Sales Officer " + targetOfficer.getName() + 
+                " holds only " + soPurchasedStock + " cases of '" + product.getBrand() + " " + product.getFlavorVariant() + 
+                "' in buffer stock, but the outlet requested " + dispatchQty + " cases. Adjust the quantity to at most " + 
+                soPurchasedStock + " cases, or have the SO purchase additional stock first."
+            ));
+        }
+
         SupplyRequest supplyReq = new SupplyRequest(outletId, productId, dispatchQty, "ADD");
         supplyReq.setUserId(userId);
         supplyReq.setRequisitionId(id);
-
-        if (body != null && (body.containsKey("sales_officer_id") || body.containsKey("salesOfficerId"))) {
-            Object soObj = body.get("sales_officer_id") != null ? body.get("sales_officer_id") : body.get("salesOfficerId");
-            try { supplyReq.setSalesOfficerId(Long.parseLong(soObj.toString())); } catch (Exception ignored) {}
-        } else if (reqRow.get("sales_officer_id") != null) {
-            try { supplyReq.setSalesOfficerId(((Number) reqRow.get("sales_officer_id")).longValue()); } catch (Exception ignored) {}
-        }
-
-        supplyReq.setNotes(body != null && body.containsKey("notes") && body.get("notes") != null ? body.get("notes").toString() : "Fulfilling requisition " + reqRow.get("requisition_code"));
+        supplyReq.setSalesOfficerId(targetOfficer.getId());
+        supplyReq.setNotes(body != null && body.containsKey("notes") && body.get("notes") != null ? body.get("notes").toString() : "Fulfilling requisition " + reqCode);
 
         return supplyStockToOutlet(supplyReq);
     }

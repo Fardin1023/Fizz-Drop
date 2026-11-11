@@ -414,6 +414,32 @@ public class SalesOfficerController {
             // District buffer stock
             var distInv = districtInventoryRepository.findByDistrictIdAndProductId(districtId, p.getProductId());
             pm.put("depot_buffer_stock", distInv.map(DistrictInventory::getCurrentStock).orElse(50));
+
+            // Sales Officer's own live purchased buffer stock
+            int soPurchasedStock = 0;
+            try {
+                List<Integer> list = jdbcTemplate.query(
+                    "SELECT current_stock FROM sales_officer_inventory WHERE sales_officer_id = ? AND product_id = ?",
+                    (rs, rowNum) -> rs.getInt("current_stock"),
+                    officer.getId(), p.getProductId()
+                );
+                if (!list.isEmpty()) {
+                    soPurchasedStock = Math.max(0, list.get(0));
+                } else {
+                    Integer purchased = jdbcTemplate.queryForObject(
+                        "SELECT COALESCE(SUM(quantity), 0) FROM outlet_requisitions " +
+                        "WHERE sales_officer_id = ? AND product_id = ? AND requisition_code LIKE 'SO-REQ-%' AND status IN ('DISPATCHED', 'COMPLETED')",
+                        Integer.class, officer.getId(), p.getProductId()
+                    );
+                    Integer distributed = jdbcTemplate.queryForObject(
+                        "SELECT COALESCE(SUM(quantity), 0) FROM outlet_requisitions " +
+                        "WHERE sales_officer_id = ? AND product_id = ? AND requisition_code NOT LIKE 'SO-REQ-%' AND status IN ('DISPATCHED', 'COMPLETED')",
+                        Integer.class, officer.getId(), p.getProductId()
+                    );
+                    soPurchasedStock = Math.max(0, (purchased != null ? purchased : 0) - (distributed != null ? distributed : 0));
+                }
+            } catch (Exception ignored) {}
+            pm.put("so_purchased_stock", soPurchasedStock);
             productCatalog.add(pm);
         }
 

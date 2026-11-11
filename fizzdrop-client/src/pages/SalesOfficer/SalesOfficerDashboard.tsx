@@ -71,6 +71,7 @@ interface ProductItem {
   retail_price?: number;
   image_url?: string;
   depot_buffer_stock?: number;
+  so_purchased_stock?: number;
   size_volume?: string;
 }
 
@@ -1211,18 +1212,28 @@ export const SalesOfficerDashboard: React.FC = () => {
                       </h4>
 
                       {/* Stock Buffer Badge */}
-                      <div className="mt-3 p-3 rounded-xl bg-white border border-slate-200/80 flex items-center justify-between">
-                        <div>
-                          <span className="text-[10px] uppercase font-bold text-slate-400 block">Territory Buffer</span>
-                          <span className="text-lg font-black text-emerald-700 font-mono">
-                            {p.depot_buffer_stock ?? 50}
-                          </span>
-                          <span className="text-xs text-slate-500 font-medium ml-1">cases</span>
+                      <div className="mt-3 p-3 rounded-xl bg-white border border-slate-200/80 space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-slate-400 block">Your Purchased Stock</span>
+                            <span className={`text-base font-black font-mono ${(p.so_purchased_stock ?? 0) > 0 ? 'text-indigo-700' : 'text-slate-400'}`}>
+                              {p.so_purchased_stock ?? 0}
+                            </span>
+                            <span className="text-xs text-slate-500 font-medium ml-1">cases</span>
+                          </div>
+
+                          <div className="text-right">
+                            <span className="text-[10px] uppercase font-bold text-slate-400 block">Supplier Depot</span>
+                            <span className="text-sm font-bold text-slate-600 font-mono">
+                              {p.depot_buffer_stock ?? 50}
+                            </span>
+                            <span className="text-xs text-slate-400 font-medium ml-1">cases</span>
+                          </div>
                         </div>
 
-                        <div className="text-right">
-                          <span className="text-[10px] uppercase font-bold text-slate-400 block">Wholesale Rate</span>
-                          <span className="text-xs font-bold text-slate-700 font-mono">
+                        <div className="pt-1 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                          <span className="text-slate-400">Wholesale Rate:</span>
+                          <span className="font-bold text-slate-800 font-mono">
                             ৳{Number(p.supplier_price || p.base_price || 35).toFixed(2)}
                           </span>
                         </div>
