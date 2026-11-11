@@ -336,7 +336,6 @@ export const SalesOfficerDashboard: React.FC = () => {
     setIsRequestModalOpen(true);
   };
 
-  const [dispatchingOrderId, setDispatchingOrderId] = useState<number | null>(null);
   const [loadingActionId, setLoadingActionId] = useState<number | null>(null);
 
   const handleTellSupplier = async (ord: any) => {
@@ -420,53 +419,6 @@ export const SalesOfficerDashboard: React.FC = () => {
       }
     } catch (e) {
       console.error(e);
-    }
-  };
-
-  const handleSoDispatchOrder = async (order: any) => {
-    if (!order || !order.id) return;
-    setDispatchingOrderId(order.id);
-    try {
-      const res = await fetch(`http://localhost:8080/api/v1/psr/orders/${order.id}/so-dispatch`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || data.message || 'Failed to dispatch stock');
-
-      // Realtime broadcast to Supplier, PSR and Outlet portals
-      try {
-        const bc = new BroadcastChannel('fizzdrop_realtime_events');
-        bc.postMessage({
-          recipientRole: 'SUPPLIER',
-          recipientUserId: 1,
-          title: `Stock Dispatched: ${order.quantity} cases of ${order.product_name}`,
-          message: `Sales Officer ${officer?.name || 'Tariq Rahman'} dispatched ${order.quantity} cases of ${order.product_name} to ${order.outlet_name}. Deducted from your depot stock.`,
-          type: 'STOCK_DISPATCHED',
-          referenceCode: order.order_code,
-          status: 'INFO',
-        });
-        bc.postMessage({
-          type: 'SO_ORDER_DISPATCHED',
-          order_code: order.order_code,
-          order_id: order.id,
-          outlet_id: order.outlet_id,
-          psr_id: order.psr_id,
-          quantity: order.quantity,
-          product_name: order.product_name,
-        });
-        bc.close();
-      } catch (ignored) {}
-
-      alert(`Products successfully dispatched! Stock deducted from supplier depot and delivered to ${order.outlet_name} shelf.`);
-      if (officer?.id) {
-        fetchDashboardData(officer.id);
-        fetchPsrData(officer.id);
-      }
-    } catch (err: any) {
-      alert(err.message || 'Failed to dispatch products');
-    } finally {
-      setDispatchingOrderId(null);
     }
   };
 
@@ -2058,11 +2010,11 @@ export const SalesOfficerDashboard: React.FC = () => {
                       <div className="flex items-center gap-2 shrink-0">
                         {req.status === 'PENDING' ? (
                           <span className="text-xs font-semibold text-amber-700 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200">
-                            Dispatched via PSR Route
+                            Awaiting Supplier Dispatch
                           </span>
                         ) : (
                           <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
-                            Completed & Dispatched
+                            Dispatched by Supplier to Outlet
                           </span>
                         )}
                       </div>

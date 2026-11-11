@@ -143,7 +143,6 @@ export default function PsrDashboard() {
     }
   }, [psrId]);
 
-  const [dispatchingId, setDispatchingId] = useState<number | null>(null);
   const [submittingToSoId, setSubmittingToSoId] = useState<number | null>(null);
 
   // Real-time listener for incoming Outlet Orders & Sales Officer Responses via BroadcastChannel
@@ -155,6 +154,8 @@ export default function PsrDashboard() {
         if (
           event.data?.type === 'OUTLET_ORDER_TO_PSR' ||
           event.data?.type === 'SO_ORDER_APPROVED' ||
+          event.data?.type === 'SO_STOCK_REQUEST_FOR_OUTLET' ||
+          event.data?.type === 'SUPPLIER_DISPATCHED_TO_OUTLET' ||
           event.data?.type === 'SO_ORDER_DISPATCHED' ||
           event.data?.type === 'SO_REFUND_APPROVED'
         ) {
@@ -207,40 +208,6 @@ export default function PsrDashboard() {
       alert(err.message || 'Failed to submit order');
     } finally {
       setSubmittingToSoId(null);
-    }
-  };
-
-  // Dispatch and deliver stock to outlet
-  const handleDispatchOrderToOutlet = async (order: any) => {
-    if (!order || !order.id) return;
-    setDispatchingId(order.id);
-    try {
-      const res = await fetch(`http://localhost:8080/api/v1/psr/orders/${order.id}/dispatch`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      const resData = await res.json();
-      if (!res.ok) throw new Error(resData.error || resData.message || 'Failed to dispatch stock');
-
-      // Broadcast to other tabs so Outlet immediately refreshes shelf inventory and shows chime
-      try {
-        const bc = new BroadcastChannel('fizzdrop_realtime_events');
-        bc.postMessage({
-          type: 'PSR_STOCK_DISPATCHED',
-          order_code: order.order_code,
-          outlet_id: order.outlet_id,
-          quantity: order.quantity,
-          product_name: order.product_name,
-        });
-        bc.close();
-      } catch (ignored) {}
-
-      alert(`Stock successfully dispatched to ${order.outlet_name}! The outlet has received a realtime notification and shelf stock is replenished.`);
-      loadDashboard();
-    } catch (err: any) {
-      alert(err.message || 'Failed to dispatch order');
-    } finally {
-      setDispatchingId(null);
     }
   };
 
@@ -969,21 +936,23 @@ export default function PsrDashboard() {
                               className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold inline-flex items-center gap-1 ${
                                 isDispatched
                                   ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
-                                  : ord.status === 'APPROVED_BY_SO'
-                                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300'
-                                  : ord.status === 'SUBMITTED_TO_SO'
+                                  : ord.status === 'REQUESTED_FROM_SUPPLIER' || ord.status === 'APPROVED_BY_SO'
                                   ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+                                  : ord.status === 'SUBMITTED_TO_SO'
+                                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300'
                                   : ord.status === 'SUBMITTED_TO_PSR'
                                   ? 'bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300'
                                   : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'
                               }`}
                             >
                               {isDispatched && <CheckCircle2 className="h-3 w-3" />}
-                              {ord.status === 'APPROVED_BY_SO' && <CheckCircle2 className="h-3 w-3 text-blue-600" />}
+                              {(ord.status === 'REQUESTED_FROM_SUPPLIER' || ord.status === 'APPROVED_BY_SO') && <Clock className="h-3 w-3 text-amber-600 animate-pulse" />}
                               {ord.status === 'SUBMITTED_TO_SO' && <Clock className="h-3 w-3" />}
                               {ord.status === 'SUBMITTED_TO_PSR' && <Store className="h-3 w-3 text-purple-600" />}
-                              {ord.status === 'APPROVED_BY_SO'
-                                ? 'Accepted by SO'
+                              {isDispatched
+                                ? 'Dispatched by Supplier'
+                                : ord.status === 'REQUESTED_FROM_SUPPLIER' || ord.status === 'APPROVED_BY_SO'
+                                ? 'Awaiting Supplier Dispatch'
                                 : ord.status === 'SUBMITTED_TO_SO'
                                 ? 'Requested to SO'
                                 : ord.status === 'SUBMITTED_TO_PSR'
@@ -1001,25 +970,14 @@ export default function PsrDashboard() {
                                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                                   Stock Delivered
                                 </span>
-                              ) : ord.status === 'APPROVED_BY_SO' ? (
-                                <button
-                                  onClick={() => handleDispatchOrderToOutlet(ord)}
-                                  disabled={dispatchingId === ord.id}
-                                  className="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white font-bold text-xs flex items-center justify-center gap-1 shadow-sm transition cursor-pointer disabled:opacity-50 whitespace-nowrap active:scale-95"
-                                  title="Send stock to outlet"
-                                >
-                                  {dispatchingId === ord.id ? (
-                                    <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                  ) : (
-                                    <>
-                                      <Truck className="w-3 h-3" />
-                                      <span>Send Stock</span>
-                                    </>
-                                  )}
-                                </button>
-                              ) : ord.status === 'SUBMITTED_TO_SO' ? (
+                              ) : ord.status === 'REQUESTED_FROM_SUPPLIER' || ord.status === 'APPROVED_BY_SO' ? (
                                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 text-xs font-bold border border-amber-200 dark:border-amber-800">
-                                  <Clock className="w-3.5 h-3.5 text-amber-600" />
+                                  <Clock className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
+                                  Awaiting Supplier Dispatch
+                                </span>
+                              ) : ord.status === 'SUBMITTED_TO_SO' ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 text-xs font-bold border border-blue-200 dark:border-blue-800">
+                                  <Clock className="w-3.5 h-3.5 text-blue-600" />
                                   Pending SO Approval
                                 </span>
                               ) : (

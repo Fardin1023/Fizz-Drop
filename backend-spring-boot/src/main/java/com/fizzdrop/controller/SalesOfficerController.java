@@ -556,112 +556,14 @@ public class SalesOfficerController {
     }
 
     /**
-     * Sales Officer distributes stock from their territory buffer directly to an outlet
+     * Sales Officer Direct Distribution to Outlet is disabled.
+     * All stocks to outlets are dispatched exclusively by Regional Suppliers (from SO purchased stock).
      */
     @PostMapping("/api/v1/sales-officer/distribute")
-    public ResponseEntity<?> distributeStockToOutlet(@RequestBody Map<String, Object> payload) {
-        try {
-            Long outletId = Long.parseLong(payload.get("outlet_id").toString());
-            Long productId = Long.parseLong(payload.get("product_id").toString());
-            int quantity = Integer.parseInt(payload.get("quantity").toString());
-            String notes = (String) payload.getOrDefault("notes", "Direct territory distribution by Sales Officer");
-
-            Optional<Outlet> outletOpt = outletRepository.findById(outletId);
-            if (outletOpt.isEmpty()) return ResponseEntity.badRequest().body(ApiResponse.fail("Outlet not found"));
-
-            Optional<Product> prodOpt = productRepository.findById(productId);
-            if (prodOpt.isEmpty()) return ResponseEntity.badRequest().body(ApiResponse.fail("Product not found"));
-
-            Product prod = prodOpt.get();
-
-            // Increase outlet shelf inventory
-            var invOpt = shopInventoryRepository.findByBranchIdAndProductId(outletId, productId);
-            ShopInventory inv;
-            if (invOpt.isPresent()) {
-                inv = invOpt.get();
-                inv.setStockQuantity(inv.getStockQuantity() + quantity);
-                inv.setUpdatedDate(LocalDateTime.now());
-            } else {
-                inv = new ShopInventory(outletId, productId, quantity);
-            }
-            shopInventoryRepository.save(inv);
-
-            // Deduct dispatched stock from supplier depot stock (since stocks are with the supplier)
-            Long targetDistrictId = outletOpt.get().getDistrictId() != null ? outletOpt.get().getDistrictId() : 1L;
-            districtInventoryRepository.findByDistrictIdAndProductId(targetDistrictId, productId).ifPresent(di -> {
-                di.setCurrentStock(Math.max(0, di.getCurrentStock() - quantity));
-                districtInventoryRepository.save(di);
-            });
-
-            // Determine Sales Officer ID
-            Long officerId = null;
-            if (payload.get("sales_officer_id") != null) {
-                officerId = Long.parseLong(payload.get("sales_officer_id").toString());
-            }
-            if (officerId == null) {
-                String oArea = outletOpt.get().getArea() != null ? outletOpt.get().getArea().toLowerCase() : "";
-                List<SalesOfficer> matchOfficers = salesOfficerRepository.findAll().stream()
-                        .filter(so -> so.getAssignedArea() != null &&
-                                (so.getAssignedArea().toLowerCase().contains(oArea) ||
-                                 oArea.contains(so.getAssignedArea().toLowerCase())))
-                        .toList();
-                officerId = !matchOfficers.isEmpty() ? matchOfficers.get(0).getId() : 1L;
-            }
-
-            // Financial profit calculations
-            BigDecimal costPrice = prod.getSupplierPrice() != null ? prod.getSupplierPrice() : (prod.getBasePrice() != null ? prod.getBasePrice() : BigDecimal.valueOf(35));
-            BigDecimal salePrice = prod.getOutletPrice() != null ? prod.getOutletPrice() : costPrice.multiply(BigDecimal.valueOf(1.15));
-            BigDecimal totalCost = costPrice.multiply(BigDecimal.valueOf(quantity));
-            BigDecimal totalRevenue = salePrice.multiply(BigDecimal.valueOf(quantity));
-            BigDecimal profitEarned = totalRevenue.subtract(totalCost);
-
-            // Record distribution and profit earned
-            try {
-                jdbcTemplate.update(
-                    "INSERT INTO sales_officer_distributions (sales_officer_id, outlet_id, product_id, quantity, cost_price, sale_price, total_cost, total_revenue, profit_earned, notes, distribution_date) " +
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())",
-                    officerId, outletId, productId, quantity, costPrice, salePrice, totalCost, totalRevenue, profitEarned, notes
-                );
-            } catch (Exception ex) {
-                System.err.println("Failed to insert sales_officer_distributions: " + ex.getMessage());
-            }
-
-            // Notify Supplier that stock has been dispatched from their depot
-            try {
-                SupplierProfile supplier = supplierProfileRepository.findAll().stream().findFirst().orElse(null);
-                Long supplierUserId = (supplier != null && supplier.getUserId() != null) ? supplier.getUserId() : 1L;
-                SalesOfficer so = salesOfficerRepository.findById(officerId).orElse(null);
-                String soName = so != null ? so.getName() : "Sales Officer";
-
-                AppNotification supNotif = new AppNotification();
-                supNotif.setRecipientRole("SUPPLIER");
-                supNotif.setRecipientUserId(supplierUserId);
-                supNotif.setTitle("Stock Dispatched: " + quantity + " units of " + prod.getBrand() + " " + prod.getFlavorVariant());
-                supNotif.setMessage("Sales Officer " + soName + " dispatched " + quantity + " units of " +
-                        prod.getBrand() + " " + prod.getFlavorVariant() + " to " + outletOpt.get().getOutletName() +
-                        ". Deducted from your depot stock.");
-                supNotif.setType("STOCK_DISPATCHED");
-                supNotif.setReferenceId(productId);
-                supNotif.setReferenceCode("SO-DIST-" + System.currentTimeMillis());
-                notificationRepository.save(supNotif);
-            } catch (Exception ignored) {}
-
-            return ResponseEntity.ok(Map.of(
-                    "success", true,
-                    "message", "Successfully distributed " + quantity + " units of " + prod.getBrand() + " " + prod.getFlavorVariant() + " to " + outletOpt.get().getOutletName() + "! (Profit earned: ৳" + String.format("%.2f", profitEarned) + ")",
-                    "outlet_id", outletId,
-                    "product_id", productId,
-                    "new_stock", inv.getStockQuantity(),
-                    "quantity", quantity,
-                    "profit_earned", profitEarned,
-                    "total_revenue", totalRevenue,
-                    "cost_price", costPrice,
-                    "sale_price", salePrice
-            ));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.fail("Distribution failed: " + e.getMessage()));
-        }
+    public ResponseEntity<?> distributeStockToOutlet(@RequestBody(required = false) Map<String, Object> payload) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.fail(
+                "Direct supply by Sales Officers is disabled. All stocks are supplied and dispatched to outlets exclusively by Regional Suppliers."
+        ));
     }
 
     private void enrichSalesOfficers(List<SalesOfficer> list) {
