@@ -42,6 +42,10 @@ public class DataInitializer {
             } catch (Exception ignored) {}
 
             try {
+                jdbcTemplate.execute("ALTER TABLE outlet_requisitions MODIFY COLUMN outlet_id BIGINT NULL");
+            } catch (Exception ignored) {}
+
+            try {
                 jdbcTemplate.execute(
                     "CREATE TABLE IF NOT EXISTS sales_officer_distributions (" +
                     "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +

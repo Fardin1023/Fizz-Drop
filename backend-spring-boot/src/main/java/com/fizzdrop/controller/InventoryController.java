@@ -1032,7 +1032,7 @@ public class InventoryController {
                 "r.quantity, r.unit_price, r.total_amount, r.urgency, r.status, r.sales_officer_id, r.outlet_remarks, r.created_date, r.updated_date, " +
                 "o.outlet_name, o.franchise_name, o.branch_name, o.city, o.area, o.location_address, o.contact_phone, o.district_id " +
                 "FROM outlet_requisitions r " +
-                "JOIN outlets o ON r.outlet_id = o.outlet_id " +
+                "LEFT JOIN outlets o ON r.outlet_id = o.outlet_id " +
                 "LEFT JOIN products p ON r.product_id = p.product_id " +
                 "ORDER BY r.created_date DESC LIMIT 100"
             );
@@ -1053,7 +1053,7 @@ public class InventoryController {
             Map<String, Object> map = new HashMap<>(row);
             Long prodId = ((Number) row.get("product_id")).longValue();
             String reqCode = row.get("requisition_code") != null ? row.get("requisition_code").toString() : "";
-            boolean isSoPurchase = reqCode.startsWith("SO-REQ-");
+            boolean isSoPurchase = reqCode.startsWith("SO-REQ-") || row.get("outlet_id") == null;
             map.put("is_so_purchase", isSoPurchase);
 
             // Calculate supplier's available depot stock for this product
@@ -1075,6 +1075,17 @@ public class InventoryController {
                         .filter(so -> !oArea.isEmpty() && (oArea.contains(so.getAssignedArea().toLowerCase().trim()) || so.getAssignedArea().toLowerCase().trim().contains(oArea)))
                         .findFirst()
                         .orElse(officers.isEmpty() ? null : officers.get(0));
+            }
+
+            if (isSoPurchase) {
+                String soName = (matchedSO != null) ? matchedSO.getName() : "Sales Officer";
+                String soArea = (matchedSO != null && matchedSO.getAssignedArea() != null) ? matchedSO.getAssignedArea() : "Territory";
+                map.put("outlet_id", null);
+                map.put("outlet_name", "SO Purchased Inventory Buffer (" + soName + ")");
+                map.put("branch_name", soArea + " Territory Buffer");
+                map.put("franchise_name", "Sales Officer Stock Buffer");
+                map.put("area", soArea);
+                map.put("city", (matchedSO != null && matchedSO.getCity() != null) ? matchedSO.getCity() : "Dhaka");
             }
 
             int soPurchasedStock = 0;
@@ -1124,11 +1135,11 @@ public class InventoryController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail("Outlet requisition not found."));
         }
         Map<String, Object> reqRow = reqRows.get(0);
-        Long outletId = ((Number) reqRow.get("outlet_id")).longValue();
+        Long outletId = reqRow.get("outlet_id") != null ? ((Number) reqRow.get("outlet_id")).longValue() : null;
         Long productId = ((Number) reqRow.get("product_id")).longValue();
         int requestedQty = ((Number) reqRow.get("quantity")).intValue();
         String reqCode = reqRow.get("requisition_code") != null ? reqRow.get("requisition_code").toString() : "";
-        boolean isSoPurchase = reqCode.startsWith("SO-REQ-");
+        boolean isSoPurchase = reqCode.startsWith("SO-REQ-") || outletId == null;
 
         int dispatchQty = requestedQty;
         if (isSoPurchase && body != null && body.containsKey("quantity") && body.get("quantity") != null) {
@@ -1165,7 +1176,7 @@ public class InventoryController {
         if (targetOfficer == null && reqRow.get("sales_officer_id") != null) {
             try { targetOfficer = salesOfficerRepository.findById(((Number) reqRow.get("sales_officer_id")).longValue()).orElse(null); } catch (Exception ignored) {}
         }
-        if (targetOfficer == null) {
+        if (targetOfficer == null && outletId != null) {
             Outlet o = outletRepository.findById(outletId).orElse(null);
             String oArea = o != null && o.getArea() != null ? o.getArea().toLowerCase().trim() : "";
             List<SalesOfficer> officers = salesOfficerRepository.findAll();

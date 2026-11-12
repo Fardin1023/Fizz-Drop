@@ -16,6 +16,7 @@ import {
   MapPin,
   Calendar,
   Layers,
+  Boxes,
   Send,
   UserCheck,
   Phone,
@@ -76,6 +77,7 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'PENDING' | 'DISPATCHED'>('ALL');
   const [filterUrgency, setFilterUrgency] = useState<string>('ALL');
   const [filterCategory, setFilterCategory] = useState<string>('ALL');
+  const [filterSource, setFilterSource] = useState<'ALL' | 'SO_BUFFER' | 'OUTLET_DEMAND'>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   // Dispatch Action Modal State
@@ -371,6 +373,11 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
         filterCategory === 'ALL' ||
         (r.category && r.category.toLowerCase() === filterCategory.toLowerCase());
 
+      const matchesSource =
+        filterSource === 'ALL' ||
+        (filterSource === 'SO_BUFFER' && r.is_so_purchase) ||
+        (filterSource === 'OUTLET_DEMAND' && !r.is_so_purchase);
+
       const q = searchQuery.toLowerCase();
       const matchesSearch =
         searchQuery === '' ||
@@ -380,15 +387,18 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
         r.branch_name?.toLowerCase().includes(q) ||
         r.product_name?.toLowerCase().includes(q) ||
         r.category?.toLowerCase().includes(q) ||
-        r.city?.toLowerCase().includes(q);
+        r.city?.toLowerCase().includes(q) ||
+        r.sales_officer_name?.toLowerCase().includes(q);
 
-      return matchesStatus && matchesUrgency && matchesCategory && matchesSearch;
+      return matchesStatus && matchesUrgency && matchesCategory && matchesSource && matchesSearch;
     });
-  }, [requisitions, filterStatus, filterUrgency, filterCategory, searchQuery]);
+  }, [requisitions, filterStatus, filterUrgency, filterCategory, filterSource, searchQuery]);
 
   // KPIs
   const pendingCount = requisitions.filter((r) => r.status === 'PENDING').length;
   const criticalCount = requisitions.filter((r) => r.status === 'PENDING' && r.urgency === 'CRITICAL').length;
+  const soBufferCount = requisitions.filter((r) => r.is_so_purchase).length;
+  const outletDemandCount = requisitions.filter((r) => !r.is_so_purchase).length;
   const totalUnitsRequested = requisitions
     .filter((r) => r.status === 'PENDING')
     .reduce((sum, r) => sum + r.quantity, 0);
@@ -495,6 +505,46 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
 
       {/* Toolbar & Filters */}
       <div className="p-4 rounded-3xl bg-white border border-slate-200/80 shadow-xs space-y-3">
+        {/* Demand Source Filter Tabs: Clean separation of SO Buffer Purchases vs Outlet Restock Orders */}
+        <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 pb-2.5">
+          <button
+            type="button"
+            onClick={() => setFilterSource('ALL')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              filterSource === 'ALL'
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>All Requisitions ({requisitions.length})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterSource('SO_BUFFER')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              filterSource === 'SO_BUFFER'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200/60'
+            }`}
+          >
+            <Truck className="w-3.5 h-3.5" />
+            <span>SO Buffer Purchases ({soBufferCount})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterSource('OUTLET_DEMAND')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              filterSource === 'OUTLET_DEMAND'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/60'
+            }`}
+          >
+            <Store className="w-3.5 h-3.5" />
+            <span>Outlet Demands ({outletDemandCount})</span>
+          </button>
+        </div>
+
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="relative flex-1">
             <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -656,56 +706,68 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
                     </span>
                   </div>
 
-                  {/* Sales Officer Assignment Banner */}
+                  {/* Requisition Destination & Beneficiary */}
                   {req.is_so_purchase ? (
-                    <div className="flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-50/90 border border-blue-200/90 text-xs text-blue-900 font-medium mb-1">
-                      <Truck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                      <span className="font-bold text-blue-800 uppercase tracking-wide text-[10px]">SO Stock Purchase Demand:</span>
-                      <strong className="font-bold text-blue-900">{req.sales_officer_name || "Designated Sales Officer"}</strong>
-                      {req.sales_officer_code && (
-                        <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-white text-blue-700 border border-blue-200 font-bold">
-                          {req.sales_officer_code}
+                    <div className="space-y-1 mb-2">
+                      <div className="flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-50/90 border border-blue-200 text-xs text-blue-900 font-medium">
+                        <Truck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                        <span className="font-bold text-blue-800 uppercase tracking-wide text-[10px]">
+                          Sales Officer Stock Purchase:
                         </span>
-                      )}
-                      <span className="text-blue-600 text-[11px] font-normal">
-                        • Territory: <strong className="text-blue-900">{req.sales_officer_area || req.area}</strong>
-                      </span>
-                      <span className="ml-auto text-[10px] bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded-full">
-                        Buffer Stock Requisition
-                      </span>
+                        <strong className="font-bold text-blue-900">
+                          {req.sales_officer_name || "Designated Sales Officer"}
+                        </strong>
+                        {req.sales_officer_code && (
+                          <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-white text-blue-700 border border-blue-200 font-bold">
+                            {req.sales_officer_code}
+                          </span>
+                        )}
+                        <span className="text-blue-600 text-[11px] font-normal">
+                          • Territory: <strong className="text-blue-900">{req.sales_officer_area || req.area}</strong>
+                        </span>
+                        <span className="ml-auto text-[10px] bg-blue-200/80 text-blue-900 font-extrabold px-2 py-0.5 rounded-full">
+                          SO Territory Buffer (Held at Depot)
+                        </span>
+                      </div>
+                      <div className="px-1 text-[11px] text-slate-500 font-medium flex items-center gap-1.5">
+                        <Boxes className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                        <span>
+                          <strong>Kept Separate:</strong> Purchased by Sales Officer to hold in reserve. Dispatches to individual outlets only when outlets submit orders. (No outlet assigned).
+                        </span>
+                      </div>
                     </div>
                   ) : (
-                    <div className="flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-xl bg-indigo-50/80 border border-indigo-200/80 text-xs text-indigo-900 font-medium mb-1">
-                      <UserCheck className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                      <span>Channeled via Sales Officer:</span>
-                      <strong className="font-bold text-teal-700">{req.sales_officer_name || "Designated Sales Officer"}</strong>
-                      {req.sales_officer_code && (
-                        <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-white text-indigo-700 border border-indigo-200 font-bold">
-                          {req.sales_officer_code}
+                    <div className="space-y-1 mb-2">
+                      <div className="flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-xl bg-indigo-50/80 border border-indigo-200/80 text-xs text-indigo-900 font-medium">
+                        <UserCheck className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                        <span>Channeled via Sales Officer:</span>
+                        <strong className="font-bold text-teal-700">{req.sales_officer_name || "Designated Sales Officer"}</strong>
+                        {req.sales_officer_code && (
+                          <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-white text-indigo-700 border border-indigo-200 font-bold">
+                            {req.sales_officer_code}
+                          </span>
+                        )}
+                        <span className="text-slate-500 text-[11px] font-normal">
+                          • Area: <strong className="text-slate-700">{req.sales_officer_area || req.area}</strong>
                         </span>
-                      )}
-                      <span className="text-slate-500 text-[11px] font-normal">
-                        • Area: <strong className="text-slate-700">{req.sales_officer_area || req.area}</strong>
-                      </span>
-                      {req.sales_officer_phone && (
-                        <span className="text-slate-500 text-[11px] font-mono flex items-center gap-1">
-                          <Phone className="w-2.5 h-2.5 text-slate-400" /> {req.sales_officer_phone}
+                        <span className="ml-auto text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
+                          Outlet Order (To be fulfilled from SO Stock)
                         </span>
-                      )}
+                      </div>
+                      <div className="flex items-center gap-2 text-sm sm:text-base font-black text-slate-900 pt-0.5">
+                        <Store className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span>{req.franchise_name || req.outlet_name}</span>
+                        <span className="text-slate-400 font-normal">—</span>
+                        <span className="text-emerald-700 font-bold">{req.branch_name || req.area}</span>
+                        <span className="text-xs text-slate-400 font-normal">
+                          ({req.city} • {req.area})
+                        </span>
+                      </div>
                     </div>
                   )}
 
-                  {/* Outlet & Beverage Header */}
+                  {/* Beverage & Quantity Details */}
                   <div>
-                    <div className="flex items-center gap-2 text-sm sm:text-base font-black text-slate-900">
-                      <Store className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <span>{req.franchise_name || req.outlet_name}</span>
-                      <span className="text-slate-400 font-normal">—</span>
-                      <span className="text-emerald-700 font-bold">{req.branch_name || req.area}</span>
-                      <span className="text-xs text-slate-400 font-normal">
-                        ({req.city} • {req.area})
-                      </span>
-                    </div>
 
                     <div className="flex flex-wrap items-center gap-2 text-sm text-slate-800 font-bold mt-1">
                       <Package className="w-4 h-4 text-blue-600 shrink-0" />
@@ -887,7 +949,7 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
                     ) : (
                       <div className="px-4 py-2.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-1.5">
                         <CheckCircle className="w-4 h-4 text-emerald-600" />
-                        <span>{req.is_so_purchase ? "Dispatched to SO" : "Dispatched to Outlet"}</span>
+                        <span>{req.is_so_purchase ? "Purchased & Reserved in SO Buffer" : "Dispatched to Outlet"}</span>
                       </div>
                     )}
                   </div>
@@ -975,11 +1037,19 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
                     <span className="text-[10px] text-slate-500 font-mono">{fulfillModalReq.sales_officer_code || fulfillModalReq.area}</span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-400 block">Destination Outlet:</span>
+                    <span className="text-[10px] text-slate-400 block">
+                      {fulfillModalReq.is_so_purchase ? 'Destination Buffer:' : 'Destination Outlet:'}
+                    </span>
                     <strong className="text-slate-800 dark:text-zinc-200 font-bold block truncate">
-                      {fulfillModalReq.outlet_name}
+                      {fulfillModalReq.is_so_purchase
+                        ? `Sales Officer Buffer Stock (${fulfillModalReq.sales_officer_name})`
+                        : fulfillModalReq.outlet_name}
                     </strong>
-                    <span className="text-[10px] text-slate-500 truncate block">{fulfillModalReq.location_address || fulfillModalReq.area}</span>
+                    <span className="text-[10px] text-slate-500 truncate block">
+                      {fulfillModalReq.is_so_purchase
+                        ? `Held at Depot • Territory: ${fulfillModalReq.sales_officer_area || fulfillModalReq.area}`
+                        : (fulfillModalReq.location_address || fulfillModalReq.area)}
+                    </span>
                   </div>
                 </div>
 

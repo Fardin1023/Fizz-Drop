@@ -722,20 +722,16 @@ public class SalesOfficerController {
             BigDecimal unitPrice = product.getOutletPrice() != null ? product.getOutletPrice() : (product.getBasePrice() != null ? product.getBasePrice() : BigDecimal.ZERO);
             BigDecimal totalAmount = unitPrice.multiply(BigDecimal.valueOf(quantity));
 
-            // Find an outlet in officer's area or representative outlet ID
+            // Sales Officer buffer stock purchase is separate and not assigned to any outlet yet
             String area = officer.getAssignedArea() != null ? officer.getAssignedArea() : "Territory";
-            List<Outlet> areaOutlets = outletRepository.findAll().stream()
-                    .filter(o -> o.getArea() != null && (o.getArea().equalsIgnoreCase(area) || o.getArea().toLowerCase().contains(area.toLowerCase())))
-                    .toList();
-            Long outletId = !areaOutlets.isEmpty() ? areaOutlets.get(0).getOutletId() : 2L;
 
-            // Save requisition in outlet_requisitions so supplier sees it under Area Demands
+            // Save requisition with outlet_id = null so it is held separate as SO purchased buffer stock
             jdbcTemplate.update(
                 "INSERT INTO outlet_requisitions (requisition_code, outlet_id, product_id, product_name, quantity, unit_price, total_amount, urgency, status, outlet_remarks, sales_officer_id, created_date, updated_date) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, NOW(), NOW())",
-                reqCode, outletId, productId, product.getBrand() + " " + product.getFlavorVariant(),
+                "VALUES (?, NULL, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, NOW(), NOW())",
+                reqCode, productId, product.getBrand() + " " + product.getFlavorVariant(),
                 quantity, unitPrice, totalAmount, urgency,
-                "Sales Officer Demand [" + officer.getName() + " - " + area + "]: " + notes,
+                "Sales Officer Buffer Purchase [" + officer.getName() + " - " + area + "]: " + notes,
                 officer.getId()
             );
 
