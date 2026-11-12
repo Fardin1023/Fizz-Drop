@@ -13,6 +13,7 @@ import { SuperadminSupplierManagement } from './SuperadminSupplierManagement';
 import { SuperadminSalesOfficerManagement } from './SuperadminSalesOfficerManagement';
 import { SuperadminPsrManagement } from './SuperadminPsrManagement';
 import { SuperadminCommercialLogs } from './SuperadminCommercialLogs';
+import { SuperadminDeliveryManagement } from './SuperadminDeliveryManagement';
 import {
   ShieldCheck,
   Building2,
@@ -35,6 +36,7 @@ import {
   TrendingUp,
   UserCheck,
   Store,
+  Truck,
 } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { getNotificationDestination } from '../../utils/notificationRouter';
@@ -46,9 +48,9 @@ export const SuperadminDashboard: React.FC = () => {
   const { user, isSuperadmin, isAuthenticated, logout, isLoading } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const validTabs = ['products', 'merchandise', 'requisitions', 'suppliers', 'sales-officers', 'psr-officers', 'logs', 'tables', 'outlets', 'inventory', 'query'];
+  const validTabs = ['products', 'merchandise', 'requisitions', 'suppliers', 'sales-officers', 'psr-officers', 'deliveries', 'logs', 'tables', 'outlets', 'inventory', 'query'];
   const initialTab = (searchParams.get('tab') as any) || 'products';
-  const [activeTab, setActiveTab] = useState<'products' | 'merchandise' | 'requisitions' | 'suppliers' | 'sales-officers' | 'psr-officers' | 'logs' | 'tables' | 'outlets' | 'inventory' | 'query'>(
+  const [activeTab, setActiveTab] = useState<'products' | 'merchandise' | 'requisitions' | 'suppliers' | 'sales-officers' | 'psr-officers' | 'deliveries' | 'logs' | 'tables' | 'outlets' | 'inventory' | 'query'>(
     validTabs.includes(initialTab) ? initialTab : 'products'
   );
 
@@ -186,6 +188,15 @@ export const SuperadminDashboard: React.FC = () => {
       icon: Store,
       gradient: 'from-orange-500 via-amber-500 to-yellow-500',
       badge: 'Field Beats',
+    },
+    {
+      id: 'deliveries' as const,
+      label: 'Vehicle Fleets & Outlet Deliveries',
+      shortLabel: 'Fleet Deliveries',
+      desc: 'Monitor supplier delivery teams, vehicle trips & subroute dispatches',
+      icon: Truck,
+      gradient: 'from-purple-600 via-indigo-600 to-blue-600',
+      badge: 'Fleets',
     },
     {
       id: 'logs' as const,
@@ -491,6 +502,7 @@ export const SuperadminDashboard: React.FC = () => {
           {activeTab === 'suppliers' && <SuperadminSupplierManagement />}
           {activeTab === 'sales-officers' && <SuperadminSalesOfficerManagement />}
           {activeTab === 'psr-officers' && <SuperadminPsrManagement />}
+          {activeTab === 'deliveries' && <SuperadminDeliveryManagement />}
           {activeTab === 'logs' && <SuperadminCommercialLogs />}
           {activeTab === 'tables' && (
             <DatabaseExplorer onOpenQueryWithTable={handleOpenQueryWithTable} />

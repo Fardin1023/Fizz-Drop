@@ -8,6 +8,7 @@ import { SupplierTransactionsView } from './SupplierTransactionsView';
 import { SupplierAllocatedOutlets } from './SupplierAllocatedOutlets';
 import { SupplierOutletRequisitions } from './SupplierOutletRequisitions';
 import { SupplierStockSalesTracking } from './SupplierStockSalesTracking';
+import { SupplierDeliveryManagement } from './SupplierDeliveryManagement';
 import { SupplierWalletModal } from './SupplierWalletModal';
 import {
   Package,
@@ -39,8 +40,8 @@ export const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = (searchParams.get('tab') as any) || 'outlet-requests';
-  const validTabs = ['outlet-requests', 'stock-sales-dispatch', 'request', 'history', 'outlets', 'profile', 'transactions'];
-  const [activeTab, setActiveTab] = useState<'outlet-requests' | 'stock-sales-dispatch' | 'request' | 'history' | 'outlets' | 'profile' | 'transactions'>(
+  const validTabs = ['outlet-requests', 'stock-sales-dispatch', 'delivery-fleet', 'request', 'history', 'outlets', 'profile', 'transactions'];
+  const [activeTab, setActiveTab] = useState<'outlet-requests' | 'stock-sales-dispatch' | 'delivery-fleet' | 'request' | 'history' | 'outlets' | 'profile' | 'transactions'>(
     validTabs.includes(initialTab) ? initialTab : 'outlet-requests'
   );
 
@@ -157,6 +158,15 @@ export const AdminDashboard: React.FC = () => {
       icon: TrendingUp,
       gradient: 'from-blue-600 via-indigo-600 to-purple-600',
       badge: 'Fulfillment',
+    },
+    {
+      id: 'delivery-fleet' as const,
+      label: 'Vehicle Deliveries & Fleet Logistics',
+      shortLabel: 'Vehicle Deliveries',
+      desc: 'Dispatch vehicles, manage delivery teams & fulfill subroutes',
+      icon: Truck,
+      gradient: 'from-blue-600 via-indigo-600 to-cyan-600',
+      badge: 'Fleet',
     },
     {
       id: 'request' as const,
@@ -443,6 +453,9 @@ export const AdminDashboard: React.FC = () => {
                 setActiveTab('request');
               }}
             />
+          )}
+          {activeTab === 'delivery-fleet' && (
+            <SupplierDeliveryManagement userId={user?.user_id || 4} />
           )}
           {activeTab === 'request' && (
             <SupplierRequestStock

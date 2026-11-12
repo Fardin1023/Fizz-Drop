@@ -197,6 +197,65 @@ public class DataInitializer {
                 );
             } catch (Exception ignored) {}
 
+            // Supplier Delivery Teams (Fleet Vehicles, Registration No. for Tracking, Members)
+            try {
+                jdbcTemplate.execute(
+                    "CREATE TABLE IF NOT EXISTS supplier_delivery_teams (" +
+                    "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
+                    "supplier_id BIGINT NOT NULL, " +
+                    "team_name VARCHAR(120) NOT NULL, " +
+                    "vehicle_registration_no VARCHAR(100) NOT NULL, " +
+                    "vehicle_type VARCHAR(60) NOT NULL DEFAULT 'Covered Van', " +
+                    "driver_name VARCHAR(100) NOT NULL, " +
+                    "driver_phone VARCHAR(50) NOT NULL, " +
+                    "team_members TEXT, " +
+                    "max_capacity_cases INT NOT NULL DEFAULT 250, " +
+                    "status VARCHAR(30) NOT NULL DEFAULT 'AVAILABLE', " +
+                    "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, " +
+                    "updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, " +
+                    "INDEX idx_sdt_supplier (supplier_id), " +
+                    "INDEX idx_sdt_reg (vehicle_registration_no)" +
+                    ")"
+                );
+
+                Integer teamCount = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM supplier_delivery_teams", Integer.class
+                );
+                if (teamCount == null || teamCount == 0) {
+                    jdbcTemplate.update(
+                        "INSERT INTO supplier_delivery_teams (supplier_id, team_name, vehicle_registration_no, vehicle_type, driver_name, driver_phone, team_members, max_capacity_cases, status, created_at, updated_at) VALUES " +
+                        "(1, 'Gulshan Express Logistics Fleet #1', 'DHA-METRO-TA-14-8890', 'Covered Van', 'Rafiqul Islam', '01712-345678', 'Rafiqul Islam (Lead Driver), Kamal Hossain (Logistics Assistant), Sajid Ahmed (Loader)', 250, 'AVAILABLE', NOW(), NOW()), " +
+                        "(1, 'Banani Fast-Track Delivery Fleet #2', 'DHA-METRO-TA-18-2234', 'Medium Truck', 'Abdul Mannan', '01823-987654', 'Abdul Mannan (Lead Driver), Sohel Rana (Delivery Officer)', 350, 'AVAILABLE', NOW(), NOW())"
+                    );
+                }
+            } catch (Exception ignored) {}
+
+            // Supplier Delivery Dispatches (Vehicle Trips to Outlets via Subroutes)
+            try {
+                jdbcTemplate.execute(
+                    "CREATE TABLE IF NOT EXISTS supplier_delivery_dispatches (" +
+                    "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
+                    "dispatch_code VARCHAR(100) NOT NULL UNIQUE, " +
+                    "supplier_id BIGINT NOT NULL, " +
+                    "delivery_team_id BIGINT NOT NULL, " +
+                    "sub_route VARCHAR(255) NOT NULL, " +
+                    "total_cases INT NOT NULL DEFAULT 0, " +
+                    "total_outlets INT NOT NULL DEFAULT 0, " +
+                    "status VARCHAR(50) NOT NULL DEFAULT 'DISPATCHED', " +
+                    "items_json LONGTEXT, " +
+                    "notes TEXT, " +
+                    "dispatched_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, " +
+                    "delivered_at DATETIME NULL, " +
+                    "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, " +
+                    "updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, " +
+                    "INDEX idx_sdd_supplier (supplier_id), " +
+                    "INDEX idx_sdd_team (delivery_team_id), " +
+                    "INDEX idx_sdd_subroute (sub_route), " +
+                    "INDEX idx_sdd_status (status)" +
+                    ")"
+                );
+            } catch (Exception ignored) {}
+
             // Pre-Sales Officers and Outlets are cleanly created and assigned by the Superadmin and Sales Officers.
         };
     }
