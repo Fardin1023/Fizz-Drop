@@ -42,6 +42,7 @@ import { useNotifications } from '../../hooks/useNotifications';
 import { NotificationDropdown } from '../../components/Notifications/NotificationDropdown';
 import { NotificationPopup } from '../../components/Notifications/NotificationPopup';
 import DeliveryFleetMap, { type VehicleDispatch } from '../../components/Map/DeliveryFleetMap';
+import salesOfficerLogo from '../../assets/img/sales-officer-logo.jpg';
 
 interface TerritoryOutlet {
   outlet_id: number;
@@ -788,10 +789,12 @@ export const SalesOfficerDashboard: React.FC = () => {
                 <span className="hidden sm:inline">Storefront</span>
               </Link>
 
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20 shrink-0">
-                  <UserCheck className="w-4 h-4" />
-                </div>
+              <div className="flex items-center gap-2.5">
+                <img
+                  src={salesOfficerLogo}
+                  alt="Sales Officer Logo"
+                  className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl object-cover shadow-md shadow-indigo-500/25 border border-indigo-400/40 shrink-0"
+                />
                 <div>
                   <div className="flex items-center gap-1.5">
                     <span className="font-oswald text-base font-bold uppercase tracking-wider text-slate-900">
@@ -899,9 +902,11 @@ export const SalesOfficerDashboard: React.FC = () => {
           
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
             <div className="flex items-start gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-500 to-indigo-500 text-white flex items-center justify-center font-bold text-xl shadow-lg shadow-blue-500/30 shrink-0">
-                {officer?.officer_code.split('-')[1] || 'SO'}
-              </div>
+              <img
+                src={salesOfficerLogo}
+                alt="Sales Officer Emblem"
+                className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover shadow-2xl border-2 border-indigo-400/40 shrink-0 bg-slate-900/60"
+              />
               <div className="space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-200 border border-blue-400/30">
