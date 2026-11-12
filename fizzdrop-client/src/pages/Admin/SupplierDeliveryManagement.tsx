@@ -257,6 +257,7 @@ export const SupplierDeliveryManagement: React.FC<SupplierDeliveryManagementProp
           team_members: '',
           max_capacity_cases: 250,
         });
+        setActiveSubTab('teams');
         fetchData();
       } else {
         setErrorMsg(data.message || 'Failed to create delivery team.');
@@ -398,14 +399,13 @@ export const SupplierDeliveryManagement: React.FC<SupplierDeliveryManagementProp
           </p>
         </div>
 
-        <div className="flex items-center gap-2 self-start md:self-auto">
+        <div className="flex items-center gap-2 self-start md:self-auto flex-wrap">
           <button
-            onClick={fetchData}
-            disabled={loading}
-            className="p-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all cursor-pointer"
-            title="Refresh Deliveries"
+            onClick={() => setIsNewTeamModalOpen(true)}
+            className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs shadow-md shadow-emerald-600/20 flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <Plus className="w-4 h-4" />
+            <span>Create Delivery Team</span>
           </button>
           <button
             onClick={() => setActiveSubTab('new-dispatch')}
@@ -413,6 +413,14 @@ export const SupplierDeliveryManagement: React.FC<SupplierDeliveryManagementProp
           >
             <Send className="w-3.5 h-3.5" />
             <span>Dispatch Vehicle to Outlets</span>
+          </button>
+          <button
+            onClick={fetchData}
+            disabled={loading}
+            className="p-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all cursor-pointer"
+            title="Refresh Deliveries"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </div>
@@ -439,11 +447,23 @@ export const SupplierDeliveryManagement: React.FC<SupplierDeliveryManagementProp
 
       {/* Quick Metrics KPI Strip */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-        <div className="p-4 rounded-3xl bg-white border border-slate-200/80 shadow-2xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">Delivery Fleets</span>
-          <div className="flex items-baseline gap-2">
-            <span className="font-oswald text-2xl font-black text-slate-900">{teams.length}</span>
-            <span className="text-[11px] text-emerald-600 font-bold">{availableTeamsCount} Available</span>
+        <div className="p-4 rounded-3xl bg-white border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-0.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Delivery Fleets</span>
+              <button
+                onClick={() => setIsNewTeamModalOpen(true)}
+                className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-0.5 cursor-pointer"
+                title="Create Delivery Team"
+              >
+                <Plus className="w-2.5 h-2.5" />
+                <span>Add</span>
+              </button>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="font-oswald text-2xl font-black text-slate-900">{teams.length}</span>
+              <span className="text-[11px] text-emerald-600 font-bold">{availableTeamsCount} Available</span>
+            </div>
           </div>
           <span className="text-[10px] text-slate-500 block mt-0.5">Supplier logistics vehicles</span>
         </div>
@@ -815,9 +835,19 @@ export const SupplierDeliveryManagement: React.FC<SupplierDeliveryManagementProp
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Step 1: Select Team & Vehicle */}
             <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-700 block">
-                1. Select Delivery Team & Vehicle <span className="text-rose-500">*</span>
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-700 block">
+                  1. Select Delivery Team & Vehicle <span className="text-rose-500">*</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setIsNewTeamModalOpen(true)}
+                  className="text-[11px] font-bold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-0.5 cursor-pointer"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>Create Team</span>
+                </button>
+              </div>
               <select
                 value={selectedTeamId}
                 onChange={(e) => setSelectedTeamId(e.target.value ? Number(e.target.value) : '')}
@@ -830,6 +860,22 @@ export const SupplierDeliveryManagement: React.FC<SupplierDeliveryManagementProp
                   </option>
                 ))}
               </select>
+
+              {teams.length === 0 && (
+                <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-center justify-between gap-2 mt-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span className="truncate">No delivery teams created yet.</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsNewTeamModalOpen(true)}
+                    className="px-2.5 py-1 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] shadow-xs shrink-0 cursor-pointer"
+                  >
+                    + Create Team
+                  </button>
+                </div>
+              )}
 
               {selectedTeamId && (
                 (() => {
@@ -1118,12 +1164,32 @@ export const SupplierDeliveryManagement: React.FC<SupplierDeliveryManagementProp
               className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-xs shadow-md shadow-blue-600/20 flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 shrink-0"
             >
               <Plus className="w-4 h-4" />
-              <span>Register Delivery Team</span>
+              <span>Create Delivery Team</span>
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {teams.map((t) => (
+          {teams.length === 0 ? (
+            <div className="bg-white rounded-3xl border-2 border-dashed border-slate-200 p-8 sm:p-12 text-center space-y-3.5">
+              <div className="w-14 h-14 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto shadow-2xs">
+                <Truck className="w-7 h-7" />
+              </div>
+              <div className="space-y-1">
+                <h4 className="font-oswald text-lg font-bold text-slate-900 tracking-tight">No Delivery Teams Created Yet</h4>
+                <p className="text-xs text-slate-500 max-w-md mx-auto">
+                  Register your logistics fleet vehicles, driver contact info, vehicle registration tracking numbers, and delivery crew members to fulfill outlet dispatches.
+                </p>
+              </div>
+              <button
+                onClick={() => setIsNewTeamModalOpen(true)}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs shadow-md shadow-blue-500/25 transition-all cursor-pointer active:scale-95"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Create Delivery Team</span>
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {teams.map((t) => (
               <div
                 key={t.id}
                 className="bg-white p-5 rounded-3xl border border-slate-200/90 shadow-2xs flex flex-col justify-between space-y-3 hover:border-slate-300 transition-all"
@@ -1182,7 +1248,8 @@ export const SupplierDeliveryManagement: React.FC<SupplierDeliveryManagementProp
                 </div>
               </div>
             ))}
-          </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1193,7 +1260,7 @@ export const SupplierDeliveryManagement: React.FC<SupplierDeliveryManagementProp
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="font-oswald text-lg font-bold text-slate-900 flex items-center gap-2">
                 <Truck className="w-5 h-5 text-blue-600" />
-                <span>Register Supplier Delivery Team & Vehicle</span>
+                <span>Create Supplier Delivery Team & Vehicle</span>
               </h3>
               <button
                 onClick={() => setIsNewTeamModalOpen(false)}
@@ -1317,7 +1384,7 @@ export const SupplierDeliveryManagement: React.FC<SupplierDeliveryManagementProp
                   disabled={actionLoading}
                   className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold cursor-pointer"
                 >
-                  {actionLoading ? 'Saving...' : 'Register Team'}
+                  {actionLoading ? 'Saving...' : 'Create Team'}
                 </button>
               </div>
             </form>
