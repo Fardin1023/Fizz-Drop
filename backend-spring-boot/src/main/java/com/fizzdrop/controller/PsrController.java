@@ -809,13 +809,13 @@ public class PsrController {
             }
             inventoryRepository.save(inv);
 
-            // 5. Record Sales Officer Distribution & Financial Profit Ledger
+            // 5. Record Sales Officer Distribution (SO earns 0 profit; SO only achieves monthly target)
             Product prod = productRepository.findById(productId).orElse(null);
             BigDecimal costPrice = (prod != null && prod.getSupplierPrice() != null) ? prod.getSupplierPrice() : BigDecimal.valueOf(35);
             BigDecimal salePrice = (prod != null && prod.getOutletPrice() != null) ? prod.getOutletPrice() : costPrice.multiply(BigDecimal.valueOf(1.15));
             BigDecimal totalCost = costPrice.multiply(BigDecimal.valueOf(quantity));
             BigDecimal totalRevenue = salePrice.multiply(BigDecimal.valueOf(quantity));
-            BigDecimal profitEarned = totalRevenue.subtract(totalCost);
+            BigDecimal profitEarned = BigDecimal.ZERO;
 
             try {
                 jdbcTemplate.update(

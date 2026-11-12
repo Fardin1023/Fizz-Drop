@@ -46,8 +46,6 @@ export interface OutletRequisitionItem {
   total_amount?: number;
   supplier_buy_rate?: number;
   outlet_sell_rate?: number;
-  supplier_profit_per_unit?: number;
-  supplier_total_profit?: number;
   created_date: string;
   updated_date?: string;
   supplier_available_stock: number;
@@ -243,9 +241,8 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
           outlet_name: fulfillModalReq.outlet_name,
           product_name: fulfillModalReq.product_name,
           quantity: fulfillQty,
-          profit_earned: data.profit_earned,
           title: `Stock Dispatched to ${fulfillModalReq.outlet_name}`,
-          message: `Supplier has dispatched ${fulfillQty} cases of ${fulfillModalReq.product_name} to ${fulfillModalReq.outlet_name} from your purchased stock. Profit has been credited to your wholesale ledger.`,
+          message: `Supplier has dispatched ${fulfillQty} cases of ${fulfillModalReq.product_name} to ${fulfillModalReq.outlet_name} from your purchased stock towards your monthly target achievement.`,
         });
         soChannel.postMessage({
           type: 'SALES_OFFICER_PURCHASE_CONFIRMED',
@@ -328,9 +325,8 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
           outlet_name: req.outlet_name,
           product_name: req.product_name,
           quantity: req.quantity,
-          profit_earned: data.profit_earned,
           title: `Stock Dispatched to ${req.outlet_name}`,
-          message: `Supplier has dispatched ${req.quantity} cases of ${req.product_name} to ${req.outlet_name} from your purchased stock. Profit has been credited to your wholesale ledger.`,
+          message: `Supplier has dispatched ${req.quantity} cases of ${req.product_name} to ${req.outlet_name} from your purchased stock towards your monthly target achievement.`,
         });
         soChannel.postMessage({
           type: 'SALES_OFFICER_PURCHASE_CONFIRMED',
@@ -731,14 +727,6 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
                         <span>Wholesale: <strong className="text-slate-800">৳{Number(req.unit_price).toFixed(2)}</strong></span>
                         <span>•</span>
                         <span>Total: <strong className="text-indigo-700">৳{Number(req.total_amount || (Number(req.unit_price) * req.quantity)).toFixed(2)}</strong></span>
-                        {req.supplier_total_profit && Number(req.supplier_total_profit) > 0 && (
-                          <>
-                            <span>•</span>
-                            <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                              Profit: +৳{Number(req.supplier_total_profit).toFixed(2)}
-                            </span>
-                          </>
-                        )}
                       </div>
                     )}
 

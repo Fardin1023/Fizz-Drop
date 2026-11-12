@@ -529,7 +529,7 @@ public class SalesOfficerController {
         }
         boolean isTargetMet = amountSpent.compareTo(monthlyTarget) >= 0;
 
-        // Query profit gained and distributions to outlets
+        // Query distributions to outlets (SO receives NO profit - SO only achieves monthly target)
         BigDecimal totalProfitGained = BigDecimal.ZERO;
         BigDecimal totalDistributionRevenue = BigDecimal.ZERO;
         BigDecimal totalDistributionCost = BigDecimal.ZERO;
@@ -537,15 +537,13 @@ public class SalesOfficerController {
 
         try {
             Map<String, Object> summary = jdbcTemplate.queryForMap(
-                "SELECT COALESCE(SUM(profit_earned), 0) as total_profit, " +
-                "COALESCE(SUM(total_revenue), 0) as total_revenue, " +
+                "SELECT COALESCE(SUM(total_revenue), 0) as total_revenue, " +
                 "COALESCE(SUM(total_cost), 0) as total_cost, " +
                 "COALESCE(SUM(quantity), 0) as total_units " +
                 "FROM sales_officer_distributions WHERE sales_officer_id = ?",
                 officer.getId()
             );
             if (summary != null) {
-                if (summary.get("total_profit") != null) totalProfitGained = new BigDecimal(summary.get("total_profit").toString()).setScale(2, java.math.RoundingMode.HALF_UP);
                 if (summary.get("total_revenue") != null) totalDistributionRevenue = new BigDecimal(summary.get("total_revenue").toString()).setScale(2, java.math.RoundingMode.HALF_UP);
                 if (summary.get("total_cost") != null) totalDistributionCost = new BigDecimal(summary.get("total_cost").toString()).setScale(2, java.math.RoundingMode.HALF_UP);
                 if (summary.get("total_units") != null) totalUnitsSold = ((Number) summary.get("total_units")).intValue();

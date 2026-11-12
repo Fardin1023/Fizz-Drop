@@ -161,9 +161,9 @@ export const SalesOfficerDashboard: React.FC = () => {
   const { user, isAuthenticated, logout, loginAsSalesOfficer, isSalesOfficer, isSuperadmin } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const validTabs = ['overview', 'psr-team', 'profit-ledger', 'outlets', 'demands', 'supplier-link'];
+  const validTabs = ['overview', 'psr-team', 'profit-ledger', 'distributions', 'outlets', 'demands', 'supplier-link'];
   const initialTab = (searchParams.get('tab') as any) || 'overview';
-  const [activeTab, setActiveTab] = useState<'overview' | 'psr-team' | 'profit-ledger' | 'outlets' | 'demands' | 'supplier-link'>(
+  const [activeTab, setActiveTab] = useState<'overview' | 'psr-team' | 'profit-ledger' | 'distributions' | 'outlets' | 'demands' | 'supplier-link'>(
     validTabs.includes(initialTab) ? initialTab : 'overview'
   );
 
@@ -345,7 +345,7 @@ export const SalesOfficerDashboard: React.FC = () => {
             }
             if (payload?.type === 'SUPPLIER_DISPATCHED_TO_OUTLET') {
               setActionSuccessMsg(
-                payload.message || `Supplier has dispatched stock to ${payload.outlet_name || 'outlet'}! Wholesale profit updated.`
+                payload.message || `Supplier has dispatched stock to ${payload.outlet_name || 'outlet'}! Territory restock updated towards monthly target.`
               );
             }
           }
@@ -902,7 +902,7 @@ export const SalesOfficerDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* 3. MONTHLY TARGET & WHOLESALE PROFIT COMMAND CENTER */}
+        {/* 3. MONTHLY TARGET & RESTOCK COMMAND CENTER */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Card 1: Monthly Purchase Target & Live Deductions */}
           <div className="p-5 rounded-3xl bg-gradient-to-br from-indigo-900 via-slate-900 to-blue-950 text-white border border-indigo-500/30 shadow-xl relative overflow-hidden flex flex-col justify-between">
@@ -975,62 +975,62 @@ export const SalesOfficerDashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* Card 2: Wholesale Profit Gained from Outlets */}
-          <div className="p-5 rounded-3xl bg-gradient-to-br from-emerald-950 via-slate-900 to-teal-950 text-white border border-emerald-500/30 shadow-xl relative overflow-hidden flex flex-col justify-between">
-            <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
+          {/* Card 2: Territory Outlet Restocks & Quota Achievement */}
+          <div className="p-5 rounded-3xl bg-gradient-to-br from-teal-950 via-slate-900 to-cyan-950 text-white border border-teal-500/30 shadow-xl relative overflow-hidden flex flex-col justify-between">
+            <div className="absolute top-0 right-0 w-48 h-48 bg-teal-500/10 rounded-full blur-2xl pointer-events-none" />
             <div className="relative z-10">
               <div className="flex items-center justify-between mb-3">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-200 border border-emerald-400/30">
-                  <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
-                  Wholesale Earnings & Margins
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-teal-500/20 text-teal-200 border border-teal-400/30">
+                  <Truck className="w-3.5 h-3.5 text-teal-400" />
+                  Territory Distribution Volume
                 </span>
-                <span className="text-[10px] font-bold font-mono px-2.5 py-0.5 rounded-full bg-emerald-500/30 text-emerald-200 border border-emerald-400/40">
-                  REVENUE SHARE
+                <span className="text-[10px] font-bold font-mono px-2.5 py-0.5 rounded-full bg-teal-500/30 text-teal-200 border border-teal-400/40">
+                  TARGET PROGRESS
                 </span>
               </div>
 
               <div className="space-y-1">
-                <span className="text-[11px] text-emerald-200 font-semibold uppercase tracking-wider block">
-                  Net Profit Gained from Outlet Sales
+                <span className="text-[11px] text-teal-200 font-semibold uppercase tracking-wider block">
+                  Dispatched to Retail Outlets
                 </span>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-emerald-400">
-                    +৳{Number(financialTarget?.total_profit_gained ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  <span className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-teal-300">
+                    {financialTarget?.total_units_sold_to_outlets ?? 0} Cases
                   </span>
                 </div>
-                <p className="text-xs text-emerald-200/80">
-                  Gained by distributing <strong className="text-white font-mono">{financialTarget?.total_units_sold_to_outlets ?? 0} cases</strong> to retail branches
+                <p className="text-xs text-teal-200/80">
+                  Stock delivered to franchise branches towards meeting assigned monthly quota
                 </p>
               </div>
 
               {/* Breakdown Grid */}
-              <div className="mt-4 grid grid-cols-2 gap-2 pt-3 border-t border-emerald-500/20 text-xs">
+              <div className="mt-4 grid grid-cols-2 gap-2 pt-3 border-t border-teal-500/20 text-xs">
                 <div className="p-2.5 rounded-2xl bg-white/5 border border-white/5">
-                  <span className="text-[10px] text-slate-400 block uppercase font-bold">Store Invoiced Revenue</span>
-                  <span className="font-mono font-bold text-white text-sm">
-                    ৳{Number(financialTarget?.total_distribution_revenue ?? 0).toLocaleString()}
+                  <span className="text-[10px] text-slate-400 block uppercase font-bold">Target Achieved</span>
+                  <span className="font-mono font-bold text-teal-300 text-sm">
+                    ৳{Number(financialTarget?.amount_spent ?? 0).toLocaleString()}
                   </span>
                 </div>
                 <div className="p-2.5 rounded-2xl bg-white/5 border border-white/5">
-                  <span className="text-[10px] text-slate-400 block uppercase font-bold">Stock Purchase Cost</span>
-                  <span className="font-mono font-bold text-slate-300 text-sm">
-                    ৳{Number(financialTarget?.total_distribution_cost ?? 0).toLocaleString()}
+                  <span className="text-[10px] text-slate-400 block uppercase font-bold">Quota Fulfillment</span>
+                  <span className="font-mono font-bold text-slate-200 text-sm">
+                    {financialTarget?.progress_percentage ?? 0}%
                   </span>
                 </div>
               </div>
             </div>
 
-            <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-[11px] text-emerald-200 relative z-10">
+            <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-[11px] text-teal-200 relative z-10">
               <span className="flex items-center gap-1.5">
-                <Award className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Profit Margin: <strong>{financialTarget?.total_distribution_revenue ? ((financialTarget.total_profit_gained / financialTarget.total_distribution_revenue) * 100).toFixed(1) : '15.0'}%</strong></span>
+                <Award className="w-3.5 h-3.5 text-teal-400" />
+                <span>Active Outlets: <strong>{outlets.length} Stores</strong></span>
               </span>
               <button
                 type="button"
-                onClick={() => setActiveTab('profit-ledger')}
-                className="text-[10px] text-emerald-300 hover:text-white font-bold underline cursor-pointer"
+                onClick={() => setActiveTab('distributions')}
+                className="text-[10px] text-teal-300 hover:text-white font-bold underline cursor-pointer"
               >
-                View Profit Ledger →
+                View Restock Logs →
               </button>
             </div>
           </div>
@@ -1127,7 +1127,7 @@ export const SalesOfficerDashboard: React.FC = () => {
             {[
               { id: 'overview', label: 'Territory Hub & Stock Buffer', icon: Boxes },
               { id: 'psr-team', label: `Pre-Sales (PSR) Team & Sub-Routes (${psrs.length})`, icon: UserCheck },
-              { id: 'profit-ledger', label: `Wholesale Profit & Target (${distributions.length})`, icon: TrendingUp },
+              { id: 'distributions', label: `Outlet Restock Distributions (${distributions.length})`, icon: Truck },
               { id: 'outlets', label: `Retail Stores (${outlets.length})`, icon: Store },
               { id: 'supplier-link', label: 'Supplier Depot & Logistics', icon: Building2 },
             ].map((tab) => {
@@ -1654,8 +1654,8 @@ export const SalesOfficerDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* TAB: WHOLESALE PROFIT & MONTHLY TARGET LEDGER */}
-        {activeTab === 'profit-ledger' && (
+        {/* TAB: TERRITORY RESTOCK DISTRIBUTIONS & MONTHLY TARGET LEDGER */}
+        {(activeTab === 'distributions' || activeTab === 'profit-ledger') && (
           <div className="space-y-5">
             {/* 1. Monthly Target & Requisition Deduction Breakdown */}
             <div className="rounded-3xl bg-white border border-slate-200/90 p-5 shadow-xs space-y-4">
@@ -1762,37 +1762,37 @@ export const SalesOfficerDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* 2. Retail Outlet Profit Ledger */}
+            {/* 2. Retail Outlet Distribution Tracking */}
             <div className="rounded-3xl bg-white border border-slate-200/90 p-5 shadow-xs space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center shrink-0">
-                    <TrendingUp className="w-5 h-5" />
+                  <div className="w-9 h-9 rounded-xl bg-teal-50 border border-teal-200 text-teal-700 flex items-center justify-center shrink-0">
+                    <Truck className="w-5 h-5" />
                   </div>
                   <div>
                     <h3 className="font-oswald text-lg font-bold uppercase tracking-wide text-slate-900">
-                      Wholesale Profit Gained from Outlet Sales
+                      Territory Outlet Stock Distributions
                     </h3>
                     <p className="text-xs text-slate-500">
-                      Real-time profit earned by supplying beverage cases to supermarkets & retail stores in {officer?.assigned_area}.
+                      Cases dispatched by Regional Supplier to retail stores in {officer?.assigned_area} towards achieving your monthly quota.
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="font-mono text-xs px-3 py-1 rounded-xl bg-emerald-100 text-emerald-800 font-black border border-emerald-300">
-                    Total Profit: +৳{Number(financialTarget?.total_profit_gained ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  <span className="font-mono text-xs px-3 py-1 rounded-xl bg-teal-100 text-teal-800 font-bold border border-teal-300">
+                    Total Delivered: {financialTarget?.total_units_sold_to_outlets ?? 0} Cases
                   </span>
                 </div>
               </div>
 
-              {/* Profit Ledger Table */}
+              {/* Distributions Table */}
               {distributions.length === 0 ? (
                 <div className="p-8 text-center text-slate-400 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
-                  <TrendingUp className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+                  <Truck className="w-10 h-10 mx-auto mb-2 text-slate-300" />
                   <p className="font-bold text-slate-700 text-sm">No Outlet Distributions Logged Yet</p>
                   <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
-                    When PSRs fulfill outlet orders in your territory, the exact wholesale revenue, purchase cost, and net profit will be recorded here permanently.
+                    When Regional Supplier fulfills outlet orders in your territory from your purchased buffer stock, the restock delivery records towards your monthly target will appear here.
                   </p>
                 </div>
               ) : (
@@ -1804,10 +1804,10 @@ export const SalesOfficerDashboard: React.FC = () => {
                         <th className="py-2.5 px-3">Target Retail Outlet</th>
                         <th className="py-2.5 px-3">Product</th>
                         <th className="py-2.5 px-3 text-center">Cases</th>
-                        <th className="py-2.5 px-3 text-right">Buy Price</th>
-                        <th className="py-2.5 px-3 text-right">Sale Price</th>
-                        <th className="py-2.5 px-3 text-right">Total Revenue</th>
-                        <th className="py-2.5 px-3 text-right font-black text-emerald-700">Net Profit Gained</th>
+                        <th className="py-2.5 px-3 text-right">Cost Rate</th>
+                        <th className="py-2.5 px-3 text-right">Outlet Rate</th>
+                        <th className="py-2.5 px-3 text-right">Total Invoiced</th>
+                        <th className="py-2.5 px-3 text-center">Status</th>
                         <th className="py-2.5 px-3">Notes</th>
                       </tr>
                     </thead>
@@ -1837,8 +1837,10 @@ export const SalesOfficerDashboard: React.FC = () => {
                           <td className="py-2.5 px-3 text-right font-semibold text-slate-800">
                             ৳{Number(d.total_revenue).toFixed(2)}
                           </td>
-                          <td className="py-2.5 px-3 text-right font-black text-emerald-600 bg-emerald-50/50">
-                            +৳{Number(d.profit_earned).toFixed(2)}
+                          <td className="py-2.5 px-3 font-sans text-center">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              Dispatched
+                            </span>
                           </td>
                           <td className="py-2.5 px-3 font-sans text-slate-500 text-[10px] truncate max-w-[150px]">
                             {d.notes || 'Direct distribution'}

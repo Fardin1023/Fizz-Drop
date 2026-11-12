@@ -315,16 +315,18 @@ public class InventoryController {
             } catch (Exception ignored) {}
         }
 
-        // Record Sales Officer Profit & Distribution Ledger when Supplier dispatches to outlet from SO purchased stock
-        BigDecimal soCostPrice = product.getSupplierPrice() != null ? product.getSupplierPrice() : BigDecimal.valueOf(35);
-        BigDecimal soSalePrice = product.getOutletPrice() != null ? product.getOutletPrice() : soCostPrice.multiply(BigDecimal.valueOf(1.15));
+        // Calculate Supplier Profit when dispatching to outlet from SO purchased stock:
+        // Supplier profit is calculated based on the product sold to the SO by the supplier vs the amount sold to the outlets
+        BigDecimal productSoldToSoRate = product.getSupplierPrice() != null ? product.getSupplierPrice() : (product.getBasePrice() != null ? product.getBasePrice() : BigDecimal.valueOf(30));
         BigDecimal finalUnitPriceCalc = product.getOutletPrice() != null ? product.getOutletPrice() : (product.getBasePrice() != null ? product.getBasePrice() : BigDecimal.ZERO);
-        if (finalUnitPriceCalc.compareTo(BigDecimal.ZERO) > 0) {
-            soSalePrice = finalUnitPriceCalc;
-        }
-        BigDecimal soTotalCost = soCostPrice.multiply(BigDecimal.valueOf(req.getQuantity()));
-        BigDecimal soTotalRevenue = soSalePrice.multiply(BigDecimal.valueOf(req.getQuantity()));
-        BigDecimal soProfitEarned = soTotalRevenue.subtract(soTotalCost);
+        BigDecimal outletSaleRate = (finalUnitPriceCalc.compareTo(BigDecimal.ZERO) > 0) ? finalUnitPriceCalc : (product.getOutletPrice() != null ? product.getOutletPrice() : productSoldToSoRate.multiply(BigDecimal.valueOf(1.15)));
+        BigDecimal supplierProfitPerUnit = outletSaleRate.subtract(productSoldToSoRate);
+        BigDecimal totalSupplierProfit = supplierProfitPerUnit.multiply(BigDecimal.valueOf(req.getQuantity()));
+
+        // The SO does NOT receive profit - SO is assigned the target and has to achieve that target!
+        BigDecimal soProfitEarned = BigDecimal.ZERO;
+        BigDecimal soTotalCost = productSoldToSoRate.multiply(BigDecimal.valueOf(req.getQuantity()));
+        BigDecimal soTotalRevenue = outletSaleRate.multiply(BigDecimal.valueOf(req.getQuantity()));
 
         if (targetOfficer != null) {
             try {
@@ -337,7 +339,7 @@ public class InventoryController {
                         "INSERT INTO sales_officer_distributions (sales_officer_id, outlet_id, product_id, quantity, cost_price, sale_price, total_cost, total_revenue, profit_earned, notes, distribution_date) " +
                         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())",
                         targetOfficer.getId(), outlet.getOutletId(), product.getProductId(), req.getQuantity(),
-                        soCostPrice, soSalePrice, soTotalCost, soTotalRevenue, soProfitEarned,
+                        productSoldToSoRate, outletSaleRate, soTotalCost, soTotalRevenue, soProfitEarned,
                         "Dispatched by Supplier from SO purchased stock to " + outlet.getOutletName() + " (" + dispatchRefCode + ")"
                     );
                 }
@@ -354,8 +356,7 @@ public class InventoryController {
                 soDispatchedNotif.setMessage("Supplier has dispatched " + req.getQuantity() + " cases of " 
                         + product.getBrand() + " " + product.getFlavorVariant() 
                         + " to " + outlet.getOutletName() 
-                        + " from your purchased stock. Profit (+৳" + String.format(Locale.US, "%.2f", soProfitEarned.doubleValue()) 
-                        + ") credited to your wholesale ledger.");
+                        + " from your purchased stock towards your monthly target achievement.");
                 soDispatchedNotif.setType("SUPPLIER_DISPATCHED_TO_OUTLET");
                 soDispatchedNotif.setReferenceCode(dispatchRefCode);
                 soDispatchedNotif.setReferenceId(targetOfficer.getId());
@@ -416,11 +417,12 @@ public class InventoryController {
         final Outlet finalOutlet = outlet;
         if (sp != null) {
             try {
-                BigDecimal buyPrice = product.getSupplierPrice() != null ? product.getSupplierPrice() : (product.getBasePrice() != null ? product.getBasePrice() : BigDecimal.ZERO);
-                BigDecimal sellPrice = product.getOutletPrice() != null ? product.getOutletPrice() : (product.getBasePrice() != null ? product.getBasePrice() : BigDecimal.ZERO);
+                BigDecimal buyPrice = productSoldToSoRate;
+                BigDecimal sellPrice = outletSaleRate;
                 BigDecimal wholesaleTotal = sellPrice.multiply(BigDecimal.valueOf(req.getQuantity()));
                 BigDecimal unitProfit = sellPrice.subtract(buyPrice);
                 BigDecimal totalProfit = unitProfit.multiply(BigDecimal.valueOf(req.getQuantity()));
+                BigDecimal supplierProfitCredited = totalProfit.compareTo(BigDecimal.ZERO) > 0 ? totalProfit : wholesaleTotal;
 
                 String recipientDesc;
                 if (finalOfficer != null) {
@@ -448,18 +450,18 @@ public class InventoryController {
                     finalRefCode,
                     "OUTLET_SALE",
                     "CREDIT",
-                    wholesaleTotal,
+                    supplierProfitCredited,
                     "OUTLET_WHOLESALE",
-                    String.format("Wholesale delivery of %d units of %s %s to %s @ ৳%.2f/unit. (Buy rate: ৳%.2f, Profit: +৳%.2f)",
+                    String.format("Wholesale profit earned from outlet delivery of %d units of %s %s to %s @ ৳%.2f/unit. (SO buy rate: ৳%.2f, Supplier Profit: +৳%.2f)",
                         req.getQuantity(), product.getBrand(), product.getFlavorVariant(), recipientDesc,
                         sellPrice.doubleValue(), buyPrice.doubleValue(), totalProfit.doubleValue()),
                     "COMPLETED"
                 );
                 supplierTransactionRepository.saveAndFlush(saleTx);
 
-                // Credit supplier wallet balance for earned wholesale delivery revenue
+                // Credit supplier wallet balance for earned wholesale delivery profit
                 BigDecimal cur = sp.getWalletBalance() != null ? sp.getWalletBalance() : BigDecimal.ZERO;
-                sp.setWalletBalance(cur.add(wholesaleTotal));
+                sp.setWalletBalance(cur.add(supplierProfitCredited));
                 supplierProfileRepository.saveAndFlush(sp);
                 try {
                     jdbcTemplate.update("UPDATE supplier_profiles SET wallet_balance = ?, updated_at = NOW() WHERE id = ?", sp.getWalletBalance(), sp.getId());

@@ -1875,7 +1875,7 @@ public class RequisitionProcessingService {
                 if ("WALLET_TOPUP".equals(txType) || "WALLET_DEPOSIT".equals(txType)) {
                     // Commercial Wallet top-up / deposit: Liquid wallet balance, NOT a refund!
                     totalDeposited = totalDeposited.add(tx.getAmount());
-                } else if ("OUTLET_SALE".equals(txType) || "WHOLESALE_SALE".equals(txType)) {
+                } else if ("OUTLET_SALE".equals(txType) || "WHOLESALE_SALE".equals(txType) || "OUTLET_SALE_PROFIT".equals(txType)) {
                     // Direct wholesale revenue earned from outlet stock dispatches
                     totalRevenue = totalRevenue.add(tx.getAmount());
                 } else if (txType.contains("REFUND") || "SHORTFALL_REFUND".equals(txType) || "STOCK_RETURN_REFUND".equals(txType)) {

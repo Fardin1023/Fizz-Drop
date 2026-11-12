@@ -195,7 +195,8 @@ export const SupplierTransactionsView: React.FC = () => {
       case 'WALLET_DEPOSIT':
         return <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">Commercial Top-Up</span>;
       case 'OUTLET_SALE':
-        return <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">Wholesale Sale (Outlet)</span>;
+      case 'OUTLET_SALE_PROFIT':
+        return <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">Wholesale Sale Profit</span>;
       case 'STOCK_PURCHASE':
         return <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">Stock Purchase</span>;
       case 'SHORTFALL_REFUND':
