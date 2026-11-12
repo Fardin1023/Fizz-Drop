@@ -1149,20 +1149,6 @@ export const SalesOfficerDashboard: React.FC = () => {
               );
             })}
           </div>
-
-          <div className="flex items-center gap-2">
-            {/* Request Stock from Supplier Button */}
-            <button
-              onClick={() => {
-                if (products.length > 0 && !reqProductId) setReqProductId(products[0].product_id);
-                setIsRequestModalOpen(true);
-              }}
-              className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-bold text-xs shadow-md shadow-blue-600/20 flex items-center gap-2 transition-all cursor-pointer active:scale-95 shrink-0"
-            >
-              <Truck className="w-3.5 h-3.5" />
-              <span>Request Products from Supplier</span>
-            </button>
-          </div>
         </div>
 
         {/* 5. TAB 1: OVERVIEW & WHOLESALE STOCK BUFFER */}
