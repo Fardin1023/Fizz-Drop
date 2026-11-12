@@ -5,6 +5,7 @@ import { getNotificationDestination } from '../../utils/notificationRouter';
 import { useNotifications } from '../../hooks/useNotifications';
 import { NotificationDropdown } from '../../components/Notifications/NotificationDropdown';
 import { NotificationPopup } from '../../components/Notifications/NotificationPopup';
+import psrLogo from '../../assets/img/psr-logo.jpg';
 import {
   Store,
   ShoppingCart,
@@ -462,9 +463,11 @@ export default function PsrDashboard() {
       <header className="sticky top-0 z-40 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md border-b border-slate-200 dark:border-zinc-800 px-4 sm:px-6 py-3 shadow-sm">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-amber-500 via-orange-500 to-red-500 flex items-center justify-center text-white shadow-md shadow-orange-500/20">
-              <Store className="h-5 w-5" />
-            </div>
+            <img
+              src={psrLogo}
+              alt="PSR Portal Logo"
+              className="h-10 w-10 sm:h-11 sm:w-11 rounded-2xl object-cover shadow-md shadow-orange-500/25 border border-orange-400/40 shrink-0"
+            />
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="font-bold text-lg text-slate-900 dark:text-white tracking-tight">
@@ -541,25 +544,32 @@ export default function PsrDashboard() {
 
         {/* Assigned Hierarchy Banner */}
         <div className="bg-gradient-to-r from-orange-600 via-amber-600 to-yellow-600 rounded-2xl p-5 text-white shadow-lg shadow-orange-500/10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="text-xs uppercase tracking-wider font-bold bg-white/20 px-2.5 py-0.5 rounded-full">
-                Pre-Sales Field Representative
-              </span>
-              <span className="text-xs bg-emerald-500/90 text-white font-semibold px-2 py-0.5 rounded-full flex items-center gap-1">
-                <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" /> Live Field Duty
-              </span>
+          <div className="flex items-center gap-4">
+            <img
+              src={psrLogo}
+              alt="PSR Representative"
+              className="h-16 w-16 sm:h-20 sm:w-20 rounded-2xl object-cover shadow-xl border-2 border-white/40 shrink-0 bg-slate-900/30"
+            />
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs uppercase tracking-wider font-bold bg-white/20 px-2.5 py-0.5 rounded-full">
+                  Pre-Sales Field Representative
+                </span>
+                <span className="text-xs bg-emerald-500/90 text-white font-semibold px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" /> Live Field Duty
+                </span>
+              </div>
+              <h2 className="text-2xl font-black tracking-tight">{data?.psr?.name || 'Pre-Sales Officer'}</h2>
+              <p className="text-sm text-orange-100 flex flex-wrap items-center gap-3">
+                <span className="flex items-center gap-1">
+                  <Phone className="h-3.5 w-3.5" /> {data?.psr?.phone || '+8801819001101'}
+                </span>
+                <span>•</span>
+                <span className="flex items-center gap-1">
+                  <Building2 className="h-3.5 w-3.5" /> Reporting to Sales Officer: <strong className="underline underline-offset-2">{data?.sales_officer?.name || data?.psr?.sales_officer_name || 'Assigned Officer'}</strong>
+                </span>
+              </p>
             </div>
-            <h2 className="text-2xl font-black tracking-tight">{data?.psr?.name || 'Pre-Sales Officer'}</h2>
-            <p className="text-sm text-orange-100 flex flex-wrap items-center gap-3">
-              <span className="flex items-center gap-1">
-                <Phone className="h-3.5 w-3.5" /> {data?.psr?.phone || '+8801819001101'}
-              </span>
-              <span>•</span>
-              <span className="flex items-center gap-1">
-                <Building2 className="h-3.5 w-3.5" /> Reporting to Sales Officer: <strong className="underline underline-offset-2">{data?.sales_officer?.name || data?.psr?.sales_officer_name || 'Assigned Officer'}</strong>
-              </span>
-            </p>
           </div>
 
           <div className="bg-white/10 backdrop-blur-md rounded-xl p-3 px-4 border border-white/20 flex flex-col sm:flex-row sm:items-center gap-4 text-xs">
