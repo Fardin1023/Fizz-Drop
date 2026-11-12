@@ -115,6 +115,11 @@ export const OutletDashboard: React.FC = () => {
     description: '',
   });
 
+  // Fleet Inbound Deliveries & Delivery Confirmation
+  const [fleetDeliveries, setFleetDeliveries] = useState<any[]>([]);
+  const [confirmingReceiptId, setConfirmingReceiptId] = useState<number | null>(null);
+  const [receiptSuccessMsg, setReceiptSuccessMsg] = useState<string | null>(null);
+
   // Real-time Notifications for this outlet
   const {
     notifications,
@@ -255,11 +260,47 @@ export const OutletDashboard: React.FC = () => {
         const allOutData = await allOutRes.json();
         if (Array.isArray(allOutData)) setAllOutlets(allOutData);
       }
+
+      // 5. Fetch Fleet Inbound Consignments for this outlet
+      try {
+        const fleetRes = await fetch(`http://localhost:8080/api/v1/delivery/outlet-pending-deliveries/${targetOutletId}`);
+        if (fleetRes.ok) {
+          const fleetData = await fleetRes.json();
+          if (Array.isArray(fleetData)) setFleetDeliveries(fleetData);
+        }
+      } catch {}
       hasLoadedOnceRef.current = true;
     } catch (err) {
       // ignore
     } finally {
       setLoadingData(false);
+    }
+  };
+
+  const handleConfirmFleetDelivery = async (dispatchId: number) => {
+    setConfirmingReceiptId(dispatchId);
+    try {
+      const res = await fetch('http://localhost:8080/api/v1/delivery/confirm-outlet-receipt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          outlet_id: outlet?.outlet_id || effectiveOutletId,
+          dispatch_id: dispatchId,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setReceiptSuccessMsg(data.message || 'Stock delivery confirmed! Shelf inventory updated and profit credited to supplier.');
+        localStorage.setItem('fizzdrop_supplier_wallet', Date.now().toString());
+        window.dispatchEvent(new Event('storage'));
+        fetchDashboardData(outlet?.outlet_id || effectiveOutletId);
+      } else {
+        alert(data.message || 'Failed to confirm delivery receipt.');
+      }
+    } catch {
+      alert('Error connecting to delivery service.');
+    } finally {
+      setConfirmingReceiptId(null);
     }
   };
 
@@ -1260,6 +1301,117 @@ export const OutletDashboard: React.FC = () => {
                     <RefreshCw className="w-4 h-4" />
                   </button>
                 </div>
+
+                {receiptSuccessMsg && (
+                  <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>{receiptSuccessMsg}</span>
+                    </div>
+                    <button onClick={() => setReceiptSuccessMsg(null)} className="text-emerald-700 hover:text-emerald-900 font-bold">×</button>
+                  </div>
+                )}
+
+                {/* Fleet Delivery Consignments */}
+                {fleetDeliveries.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-oswald text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                        <Truck className="w-4 h-4 text-indigo-600" />
+                        <span>Supplier Delivery Fleet Consignments</span>
+                      </h4>
+                      <span className="text-[11px] font-mono text-slate-500 font-bold">
+                        {fleetDeliveries.length} Consignments
+                      </span>
+                    </div>
+
+                    <div className="space-y-2.5">
+                      {fleetDeliveries.map((delivery) => {
+                        const isDeliveredByDriver = delivery.is_delivered_by_driver;
+                        const isConfirmedByOutlet = delivery.is_confirmed_by_outlet;
+
+                        return (
+                          <div
+                            key={delivery.id}
+                            className={`p-4 rounded-2xl border transition-all ${
+                              isConfirmedByOutlet
+                                ? 'bg-white border-emerald-200 shadow-xs'
+                                : isDeliveredByDriver
+                                ? 'bg-gradient-to-r from-cyan-50/70 via-blue-50/40 to-emerald-50/50 border-2 border-cyan-400 shadow-md'
+                                : 'bg-white border-slate-200/80 shadow-xs'
+                            }`}
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-xs font-black font-mono text-slate-900">
+                                    {delivery.dispatch_code}
+                                  </span>
+                                  <span className="font-mono text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
+                                    Vehicle: {delivery.vehicle_registration_no}
+                                  </span>
+                                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-black uppercase ${
+                                    isConfirmedByOutlet
+                                      ? 'bg-emerald-100 text-emerald-800'
+                                      : isDeliveredByDriver
+                                      ? 'bg-cyan-100 text-cyan-800 animate-pulse'
+                                      : 'bg-amber-100 text-amber-800'
+                                  }`}>
+                                    {isConfirmedByOutlet
+                                      ? '✓ Stock Received & Added to Shelf'
+                                      : isDeliveredByDriver
+                                      ? '🚚 Vehicle Arrived & Unloaded'
+                                      : '🚚 En Route'}
+                                  </span>
+                                </div>
+
+                                <p className="text-xs text-slate-600">
+                                  Sub-Route: <strong>{delivery.sub_route}</strong> • Driver: <strong>{delivery.driver_name}</strong> ({delivery.driver_phone})
+                                </p>
+
+                                {/* Unloaded Products */}
+                                <div className="flex flex-wrap gap-1.5 pt-1">
+                                  {delivery.outlet_items?.map((it: any, itemIdx: number) => (
+                                    <span
+                                      key={itemIdx}
+                                      className="text-xs px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-800 font-medium"
+                                    >
+                                      {it.product_name} • <strong className="text-indigo-600 font-mono font-bold">{it.assigned_cases || it.demanded_cases} cases</strong>
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* Outlet Confirmation Action Button */}
+                              <div className="text-right sm:self-center">
+                                {isConfirmedByOutlet ? (
+                                  <div className="flex items-center gap-1.5 text-xs text-emerald-700 font-bold bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
+                                    <CheckCircle className="w-4 h-4 text-emerald-600" />
+                                    <span>Consignment Accepted</span>
+                                  </div>
+                                ) : isDeliveredByDriver ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleConfirmFleetDelivery(delivery.id)}
+                                    disabled={confirmingReceiptId === delivery.id}
+                                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-sm transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
+                                  >
+                                    <CheckCircle className="w-4 h-4" />
+                                    <span>{confirmingReceiptId === delivery.id ? 'Confirming...' : 'Confirm Stock Received'}</span>
+                                  </button>
+                                ) : (
+                                  <span className="text-[11px] text-slate-400 italic">
+                                    Awaiting vehicle arrival
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {requisitions.length === 0 ? (
                   <div className="p-12 text-center bg-white rounded-3xl border border-slate-200 text-slate-400">

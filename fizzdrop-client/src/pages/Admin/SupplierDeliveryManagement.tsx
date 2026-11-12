@@ -85,6 +85,11 @@ export interface DispatchItem {
   total_amount?: number;
   requisition_code?: string;
   delivery_status?: string;
+  stop_status?: 'PENDING' | 'DELIVERED_BY_DRIVER' | 'CONFIRMED_BY_OUTLET' | string;
+  driver_delivered_at?: string;
+  driver_delivered_cases?: number;
+  outlet_confirmed_at?: string;
+  profit_earned?: number;
 }
 
 export interface VehicleDispatch {
@@ -101,10 +106,15 @@ export interface VehicleDispatch {
   sub_route: string;
   total_cases: number;
   total_outlets: number;
-  status: 'DISPATCHED' | 'IN_TRANSIT' | 'DELIVERED' | 'COMPLETED';
+  status: 'DISPATCHED' | 'BOARDED' | 'IN_TRANSIT' | 'DELIVERED' | 'COMPLETED' | string;
   notes?: string;
   dispatched_at: string;
+  boarded_at?: string;
+  ride_started_at?: string;
   delivered_at?: string;
+  delivered_outlets_count?: number;
+  confirmed_outlets_count?: number;
+  total_profit_earned?: number;
   items: DispatchItem[];
 }
 
@@ -126,6 +136,10 @@ export const SupplierDeliveryManagement: React.FC<SupplierDeliveryManagementProp
 
   // Expanded dispatch cards in history
   const [expandedTripId, setExpandedTripId] = useState<number | null>(null);
+
+  const totalFleetProfitEarned = dispatches.reduce((acc, trip) => {
+    return acc + Number(trip.total_profit_earned || 0);
+  }, 0);
 
   // New Dispatch Form State
   const [selectedTeamId, setSelectedTeamId] = useState<number | ''>('');
@@ -181,6 +195,10 @@ export const SupplierDeliveryManagement: React.FC<SupplierDeliveryManagementProp
 
   useEffect(() => {
     fetchData();
+    const interval = setInterval(() => {
+      fetchData();
+    }, 5000);
+    return () => clearInterval(interval);
   }, [userId]);
 
   // When subroute changes in new dispatch form, auto-select outlets with pending demands
@@ -420,7 +438,7 @@ export const SupplierDeliveryManagement: React.FC<SupplierDeliveryManagementProp
       )}
 
       {/* Quick Metrics KPI Strip */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
         <div className="p-4 rounded-3xl bg-white border border-slate-200/80 shadow-2xs">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">Delivery Fleets</span>
           <div className="flex items-baseline gap-2">
@@ -454,7 +472,17 @@ export const SupplierDeliveryManagement: React.FC<SupplierDeliveryManagementProp
             <span className="font-oswald text-2xl font-black text-indigo-700">{subroutes.length}</span>
             <span className="text-[11px] text-indigo-600 font-bold">Routes</span>
           </div>
-          <span className="text-[10px] text-slate-500 block mt-0.5">Territory distribution corridors</span>
+          <span className="text-[10px] text-slate-500 block mt-0.5">Territory corridors</span>
+        </div>
+
+        <div className="p-4 rounded-3xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200/80 shadow-2xs col-span-2 sm:col-span-1">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 block mb-0.5">Outlet Deliveries Profit</span>
+          <div className="flex items-baseline gap-1">
+            <span className="font-oswald text-2xl font-black text-emerald-700">
+              +৳{totalFleetProfitEarned.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+          </div>
+          <span className="text-[10px] text-emerald-600 block mt-0.5 font-medium">Auto-credited upon receipt</span>
         </div>
       </div>
 
@@ -623,6 +651,59 @@ export const SupplierDeliveryManagement: React.FC<SupplierDeliveryManagementProp
                       </div>
                     </div>
 
+                    {/* Live Truck Progression Stepper & Real-time Status */}
+                    <div className="px-5 py-3 bg-slate-50/90 border-t border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+                      <div className="flex items-center gap-2.5 flex-wrap">
+                        {/* Stage 1: Stocks Boarding */}
+                        <div className="flex items-center gap-1.5">
+                          {trip.boarded_at || trip.status === 'BOARDED' || trip.status === 'IN_TRANSIT' || trip.status === 'DELIVERED' || trip.status === 'COMPLETED' ? (
+                            <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-bold font-mono text-[11px] flex items-center gap-1">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>Stocks Boarded {trip.boarded_at && `(${new Date(trip.boarded_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`}</span>
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 font-bold font-mono text-[11px] flex items-center gap-1">
+                              <Clock className="w-3.5 h-3.5 text-amber-600" />
+                              <span>Awaiting Driver Boarding Verification</span>
+                            </span>
+                          )}
+                        </div>
+
+                        <span className="text-slate-300">→</span>
+
+                        {/* Stage 2: Ride Status */}
+                        <div className="flex items-center gap-1.5">
+                          {trip.ride_started_at || trip.status === 'IN_TRANSIT' || trip.status === 'DELIVERED' || trip.status === 'COMPLETED' ? (
+                            <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 font-bold font-mono text-[11px] flex items-center gap-1">
+                              <Truck className="w-3.5 h-3.5 text-blue-600" />
+                              <span>Ride In Transit {trip.ride_started_at && `(${new Date(trip.ride_started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`}</span>
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-md bg-slate-200 text-slate-600 font-bold font-mono text-[11px]">
+                              <span>At Depot</span>
+                            </span>
+                          )}
+                        </div>
+
+                        <span className="text-slate-300">→</span>
+
+                        {/* Stage 3: Outlets Delivered Progress */}
+                        <div className="flex items-center gap-1.5">
+                          <span className="px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 font-bold font-mono text-[11px]">
+                            {trip.delivered_outlets_count || 0} / {trip.total_outlets} Outlets Dropped ({Math.round(((trip.delivered_outlets_count || 0) / (trip.total_outlets || 1)) * 100)}%)
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Earned Wholesale Profit from Outlets */}
+                      <div className="flex items-center gap-2 self-start md:self-auto">
+                        <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">Wholesale Profit:</span>
+                        <span className="font-mono text-xs font-black text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-md border border-emerald-300">
+                          +৳{Number(trip.total_profit_earned || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    </div>
+
                     {/* Expandable Manifest: Outlets & Assigned Products */}
                     {isExpanded && (
                       <div className="bg-slate-50/70 border-t border-slate-200/80 p-5 space-y-3">
@@ -675,13 +756,23 @@ export const SupplierDeliveryManagement: React.FC<SupplierDeliveryManagementProp
                                       ৳{Number(item.total_amount || 0).toFixed(2)}
                                     </td>
                                     <td className="py-2.5 px-3 font-sans text-center">
-                                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${
-                                        isDelivered
-                                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                          : 'bg-blue-50 text-blue-700 border border-blue-200'
-                                      }`}>
-                                        {isDelivered ? 'DELIVERED' : 'ASSIGNED'}
-                                      </span>
+                                      {item.stop_status === 'CONFIRMED_BY_OUTLET' ? (
+                                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-300 block">
+                                          ✓ Outlet Confirmed (+৳{Number(item.profit_earned || 0).toFixed(2)})
+                                        </span>
+                                      ) : item.stop_status === 'DELIVERED_BY_DRIVER' ? (
+                                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-cyan-100 text-cyan-800 border border-cyan-300 block">
+                                          🚚 Delivered by Driver (Pending Outlet)
+                                        </span>
+                                      ) : (
+                                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${
+                                          isDelivered
+                                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                            : 'bg-blue-50 text-blue-700 border border-blue-200'
+                                        }`}>
+                                          {isDelivered ? 'DELIVERED' : 'ASSIGNED'}
+                                        </span>
+                                      )}
                                     </td>
                                   </tr>
                                 ))}

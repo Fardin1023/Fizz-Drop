@@ -16,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -410,6 +411,434 @@ public class DeliveryController {
             "status", newStatus.toUpperCase(),
             "message", "Dispatch trip status updated to " + newStatus.toUpperCase() + "."
         ));
+    }
+
+    // ==========================================
+    // 3B. DRIVER BOARDING & PROGRESSION ACTIONS
+    // ==========================================
+
+    @PutMapping("/dispatches/{id}/board")
+    public ResponseEntity<?> boardDispatch(@PathVariable Long id) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+            "SELECT d.*, t.vehicle_registration_no, t.driver_name, t.supplier_id as team_supplier_id " +
+            "FROM supplier_delivery_dispatches d " +
+            "LEFT JOIN supplier_delivery_teams t ON d.delivery_team_id = t.id " +
+            "WHERE d.id = ?", id
+        );
+        if (rows.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail("Dispatch trip not found."));
+        }
+        Map<String, Object> trip = rows.get(0);
+        String regNo = (String) trip.getOrDefault("vehicle_registration_no", "FLEET");
+        String driver = (String) trip.getOrDefault("driver_name", "Driver");
+        String route = (String) trip.getOrDefault("sub_route", "Route");
+        Long supplierId = ((Number) trip.get("supplier_id")).longValue();
+
+        jdbcTemplate.update(
+            "UPDATE supplier_delivery_dispatches SET status = 'BOARDED', boarded_at = NOW(), updated_at = NOW() WHERE id = ?",
+            id
+        );
+
+        // Notify Supplier in real time
+        try {
+            AppNotification notif = new AppNotification();
+            notif.setRecipientRole("SUPPLIER");
+            notif.setRecipientUserId(supplierId);
+            notif.setTitle("Stocks Boarded on Truck (" + regNo + ")");
+            notif.setMessage("Driver " + driver + " confirmed stocks boarded onto vehicle " + regNo + " for subroute '" + route + "'. Ready to roll.");
+            notif.setType("FLEET_STOCKS_BOARDED");
+            notif.setReferenceCode((String) trip.get("dispatch_code"));
+            notif.setReferenceId(id);
+            notificationRepository.save(notif);
+        } catch (Exception ignored) {}
+
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "status", "BOARDED",
+            "message", "Stocks verified and boarded on truck " + regNo + " successfully!"
+        ));
+    }
+
+    @PutMapping("/dispatches/{id}/start-ride")
+    public ResponseEntity<?> startDeliveryRide(@PathVariable Long id) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+            "SELECT d.*, t.vehicle_registration_no, t.driver_name " +
+            "FROM supplier_delivery_dispatches d " +
+            "LEFT JOIN supplier_delivery_teams t ON d.delivery_team_id = t.id " +
+            "WHERE d.id = ?", id
+        );
+        if (rows.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail("Dispatch trip not found."));
+        }
+        Map<String, Object> trip = rows.get(0);
+        String regNo = (String) trip.getOrDefault("vehicle_registration_no", "FLEET");
+        String driver = (String) trip.getOrDefault("driver_name", "Driver");
+        String route = (String) trip.getOrDefault("sub_route", "Route");
+        Long supplierId = ((Number) trip.get("supplier_id")).longValue();
+
+        jdbcTemplate.update(
+            "UPDATE supplier_delivery_dispatches SET status = 'IN_TRANSIT', ride_started_at = NOW(), updated_at = NOW() WHERE id = ?",
+            id
+        );
+
+        // Notify Supplier
+        try {
+            AppNotification notif = new AppNotification();
+            notif.setRecipientRole("SUPPLIER");
+            notif.setRecipientUserId(supplierId);
+            notif.setTitle("Vehicle In Transit (" + regNo + ")");
+            notif.setMessage("Delivery run started! Driver " + driver + " is now in transit along subroute '" + route + "'.");
+            notif.setType("FLEET_RIDE_STARTED");
+            notif.setReferenceCode((String) trip.get("dispatch_code"));
+            notif.setReferenceId(id);
+            notificationRepository.save(notif);
+        } catch (Exception ignored) {}
+
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "status", "IN_TRANSIT",
+            "message", "Delivery ride started for vehicle " + regNo + "!"
+        ));
+    }
+
+    @PostMapping("/dispatches/{id}/confirm-outlet-delivery")
+    public ResponseEntity<?> confirmOutletDelivery(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> body) {
+
+        if (!body.containsKey("outlet_id") || body.get("outlet_id") == null) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("Missing outlet_id."));
+        }
+        Long targetOutletId = Long.parseLong(body.get("outlet_id").toString());
+        Integer deliveredCases = body.containsKey("quantity_delivered") && body.get("quantity_delivered") != null
+                ? Integer.parseInt(body.get("quantity_delivered").toString()) : null;
+        String notes = body.containsKey("notes") && body.get("notes") != null ? body.get("notes").toString() : "";
+
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+            "SELECT d.*, t.vehicle_registration_no, t.driver_name " +
+            "FROM supplier_delivery_dispatches d " +
+            "LEFT JOIN supplier_delivery_teams t ON d.delivery_team_id = t.id " +
+            "WHERE d.id = ?", id
+        );
+        if (rows.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail("Dispatch trip not found."));
+        }
+        Map<String, Object> trip = rows.get(0);
+        String regNo = (String) trip.getOrDefault("vehicle_registration_no", "FLEET");
+        String driver = (String) trip.getOrDefault("driver_name", "Driver");
+        String route = (String) trip.getOrDefault("sub_route", "Route");
+        Long supplierId = ((Number) trip.get("supplier_id")).longValue();
+
+        List<Map<String, Object>> items = new ArrayList<>();
+        if (trip.get("items_json") != null) {
+            try {
+                items = objectMapper.readValue(
+                    trip.get("items_json").toString(),
+                    new TypeReference<List<Map<String, Object>>>() {}
+                );
+            } catch (Exception ignored) {}
+        }
+
+        String outletName = "Outlet #" + targetOutletId;
+        int totalCasesDelivered = 0;
+        int totalOutletsOnTrip = ((Number) trip.getOrDefault("total_outlets", 1)).intValue();
+        Set<Object> deliveredOutletsSet = new HashSet<>();
+
+        for (Map<String, Object> it : items) {
+            Long outId = it.containsKey("outlet_id") && it.get("outlet_id") != null
+                    ? Long.parseLong(it.get("outlet_id").toString()) : -1L;
+            if (outId.equals(targetOutletId)) {
+                if (it.containsKey("outlet_name")) outletName = it.get("outlet_name").toString();
+                it.put("stop_status", "DELIVERED_BY_DRIVER");
+                it.put("driver_delivered_at", LocalDateTime.now().toString());
+                int itemCases = deliveredCases != null ? deliveredCases
+                        : (it.containsKey("assigned_cases") ? Integer.parseInt(it.get("assigned_cases").toString()) : 0);
+                it.put("driver_delivered_cases", itemCases);
+                it.put("driver_delivery_notes", notes);
+                totalCasesDelivered += itemCases;
+            }
+            if ("DELIVERED_BY_DRIVER".equalsIgnoreCase(String.valueOf(it.get("stop_status")))
+                    || "CONFIRMED_BY_OUTLET".equalsIgnoreCase(String.valueOf(it.get("stop_status")))) {
+                deliveredOutletsSet.add(it.get("outlet_id"));
+            }
+        }
+
+        String updatedItemsJson;
+        try {
+            updatedItemsJson = objectMapper.writeValueAsString(items);
+        } catch (Exception e) {
+            updatedItemsJson = trip.get("items_json").toString();
+        }
+
+        int deliveredCount = deliveredOutletsSet.size();
+        String nextStatus = (deliveredCount >= totalOutletsOnTrip) ? "DELIVERED" : "IN_TRANSIT";
+
+        jdbcTemplate.update(
+            "UPDATE supplier_delivery_dispatches SET items_json = ?, delivered_outlets_count = ?, status = ?, updated_at = NOW() WHERE id = ?",
+            updatedItemsJson, deliveredCount, nextStatus, id
+        );
+
+        // Real-time Notification to Supplier
+        try {
+            AppNotification notif = new AppNotification();
+            notif.setRecipientRole("SUPPLIER");
+            notif.setRecipientUserId(supplierId);
+            notif.setTitle("Stock Delivered to " + outletName + " (" + regNo + ")");
+            notif.setMessage("Driver " + driver + " confirmed delivery of " + totalCasesDelivered + " cases to " + outletName + " on route " + route + ". Awaiting outlet confirmation.");
+            notif.setType("FLEET_STOP_DELIVERED");
+            notif.setReferenceCode((String) trip.get("dispatch_code"));
+            notif.setReferenceId(id);
+            notificationRepository.save(notif);
+        } catch (Exception ignored) {}
+
+        // Notification to Outlet
+        try {
+            AppNotification outNotif = new AppNotification();
+            outNotif.setRecipientRole("OUTLET");
+            outNotif.setRecipientUserId(targetOutletId);
+            outNotif.setTitle("Delivery Unloaded by Driver (" + regNo + ")");
+            outNotif.setMessage("Vehicle " + regNo + " (Driver " + driver + ") has arrived and unloaded " + totalCasesDelivered + " cases at your branch. Please confirm receipt in your Inbound Deliveries tab.");
+            outNotif.setType("FLEET_STOCK_ARRIVED");
+            outNotif.setReferenceCode((String) trip.get("dispatch_code"));
+            outNotif.setReferenceId(targetOutletId);
+            notificationRepository.save(outNotif);
+        } catch (Exception ignored) {}
+
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "outlet_id", targetOutletId,
+            "stop_status", "DELIVERED_BY_DRIVER",
+            "message", "Successfully confirmed delivery of " + totalCasesDelivered + " cases to " + outletName + "!"
+        ));
+    }
+
+    @PostMapping("/confirm-outlet-receipt")
+    public ResponseEntity<?> confirmOutletReceipt(@RequestBody Map<String, Object> body) {
+        if (!body.containsKey("outlet_id") || body.get("outlet_id") == null) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("Missing outlet_id."));
+        }
+        Long outletId = Long.parseLong(body.get("outlet_id").toString());
+        Long dispatchId = body.containsKey("dispatch_id") && body.get("dispatch_id") != null
+                ? Long.parseLong(body.get("dispatch_id").toString()) : null;
+
+        List<Map<String, Object>> candidateTrips;
+        if (dispatchId != null && dispatchId > 0) {
+            candidateTrips = jdbcTemplate.queryForList("SELECT * FROM supplier_delivery_dispatches WHERE id = ?", dispatchId);
+        } else {
+            // Find most recent active trip for this outlet
+            candidateTrips = jdbcTemplate.queryForList(
+                "SELECT * FROM supplier_delivery_dispatches WHERE status IN ('DISPATCHED', 'BOARDED', 'IN_TRANSIT', 'DELIVERED') ORDER BY id DESC"
+            );
+        }
+
+        if (candidateTrips.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail("No active delivery dispatch found."));
+        }
+
+        Map<String, Object> targetTrip = null;
+        List<Map<String, Object>> targetItems = null;
+
+        for (Map<String, Object> trip : candidateTrips) {
+            if (trip.get("items_json") != null) {
+                try {
+                    List<Map<String, Object>> items = objectMapper.readValue(
+                        trip.get("items_json").toString(),
+                        new TypeReference<List<Map<String, Object>>>() {}
+                    );
+                    boolean hasOutlet = items.stream().anyMatch(it -> {
+                        Long oid = it.get("outlet_id") != null ? Long.parseLong(it.get("outlet_id").toString()) : -1L;
+                        return oid.equals(outletId);
+                    });
+                    if (hasOutlet) {
+                        targetTrip = trip;
+                        targetItems = items;
+                        break;
+                    }
+                } catch (Exception ignored) {}
+            }
+        }
+
+        if (targetTrip == null || targetItems == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail("Outlet not associated with this dispatch trip."));
+        }
+
+        Long tripId = ((Number) targetTrip.get("id")).longValue();
+        Long supplierId = ((Number) targetTrip.get("supplier_id")).longValue();
+        String dispatchCode = (String) targetTrip.get("dispatch_code");
+
+        BigDecimal totalStopProfit = BigDecimal.ZERO;
+        String outletName = "Outlet #" + outletId;
+        int stopDeliveredCases = 0;
+        Set<Object> confirmedOutletsSet = new HashSet<>();
+        int totalTripOutlets = ((Number) targetTrip.getOrDefault("total_outlets", 1)).intValue();
+
+        for (Map<String, Object> it : targetItems) {
+            Long oid = it.get("outlet_id") != null ? Long.parseLong(it.get("outlet_id").toString()) : -1L;
+            if (oid.equals(outletId)) {
+                if (it.containsKey("outlet_name")) outletName = it.get("outlet_name").toString();
+                it.put("stop_status", "CONFIRMED_BY_OUTLET");
+                it.put("outlet_confirmed_at", LocalDateTime.now().toString());
+                it.put("outlet_confirmation_status", "CONFIRMED");
+
+                int qty = it.containsKey("driver_delivered_cases") && it.get("driver_delivered_cases") != null
+                        ? Integer.parseInt(it.get("driver_delivered_cases").toString())
+                        : (it.containsKey("assigned_cases") ? Integer.parseInt(it.get("assigned_cases").toString()) : 0);
+                stopDeliveredCases += qty;
+
+                // Profit calculation:
+                // Profit = (outlet_sale_price - product_sold_to_so_price) * cases
+                Long prodId = it.get("product_id") != null ? Long.parseLong(it.get("product_id").toString()) : 1L;
+                Product product = productRepository.findById(prodId).orElse(null);
+                if (product != null) {
+                    BigDecimal soldToSoRate = product.getSupplierPrice() != null ? product.getSupplierPrice()
+                            : (product.getBasePrice() != null ? product.getBasePrice() : BigDecimal.valueOf(30.00));
+                    BigDecimal outletPrice = product.getOutletPrice() != null ? product.getOutletPrice()
+                            : (product.getBasePrice() != null ? product.getBasePrice() : soldToSoRate.multiply(BigDecimal.valueOf(1.15)));
+                    BigDecimal unitProfit = outletPrice.subtract(soldToSoRate);
+                    BigDecimal itemProfit = unitProfit.multiply(BigDecimal.valueOf(qty));
+                    it.put("profit_earned", itemProfit.doubleValue());
+                    totalStopProfit = totalStopProfit.add(itemProfit);
+
+                    // Replenish outlet shelf stock in shop_inventory
+                    try {
+                        List<Map<String, Object>> exInv = jdbcTemplate.queryForList(
+                            "SELECT stock_quantity FROM shop_inventory WHERE branch_id = ? AND product_id = ?",
+                            outletId, prodId
+                        );
+                        if (exInv.isEmpty()) {
+                            jdbcTemplate.update(
+                                "INSERT INTO shop_inventory (branch_id, product_id, stock_quantity, created_date, updated_date) VALUES (?, ?, ?, NOW(), NOW())",
+                                outletId, prodId, qty
+                            );
+                        } else {
+                            jdbcTemplate.update(
+                                "UPDATE shop_inventory SET stock_quantity = stock_quantity + ?, updated_date = NOW() WHERE branch_id = ? AND product_id = ?",
+                                qty, outletId, prodId
+                            );
+                        }
+                    } catch (Exception ex) {
+                        System.err.println("[DeliveryController] Error updating shop_inventory: " + ex.getMessage());
+                    }
+
+                    // Mark outlet_requisitions COMPLETED
+                    try {
+                        jdbcTemplate.update(
+                            "UPDATE outlet_requisitions SET status = 'COMPLETED', updated_date = NOW() WHERE outlet_id = ? AND product_id = ? AND status IN ('PENDING', 'APPROVED', 'DISPATCHED')",
+                            outletId, prodId
+                        );
+                    } catch (Exception ignored) {}
+                }
+            }
+            if ("CONFIRMED_BY_OUTLET".equalsIgnoreCase(String.valueOf(it.get("stop_status")))) {
+                confirmedOutletsSet.add(it.get("outlet_id"));
+            }
+        }
+
+        String updatedItemsJson;
+        try {
+            updatedItemsJson = objectMapper.writeValueAsString(targetItems);
+        } catch (Exception e) {
+            updatedItemsJson = targetTrip.get("items_json").toString();
+        }
+
+        int confirmedCount = confirmedOutletsSet.size();
+        boolean tripFullyCompleted = confirmedCount >= totalTripOutlets;
+
+        jdbcTemplate.update(
+            "UPDATE supplier_delivery_dispatches SET items_json = ?, confirmed_outlets_count = ?, " +
+            "total_profit_earned = total_profit_earned + ?, " +
+            "status = CASE WHEN ? = TRUE THEN 'COMPLETED' ELSE status END, " +
+            "delivered_at = CASE WHEN ? = TRUE THEN NOW() ELSE delivered_at END, " +
+            "updated_at = NOW() WHERE id = ?",
+            updatedItemsJson, confirmedCount, totalStopProfit, tripFullyCompleted, tripFullyCompleted, tripId
+        );
+
+        if (tripFullyCompleted) {
+            Long teamId = ((Number) targetTrip.get("delivery_team_id")).longValue();
+            jdbcTemplate.update("UPDATE supplier_delivery_teams SET status = 'AVAILABLE', updated_at = NOW() WHERE id = ?", teamId);
+        }
+
+        // Credit Supplier Wallet & Record Supplier Transaction
+        try {
+            Optional<SupplierProfile> spOpt = supplierProfileRepository.findById(supplierId);
+            if (spOpt.isPresent()) {
+                SupplierProfile sp = spOpt.get();
+                BigDecimal cur = sp.getWalletBalance() != null ? sp.getWalletBalance() : BigDecimal.ZERO;
+                sp.setWalletBalance(cur.add(totalStopProfit));
+                supplierProfileRepository.saveAndFlush(sp);
+
+                String txCode = "TXN-OUT-" + System.currentTimeMillis() + "-" + (100 + new Random().nextInt(900));
+                jdbcTemplate.update(
+                    "INSERT INTO supplier_transactions (transaction_code, supplier_id, reference_code, type, entry_type, amount, payment_method, description, status, created_at) " +
+                    "VALUES (?, ?, ?, 'OUTLET_SALE', 'CREDIT', ?, 'OUTLET_WHOLESALE', ?, 'COMPLETED', NOW())",
+                    txCode, supplierId, dispatchCode, totalStopProfit,
+                    "Wholesale profit earned from outlet delivery of " + stopDeliveredCases + " cases to " + outletName + " (" + dispatchCode + "). Profit credited: +৳" + totalStopProfit
+                );
+            }
+        } catch (Exception ex) {
+            System.err.println("[DeliveryController] Failed to record profit transaction: " + ex.getMessage());
+        }
+
+        // Real-time Notification to Supplier of Earned Profit
+        try {
+            AppNotification notif = new AppNotification();
+            notif.setRecipientRole("SUPPLIER");
+            notif.setRecipientUserId(supplierId);
+            notif.setTitle("🎉 Delivery Confirmed & Profit Credited (" + outletName + ")");
+            notif.setMessage(outletName + " has confirmed receipt of " + stopDeliveredCases + " cases. Wholesale profit of +৳" + String.format(Locale.US, "%.2f", totalStopProfit.doubleValue()) + " has been automatically credited to your dashboard!");
+            notif.setType("FLEET_OUTLET_CONFIRMED");
+            notif.setReferenceCode(dispatchCode);
+            notif.setReferenceId(tripId);
+            notificationRepository.save(notif);
+        } catch (Exception ignored) {}
+
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "outlet_id", outletId,
+            "stop_status", "CONFIRMED_BY_OUTLET",
+            "profit_earned", totalStopProfit,
+            "trip_completed", tripFullyCompleted,
+            "message", "Consignment receipt confirmed successfully! Stock added to shop inventory and profit of ৳" + String.format(Locale.US, "%.2f", totalStopProfit.doubleValue()) + " credited to supplier."
+        ));
+    }
+
+    @GetMapping("/outlet-pending-deliveries/{outletId}")
+    public ResponseEntity<?> getOutletPendingDeliveries(@PathVariable Long outletId) {
+        List<Map<String, Object>> activeTrips = jdbcTemplate.queryForList(
+            "SELECT d.*, t.vehicle_registration_no, t.vehicle_type, t.driver_name, t.driver_phone, s.business_name as supplier_name " +
+            "FROM supplier_delivery_dispatches d " +
+            "LEFT JOIN supplier_delivery_teams t ON d.delivery_team_id = t.id " +
+            "LEFT JOIN supplier_profiles s ON d.supplier_id = s.id " +
+            "WHERE d.status IN ('DISPATCHED', 'BOARDED', 'IN_TRANSIT', 'DELIVERED', 'COMPLETED') " +
+            "ORDER BY d.dispatched_at DESC LIMIT 30"
+        );
+
+        List<Map<String, Object>> outletDeliveries = new ArrayList<>();
+        for (Map<String, Object> trip : activeTrips) {
+            if (trip.get("items_json") != null) {
+                try {
+                    List<Map<String, Object>> items = objectMapper.readValue(
+                        trip.get("items_json").toString(),
+                        new TypeReference<List<Map<String, Object>>>() {}
+                    );
+                    List<Map<String, Object>> myItems = items.stream().filter(it -> {
+                        Long oid = it.get("outlet_id") != null ? Long.parseLong(it.get("outlet_id").toString()) : -1L;
+                        return oid.equals(outletId);
+                    }).toList();
+
+                    if (!myItems.isEmpty()) {
+                        Map<String, Object> outDelivery = new HashMap<>(trip);
+                        outDelivery.put("outlet_items", myItems);
+                        boolean isDeliveredByDriver = myItems.stream().anyMatch(it -> "DELIVERED_BY_DRIVER".equalsIgnoreCase(String.valueOf(it.get("stop_status"))));
+                        boolean isConfirmed = myItems.stream().allMatch(it -> "CONFIRMED_BY_OUTLET".equalsIgnoreCase(String.valueOf(it.get("stop_status"))));
+                        outDelivery.put("is_delivered_by_driver", isDeliveredByDriver);
+                        outDelivery.put("is_confirmed_by_outlet", isConfirmed);
+                        outletDeliveries.add(outDelivery);
+                    }
+                } catch (Exception ignored) {}
+            }
+        }
+        return ResponseEntity.ok(outletDeliveries);
     }
 
     // ==========================================

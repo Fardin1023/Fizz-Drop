@@ -256,6 +256,22 @@ public class DataInitializer {
                 );
             } catch (Exception ignored) {}
 
+            try {
+                jdbcTemplate.execute("ALTER TABLE supplier_delivery_dispatches ADD COLUMN boarded_at DATETIME NULL");
+            } catch (Exception ignored) {}
+            try {
+                jdbcTemplate.execute("ALTER TABLE supplier_delivery_dispatches ADD COLUMN ride_started_at DATETIME NULL");
+            } catch (Exception ignored) {}
+            try {
+                jdbcTemplate.execute("ALTER TABLE supplier_delivery_dispatches ADD COLUMN delivered_outlets_count INT NOT NULL DEFAULT 0");
+            } catch (Exception ignored) {}
+            try {
+                jdbcTemplate.execute("ALTER TABLE supplier_delivery_dispatches ADD COLUMN confirmed_outlets_count INT NOT NULL DEFAULT 0");
+            } catch (Exception ignored) {}
+            try {
+                jdbcTemplate.execute("ALTER TABLE supplier_delivery_dispatches ADD COLUMN total_profit_earned DECIMAL(12,2) NOT NULL DEFAULT 0.00");
+            } catch (Exception ignored) {}
+
             // Pre-Sales Officers and Outlets are cleanly created and assigned by the Superadmin and Sales Officers.
         };
     }
