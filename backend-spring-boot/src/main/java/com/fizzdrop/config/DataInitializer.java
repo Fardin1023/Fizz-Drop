@@ -217,17 +217,6 @@ public class DataInitializer {
                     "INDEX idx_sdt_reg (vehicle_registration_no)" +
                     ")"
                 );
-
-                Integer teamCount = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM supplier_delivery_teams", Integer.class
-                );
-                if (teamCount == null || teamCount == 0) {
-                    jdbcTemplate.update(
-                        "INSERT INTO supplier_delivery_teams (supplier_id, team_name, vehicle_registration_no, vehicle_type, driver_name, driver_phone, team_members, max_capacity_cases, status, created_at, updated_at) VALUES " +
-                        "(1, 'Gulshan Express Logistics Fleet #1', 'DHA-METRO-TA-14-8890', 'Covered Van', 'Rafiqul Islam', '01712-345678', 'Rafiqul Islam (Lead Driver), Kamal Hossain (Logistics Assistant), Sajid Ahmed (Loader)', 250, 'AVAILABLE', NOW(), NOW()), " +
-                        "(1, 'Banani Fast-Track Delivery Fleet #2', 'DHA-METRO-TA-18-2234', 'Medium Truck', 'Abdul Mannan', '01823-987654', 'Abdul Mannan (Lead Driver), Sohel Rana (Delivery Officer)', 350, 'AVAILABLE', NOW(), NOW())"
-                    );
-                }
             } catch (Exception ignored) {}
 
             // Supplier Delivery Dispatches (Vehicle Trips to Outlets via Subroutes)
