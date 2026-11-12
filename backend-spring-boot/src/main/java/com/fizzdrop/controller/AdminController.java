@@ -378,7 +378,7 @@ public class AdminController {
                         "COALESCE(SUM(COALESCE(r.total_amount, r.quantity * COALESCE(r.unit_price, p.outlet_price, 0)) - (r.quantity * COALESCE(p.supplier_price, p.base_price, 0))), 0) AS profit " +
                         "FROM outlet_requisitions r " +
                         "JOIN products p ON r.product_id = p.product_id " +
-                        "WHERE r.status IN ('DISPATCHED', 'DELIVERED', 'COMPLETED') AND r.outlet_id IN (" + inSql + ")"
+                        "WHERE r.status = 'COMPLETED' AND r.outlet_id IN (" + inSql + ")"
                     );
                     if (!pnlRows.isEmpty()) {
                         spWholesaleRevenue = ((Number) pnlRows.get(0).getOrDefault("rev", 0.0)).doubleValue();

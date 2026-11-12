@@ -408,10 +408,12 @@ public class InventoryController {
         } catch (Exception ignored) {}
 
         // Record Wholesale Transaction for Supplier (Tier 2: Supplier sells to Sales Officer at outlet_price)
+        // RULE: The profit of the supplier gets updated ONLY when the outlet confirms the successful delivery of the product (in DeliveryController.confirmOutletReceipt).
+        // For unrequested direct push, delivery is immediate so transaction is logged here.
         final String finalRefCode = dispatchRefCode;
         final SalesOfficer finalOfficer = targetOfficer;
         final Outlet finalOutlet = outlet;
-        if (sp != null) {
+        if (sp != null && isUnrequestedDirectSupply) {
             try {
                 BigDecimal buyPrice = productSoldToSoRate;
                 BigDecimal sellPrice = outletSaleRate;
