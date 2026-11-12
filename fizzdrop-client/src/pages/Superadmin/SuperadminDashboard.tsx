@@ -43,6 +43,7 @@ import { getNotificationDestination } from '../../utils/notificationRouter';
 import { useNotifications } from '../../hooks/useNotifications';
 import { NotificationDropdown } from '../../components/Notifications/NotificationDropdown';
 import { NotificationPopup } from '../../components/Notifications/NotificationPopup';
+import superadminLogo from '../../assets/img/superadmin-logo.jpg';
 
 export const SuperadminDashboard: React.FC = () => {
   const { user, isSuperadmin, isAuthenticated, logout, isLoading } = useAuth();
@@ -308,9 +309,11 @@ export const SuperadminDashboard: React.FC = () => {
                 <span className="hidden sm:inline">Storefront</span>
               </Link>
 
-              <div className="w-6 h-6 rounded-md bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-500 text-white flex items-center justify-center shadow-2xs shrink-0">
-                <ShieldCheck className="w-3.5 h-3.5 text-white" />
-              </div>
+              <img
+                src={superadminLogo}
+                alt="Superadmin Logo"
+                className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl object-cover shadow-md shadow-indigo-500/25 border border-indigo-400/40 shrink-0"
+              />
 
               <span className="font-oswald font-bold tracking-tight uppercase text-zinc-900 text-xs sm:text-sm truncate">
                 Superadmin Operations Hub
@@ -378,14 +381,22 @@ export const SuperadminDashboard: React.FC = () => {
             {/* Sidebar Section Title */}
             <div className="px-2 py-1.5 flex items-center justify-between border-b border-slate-100 mb-1">
               {!isSidebarCollapsed ? (
-                <div className="flex items-center gap-1.5">
-                  <Sparkles className="w-3 h-3 text-indigo-600 animate-pulse" />
-                  <span className="text-[10px] font-bold font-mono tracking-wider text-slate-400 uppercase">
+                <div className="flex items-center gap-2 min-w-0">
+                  <img
+                    src={superadminLogo}
+                    alt="Superadmin Emblem"
+                    className="w-5 h-5 rounded-md object-cover shadow-2xs border border-indigo-300/40 shrink-0"
+                  />
+                  <span className="text-[10px] font-bold font-mono tracking-wider text-slate-500 uppercase truncate">
                     Central Operations Matrix
                   </span>
                 </div>
               ) : (
-                <Sparkles className="w-3.5 h-3.5 text-indigo-600 mx-auto" />
+                <img
+                  src={superadminLogo}
+                  alt="Superadmin"
+                  className="w-7 h-7 rounded-lg object-cover shadow-2xs mx-auto border border-indigo-300/40"
+                />
               )}
               
               <button
