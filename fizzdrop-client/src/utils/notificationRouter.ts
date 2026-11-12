@@ -78,6 +78,22 @@ export const getNotificationDestination = (
   // 2. SALES OFFICER PORTAL (/sales-officer)
   if (role === 'SALES_OFFICER') {
     if (
+      type.includes('FLEET') ||
+      type.includes('TRUCK') ||
+      type.includes('RIDE') ||
+      type.includes('TRANSIT') ||
+      type.includes('BOARDED') ||
+      title.includes('TRUCK') ||
+      title.includes('VEHICLE') ||
+      title.includes('IN TRANSIT') ||
+      title.includes('BOARDED') ||
+      msg.includes('TRUCK') ||
+      msg.includes('TRANSIT') ||
+      msg.includes('BOARDED')
+    ) {
+      return { path: '/sales-officer', tab: 'fleet-tracking', label: 'Live Delivery Fleet Map', fullUrl: '/sales-officer?tab=fleet-tracking' };
+    }
+    if (
       type.includes('PSR_ORDER') ||
       type.includes('NEW_PSR') ||
       type.includes('REFUND') ||

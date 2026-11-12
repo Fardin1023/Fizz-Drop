@@ -32,6 +32,7 @@ import {
   Award,
   Calendar,
   Percent,
+  Navigation,
 } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { getNotificationDestination } from '../../utils/notificationRouter';
@@ -40,6 +41,7 @@ import AdminLogin from '../Admin/AdminLogin';
 import { useNotifications } from '../../hooks/useNotifications';
 import { NotificationDropdown } from '../../components/Notifications/NotificationDropdown';
 import { NotificationPopup } from '../../components/Notifications/NotificationPopup';
+import DeliveryFleetMap, { type VehicleDispatch } from '../../components/Map/DeliveryFleetMap';
 
 interface TerritoryOutlet {
   outlet_id: number;
@@ -161,9 +163,9 @@ export const SalesOfficerDashboard: React.FC = () => {
   const { user, isAuthenticated, logout, loginAsSalesOfficer, isSalesOfficer, isSuperadmin } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const validTabs = ['overview', 'psr-team', 'profit-ledger', 'distributions', 'outlets', 'demands', 'supplier-link'];
+  const validTabs = ['overview', 'fleet-tracking', 'psr-team', 'profit-ledger', 'distributions', 'outlets', 'demands', 'supplier-link'];
   const initialTab = (searchParams.get('tab') as any) || 'overview';
-  const [activeTab, setActiveTab] = useState<'overview' | 'psr-team' | 'profit-ledger' | 'distributions' | 'outlets' | 'demands' | 'supplier-link'>(
+  const [activeTab, setActiveTab] = useState<'overview' | 'fleet-tracking' | 'psr-team' | 'profit-ledger' | 'distributions' | 'outlets' | 'demands' | 'supplier-link'>(
     validTabs.includes(initialTab) ? initialTab : 'overview'
   );
 
@@ -262,6 +264,36 @@ export const SalesOfficerDashboard: React.FC = () => {
   const [outletSearch, setOutletSearch] = useState('');
   const [demandStatusFilter, setDemandStatusFilter] = useState<'ALL' | 'PENDING' | 'DISPATCHED'>('ALL');
 
+  // Delivery Fleet & Map Tracking State
+  const [fleetDispatches, setFleetDispatches] = useState<VehicleDispatch[]>([]);
+  const [selectedFleetDispatch, setSelectedFleetDispatch] = useState<VehicleDispatch | null>(null);
+  const [loadingFleet, setLoadingFleet] = useState<boolean>(false);
+
+  const fetchFleetDispatches = async (officerId?: number) => {
+    const id = officerId || officer?.id;
+    if (!id) return;
+    try {
+      setLoadingFleet(true);
+      const res = await fetch(`http://localhost:8080/api/v1/delivery/dispatches?soId=${id}`);
+      if (res.ok) {
+        const data = await res.json();
+        const list: VehicleDispatch[] = Array.isArray(data) ? data : [];
+        setFleetDispatches(list);
+        if (list.length > 0) {
+          setSelectedFleetDispatch((prev) => {
+            if (!prev) return list[0];
+            const updated = list.find((d) => d.id === prev.id);
+            return updated || list[0];
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching fleet dispatches:', err);
+    } finally {
+      setLoadingFleet(false);
+    }
+  };
+
   const fetchDashboardData = async (targetOfficerId?: number) => {
     setLoading(true);
     try {
@@ -283,6 +315,7 @@ export const SalesOfficerDashboard: React.FC = () => {
 
         if (data.sales_officer?.id) {
           fetchPsrData(data.sales_officer.id);
+          fetchFleetDispatches(data.sales_officer.id);
         }
       }
 
@@ -316,6 +349,16 @@ export const SalesOfficerDashboard: React.FC = () => {
     fetchDashboardData();
   }, [user?.user_id]);
 
+  // Periodic polling for fleet dispatches and truck telemetry
+  useEffect(() => {
+    if (!officer?.id) return;
+    fetchFleetDispatches(officer.id);
+    const interval = setInterval(() => {
+      fetchFleetDispatches(officer.id);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [officer?.id]);
+
   // Auto-refresh financial target and order status upon Supplier purchase confirmation
   useEffect(() => {
     let channel: BroadcastChannel | null = null;
@@ -331,7 +374,16 @@ export const SalesOfficerDashboard: React.FC = () => {
           payload?.type === 'NEW_PSR_ORDER' ||
           payload?.type === 'NEW_PSR_REFUND' ||
           payload?.type === 'SO_ORDER_APPROVED' ||
-          payload?.type === 'PSR_STOCK_DISPATCHED'
+          payload?.type === 'PSR_STOCK_DISPATCHED' ||
+          payload?.type === 'FLEET_STOCKS_BOARDED' ||
+          payload?.type === 'FLEET_RIDE_STARTED' ||
+          payload?.type === 'FLEET_STOP_DELIVERED' ||
+          payload?.type === 'FLEET_DELIVERY_DISPATCHED' ||
+          payload?.type === 'SO_FLEET_STOCKS_BOARDED' ||
+          payload?.type === 'SO_FLEET_RIDE_STARTED' ||
+          payload?.type === 'SO_FLEET_STOP_DELIVERED' ||
+          payload?.type === 'SO_FLEET_DISPATCHED' ||
+          payload?.type === 'SO_STOCK_DELIVERY_CONFIRMED'
         ) {
           if (
             !payload.recipientUserId ||
@@ -342,6 +394,7 @@ export const SalesOfficerDashboard: React.FC = () => {
             if (officer?.id) {
               fetchDashboardData(officer.id);
               fetchPsrData(officer.id);
+              fetchFleetDispatches(officer.id);
             }
             if (payload?.type === 'SUPPLIER_DISPATCHED_TO_OUTLET') {
               setActionSuccessMsg(
@@ -1072,6 +1125,14 @@ export const SalesOfficerDashboard: React.FC = () => {
               </button>
 
               <button
+                onClick={() => setActiveTab('fleet-tracking')}
+                className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 hover:from-cyan-700 hover:to-indigo-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs cursor-pointer transition-all active:scale-95"
+              >
+                <Navigation className="w-3.5 h-3.5 animate-pulse" />
+                <span>Track Delivery Trucks on Live Map ({fleetDispatches.filter(d => d.status === 'IN_TRANSIT').length} In Transit)</span>
+              </button>
+
+              <button
                 onClick={() => setActiveTab('psr-team')}
                 className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs cursor-pointer transition-all active:scale-95"
               >
@@ -1126,6 +1187,7 @@ export const SalesOfficerDashboard: React.FC = () => {
           <div className="flex items-center gap-1.5 overflow-x-auto">
             {[
               { id: 'overview', label: 'Territory Hub & Stock Buffer', icon: Boxes },
+              { id: 'fleet-tracking', label: `Live Fleet Map Tracking (${fleetDispatches.length})`, icon: Navigation },
               { id: 'psr-team', label: `Pre-Sales (PSR) Team & Sub-Routes (${psrs.length})`, icon: UserCheck },
               { id: 'distributions', label: `Outlet Restock Distributions (${distributions.length})`, icon: Truck },
               { id: 'outlets', label: `Retail Stores (${outlets.length})`, icon: Store },
@@ -1241,6 +1303,186 @@ export const SalesOfficerDashboard: React.FC = () => {
                 ))}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* TAB: LIVE DELIVERY FLEET & OPENSTREETMAP TELEMETRY */}
+        {activeTab === 'fleet-tracking' && (
+          <div className="space-y-5 animate-fade-in">
+            {/* Top Stat Ribbon */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+              <div className="p-4 rounded-3xl bg-white border border-slate-200/90 shadow-2xs">
+                <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Total Fleet Trips</p>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-2xl font-black text-blue-700 font-mono">{fleetDispatches.length}</span>
+                  <span className="text-xs text-slate-500 font-medium">consignments</span>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-0.5">Supplier logistics fleet</p>
+              </div>
+
+              <div className="p-4 rounded-3xl bg-white border border-slate-200/90 shadow-2xs">
+                <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Trucks In Transit</p>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-2xl font-black text-amber-600 font-mono">
+                    {fleetDispatches.filter((d) => d.status === 'IN_TRANSIT').length}
+                  </span>
+                  <span className="text-xs text-slate-500 font-medium">active routes</span>
+                </div>
+                <p className="text-[10px] text-emerald-600 font-bold mt-0.5 flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping inline-block" /> Live moving on road
+                </p>
+              </div>
+
+              <div className="p-4 rounded-3xl bg-white border border-slate-200/90 shadow-2xs">
+                <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Cargo In Transit</p>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-2xl font-black text-indigo-700 font-mono">
+                    {fleetDispatches
+                      .filter((d) => d.status === 'IN_TRANSIT' || d.status === 'BOARDED')
+                      .reduce((acc, d) => acc + (d.total_cases || 0), 0)}
+                  </span>
+                  <span className="text-xs text-slate-500 font-medium">cases</span>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-0.5">Dispatched for sub-route stores</p>
+              </div>
+
+              <div className="p-4 rounded-3xl bg-white border border-slate-200/90 shadow-2xs">
+                <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400">OpenStreetMap API</p>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-2xl font-black text-emerald-600 font-mono">100%</span>
+                  <span className="text-xs text-slate-500 font-medium">synchronized</span>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-0.5">Live waypoint telemetry</p>
+              </div>
+            </div>
+
+            {/* Live OpenStreetMap Component */}
+            {fleetDispatches.length === 0 ? (
+              <div className="bg-white rounded-3xl border border-slate-200/90 p-12 text-center shadow-xs">
+                <div className="w-16 h-16 rounded-3xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-4 border border-blue-100 shadow-sm">
+                  <Truck className="w-8 h-8 text-blue-500" />
+                </div>
+                <h4 className="font-oswald text-xl font-bold uppercase tracking-wide text-slate-900">
+                  No Active Delivery Dispatches Found
+                </h4>
+                <p className="text-slate-500 text-xs mt-1.5 max-w-md mx-auto">
+                  When your Central Wholesale Supplier ({supplier?.business_name || 'Supplier'}) assigns a vehicle delivery team and dispatches stock to your sub-routes, live GPS tracking and OpenStreetMap progression will display here automatically.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => officer?.id && fetchFleetDispatches(officer.id)}
+                  className="mt-5 inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+                >
+                  <RefreshCw className={`w-4 h-4 ${loadingFleet ? 'animate-spin' : ''}`} />
+                  <span>Check for Fleet Trips</span>
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <DeliveryFleetMap
+                  dispatches={fleetDispatches}
+                  selectedDispatchId={selectedFleetDispatch?.id}
+                  onSelectDispatch={(disp) => setSelectedFleetDispatch(disp)}
+                  height="560px"
+                />
+
+                {/* Selected Trip Details & Stop Progression Manifest */}
+                {selectedFleetDispatch && (
+                  <div className="rounded-3xl bg-white border border-slate-200/90 p-5 shadow-xs space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-700 flex items-center justify-center font-bold text-base border border-blue-100">
+                          🚚
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-bold text-slate-900 text-base">
+                              {selectedFleetDispatch.team_name || 'Delivery Logistics Fleet'}
+                            </h4>
+                            <span className="font-mono text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
+                              {selectedFleetDispatch.vehicle_registration_no}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500">
+                            Sub-Route: <strong className="text-slate-800">{selectedFleetDispatch.sub_route}</strong> • Driver: <strong className="text-slate-800">{selectedFleetDispatch.driver_name}</strong> ({selectedFleetDispatch.driver_phone || 'N/A'})
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => officer?.id && fetchFleetDispatches(officer.id)}
+                          className="p-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs flex items-center gap-1.5 transition cursor-pointer"
+                          title="Refresh live fleet dispatches"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${loadingFleet ? 'animate-spin text-blue-600' : ''}`} />
+                          <span className="hidden sm:inline">Sync Live</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Checkpoints & Outlets Table */}
+                    <div className="overflow-x-auto rounded-2xl border border-slate-100">
+                      <table className="w-full text-xs text-left">
+                        <thead className="bg-slate-50 text-slate-500 font-mono text-[10px] uppercase border-b border-slate-100">
+                          <tr>
+                            <th className="py-2.5 px-3">Stop #</th>
+                            <th className="py-2.5 px-3">Outlet Name</th>
+                            <th className="py-2.5 px-3">Product Cases</th>
+                            <th className="py-2.5 px-3">Delivery Status</th>
+                            <th className="py-2.5 px-3 text-right">Wholesale Profit</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 font-sans">
+                          {(selectedFleetDispatch.items || []).map((item, idx) => {
+                            const isConfirmed = item.stop_status === 'CONFIRMED_BY_OUTLET';
+                            const isDelivered = item.stop_status === 'DELIVERED_BY_DRIVER';
+                            return (
+                              <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
+                                <td className="py-2.5 px-3 font-mono font-bold text-slate-400">
+                                  #{idx + 1}
+                                </td>
+                                <td className="py-2.5 px-3">
+                                  <p className="font-bold text-slate-900">{item.outlet_name}</p>
+                                  <p className="text-[11px] text-slate-400 truncate max-w-xs">{item.outlet_address || selectedFleetDispatch.sub_route}</p>
+                                </td>
+                                <td className="py-2.5 px-3">
+                                  <span className="font-mono font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
+                                    {item.assigned_cases || item.demanded_cases || 0} cases
+                                  </span>
+                                  <span className="text-[11px] text-slate-500 block mt-0.5">
+                                    {item.brand || ''} {item.flavor_variant || ''}
+                                  </span>
+                                </td>
+                                <td className="py-2.5 px-3">
+                                  {isConfirmed ? (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                      <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Confirmed by Outlet
+                                    </span>
+                                  ) : isDelivered ? (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                      <Truck className="w-3 h-3 text-amber-600" /> Delivered by Driver
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                      <Clock className="w-3 h-3 text-blue-600" /> En Route
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-700">
+                                  {isConfirmed && item.wholesale_profit ? `+৳${Number(item.wholesale_profit).toLocaleString()}` : '—'}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 

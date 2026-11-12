@@ -53,6 +53,31 @@ public class DeliveryController {
         return all.isEmpty() ? 1L : all.get(0).getId();
     }
 
+    private void notifySalesOfficersForDispatch(Long supplierId, String subRoute, String title, String message, String notifType, String dispatchCode, Long tripId) {
+        if (supplierId == null) return;
+        try {
+            List<Map<String, Object>> soList = jdbcTemplate.queryForList(
+                "SELECT id, user_id, name, assigned_area FROM sales_officers WHERE supplier_id = ?",
+                supplierId
+            );
+            for (Map<String, Object> so : soList) {
+                Long soId = ((Number) so.get("id")).longValue();
+                Long soUserId = so.get("user_id") != null ? ((Number) so.get("user_id")).longValue() : (100L + soId);
+                AppNotification soNotif = new AppNotification();
+                soNotif.setRecipientRole("SALES_OFFICER");
+                soNotif.setRecipientUserId(soUserId);
+                soNotif.setTitle(title);
+                soNotif.setMessage(message);
+                soNotif.setType(notifType);
+                soNotif.setReferenceCode(dispatchCode);
+                soNotif.setReferenceId(tripId);
+                notificationRepository.save(soNotif);
+            }
+        } catch (Exception ex) {
+            System.err.println("[DeliveryController] Failed to notify Sales Officers: " + ex.getMessage());
+        }
+    }
+
     // ==========================================
     // 1. DELIVERY TEAMS & FLEET MANAGEMENT
     // ==========================================
@@ -251,10 +276,33 @@ public class DeliveryController {
     public ResponseEntity<?> getDispatches(
             @RequestParam(required = false) Long supplierId,
             @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) Long soId,
+            @RequestParam(required = false) Long salesOfficerId,
             @RequestParam(required = false, defaultValue = "false") boolean all) {
 
         List<Map<String, Object>> list;
-        if (all) {
+        Long targetSoId = soId != null ? soId : salesOfficerId;
+        if (targetSoId != null) {
+            List<Map<String, Object>> soRows = jdbcTemplate.queryForList(
+                "SELECT id, supplier_id, assigned_area, city FROM sales_officers WHERE id = ? OR user_id = ?",
+                targetSoId, targetSoId
+            );
+            if (!soRows.isEmpty()) {
+                Long sId = ((Number) soRows.get(0).get("supplier_id")).longValue();
+                list = jdbcTemplate.queryForList(
+                    "SELECT d.*, t.team_name, t.vehicle_registration_no, t.vehicle_type, t.driver_name, t.driver_phone, t.team_members, " +
+                    "s.business_name as supplier_name " +
+                    "FROM supplier_delivery_dispatches d " +
+                    "LEFT JOIN supplier_delivery_teams t ON d.delivery_team_id = t.id " +
+                    "LEFT JOIN supplier_profiles s ON d.supplier_id = s.id " +
+                    "WHERE d.supplier_id = ? " +
+                    "ORDER BY d.dispatched_at DESC",
+                    sId
+                );
+            } else {
+                list = Collections.emptyList();
+            }
+        } else if (all) {
             list = jdbcTemplate.queryForList(
                 "SELECT d.*, t.team_name, t.vehicle_registration_no, t.vehicle_type, t.driver_name, t.driver_phone, t.team_members, " +
                 "s.business_name as supplier_name " +
@@ -369,6 +417,18 @@ public class DeliveryController {
             } catch (Exception ignored) {}
         }
 
+        // Notify Sales Officers for this supplier/subroute
+        try {
+            notifySalesOfficersForDispatch(
+                sId, subRoute,
+                "🚚 Delivery Truck Dispatched (" + subRoute + ")",
+                "Vehicle dispatched for subroute '" + subRoute + "' with " + totalCases + " cases across " + uniqueOutlets.size() + " stores. Live map tracking active.",
+                "SO_FLEET_DISPATCHED",
+                dispatchCode,
+                null
+            );
+        } catch (Exception ignored) {}
+
         return ResponseEntity.ok(Map.of(
             "success", true,
             "dispatch_code", dispatchCode,
@@ -452,6 +512,18 @@ public class DeliveryController {
             notificationRepository.save(notif);
         } catch (Exception ignored) {}
 
+        // Notify Sales Officers in real time
+        try {
+            notifySalesOfficersForDispatch(
+                supplierId, route,
+                "📦 Stocks Boarded on Truck (" + regNo + ")",
+                "Driver " + driver + " confirmed stocks boarded onto vehicle " + regNo + " for subroute '" + route + "'.",
+                "SO_FLEET_STOCKS_BOARDED",
+                (String) trip.get("dispatch_code"),
+                id
+            );
+        } catch (Exception ignored) {}
+
         return ResponseEntity.ok(Map.of(
             "success", true,
             "status", "BOARDED",
@@ -492,6 +564,18 @@ public class DeliveryController {
             notif.setReferenceCode((String) trip.get("dispatch_code"));
             notif.setReferenceId(id);
             notificationRepository.save(notif);
+        } catch (Exception ignored) {}
+
+        // Notify Sales Officers in real time
+        try {
+            notifySalesOfficersForDispatch(
+                supplierId, route,
+                "🚚 Delivery Truck In Transit (" + regNo + ")",
+                "Delivery ride started! Driver " + driver + " is now in transit along subroute '" + route + "'. Track live progression on map.",
+                "SO_FLEET_RIDE_STARTED",
+                (String) trip.get("dispatch_code"),
+                id
+            );
         } catch (Exception ignored) {}
 
         return ResponseEntity.ok(Map.of(
@@ -602,6 +686,18 @@ public class DeliveryController {
             outNotif.setReferenceCode((String) trip.get("dispatch_code"));
             outNotif.setReferenceId(targetOutletId);
             notificationRepository.save(outNotif);
+        } catch (Exception ignored) {}
+
+        // Notification to Sales Officers
+        try {
+            notifySalesOfficersForDispatch(
+                supplierId, route,
+                "📦 Stock Dropped at " + outletName + " (" + regNo + ")",
+                "Driver " + driver + " confirmed delivery of " + totalCasesDelivered + " cases to " + outletName + " on route " + route + ". Awaiting outlet confirmation.",
+                "SO_FLEET_STOP_DELIVERED",
+                (String) trip.get("dispatch_code"),
+                id
+            );
         } catch (Exception ignored) {}
 
         return ResponseEntity.ok(Map.of(
