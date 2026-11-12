@@ -34,6 +34,7 @@ import { getNotificationDestination } from '../../utils/notificationRouter';
 import { useNotifications } from '../../hooks/useNotifications';
 import { NotificationDropdown } from '../../components/Notifications/NotificationDropdown';
 import { NotificationPopup } from '../../components/Notifications/NotificationPopup';
+import supplierLogo from '../../assets/img/supplier-logo.jpg';
 
 export const AdminDashboard: React.FC = () => {
   const { user, isSupplier, isSuperadmin, isAuthenticated, logout, isLoading } = useAuth();
@@ -242,9 +243,11 @@ export const AdminDashboard: React.FC = () => {
                 <span className="hidden sm:inline">Storefront</span>
               </Link>
 
-              <div className="w-6 h-6 rounded-md bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
-                <Truck className="w-3.5 h-3.5" />
-              </div>
+              <img
+                src={supplierLogo}
+                alt="Regional Supplier Logo"
+                className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl object-cover shadow-md shadow-indigo-500/25 border border-indigo-400/40 shrink-0"
+              />
 
               <span className="font-oswald font-bold tracking-tight uppercase text-zinc-900 text-xs sm:text-sm truncate">
                 Regional Supplier & Logistics Portal
@@ -317,15 +320,23 @@ export const AdminDashboard: React.FC = () => {
             
             {/* Sidebar Header: Toggle button and section title */}
             <div className="flex items-center justify-between px-2 py-1.5 border-b border-slate-100">
-              {!isSidebarCollapsed && (
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <div className="w-5 h-5 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center shrink-0">
-                    <Sparkles className="w-3 h-3" />
-                  </div>
+              {!isSidebarCollapsed ? (
+                <div className="flex items-center gap-2 min-w-0">
+                  <img
+                    src={supplierLogo}
+                    alt="Supplier Emblem"
+                    className="w-5 h-5 rounded-md object-cover shadow-2xs border border-indigo-300/40 shrink-0"
+                  />
                   <span className="text-[11px] font-bold text-slate-800 tracking-wider uppercase truncate">
                     Supplier Hub
                   </span>
                 </div>
+              ) : (
+                <img
+                  src={supplierLogo}
+                  alt="Supplier"
+                  className="w-7 h-7 rounded-lg object-cover shadow-2xs mx-auto border border-indigo-300/40"
+                />
               )}
               <button
                 onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
