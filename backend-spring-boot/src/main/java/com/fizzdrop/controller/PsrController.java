@@ -379,8 +379,9 @@ public class PsrController {
                 AppNotification notif = new AppNotification();
                 notif.setRecipientRole("SALES_OFFICER");
                 notif.setRecipientUserId(soUserId);
-                notif.setTitle("New Route Order from PSR " + psr.getName());
-                notif.setMessage("PSR " + psr.getName() + " booked " + quantity + " cases of " + productName.trim() +
+                notif.setReferenceId(psr.getSalesOfficerId());
+                notif.setTitle("Stock Permission Requested by PSR " + psr.getName());
+                notif.setMessage("PSR " + psr.getName() + " requested SO permission & stock approval for " + quantity + " cases of " + productName.trim() +
                                 " (৳" + totalAmount + ") for " + outletName.trim() + " on route " + psr.getSubRoute() + ".");
                 notif.setType("NEW_PSR_ORDER");
                 notif.setReferenceCode(orderCode);
@@ -423,8 +424,8 @@ public class PsrController {
                 notif.setRecipientRole("SALES_OFFICER");
                 notif.setRecipientUserId(soUserId);
                 notif.setReferenceId(psr.getSalesOfficerId());
-                notif.setTitle("Batch Restock Orders from PSR " + psr.getName());
-                notif.setMessage("PSR " + psr.getName() + " submitted " + updated + " store orders from route " + psr.getSubRoute() + " for your review and approval.");
+                notif.setTitle("Stock Permission Requested for Batch Orders by PSR " + psr.getName());
+                notif.setMessage("PSR " + psr.getName() + " submitted " + updated + " store orders from route " + psr.getSubRoute() + " requesting your SO permission and review.");
                 notif.setType("NEW_PSR_ORDER");
                 notificationRepository.save(notif);
             } catch (Exception ignored) {}
@@ -471,8 +472,8 @@ public class PsrController {
                 notif.setRecipientRole("SALES_OFFICER");
                 notif.setRecipientUserId(soUserId);
                 notif.setReferenceId(soId);
-                notif.setTitle("Restock Order Requested by PSR " + psrName);
-                notif.setMessage("PSR " + psrName + " requested stock approval for " + quantity + " cases of " +
+                notif.setTitle("Stock Permission Requested by PSR " + psrName);
+                notif.setMessage("PSR " + psrName + " requested SO permission & stock approval for " + quantity + " cases of " +
                         productName + " (৳" + totalAmount + ") for " + outletName + ".");
                 notif.setType("NEW_PSR_ORDER");
                 notif.setReferenceCode(orderCode);
@@ -984,8 +985,9 @@ public class PsrController {
                 AppNotification notif = new AppNotification();
                 notif.setRecipientRole("SALES_OFFICER");
                 notif.setRecipientUserId(soUserId);
-                notif.setTitle("New Field Refund Claim from PSR " + psr.getName());
-                notif.setMessage("PSR " + psr.getName() + " recorded a return claim for " + quantity + " units of " +
+                notif.setReferenceId(psr.getSalesOfficerId());
+                notif.setTitle("Return Permission Requested by PSR " + psr.getName());
+                notif.setMessage("PSR " + psr.getName() + " requested return approval for " + quantity + " units of " +
                                 productName.trim() + " (Reason: " + reason + ") from " + outletName.trim() + ".");
                 notif.setType("NEW_PSR_REFUND");
                 notif.setReferenceCode(refundCode);

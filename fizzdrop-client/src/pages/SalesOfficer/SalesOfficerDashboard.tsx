@@ -389,6 +389,7 @@ export const SalesOfficerDashboard: React.FC = () => {
           if (
             !payload.recipientUserId ||
             payload.recipientUserId === officer?.user_id ||
+            payload.recipientUserId === soUserId ||
             payload.referenceId === officer?.id ||
             payload.sales_officer_id === officer?.id
           ) {
@@ -396,6 +397,11 @@ export const SalesOfficerDashboard: React.FC = () => {
               fetchDashboardData(officer.id);
               fetchPsrData(officer.id);
               fetchFleetDispatches(officer.id);
+            }
+            if (payload?.type === 'NEW_PSR_ORDER' || payload?.type === 'NEW_PSR_REFUND') {
+              setActionSuccessMsg(
+                payload.message || `PSR has submitted a new stock permission request.`
+              );
             }
             if (payload?.type === 'SUPPLIER_DISPATCHED_TO_OUTLET') {
               setActionSuccessMsg(

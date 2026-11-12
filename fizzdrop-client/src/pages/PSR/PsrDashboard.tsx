@@ -226,6 +226,12 @@ export default function PsrDashboard() {
         const bc = new BroadcastChannel('fizzdrop_realtime_events');
         bc.postMessage({
           type: 'NEW_PSR_ORDER',
+          recipientRole: 'SALES_OFFICER',
+          recipientUserId: data?.sales_officer?.user_id || (data?.sales_officer?.id ? 100 + data.sales_officer.id : undefined),
+          referenceId: data?.sales_officer?.id || order.sales_officer_id,
+          title: `Stock Permission Requested by PSR ${data?.psr?.name || 'Field Agent'}`,
+          message: `PSR ${data?.psr?.name || 'Field Agent'} requested SO permission & stock approval for ${order.quantity} cases of ${order.product_name} for ${order.outlet_name}.`,
+          referenceCode: order.order_code,
           order_code: order.order_code,
           psr_id: order.psr_id,
           outlet_name: order.outlet_name,
@@ -325,9 +331,14 @@ export default function PsrDashboard() {
         channel.postMessage({
           type: 'NEW_PSR_ORDER',
           recipientRole: 'SALES_OFFICER',
-          title: `New Field Order from PSR ${data?.psr?.name}`,
-          message: `Order for ${orderModalOutlet.franchise_name || 'Outlet'} (${quantity} units) submitted.`,
+          recipientUserId: data?.sales_officer?.user_id || (data?.sales_officer?.id ? 100 + data.sales_officer.id : undefined),
+          referenceId: data?.sales_officer?.id,
+          title: `Stock Permission Requested by PSR ${data?.psr?.name || 'Field Agent'}`,
+          message: `PSR ${data?.psr?.name || 'Field Agent'} booked ${quantity} units for ${orderModalOutlet.franchise_name || orderModalOutlet.outlet_name || 'Outlet'} and requested SO stock permission.`,
           referenceCode: resJson.order_code,
+          order_code: resJson.order_code,
+          outlet_name: orderModalOutlet.franchise_name || orderModalOutlet.outlet_name || 'Outlet',
+          quantity: quantity,
         });
         channel.close();
       } catch (err) {}
@@ -385,8 +396,10 @@ export default function PsrDashboard() {
         channel.postMessage({
           type: 'NEW_PSR_REFUND',
           recipientRole: 'SALES_OFFICER',
-          title: `New Field Refund Claim from PSR ${data?.psr?.name}`,
-          message: `Return claim from ${refundModalOutlet.franchise_name || 'Outlet'} for ${quantity} units logged.`,
+          recipientUserId: data?.sales_officer?.user_id || (data?.sales_officer?.id ? 100 + data.sales_officer.id : undefined),
+          referenceId: data?.sales_officer?.id,
+          title: `Return Permission Requested by PSR ${data?.psr?.name || 'Field Agent'}`,
+          message: `Return claim from ${refundModalOutlet.franchise_name || refundModalOutlet.outlet_name || 'Outlet'} for ${quantity} units logged by PSR ${data?.psr?.name || ''}.`,
           referenceCode: resJson.refund_code,
         });
         channel.close();
