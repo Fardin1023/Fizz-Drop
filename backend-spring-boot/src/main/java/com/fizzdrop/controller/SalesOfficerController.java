@@ -428,7 +428,7 @@ public class SalesOfficerController {
         Map<Long, Integer> distributedMap = new HashMap<>();
         try {
             jdbcTemplate.query(
-                "SELECT product_id, COALESCE(SUM(quantity), 0) as qty FROM outlet_requisitions WHERE sales_officer_id = ? AND requisition_code NOT LIKE 'SO-REQ-%' AND status IN ('DISPATCHED', 'COMPLETED') GROUP BY product_id",
+                "SELECT product_id, COALESCE(SUM(quantity), 0) as qty FROM outlet_requisitions WHERE sales_officer_id = ? AND requisition_code NOT LIKE 'SO-REQ-%' AND status = 'COMPLETED' GROUP BY product_id",
                 (rs) -> {
                     distributedMap.put(rs.getLong("product_id"), rs.getInt("qty"));
                 },

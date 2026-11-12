@@ -727,6 +727,81 @@ public class DeliveryController {
                             outletId, prodId
                         );
                     } catch (Exception ignored) {}
+
+                    // Update stock count on the products purchased from supplier by the SO (deducted ONLY upon confirmed outlet delivery)
+                    Long soId = null;
+                    try {
+                        List<Map<String, Object>> soList = jdbcTemplate.queryForList(
+                            "SELECT sales_officer_id FROM outlet_requisitions WHERE outlet_id = ? AND product_id = ? AND sales_officer_id IS NOT NULL ORDER BY id DESC LIMIT 1",
+                            outletId, prodId
+                        );
+                        if (!soList.isEmpty() && soList.get(0).get("sales_officer_id") != null) {
+                            soId = ((Number) soList.get(0).get("sales_officer_id")).longValue();
+                        }
+                    } catch (Exception ignored) {}
+
+                    if (soId == null) {
+                        try {
+                            Outlet outObj = outletRepository.findById(outletId).orElse(null);
+                            if (outObj != null && outObj.getArea() != null) {
+                                List<Map<String, Object>> soAreaList = jdbcTemplate.queryForList(
+                                    "SELECT id FROM sales_officers WHERE LOWER(assigned_area) = LOWER(?) LIMIT 1",
+                                    outObj.getArea().trim()
+                                );
+                                if (!soAreaList.isEmpty()) {
+                                    soId = ((Number) soAreaList.get(0).get("id")).longValue();
+                                }
+                            }
+                        } catch (Exception ignored) {}
+                    }
+
+                    if (soId != null) {
+                        try {
+                            jdbcTemplate.update(
+                                "UPDATE sales_officer_inventory " +
+                                "SET current_stock = GREATEST(0, current_stock - ?), " +
+                                "    total_distributed = total_distributed + ?, " +
+                                "    updated_at = NOW() " +
+                                "WHERE sales_officer_id = ? AND product_id = ?",
+                                qty, qty, soId, prodId
+                            );
+                        } catch (Exception ex) {
+                            System.err.println("[DeliveryController] Failed to update sales_officer_inventory: " + ex.getMessage());
+                        }
+
+                        // Record distribution record towards SO target
+                        try {
+                            List<Map<String, Object>> existingDist = jdbcTemplate.queryForList(
+                                "SELECT id FROM sales_officer_distributions WHERE notes LIKE ?",
+                                "%" + dispatchCode + "%"
+                            );
+                            if (existingDist.isEmpty()) {
+                                jdbcTemplate.update(
+                                    "INSERT INTO sales_officer_distributions (sales_officer_id, outlet_id, product_id, quantity, cost_price, sale_price, total_cost, total_revenue, profit_earned, notes, distribution_date) " +
+                                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, NOW())",
+                                    soId, outletId, prodId, qty, soldToSoRate, outletPrice,
+                                    soldToSoRate.multiply(BigDecimal.valueOf(qty)),
+                                    outletPrice.multiply(BigDecimal.valueOf(qty)),
+                                    "Delivery confirmed by " + outletName + " from SO purchased stock (" + dispatchCode + ")"
+                                );
+                            }
+                        } catch (Exception ignored) {}
+
+                        // Notify Sales Officer
+                        try {
+                            List<Map<String, Object>> soUserList = jdbcTemplate.queryForList("SELECT user_id, name FROM sales_officers WHERE id = ?", soId);
+                            Long soUserId = !soUserList.isEmpty() && soUserList.get(0).get("user_id") != null ? ((Number) soUserList.get(0).get("user_id")).longValue() : (100L + soId);
+                            AppNotification soNotif = new AppNotification();
+                            soNotif.setRecipientRole("SALES_OFFICER");
+                            soNotif.setRecipientUserId(soUserId);
+                            soNotif.setTitle("Delivery Confirmed by " + outletName);
+                            soNotif.setMessage(outletName + " has confirmed receipt of " + qty + " cases of " + product.getBrand() + " " + product.getFlavorVariant() + ". Your purchased stock count has been updated towards monthly target fulfillment.");
+                            soNotif.setType("SO_STOCK_DELIVERY_CONFIRMED");
+                            soNotif.setReferenceCode(dispatchCode);
+                            soNotif.setReferenceId(tripId);
+                            notificationRepository.save(soNotif);
+                        } catch (Exception ignored) {}
+                    }
                 }
             }
             if ("CONFIRMED_BY_OUTLET".equalsIgnoreCase(String.valueOf(it.get("stop_status")))) {

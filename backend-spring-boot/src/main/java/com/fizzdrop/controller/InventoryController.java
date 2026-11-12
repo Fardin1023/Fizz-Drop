@@ -203,38 +203,34 @@ public class InventoryController {
                     "' in buffer stock, but " + req.getQuantity() + " cases were requested."
                 ));
             }
-            // Deduct dispatched stock from SO purchased buffer
-            try {
-                jdbcTemplate.update(
-                    "UPDATE sales_officer_inventory SET current_stock = GREATEST(0, current_stock - ?), total_distributed = total_distributed + ?, updated_at = NOW() " +
-                    "WHERE sales_officer_id = ? AND product_id = ?",
-                    req.getQuantity(), req.getQuantity(), targetOfficer.getId(), product.getProductId()
-                );
-            } catch (Exception ignored) {}
+            // NOTE: Per requirement, the stock count on products purchased from supplier by the SO
+            // gets updated ONLY when the stock is delivered to the outlet and the outlet confirms delivery, not before that.
         }
 
-        // Find or create inventory row
+        // For direct unrequested push or manual SET mode, update shop inventory immediately.
+        // For dispatched outlet requisitions, shelf stock is replenished when outlet confirms delivery receipt.
         Optional<ShopInventory> invOpt = inventoryRepository.findByBranchIdAndProductId(outlet.getOutletId(), product.getProductId());
-        ShopInventory inventory;
-        int previousStock = 0;
-        int newStock;
+        int previousStock = invOpt.map(ShopInventory::getStockQuantity).orElse(0);
+        int newStock = previousStock;
 
-        if (invOpt.isPresent()) {
-            inventory = invOpt.get();
-            previousStock = inventory.getStockQuantity();
-            if ("SET".equalsIgnoreCase(req.getMode())) {
-                newStock = req.getQuantity();
+        if (isUnrequestedDirectSupply || "SET".equalsIgnoreCase(req.getMode())) {
+            ShopInventory inventory;
+            if (invOpt.isPresent()) {
+                inventory = invOpt.get();
+                if ("SET".equalsIgnoreCase(req.getMode())) {
+                    newStock = req.getQuantity();
+                } else {
+                    newStock = previousStock + req.getQuantity();
+                }
+                inventory.setStockQuantity(newStock);
+                inventory.setUpdatedDate(LocalDateTime.now());
             } else {
-                newStock = previousStock + req.getQuantity();
+                newStock = req.getQuantity();
+                inventory = new ShopInventory(outlet.getOutletId(), product.getProductId(), newStock);
             }
-            inventory.setStockQuantity(newStock);
-            inventory.setUpdatedDate(LocalDateTime.now());
-        } else {
-            newStock = req.getQuantity();
-            inventory = new ShopInventory(outlet.getOutletId(), product.getProductId(), newStock);
-        }
 
-        inventoryRepository.save(inventory);
+            inventoryRepository.save(inventory);
+        }
 
         // Deduct supplied stock from supplier's district/depot inventory ONLY for direct unrequested push (outlet requisitions are deducted from SO buffer)
         if (isUnrequestedDirectSupply && sp != null) {
@@ -980,7 +976,7 @@ public class InventoryController {
             );
             Integer distributed = jdbcTemplate.queryForObject(
                 "SELECT COALESCE(SUM(quantity), 0) FROM outlet_requisitions " +
-                "WHERE sales_officer_id = ? AND product_id = ? AND requisition_code NOT LIKE 'SO-REQ-%' AND status IN ('DISPATCHED', 'COMPLETED')",
+                "WHERE sales_officer_id = ? AND product_id = ? AND requisition_code NOT LIKE 'SO-REQ-%' AND status = 'COMPLETED'",
                 Integer.class, salesOfficerId, productId
             );
             int p = (purchased != null) ? purchased : 0;
