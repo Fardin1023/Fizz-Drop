@@ -60,7 +60,13 @@ export const SupplierTransactionsView: React.FC = () => {
     wallet_balance: (() => {
       try {
         const cached = localStorage.getItem('fizzdrop_supplier_wallet');
-        return cached ? parseFloat(cached) : 0;
+        if (cached) {
+          const val = parseFloat(cached);
+          if (!isNaN(val) && val < 100000000000) {
+            return val;
+          }
+        }
+        return 0;
       } catch {
         return 0;
       }
@@ -166,6 +172,28 @@ export const SupplierTransactionsView: React.FC = () => {
 
   useEffect(() => {
     fetchData();
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'fizzdrop_supplier_wallet_refresh' || e.key === 'fizzdrop_supplier_wallet') {
+        fetchData();
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel('fizzdrop_realtime_events');
+      channel.onmessage = (event) => {
+        if (event.data?.type === 'SUPPLIER_WALLET_UPDATED' || event.data?.type === 'OUTLET_DELIVERY_CONFIRMED') {
+          fetchData();
+        }
+      };
+    } catch (ignored) {}
+
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      if (channel) channel.close();
+    };
   }, []);
 
   // Filtered transactions

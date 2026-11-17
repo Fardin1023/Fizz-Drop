@@ -42,6 +42,8 @@ export interface SalesOfficerItem {
   created_at?: string;
   user_id?: number;
   monthly_target?: number;
+  allocated_supplier_ids?: string;
+  allocated_suppliers?: any[];
 }
 
 export interface SupplierSummary {
@@ -75,6 +77,7 @@ export const SuperadminSalesOfficerManagement: React.FC = () => {
   const [formPassword, setFormPassword] = useState('Officer123!');
   const [formPhone, setFormPhone] = useState('');
   const [formSupplierId, setFormSupplierId] = useState<number | string>('');
+  const [formAllocatedSupplierIds, setFormAllocatedSupplierIds] = useState<number[]>([]);
   const [formCity, setFormCity] = useState('');
   const [formArea, setFormArea] = useState('');
   const [formMonthlyTarget, setFormMonthlyTarget] = useState('2000000');
@@ -152,6 +155,24 @@ export const SuperadminSalesOfficerManagement: React.FC = () => {
     setFormArea(areas.length > 0 ? areas[0] : '');
   };
 
+  const toggleAllocatedSupplier = (supId: number) => {
+    setFormAllocatedSupplierIds((prev) => {
+      let next: number[];
+      if (prev.includes(supId)) {
+        if (prev.length <= 1) {
+          return prev; // keep at least one supplier
+        }
+        next = prev.filter((id) => id !== supId);
+      } else {
+        next = [...prev, supId];
+      }
+      if (!next.includes(Number(formSupplierId)) && next.length > 0) {
+        handleSupplierChange(next[0]);
+      }
+      return next;
+    });
+  };
+
   const handleOpenCreateModal = () => {
     setEditingOfficer(null);
     setFormName('');
@@ -165,6 +186,10 @@ export const SuperadminSalesOfficerManagement: React.FC = () => {
 
     if (suppliers.length > 0) {
       handleSupplierChange(suppliers[0].id);
+      // Allot all registered suppliers by default during creation so SO can partner with all depots
+      setFormAllocatedSupplierIds(suppliers.map((s) => s.id));
+    } else {
+      setFormAllocatedSupplierIds([]);
     }
     setIsModalOpen(true);
   };
@@ -182,6 +207,15 @@ export const SuperadminSalesOfficerManagement: React.FC = () => {
     setFormStatus(so.status);
     setFormNotes(so.notes || '');
     setErrorMsg(null);
+
+    const initialAllocated = so.allocated_supplier_ids
+      ? so.allocated_supplier_ids
+          .split(',')
+          .map((id) => Number(id.trim()))
+          .filter((n) => !isNaN(n) && n > 0)
+      : [so.supplier_id];
+    setFormAllocatedSupplierIds(initialAllocated.length > 0 ? initialAllocated : [so.supplier_id]);
+
     setIsModalOpen(true);
   };
 
@@ -210,11 +244,20 @@ export const SuperadminSalesOfficerManagement: React.FC = () => {
       : 'http://localhost:8080/api/v1/sales-officers';
     const method = isEdit ? 'PUT' : 'POST';
 
+    const finalAllocatedIds = formAllocatedSupplierIds.length > 0
+      ? [...formAllocatedSupplierIds]
+      : [Number(formSupplierId)];
+    
+    if (!finalAllocatedIds.includes(Number(formSupplierId))) {
+      finalAllocatedIds.unshift(Number(formSupplierId));
+    }
+
     const payload: any = {
       name: formName.trim(),
       phone: formPhone.trim(),
       email: formEmail.trim() || undefined,
       supplier_id: Number(formSupplierId),
+      allocated_supplier_ids: finalAllocatedIds.join(','),
       city: formCity,
       assigned_area: formArea,
       monthly_target: parseFloat(formMonthlyTarget) || 2000000,
@@ -574,16 +617,28 @@ export const SuperadminSalesOfficerManagement: React.FC = () => {
                       </div>
                     </td>
 
-                    {/* Linked Supplier */}
+                    {/* Linked & Allotted Suppliers */}
                     <td className="px-4 py-4">
-                      <div className="space-y-0.5">
+                      <div className="space-y-1">
                         <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
                           <Building2 className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
                           {so.supplier_name || `Supplier #${so.supplier_id}`}
                         </span>
-                        <span className="text-[10px] text-slate-400 font-mono">
-                          Supplier ID: #{so.supplier_id}
-                        </span>
+                        {(() => {
+                          const allIds = so.allocated_supplier_ids
+                            ? so.allocated_supplier_ids.split(',').map((x) => x.trim()).filter(Boolean)
+                            : [String(so.supplier_id)];
+                          return (
+                            <div className="flex flex-wrap items-center gap-1">
+                              <span className="text-[10px] font-semibold text-slate-500">Allotted ({allIds.length}):</span>
+                              {allIds.map((sid) => (
+                                <span key={sid} className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                  #{sid}
+                                </span>
+                              ))}
+                            </div>
+                          );
+                        })()}
                       </div>
                     </td>
 
@@ -782,26 +837,126 @@ export const SuperadminSalesOfficerManagement: React.FC = () => {
                 </div>
               </div>
 
-              {/* Linked Supplier */}
-              <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
-                  Linked Regional Supplier *
-                </label>
-                <select
-                  value={formSupplierId}
-                  onChange={(e) => handleSupplierChange(e.target.value)}
-                  required
-                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 font-semibold text-slate-800"
-                >
-                  {suppliers.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.business_name} (ID #{s.id} • {s.division_name || 'Dhaka'})
-                    </option>
-                  ))}
-                </select>
-                <p className="text-[10px] text-slate-400 mt-0.5">
-                  The supplier will dispatch wholesale stock directly to this Sales Officer.
+              {/* Allot Multiple Wholesale Suppliers to SO */}
+              <div className="space-y-2 p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Allot Wholesale Suppliers to SO (Multiple Allowed) *</span>
+                  </label>
+                  <div className="flex items-center gap-1.5 text-[10px]">
+                    <span className="font-bold font-mono px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                      {formAllocatedSupplierIds.length} Allotted
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const allIds = suppliers.map((s) => s.id);
+                        setFormAllocatedSupplierIds(allIds);
+                      }}
+                      className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold transition cursor-pointer"
+                    >
+                      Select All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (suppliers.length > 0) {
+                          setFormAllocatedSupplierIds([suppliers[0].id]);
+                          handleSupplierChange(suppliers[0].id);
+                        }
+                      }}
+                      className="px-2 py-0.5 rounded bg-slate-200 text-slate-700 hover:bg-slate-300 font-bold transition cursor-pointer"
+                    >
+                      Reset
+                    </button>
+                  </div>
+                </div>
+
+                <p className="text-[10px] text-slate-500 leading-relaxed">
+                  Superadmin can allot multiple wholesale suppliers to this Sales Officer. The Sales Officer can procure stocks from and supervise dedicated PSRs under each allotted supplier depot.
                 </p>
+
+                {/* Multi-Supplier Checkbox List */}
+                <div className="space-y-1.5 max-h-48 overflow-y-auto pt-1">
+                  {suppliers.map((s) => {
+                    const isAllotted = formAllocatedSupplierIds.includes(s.id);
+                    const isPrimary = Number(formSupplierId) === Number(s.id);
+
+                    return (
+                      <div
+                        key={s.id}
+                        onClick={() => toggleAllocatedSupplier(s.id)}
+                        className={`p-2.5 rounded-xl border flex items-center justify-between gap-3 cursor-pointer transition ${
+                          isAllotted
+                            ? 'bg-blue-50/70 border-blue-300 ring-1 ring-blue-500/20'
+                            : 'bg-white border-slate-200 hover:border-slate-300'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <input
+                            type="checkbox"
+                            checked={isAllotted}
+                            onChange={() => {}} // handled by row click
+                            className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                          />
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-bold text-xs text-slate-900 truncate">
+                                {s.business_name}
+                              </span>
+                              <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600">
+                                #{s.id}
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-slate-500 block truncate">
+                              Division: {s.division_name || s.district_name || 'Regional Zone'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {isPrimary ? (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-600 text-white">
+                              Primary Hub
+                            </span>
+                          ) : isAllotted ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSupplierChange(s.id);
+                              }}
+                              className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white hover:bg-indigo-50 text-indigo-700 border border-indigo-200 transition cursor-pointer"
+                              title="Make this the primary supplier for area validation"
+                            >
+                              Set Primary
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Primary Supplier Dropdown */}
+                <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between gap-2 text-xs">
+                  <span className="text-[11px] font-bold text-slate-600">Primary Registered Depot:</span>
+                  <select
+                    value={formSupplierId}
+                    onChange={(e) => handleSupplierChange(e.target.value)}
+                    required
+                    className="px-2.5 py-1 text-xs rounded-lg border border-slate-200 bg-white font-semibold text-slate-800"
+                  >
+                    {suppliers
+                      .filter((s) => formAllocatedSupplierIds.length === 0 || formAllocatedSupplierIds.includes(s.id))
+                      .map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.business_name} (ID #{s.id})
+                        </option>
+                      ))}
+                  </select>
+                </div>
               </div>
 
               {/* City & Municipal Area */}

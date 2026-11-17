@@ -8,6 +8,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.type.TypeReference;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -18,6 +21,7 @@ import java.util.stream.Collectors;
 @CrossOrigin(origins = "*")
 public class PsrController {
 
+    private final ObjectMapper objectMapper = new ObjectMapper();
     private final PreSalesOfficerRepository psrRepository;
     private final SalesOfficerRepository salesOfficerRepository;
     private final OutletRepository outletRepository;
@@ -101,6 +105,28 @@ public class PsrController {
             psr.setPasswordHash(password);
             psr.setNotes(notes);
             psr.setStatus("ACTIVE");
+
+            // Allocate to specific Supplier (default to SO's supplier or Supplier #1)
+            Long supplierId = null;
+            if (req.containsKey("supplier_id") && req.get("supplier_id") != null && !req.get("supplier_id").toString().trim().isEmpty()) {
+                try {
+                    supplierId = Long.parseLong(req.get("supplier_id").toString().trim());
+                } catch (Exception ignored) {}
+            }
+            if (supplierId == null && so.getSupplierId() != null) {
+                supplierId = so.getSupplierId();
+            }
+            if (supplierId == null) {
+                supplierId = 1L;
+            }
+            psr.setSupplierId(supplierId);
+            SupplierProfile sp = supplierProfileRepository.findById(supplierId).orElse(null);
+            if (sp != null) {
+                psr.setSupplierName(sp.getBusinessName());
+            } else {
+                psr.setSupplierName("Dhaka Metropolitan & Central Beverage Logistics Hub");
+            }
+
             psr.setCreatedAt(LocalDateTime.now());
             psr.setUpdatedAt(LocalDateTime.now());
 
@@ -142,6 +168,14 @@ public class PsrController {
             if (req.containsKey("status") && req.get("status") != null) psr.setStatus(req.get("status").toString());
             if (req.containsKey("notes") && req.get("notes") != null) psr.setNotes(req.get("notes").toString());
 
+            if (req.containsKey("supplier_id") && req.get("supplier_id") != null && !req.get("supplier_id").toString().trim().isEmpty()) {
+                try {
+                    Long newSupId = Long.parseLong(req.get("supplier_id").toString().trim());
+                    psr.setSupplierId(newSupId);
+                    supplierProfileRepository.findById(newSupId).ifPresent(sp -> psr.setSupplierName(sp.getBusinessName()));
+                } catch (Exception ignored) {}
+            }
+
             psr.setUpdatedAt(LocalDateTime.now());
             psrRepository.save(psr);
 
@@ -153,7 +187,7 @@ public class PsrController {
     }
 
     /**
-     * Dedicated Endpoint for Superadmin to Assign / Reassign a PSR to a Sales Officer.
+     * Dedicated Endpoint for Superadmin to Assign / Reassign a PSR to a Sales Officer and/or Supplier.
      */
     @PutMapping("/{id}/assign-sales-officer")
     public ResponseEntity<?> assignSalesOfficer(@PathVariable Long id, @RequestBody Map<String, Object> req) {
@@ -161,23 +195,68 @@ public class PsrController {
             PreSalesOfficer psr = psrRepository.findById(id)
                     .orElseThrow(() -> new RuntimeException("Pre-Sales Officer with ID " + id + " not found."));
 
-            Long newSoId = Long.parseLong(req.get("sales_officer_id").toString());
-            SalesOfficer so = salesOfficerRepository.findById(newSoId)
-                    .orElseThrow(() -> new RuntimeException("Sales Officer with ID " + newSoId + " not found."));
+            String soName = "";
+            if (req.containsKey("sales_officer_id") && req.get("sales_officer_id") != null && !req.get("sales_officer_id").toString().trim().isEmpty()) {
+                Long newSoId = Long.parseLong(req.get("sales_officer_id").toString().trim());
+                SalesOfficer so = salesOfficerRepository.findById(newSoId)
+                        .orElseThrow(() -> new RuntimeException("Sales Officer with ID " + newSoId + " not found."));
+                psr.setSalesOfficerId(newSoId);
+                psr.setAssignedArea(so.getAssignedArea());
+                soName = so.getName();
+            }
 
-            psr.setSalesOfficerId(newSoId);
-            psr.setAssignedArea(so.getAssignedArea());
+            if (req.containsKey("supplier_id") && req.get("supplier_id") != null && !req.get("supplier_id").toString().trim().isEmpty()) {
+                Long newSupId = Long.parseLong(req.get("supplier_id").toString().trim());
+                SupplierProfile sp = supplierProfileRepository.findById(newSupId).orElse(null);
+                if (sp != null) {
+                    psr.setSupplierId(newSupId);
+                    psr.setSupplierName(sp.getBusinessName());
+                }
+            }
+
             psr.setUpdatedAt(LocalDateTime.now());
             psrRepository.save(psr);
 
             enrichPsrs(List.of(psr));
             return ResponseEntity.ok(Map.of(
                 "success", true,
-                "message", "PSR " + psr.getName() + " successfully assigned to Sales Officer " + so.getName() + " (" + so.getAssignedArea() + ")!",
+                "message", "PSR " + psr.getName() + " successfully allocated to SO " + (soName.isEmpty() ? psr.getSalesOfficerName() : soName) + " and Supplier " + psr.getSupplierName() + "!",
                 "psr", psr
             ));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(ApiResponse.fail("Failed to assign Sales Officer: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Dedicated Endpoint for Sales Officer or Superadmin to Allot/Switch the PSR's Supplier.
+     */
+    @PutMapping("/{id}/allocate-supplier")
+    public ResponseEntity<?> allocateSupplier(@PathVariable Long id, @RequestBody Map<String, Object> req) {
+        try {
+            PreSalesOfficer psr = psrRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Pre-Sales Officer with ID " + id + " not found."));
+
+            if (!req.containsKey("supplier_id") || req.get("supplier_id") == null || req.get("supplier_id").toString().trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(ApiResponse.fail("Supplier ID is required."));
+            }
+            Long supplierId = Long.parseLong(req.get("supplier_id").toString().trim());
+            SupplierProfile sp = supplierProfileRepository.findById(supplierId)
+                    .orElseThrow(() -> new RuntimeException("Supplier with ID " + supplierId + " not found."));
+
+            psr.setSupplierId(supplierId);
+            psr.setSupplierName(sp.getBusinessName());
+            psr.setUpdatedAt(LocalDateTime.now());
+            psrRepository.save(psr);
+
+            enrichPsrs(List.of(psr));
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "PSR " + psr.getName() + " successfully allocated to Supplier: " + sp.getBusinessName() + "!",
+                "psr", psr
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("Failed to allocate supplier: " + e.getMessage()));
         }
     }
 
@@ -352,13 +431,27 @@ public class PsrController {
                                 (outlet.getBranchName() != null ? outlet.getBranchName() : "");
             String productName = product.getBrand() + " " + (product.getFlavorVariant() != null ? product.getFlavorVariant() : "");
 
+            Long psrSupplierId = psr.getSupplierId();
+            String psrSupplierName = psr.getSupplierName();
+            if (psrSupplierId == null) {
+                SalesOfficer so = salesOfficerRepository.findById(psr.getSalesOfficerId()).orElse(null);
+                if (so != null && so.getSupplierId() != null) {
+                    psrSupplierId = so.getSupplierId();
+                    SupplierProfile sp = supplierProfileRepository.findById(psrSupplierId).orElse(null);
+                    if (sp != null) psrSupplierName = sp.getBusinessName();
+                }
+            }
+            if (psrSupplierId == null) psrSupplierId = 1L;
+            if (psrSupplierName == null) psrSupplierName = "Dhaka Metropolitan & Central Beverage Logistics Hub";
+
             jdbcTemplate.update(
                     "INSERT INTO psr_orders (order_code, psr_id, psr_name, sales_officer_id, outlet_id, outlet_name, sub_route, " +
-                    "product_id, product_name, quantity, unit_price, total_amount, urgency, status, outlet_remarks, psr_notes, created_at, updated_at) " +
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())",
+                    "product_id, product_name, quantity, unit_price, total_amount, urgency, status, outlet_remarks, psr_notes, supplier_id, supplier_name, created_at, updated_at) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())",
                     orderCode, psr.getId(), psr.getName(), psr.getSalesOfficerId(), outlet.getOutletId(),
                     outletName.trim(), psr.getSubRoute(), product.getProductId(), productName.trim(),
-                    quantity, unitPrice, totalAmount, urgency, status, outletRemarks, psrNotes
+                    quantity, unitPrice, totalAmount, urgency, status, outletRemarks, psrNotes,
+                    psrSupplierId, psrSupplierName
             );
 
             // Log visit
@@ -519,6 +612,7 @@ public class PsrController {
                     Long productId = Long.parseLong(ord.get("product_id").toString());
                     int quantity = Integer.parseInt(ord.get("quantity").toString());
                     Long soId = ord.get("sales_officer_id") != null ? Long.parseLong(ord.get("sales_officer_id").toString()) : 1L;
+                    Long psrId = ord.get("psr_id") != null ? Long.parseLong(ord.get("psr_id").toString()) : null;
                     String orderCode = (String) ord.get("order_code");
                     String psrName = ord.get("psr_name") != null ? ord.get("psr_name").toString() : "PSR";
                     String outletName = (String) ord.get("outlet_name");
@@ -532,48 +626,56 @@ public class PsrController {
                     SalesOfficer so = salesOfficerRepository.findById(soId).orElse(null);
                     String soName = so != null ? so.getName() : "Sales Officer";
 
+                    PreSalesOfficer psr = (psrId != null) ? psrRepository.findById(psrId).orElse(null) : null;
+                    Long targetSupplierId = null;
+                    if (psr != null && psr.getSupplierId() != null && psr.getSupplierId() > 0) {
+                        targetSupplierId = psr.getSupplierId();
+                    } else if (ord.get("supplier_id") != null) {
+                        try { targetSupplierId = Long.parseLong(ord.get("supplier_id").toString()); } catch (Exception ignored) {}
+                    } else if (so != null && so.getSupplierId() != null) {
+                        targetSupplierId = so.getSupplierId();
+                    }
+                    if (targetSupplierId == null) targetSupplierId = 1L;
+
+                    SupplierProfile sp = supplierProfileRepository.findById(targetSupplierId).orElse(null);
+                    String targetSupplierName = sp != null ? sp.getBusinessName() : (psr != null && psr.getSupplierName() != null ? psr.getSupplierName() : "Supplier");
+                    Long supplierUserId = (sp != null && sp.getUserId() != null) ? sp.getUserId() : 4L;
+
+                    // Ensure psr_orders has the supplier bound
+                    jdbcTemplate.update(
+                            "UPDATE psr_orders SET supplier_id = ?, supplier_name = ? WHERE id = ? AND (supplier_id IS NULL OR supplier_id <= 0)",
+                            targetSupplierId, targetSupplierName, id
+                    );
+
                     // Ensure outlet_requisitions entry exists for Supplier fulfillment
                     List<Map<String, Object>> existingReqs = jdbcTemplate.queryForList(
                             "SELECT id FROM outlet_requisitions WHERE requisition_code = ?", orderCode
                     );
-                    String remarks = "Requested by SO " + soName + ": " + quantity + " cases of " + productName + " needed in " + outletName + " (via PSR " + psrName + ")";
-                    String reqNotes = "SO Stock Request for Outlet fulfillment from SO purchased stock";
+                    String remarks = "Requested by SO " + soName + ": " + quantity + " cases of " + productName + " needed in " + outletName + " (via PSR " + psrName + " from Supplier " + targetSupplierName + ")";
+                    String reqNotes = "SO Stock Request for Outlet fulfillment from SO purchased stock (Supplier: " + targetSupplierName + ")";
 
                     if (existingReqs.isEmpty()) {
                         jdbcTemplate.update(
-                                "INSERT INTO outlet_requisitions (requisition_code, outlet_id, product_id, product_name, quantity, unit_price, total_amount, urgency, status, sales_officer_id, outlet_remarks, admin_supplier_notes, created_date, updated_date) " +
-                                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, ?, NOW(), NOW())",
-                                orderCode, outletId, productId, productName, quantity, unitPrice, totalAmount, urgency, soId, remarks, reqNotes
+                                "INSERT INTO outlet_requisitions (requisition_code, outlet_id, product_id, product_name, quantity, unit_price, total_amount, urgency, status, sales_officer_id, supplier_id, outlet_remarks, admin_supplier_notes, created_date, updated_date) " +
+                                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, ?, ?, NOW(), NOW())",
+                                orderCode, outletId, productId, productName, quantity, unitPrice, totalAmount, urgency, soId, targetSupplierId, remarks, reqNotes
                         );
                     } else {
                         Long reqId = ((Number) existingReqs.get(0).get("id")).longValue();
                         jdbcTemplate.update(
-                                "UPDATE outlet_requisitions SET quantity = ?, unit_price = ?, total_amount = ?, urgency = ?, status = 'PENDING', sales_officer_id = ?, outlet_remarks = ?, admin_supplier_notes = ?, updated_date = NOW() WHERE id = ?",
-                                quantity, unitPrice, totalAmount, urgency, soId, remarks, reqNotes, reqId
+                                "UPDATE outlet_requisitions SET quantity = ?, unit_price = ?, total_amount = ?, urgency = ?, status = 'PENDING', sales_officer_id = ?, supplier_id = ?, outlet_remarks = ?, admin_supplier_notes = ?, updated_date = NOW() WHERE id = ?",
+                                quantity, unitPrice, totalAmount, urgency, soId, targetSupplierId, remarks, reqNotes, reqId
                         );
                     }
 
                     // Notify Supplier that SO has requested stock for this outlet
-                    Long supplierUserId = 4L;
-                    if (so != null && so.getSupplierId() != null) {
-                        SupplierProfile sp = supplierProfileRepository.findById(so.getSupplierId()).orElse(null);
-                        if (sp != null && sp.getUserId() != null) {
-                            supplierUserId = sp.getUserId();
-                        }
-                    } else {
-                        SupplierProfile sp = supplierProfileRepository.findAll().stream().findFirst().orElse(null);
-                        if (sp != null && sp.getUserId() != null) {
-                            supplierUserId = sp.getUserId();
-                        }
-                    }
-
                     AppNotification suppNotif = new AppNotification();
                     suppNotif.setRecipientRole("SUPPLIER");
                     suppNotif.setRecipientUserId(supplierUserId);
                     suppNotif.setReferenceId(soId);
                     suppNotif.setTitle("Stock Needed: " + quantity + " cases in " + outletName);
                     suppNotif.setMessage("Sales Officer " + soName + " notified that " + quantity + " cases of " + productName +
-                            " is needed in " + outletName + ". Please dispatch stocks to outlet from SO purchased stock.");
+                            " is needed in " + outletName + " (PSR: " + psrName + "). Please dispatch stocks to outlet from SO purchased stock.");
                     suppNotif.setType("SO_STOCK_REQUEST_FOR_OUTLET");
                     suppNotif.setReferenceCode(orderCode);
                     notificationRepository.save(suppNotif);
@@ -662,58 +764,65 @@ public class PsrController {
             BigDecimal unitPrice = ord.get("unit_price") != null ? new BigDecimal(ord.get("unit_price").toString()) : (prod != null && prod.getOutletPrice() != null ? prod.getOutletPrice() : BigDecimal.valueOf(42.50));
             BigDecimal totalAmount = ord.get("total_amount") != null ? new BigDecimal(ord.get("total_amount").toString()) : unitPrice.multiply(BigDecimal.valueOf(quantity));
 
-            // 1. Update order status to REQUESTED_FROM_SUPPLIER
-            jdbcTemplate.update(
-                    "UPDATE psr_orders SET status = 'REQUESTED_FROM_SUPPLIER', sales_officer_id = ?, updated_at = NOW() WHERE id = ?",
-                    soId, id
-            );
-
             SalesOfficer so = salesOfficerRepository.findById(soId).orElse(null);
             String soName = so != null ? so.getName() : "Sales Officer";
 
-            // 2. Insert or update entry in outlet_requisitions
+            PreSalesOfficer psr = psrRepository.findById(psrId).orElse(null);
+
+            // Resolve Target Supplier: strictly route to the supplier whose PSR took/received the order
+            Long targetSupplierId = null;
+            if (psr != null && psr.getSupplierId() != null && psr.getSupplierId() > 0) {
+                targetSupplierId = psr.getSupplierId();
+            } else if (ord.get("supplier_id") != null) {
+                try { targetSupplierId = Long.parseLong(ord.get("supplier_id").toString()); } catch (Exception ignored) {}
+            } else if (req != null && req.get("supplier_id") != null) {
+                try { targetSupplierId = Long.parseLong(req.get("supplier_id").toString()); } catch (Exception ignored) {}
+            } else if (so != null && so.getSupplierId() != null) {
+                targetSupplierId = so.getSupplierId();
+            }
+            if (targetSupplierId == null) {
+                targetSupplierId = 1L;
+            }
+
+            SupplierProfile supplierProfile = supplierProfileRepository.findById(targetSupplierId).orElse(null);
+            String targetSupplierName = supplierProfile != null ? supplierProfile.getBusinessName() : (psr != null && psr.getSupplierName() != null ? psr.getSupplierName() : "Dhaka Metropolitan & Central Beverage Logistics Hub");
+            Long supplierUserId = (supplierProfile != null && supplierProfile.getUserId() != null) ? supplierProfile.getUserId() : 4L;
+
+            // 1. Update order status to REQUESTED_FROM_SUPPLIER, binding with target supplier
+            jdbcTemplate.update(
+                    "UPDATE psr_orders SET status = 'REQUESTED_FROM_SUPPLIER', sales_officer_id = ?, supplier_id = ?, supplier_name = ?, updated_at = NOW() WHERE id = ?",
+                    soId, targetSupplierId, targetSupplierName, id
+            );
+
+            // 2. Insert or update entry in outlet_requisitions (tagged with supplier_id)
             List<Map<String, Object>> existingReqs = jdbcTemplate.queryForList(
                     "SELECT id FROM outlet_requisitions WHERE requisition_code = ?", orderCode
             );
-            String remarks = "Requested by SO " + soName + ": " + quantity + " cases of " + productName + " needed in " + outletName + " (via PSR " + psrName + ")";
-            String reqNotes = "SO Stock Request for Outlet fulfillment from SO purchased stock";
+            String remarks = "Requested by SO " + soName + ": " + quantity + " cases of " + productName + " needed in " + outletName + " (via PSR " + psrName + " from Supplier " + targetSupplierName + ")";
+            String reqNotes = "SO Stock Request for Outlet fulfillment from SO purchased stock (Supplier: " + targetSupplierName + ")";
 
             if (existingReqs.isEmpty()) {
                 jdbcTemplate.update(
-                        "INSERT INTO outlet_requisitions (requisition_code, outlet_id, product_id, product_name, quantity, unit_price, total_amount, urgency, status, sales_officer_id, outlet_remarks, admin_supplier_notes, created_date, updated_date) " +
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, ?, NOW(), NOW())",
-                        orderCode, outletId, productId, productName, quantity, unitPrice, totalAmount, urgency, soId, remarks, reqNotes
+                        "INSERT INTO outlet_requisitions (requisition_code, outlet_id, product_id, product_name, quantity, unit_price, total_amount, urgency, status, sales_officer_id, supplier_id, outlet_remarks, admin_supplier_notes, created_date, updated_date) " +
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, ?, ?, NOW(), NOW())",
+                        orderCode, outletId, productId, productName, quantity, unitPrice, totalAmount, urgency, soId, targetSupplierId, remarks, reqNotes
                 );
             } else {
                 Long reqId = ((Number) existingReqs.get(0).get("id")).longValue();
                 jdbcTemplate.update(
-                        "UPDATE outlet_requisitions SET quantity = ?, unit_price = ?, total_amount = ?, urgency = ?, status = 'PENDING', sales_officer_id = ?, outlet_remarks = ?, admin_supplier_notes = ?, updated_date = NOW() WHERE id = ?",
-                        quantity, unitPrice, totalAmount, urgency, soId, remarks, reqNotes, reqId
+                        "UPDATE outlet_requisitions SET quantity = ?, unit_price = ?, total_amount = ?, urgency = ?, status = 'PENDING', sales_officer_id = ?, supplier_id = ?, outlet_remarks = ?, admin_supplier_notes = ?, updated_date = NOW() WHERE id = ?",
+                        quantity, unitPrice, totalAmount, urgency, soId, targetSupplierId, remarks, reqNotes, reqId
                 );
             }
 
-            // 3. Resolve Supplier for this Sales Officer
-            Long supplierUserId = 4L;
-            if (so != null && so.getSupplierId() != null) {
-                SupplierProfile sp = supplierProfileRepository.findById(so.getSupplierId()).orElse(null);
-                if (sp != null && sp.getUserId() != null) {
-                    supplierUserId = sp.getUserId();
-                }
-            } else {
-                SupplierProfile sp = supplierProfileRepository.findAll().stream().findFirst().orElse(null);
-                if (sp != null && sp.getUserId() != null) {
-                    supplierUserId = sp.getUserId();
-                }
-            }
-
-            // 4. Create AppNotification for Supplier
+            // 3. Create AppNotification for Supplier
             AppNotification suppNotif = new AppNotification();
             suppNotif.setRecipientRole("SUPPLIER");
             suppNotif.setRecipientUserId(supplierUserId);
             suppNotif.setReferenceId(soId);
             suppNotif.setTitle("Stock Needed: " + quantity + " cases in " + outletName);
             suppNotif.setMessage("Sales Officer " + soName + " notified that " + quantity + " cases of " + productName +
-                    " is needed in " + outletName + ". Please dispatch stocks to outlet from SO purchased stock.");
+                    " is needed in " + outletName + " (via PSR " + psrName + "). Please dispatch stocks to outlet from SO purchased stock.");
             suppNotif.setType("SO_STOCK_REQUEST_FOR_OUTLET");
             suppNotif.setReferenceCode(orderCode);
             notificationRepository.save(suppNotif);
@@ -724,8 +833,8 @@ public class PsrController {
                 psrNotif.setRecipientRole("PSR");
                 psrNotif.setRecipientUserId(p.getUserId() != null ? p.getUserId() : (200L + p.getId()));
                 psrNotif.setReferenceId(p.getId());
-                psrNotif.setTitle("Order " + orderCode + " - Sent to Supplier");
-                psrNotif.setMessage("Sales Officer " + soName + " approved your order and requested Supplier to dispatch " + quantity + " cases of " + productName + " to " + outletName + ".");
+                psrNotif.setTitle("Order " + orderCode + " - Sent to Supplier " + targetSupplierName);
+                psrNotif.setMessage("Sales Officer " + soName + " approved your order and requested Supplier " + targetSupplierName + " to dispatch " + quantity + " cases of " + productName + " to " + outletName + ".");
                 psrNotif.setType("SO_REQUESTED_SUPPLIER");
                 psrNotif.setReferenceCode(orderCode);
                 notificationRepository.save(psrNotif);
@@ -738,8 +847,10 @@ public class PsrController {
             resp.put("outlet_name", outletName);
             resp.put("product_name", productName);
             resp.put("quantity", quantity);
+            resp.put("supplier_id", targetSupplierId);
+            resp.put("supplier_name", targetSupplierName);
             resp.put("supplier_user_id", supplierUserId);
-            resp.put("message", "Notified Supplier that " + quantity + " cases of " + productName + " is needed in " + outletName);
+            resp.put("message", "Notified Supplier (" + targetSupplierName + ") that " + quantity + " cases of " + productName + " is needed in " + outletName);
             return ResponseEntity.ok(resp);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(ApiResponse.fail("Failed to notify supplier: " + e.getMessage()));
@@ -860,8 +971,18 @@ public class PsrController {
 
             // 8. Notify Supplier that stock has been dispatched from their depot
             try {
-                SupplierProfile supplier = supplierProfileRepository.findAll().stream().findFirst().orElse(null);
-                Long supplierUserId = (supplier != null && supplier.getUserId() != null) ? supplier.getUserId() : 1L;
+                Long targetSupplierId = null;
+                if (psr != null && psr.getSupplierId() != null && psr.getSupplierId() > 0) {
+                    targetSupplierId = psr.getSupplierId();
+                } else if (ord.get("supplier_id") != null) {
+                    try { targetSupplierId = Long.parseLong(ord.get("supplier_id").toString()); } catch (Exception ignored) {}
+                } else if (so != null && so.getSupplierId() != null) {
+                    targetSupplierId = so.getSupplierId();
+                }
+                if (targetSupplierId == null) targetSupplierId = 1L;
+
+                SupplierProfile supplier = supplierProfileRepository.findById(targetSupplierId).orElse(null);
+                Long supplierUserId = (supplier != null && supplier.getUserId() != null) ? supplier.getUserId() : 4L;
 
                 AppNotification supNotif = new AppNotification();
                 supNotif.setRecipientRole("SUPPLIER");
@@ -1090,14 +1211,32 @@ public class PsrController {
      * Sales Officer Summary: Aggregate all PSRs, route orders, and refund requests under a specific Sales Officer.
      */
     @GetMapping("/so-summary/{salesOfficerId}")
-    public ResponseEntity<?> getSalesOfficerSummary(@PathVariable Long salesOfficerId) {
+    public ResponseEntity<?> getSalesOfficerSummary(
+            @PathVariable Long salesOfficerId,
+            @RequestParam(required = false) Long supplierId) {
         List<PreSalesOfficer> psrs = psrRepository.findBySalesOfficerId(salesOfficerId);
         enrichPsrs(psrs);
 
-        List<Map<String, Object>> orders = jdbcTemplate.queryForList(
-                "SELECT * FROM psr_orders WHERE sales_officer_id = ? ORDER BY id DESC LIMIT 100",
-                salesOfficerId
-        );
+        String orderSql = "SELECT * FROM psr_orders WHERE sales_officer_id = ?";
+        List<Object> params = new ArrayList<>();
+        params.add(salesOfficerId);
+        if (supplierId != null) {
+            orderSql += " AND (supplier_id = ? OR (supplier_id IS NULL AND ? = 1))";
+            params.add(supplierId);
+            params.add(supplierId);
+        }
+        orderSql += " ORDER BY id DESC LIMIT 100";
+
+        List<Map<String, Object>> orders = jdbcTemplate.queryForList(orderSql, params.toArray());
+
+        for (Map<String, Object> o : orders) {
+            if (o.get("supplier_id") == null) {
+                o.put("supplier_id", 1L);
+            }
+            if (o.get("supplier_name") == null || o.get("supplier_name").toString().trim().isEmpty()) {
+                o.put("supplier_name", "Dhaka Metropolitan & Central Beverage Logistics Hub");
+            }
+        }
 
         List<Map<String, Object>> refunds = jdbcTemplate.queryForList(
                 "SELECT * FROM psr_refund_requests WHERE sales_officer_id = ? ORDER BY id DESC LIMIT 100",
@@ -1142,6 +1281,77 @@ public class PsrController {
         res.put("pending_refunds_count", pendingRefundsCount);
         res.put("pending_refunds_value", pendingRefundsValue);
 
+        // Build structured allocated suppliers hierarchy for this SO
+        List<SupplierProfile> allSuppliers = supplierProfileRepository.findAll();
+        SalesOfficer currentSo = salesOfficerRepository.findById(salesOfficerId).orElse(null);
+        List<SupplierProfile> soSuppliers = new ArrayList<>();
+        if (currentSo != null && currentSo.getAllocatedSupplierIds() != null && !currentSo.getAllocatedSupplierIds().trim().isEmpty()) {
+            Set<Long> sids = Arrays.stream(currentSo.getAllocatedSupplierIds().split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .map(Long::parseLong)
+                    .collect(Collectors.toSet());
+            for (SupplierProfile sp : allSuppliers) {
+                if (sids.contains(sp.getId())) soSuppliers.add(sp);
+            }
+        }
+        if (soSuppliers.isEmpty()) {
+            if (currentSo != null && currentSo.getSupplierId() != null) {
+                for (SupplierProfile sp : allSuppliers) {
+                    if (Objects.equals(sp.getId(), currentSo.getSupplierId())) soSuppliers.add(sp);
+                }
+            }
+            for (SupplierProfile sp : allSuppliers) {
+                if (!soSuppliers.contains(sp)) soSuppliers.add(sp);
+            }
+        }
+
+        List<Map<String, Object>> supplierHierarchy = new ArrayList<>();
+        for (SupplierProfile sp : soSuppliers) {
+            Map<String, Object> smap = new HashMap<>();
+            smap.put("supplier_id", sp.getId());
+            smap.put("id", sp.getId());
+            smap.put("business_name", sp.getBusinessName());
+            smap.put("trade_license_number", sp.getTradeLicenseNumber());
+            smap.put("depot_address", sp.getDepotAddress());
+            smap.put("phone_number", sp.getPhoneNumber());
+            smap.put("division_name", sp.getDivisionName());
+            smap.put("is_verified", sp.getIsVerified());
+
+            List<PreSalesOfficer> spPsrs = psrs.stream()
+                    .filter(p -> Objects.equals(p.getSupplierId(), sp.getId()) || (p.getSupplierId() == null && sp.getId() == 1L))
+                    .collect(Collectors.toList());
+
+            List<Map<String, Object>> spOrders = orders.stream()
+                    .filter(o -> {
+                        Object sid = o.get("supplier_id");
+                        return sid != null && sid.toString().equals(sp.getId().toString());
+                    })
+                    .collect(Collectors.toList());
+
+            int cases = 0;
+            BigDecimal amt = BigDecimal.ZERO;
+            for (Map<String, Object> o : spOrders) {
+                if (o.get("quantity") != null) cases += ((Number) o.get("quantity")).intValue();
+                if (o.get("total_amount") != null) {
+                    try {
+                        amt = amt.add(new BigDecimal(o.get("total_amount").toString()));
+                    } catch (Exception ignored) {}
+                }
+            }
+
+            smap.put("psrs", spPsrs);
+            smap.put("psr_count", spPsrs.size());
+            smap.put("transactions", spOrders);
+            smap.put("transactions_count", spOrders.size());
+            smap.put("total_cases", cases);
+            smap.put("total_amount", amt);
+
+            supplierHierarchy.add(smap);
+        }
+
+        res.put("allocated_suppliers", supplierHierarchy);
+
         return ResponseEntity.ok(res);
     }
 
@@ -1151,12 +1361,24 @@ public class PsrController {
         Map<Long, SalesOfficer> soMap = new HashMap<>();
         salesOfficerRepository.findAll().forEach(so -> soMap.put(so.getId(), so));
 
+        Map<Long, String> supplierNames = new HashMap<>();
+        try {
+            supplierProfileRepository.findAll().forEach(sp -> supplierNames.put(sp.getId(), sp.getBusinessName()));
+        } catch (Exception ignored) {}
+
         for (PreSalesOfficer psr : psrs) {
             if (psr.getSalesOfficerId() != null && soMap.containsKey(psr.getSalesOfficerId())) {
                 SalesOfficer so = soMap.get(psr.getSalesOfficerId());
                 psr.setSalesOfficerName(so.getName());
                 psr.setSalesOfficerCode(so.getOfficerCode());
+                if (psr.getSupplierId() == null && so.getSupplierId() != null) {
+                    psr.setSupplierId(so.getSupplierId());
+                }
             }
+            if (psr.getSupplierId() == null) {
+                psr.setSupplierId(1L);
+            }
+            psr.setSupplierName(supplierNames.getOrDefault(psr.getSupplierId(), "Dhaka Metropolitan & Central Beverage Logistics Hub"));
 
             try {
                 Integer outletCount = jdbcTemplate.queryForObject(
@@ -1191,23 +1413,81 @@ public class PsrController {
                 psr.setPendingRefundsCount(0);
             }
 
-            // Calculate achieved target cases
+            // Calculate achieved target cases (supports multiple categories & brands)
             try {
-                Integer achieved = 0;
-                if (psr.getTargetProductId() != null && psr.getTargetProductId() > 0) {
-                    achieved = jdbcTemplate.queryForObject(
-                            "SELECT COALESCE(SUM(quantity), 0) FROM psr_orders WHERE psr_id = ? AND product_id = ? AND status != 'CANCELLED'",
-                            Integer.class,
-                            psr.getId(), psr.getTargetProductId()
-                    );
-                } else {
-                    achieved = jdbcTemplate.queryForObject(
-                            "SELECT COALESCE(SUM(quantity), 0) FROM psr_orders WHERE psr_id = ? AND status != 'CANCELLED'",
-                            Integer.class,
-                            psr.getId()
-                    );
+                int totalAchieved = 0;
+                boolean hasMultiTargets = false;
+
+                if (psr.getTargetsJson() != null && !psr.getTargetsJson().trim().isEmpty()) {
+                    try {
+                        List<Map<String, Object>> targetsList = objectMapper.readValue(
+                                psr.getTargetsJson(),
+                                new TypeReference<List<Map<String, Object>>>() {}
+                        );
+                        if (targetsList != null && !targetsList.isEmpty()) {
+                            hasMultiTargets = true;
+                            for (Map<String, Object> t : targetsList) {
+                                Long prodId = t.containsKey("product_id") && t.get("product_id") != null && !t.get("product_id").toString().isEmpty()
+                                        ? Long.parseLong(t.get("product_id").toString()) : null;
+                                String cat = t.containsKey("category") && t.get("category") != null ? t.get("category").toString().trim() : null;
+                                String brand = t.containsKey("brand") && t.get("brand") != null ? t.get("brand").toString().trim() : null;
+
+                                Integer tAchieved = 0;
+                                if (prodId != null && prodId > 0) {
+                                    tAchieved = jdbcTemplate.queryForObject(
+                                            "SELECT COALESCE(SUM(quantity), 0) FROM psr_orders WHERE psr_id = ? AND product_id = ? AND status != 'CANCELLED'",
+                                            Integer.class, psr.getId(), prodId
+                                    );
+                                } else if (cat != null && !cat.isEmpty() && brand != null && !brand.isEmpty()) {
+                                    tAchieved = jdbcTemplate.queryForObject(
+                                            "SELECT COALESCE(SUM(o.quantity), 0) FROM psr_orders o JOIN products p ON o.product_id = p.product_id WHERE o.psr_id = ? AND LOWER(p.category) = LOWER(?) AND LOWER(p.brand) = LOWER(?) AND o.status != 'CANCELLED'",
+                                            Integer.class, psr.getId(), cat, brand
+                                    );
+                                } else if (cat != null && !cat.isEmpty()) {
+                                    tAchieved = jdbcTemplate.queryForObject(
+                                            "SELECT COALESCE(SUM(o.quantity), 0) FROM psr_orders o JOIN products p ON o.product_id = p.product_id WHERE o.psr_id = ? AND LOWER(p.category) = LOWER(?) AND o.status != 'CANCELLED'",
+                                            Integer.class, psr.getId(), cat
+                                    );
+                                } else if (brand != null && !brand.isEmpty()) {
+                                    tAchieved = jdbcTemplate.queryForObject(
+                                            "SELECT COALESCE(SUM(o.quantity), 0) FROM psr_orders o JOIN products p ON o.product_id = p.product_id WHERE o.psr_id = ? AND LOWER(p.brand) = LOWER(?) AND o.status != 'CANCELLED'",
+                                            Integer.class, psr.getId(), brand
+                                    );
+                                }
+
+                                int itemAchieved = (tAchieved != null ? tAchieved : 0);
+                                t.put("achieved_cases", itemAchieved);
+                                int tTarget = t.containsKey("target_cases") && t.get("target_cases") != null ? Integer.parseInt(t.get("target_cases").toString()) : 0;
+                                int tPct = tTarget > 0 ? Math.min(100, Math.round((itemAchieved * 100.0f) / tTarget)) : 0;
+                                t.put("achievement_percentage", tPct);
+                                totalAchieved += itemAchieved;
+                            }
+                            psr.setTargets(targetsList);
+                        }
+                    } catch (Exception e) {
+                        psr.setTargets(Collections.emptyList());
+                    }
                 }
-                psr.setAchievedCases(achieved != null ? achieved : 0);
+
+                if (!hasMultiTargets) {
+                    Integer achieved = 0;
+                    if (psr.getTargetProductId() != null && psr.getTargetProductId() > 0) {
+                        achieved = jdbcTemplate.queryForObject(
+                                "SELECT COALESCE(SUM(quantity), 0) FROM psr_orders WHERE psr_id = ? AND product_id = ? AND status != 'CANCELLED'",
+                                Integer.class,
+                                psr.getId(), psr.getTargetProductId()
+                        );
+                    } else {
+                        achieved = jdbcTemplate.queryForObject(
+                                "SELECT COALESCE(SUM(quantity), 0) FROM psr_orders WHERE psr_id = ? AND status != 'CANCELLED'",
+                                Integer.class,
+                                psr.getId()
+                        );
+                    }
+                    totalAchieved = (achieved != null ? achieved : 0);
+                }
+
+                psr.setAchievedCases(totalAchieved);
             } catch (Exception ignored) {
                 psr.setAchievedCases(0);
             }
@@ -1409,13 +1689,50 @@ public class PsrController {
                 psr.setSubRoute(subRoute);
             }
 
-            if (req.containsKey("target_cases")) {
+            if (req.containsKey("targets") && req.get("targets") instanceof List<?>) {
+                try {
+                    List<?> rawTargets = (List<?>) req.get("targets");
+                    String tJson = objectMapper.writeValueAsString(rawTargets);
+                    psr.setTargetsJson(tJson);
+
+                    int totalTargetCases = 0;
+                    StringBuilder skuDescBuilder = new StringBuilder();
+                    for (Object obj : rawTargets) {
+                        if (obj instanceof Map<?, ?>) {
+                            Map<?, ?> m = (Map<?, ?>) obj;
+                            if (m.containsKey("target_cases") && m.get("target_cases") != null) {
+                                try {
+                                    totalTargetCases += Integer.parseInt(m.get("target_cases").toString());
+                                } catch (Exception ignored) {}
+                            }
+                            String bName = m.get("brand") != null ? m.get("brand").toString() : (m.get("product_name") != null ? m.get("product_name").toString() : "");
+                            Object tCases = m.get("target_cases");
+                            if (!bName.isEmpty()) {
+                                if (skuDescBuilder.length() > 0) skuDescBuilder.append(", ");
+                                skuDescBuilder.append(bName).append(" (").append(tCases).append(" cs)");
+                            }
+                        }
+                    }
+                    if (totalTargetCases > 0) {
+                        psr.setTargetCases(totalTargetCases);
+                    }
+                    if (skuDescBuilder.length() > 0) {
+                        String summary = skuDescBuilder.toString();
+                        if (summary.length() > 140) summary = summary.substring(0, 137) + "...";
+                        psr.setTargetSkuOunces(summary);
+                    }
+                } catch (Exception ignored) {}
+            } else if (req.containsKey("targets_json") && req.get("targets_json") != null) {
+                psr.setTargetsJson(req.get("targets_json").toString());
+            }
+
+            if (req.containsKey("target_cases") && (psr.getTargetCases() == null || psr.getTargetCases() <= 0)) {
                 try {
                     int cases = Integer.parseInt(req.get("target_cases").toString());
                     psr.setTargetCases(cases);
                 } catch (Exception ignored) {}
             }
-            if (req.containsKey("target_sku_ounces") && req.get("target_sku_ounces") != null) {
+            if (req.containsKey("target_sku_ounces") && req.get("target_sku_ounces") != null && psr.getTargetSkuOunces() == null) {
                 psr.setTargetSkuOunces(req.get("target_sku_ounces").toString().trim());
             }
             if (req.containsKey("target_product_id") && req.get("target_product_id") != null && !req.get("target_product_id").toString().isEmpty()) {
@@ -1425,6 +1742,15 @@ public class PsrController {
             }
             if (req.containsKey("target_notes") && req.get("target_notes") != null) {
                 psr.setTargetNotes(req.get("target_notes").toString().trim());
+            }
+
+            // Optional: SO allots/updates the PSR's individual Supplier
+            if (req.containsKey("supplier_id") && req.get("supplier_id") != null && !req.get("supplier_id").toString().trim().isEmpty()) {
+                try {
+                    Long newSupId = Long.parseLong(req.get("supplier_id").toString().trim());
+                    psr.setSupplierId(newSupId);
+                    supplierProfileRepository.findById(newSupId).ifPresent(sp -> psr.setSupplierName(sp.getBusinessName()));
+                } catch (Exception ignored) {}
             }
 
             psr.setUpdatedAt(LocalDateTime.now());

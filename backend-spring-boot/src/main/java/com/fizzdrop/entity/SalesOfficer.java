@@ -80,6 +80,15 @@ public class SalesOfficer {
     @JsonProperty("supplier_name")
     private String supplierName;
 
+    @Column(name = "allocated_supplier_ids", length = 500)
+    @JsonProperty("allocated_supplier_ids")
+    @JsonAlias({"allocated_supplier_ids", "allocatedSupplierIds"})
+    private String allocatedSupplierIds;
+
+    @Transient
+    @JsonProperty("allocated_suppliers")
+    private java.util.List<SupplierProfile> allocatedSuppliers = new java.util.ArrayList<>();
+
     @Transient
     @JsonProperty("outlet_count")
     private Integer outletCount = 0;
@@ -166,6 +175,12 @@ public class SalesOfficer {
 
     public String getSupplierName() { return supplierName; }
     public void setSupplierName(String supplierName) { this.supplierName = supplierName; }
+
+    public String getAllocatedSupplierIds() { return allocatedSupplierIds; }
+    public void setAllocatedSupplierIds(String allocatedSupplierIds) { this.allocatedSupplierIds = allocatedSupplierIds; }
+
+    public java.util.List<SupplierProfile> getAllocatedSuppliers() { return allocatedSuppliers; }
+    public void setAllocatedSuppliers(java.util.List<SupplierProfile> allocatedSuppliers) { this.allocatedSuppliers = allocatedSuppliers; }
 
     public Integer getOutletCount() { return outletCount; }
     public void setOutletCount(Integer outletCount) { this.outletCount = outletCount; }

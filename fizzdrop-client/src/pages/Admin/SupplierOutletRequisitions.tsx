@@ -21,9 +21,27 @@ import {
   UserCheck,
   Phone,
   X,
+  Route,
+  Users,
+  Check,
+  ExternalLink,
+  Plus,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { SupplyStockModal, type ProductOption, type OutletOption } from './SupplyStockModal';
 import { ZeroStockAlertModal, type ZeroStockAlertData } from '../../components/Alerts/ZeroStockAlertModal';
+
+export interface DeliveryTeam {
+  id: number;
+  team_name: string;
+  vehicle_registration_no: string;
+  vehicle_type: string;
+  driver_name: string;
+  driver_phone?: string;
+  team_members?: string;
+  max_capacity_cases: number;
+  status: string;
+}
 
 export interface OutletRequisitionItem {
   id: number;
@@ -34,6 +52,7 @@ export interface OutletRequisitionItem {
   branch_name?: string;
   city?: string;
   area?: string;
+  sub_route?: string;
   location_address?: string;
   contact_phone?: string;
   product_id: number;
@@ -96,6 +115,73 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
   const [fulfillNotes, setFulfillNotes] = useState<string>('');
   const [fulfillSubmitting, setFulfillSubmitting] = useState<boolean>(false);
 
+  // Delivery Teams for Outlet Dispatch Form
+  const [deliveryTeams, setDeliveryTeams] = useState<DeliveryTeam[]>([]);
+  const [selectedDeliveryTeamId, setSelectedDeliveryTeamId] = useState<number | ''>('');
+  const [dispatchSubRoute, setDispatchSubRoute] = useState<string>('');
+  const [lastAssignedVehicleReg, setLastAssignedVehicleReg] = useState<string | null>(null);
+
+  // Quick inline team creation if supplier doesn't have a delivery team yet
+  const [showInlineNewTeam, setShowInlineNewTeam] = useState<boolean>(false);
+  const [inlineTeamForm, setInlineTeamForm] = useState({
+    team_name: 'Dhaka Central Express Fleet',
+    vehicle_registration_no: 'DHA-METRO-4892',
+    vehicle_type: 'Covered Van',
+    driver_name: 'Karim Ullah',
+    driver_phone: '01711-234567',
+    team_members: 'Karim Ullah (Lead Driver), Rafiq (Loader)',
+    max_capacity_cases: 250,
+  });
+  const [inlineTeamCreating, setInlineTeamCreating] = useState<boolean>(false);
+
+  // Fetch delivery teams
+  const fetchDeliveryTeams = async () => {
+    try {
+      const res = await fetch(`http://localhost:8080/api/v1/delivery/teams?userId=${userId}&all=true`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setDeliveryTeams(data);
+          if (data.length > 0) {
+            setSelectedDeliveryTeamId((prev) => {
+              if (prev && data.some((t: any) => t.id === prev)) return prev;
+              const avail = data.find((t: any) => t.status === 'AVAILABLE') || data[0];
+              return avail ? avail.id : '';
+            });
+          }
+        }
+      }
+    } catch (err) {}
+  };
+
+  const handleCreateInlineTeam = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setInlineTeamCreating(true);
+    setActionErrorMsg(null);
+    try {
+      const res = await fetch(`http://localhost:8080/api/v1/delivery/teams`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: userId,
+          ...inlineTeamForm,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        await fetchDeliveryTeams();
+        if (data.id) setSelectedDeliveryTeamId(data.id);
+        setShowInlineNewTeam(false);
+      } else {
+        setActionErrorMsg(data.message || 'Failed to create delivery team');
+      }
+    } catch (e) {
+      setActionErrorMsg('Network error while creating delivery team');
+    } finally {
+      setInlineTeamCreating(false);
+    }
+  };
+
   // Fetch incoming requisitions
   const fetchRequisitions = async () => {
     setLoading(true);
@@ -114,6 +200,7 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
 
   useEffect(() => {
     fetchRequisitions();
+    fetchDeliveryTeams();
 
     let channel: BroadcastChannel | null = null;
     try {
@@ -124,9 +211,14 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
           payload?.type === 'SO_STOCK_REQUEST_FOR_OUTLET' ||
           payload?.type === 'SO_ORDER_APPROVED' ||
           payload?.type === 'NEW_PSR_ORDER' ||
-          payload?.type === 'REQUISITION_ACTION'
+          payload?.type === 'REQUISITION_ACTION' ||
+          payload?.type === 'FLEET_DELIVERY_DISPATCHED' ||
+          payload?.type === 'FLEET_STOCKS_BOARDED' ||
+          payload?.type === 'FLEET_RIDE_STARTED' ||
+          payload?.type === 'FLEET_STOP_DELIVERED'
         ) {
           fetchRequisitions();
+          fetchDeliveryTeams();
         }
       };
     } catch (e) {}
@@ -148,18 +240,19 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
       return;
     }
     setFulfillModalReq(req);
+    setShowInlineNewTeam(false);
     // For outlet requisitions, quantity is strictly locked to requested quantity (not more or less)
     if (!req.is_so_purchase) {
       setFulfillQty(req.quantity);
+      const initialRoute = req.sub_route || (req.branch_name ? `${req.branch_name} Sub-Route` : `${req.area || 'Territory'} Sub-Route`);
+      setDispatchSubRoute(initialRoute);
+      fetchDeliveryTeams();
+      setFulfillNotes(`Dispatched ${req.quantity} cases of ${req.product_name} to ${req.outlet_name} via delivery team`);
     } else {
       setFulfillQty(Math.max(1, Math.min(req.quantity, req.supplier_available_stock > 0 ? req.supplier_available_stock : req.quantity)));
+      setFulfillNotes(`Wholesale stock delivery to Sales Officer ${req.sales_officer_name || ''} buffer`);
     }
     setFulfillPrice(Number(req.unit_price || 35));
-    setFulfillNotes(
-      req.is_so_purchase
-        ? `Wholesale stock delivery to Sales Officer ${req.sales_officer_name || ''} buffer`
-        : `Dispatched ${req.quantity} cases from Sales Officer ${req.sales_officer_name || ''}'s purchased stock to ${req.outlet_name}`
-    );
   };
 
   const handleFulfillSubmit = async (e: React.FormEvent) => {
@@ -179,7 +272,7 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
         return;
       }
     } else {
-      // Outlet requisition: Dispatched from SO purchased buffer stock
+      // Outlet requisition: Dispatched from SO purchased buffer stock via Delivery Team
       if (!fulfillModalReq.so_has_purchased || (fulfillModalReq.so_purchased_stock ?? 0) <= 0) {
         setActionErrorMsg(`Cannot dispatch: ${fulfillModalReq.product_name} has not been purchased by Sales Officer ${fulfillModalReq.sales_officer_name || ''}. The Sales Officer must purchase stock from the Regional Supplier first.`);
         return;
@@ -188,6 +281,96 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
         setActionErrorMsg(`Cannot dispatch: Sales Officer holds only ${fulfillModalReq.so_purchased_stock ?? 0} cases in buffer, but outlet requested ${fulfillModalReq.quantity} cases. The SO must purchase additional stock first.`);
         return;
       }
+      if (!selectedDeliveryTeamId) {
+        setActionErrorMsg("Please select an assigned delivery team / fleet vehicle for this outlet dispatch.");
+        return;
+      }
+
+      setFulfillSubmitting(true);
+      setActionErrorMsg(null);
+      setActionSuccessMsg(null);
+
+      try {
+        const assignedTeam = deliveryTeams.find((t) => t.id === Number(selectedDeliveryTeamId));
+        const subRouteToUse = dispatchSubRoute.trim() || fulfillModalReq.sub_route || fulfillModalReq.area || 'Main Territory Sub-Route';
+
+        const dispatchPayload = {
+          user_id: userId,
+          delivery_team_id: Number(selectedDeliveryTeamId),
+          sub_route: subRouteToUse,
+          notes: fulfillNotes || `Dispatched to ${fulfillModalReq.outlet_name} from SO ${fulfillModalReq.sales_officer_name || ''} buffer`,
+          items: [
+            {
+              outlet_id: fulfillModalReq.outlet_id,
+              outlet_name: fulfillModalReq.franchise_name ? `${fulfillModalReq.franchise_name} — ${fulfillModalReq.branch_name || fulfillModalReq.outlet_name}` : fulfillModalReq.outlet_name,
+              branch_name: fulfillModalReq.branch_name,
+              location_address: fulfillModalReq.location_address,
+              contact_phone: fulfillModalReq.contact_phone,
+              product_id: fulfillModalReq.product_id,
+              product_name: fulfillModalReq.product_name,
+              category: fulfillModalReq.category,
+              demanded_cases: fulfillModalReq.quantity,
+              assigned_cases: fulfillModalReq.quantity,
+              unit_price: fulfillPrice,
+              requisition_id: fulfillModalReq.id,
+              requisition_code: fulfillModalReq.requisition_code,
+              sales_officer_id: fulfillModalReq.sales_officer_id,
+              stop_status: 'ASSIGNED',
+            },
+          ],
+        };
+
+        const res = await fetch(`http://localhost:8080/api/v1/delivery/dispatches`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(dispatchPayload),
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.message || data.error || 'Failed to dispatch via delivery fleet');
+        }
+
+        const vehicleReg = data.vehicle_registration_no || assignedTeam?.vehicle_registration_no || 'Vehicle';
+        setLastAssignedVehicleReg(vehicleReg);
+
+        // Broadcast real-time events to all channels
+        try {
+          const ch = new BroadcastChannel('fizzdrop_realtime_events');
+          ch.postMessage({
+            type: 'FLEET_DELIVERY_DISPATCHED',
+            dispatch_code: data.dispatch_code,
+            vehicle_registration_no: vehicleReg,
+            outlet_id: fulfillModalReq.outlet_id,
+            outlet_name: fulfillModalReq.outlet_name,
+            sub_route: subRouteToUse,
+          });
+          ch.postMessage({
+            type: 'SUPPLIER_DISPATCHED_TO_OUTLET',
+            recipientRole: 'SALES_OFFICER',
+            recipientUserId: fulfillModalReq.sales_officer_id,
+            outlet_name: fulfillModalReq.outlet_name,
+            product_name: fulfillModalReq.product_name,
+            quantity: fulfillModalReq.quantity,
+            title: `Stock Dispatched via Delivery Fleet to ${fulfillModalReq.outlet_name}`,
+            message: `Supplier assigned vehicle ${vehicleReg} to deliver ${fulfillModalReq.quantity} cases of ${fulfillModalReq.product_name} to ${fulfillModalReq.outlet_name} on route ${subRouteToUse}.`,
+          });
+          setTimeout(() => ch.close(), 100);
+        } catch (e) {}
+
+        setActionSuccessMsg(
+          `Successfully assigned delivery team "${assignedTeam?.team_name || 'Fleet'}" (${vehicleReg}) to deliver ${fulfillModalReq.quantity} cases to ${fulfillModalReq.outlet_name} on sub-route "${subRouteToUse}"! The delivery team can now confirm the order in the Delivery Team Portal.`
+        );
+
+        setFulfillModalReq(null);
+        fetchRequisitions();
+        fetchDeliveryTeams();
+      } catch (err: any) {
+        setActionErrorMsg(err.message || 'Failed to dispatch via delivery fleet');
+      } finally {
+        setFulfillSubmitting(false);
+      }
+      return;
     }
 
     if (effectiveDispatchQty <= 0) {
@@ -208,7 +391,7 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
           unit_price: fulfillPrice,
           user_id: userId,
           sales_officer_id: fulfillModalReq.sales_officer_id,
-          notes: fulfillNotes || `Dispatched to ${fulfillModalReq.outlet_name} from SO ${fulfillModalReq.sales_officer_name || ''} buffer`,
+          notes: fulfillNotes || `Dispatched to SO ${fulfillModalReq.sales_officer_name || ''} buffer`,
         }),
       });
 
@@ -407,17 +590,32 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
     <div className="space-y-6 animate-fade-in">
       {/* Toast Alert Banners */}
       {actionSuccessMsg && (
-        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center justify-between shadow-sm animate-scale-up">
+        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm animate-scale-up">
           <div className="flex items-center gap-2">
             <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
             <span className="font-bold">{actionSuccessMsg}</span>
           </div>
-          <button
-            onClick={() => setActionSuccessMsg(null)}
-            className="text-emerald-700 hover:text-emerald-900 font-bold ml-3"
-          >
-            ✕
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            {lastAssignedVehicleReg && (
+              <Link
+                to={`/delivery-team?regNo=${encodeURIComponent(lastAssignedVehicleReg)}`}
+                className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition"
+              >
+                <Truck className="w-3.5 h-3.5" />
+                <span>Open Delivery Team Portal ({lastAssignedVehicleReg})</span>
+                <ExternalLink className="w-3 h-3" />
+              </Link>
+            )}
+            <button
+              onClick={() => {
+                setActionSuccessMsg(null);
+                setLastAssignedVehicleReg(null);
+              }}
+              className="text-emerald-700 hover:text-emerald-900 font-bold ml-1 p-1"
+            >
+              ✕
+            </button>
+          </div>
         </div>
       )}
 
@@ -934,14 +1132,14 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
                             title={
                               req.is_so_purchase
                                 ? "Fulfill and dispatch stock directly to Sales Officer's buffer"
-                                : `Confirm and dispatch exact ${req.quantity} cases to outlet from SO purchased stock`
+                                : `Assign delivery team and dispatch exact ${req.quantity} cases to outlet`
                             }
                           >
-                            <Send className="w-3.5 h-3.5" />
+                            <Truck className="w-3.5 h-3.5" />
                             <span>
                               {req.is_so_purchase
                                 ? `Confirm & Dispatch to SO (${req.quantity} Cases)`
-                                : `Confirm & Dispatch (${req.quantity} Cases)`}
+                                : `Dispatch to Outlet (${req.quantity} Cases)`}
                             </span>
                           </button>
                         )}
@@ -973,29 +1171,38 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
         }}
       />
 
-      {/* MODAL: Adjust & Dispatch to Sales Officer Modal */}
+      {/* MODAL: Dispatch Modal (Wholesale Buffer Stock vs Assign Delivery Team for Outlets) */}
       {fulfillModalReq && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-zinc-800 w-full max-w-lg overflow-hidden flex flex-col max-h-[92vh]">
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-zinc-800 w-full max-w-xl overflow-hidden flex flex-col max-h-[92vh]">
             
             {/* Modal Header */}
             <div className="p-5 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between bg-gradient-to-r from-slate-900 via-zinc-900 to-slate-900 text-white">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white shadow-md shadow-emerald-500/20">
-                  <Send className="w-5 h-5" />
+                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-md ${
+                  fulfillModalReq.is_so_purchase
+                    ? 'bg-gradient-to-br from-blue-500 to-indigo-600 shadow-blue-500/20'
+                    : 'bg-gradient-to-br from-emerald-500 via-teal-600 to-cyan-600 shadow-emerald-500/20'
+                }`}>
+                  <Truck className="w-5 h-5" />
                 </div>
                 <div>
                   <h3 className="font-black text-base tracking-tight text-white flex items-center gap-2">
-                    Adjust & Dispatch Stock
+                    {fulfillModalReq.is_so_purchase
+                      ? 'Fulfill SO Buffer Stock Requisition'
+                      : 'Assign Delivery Team & Dispatch to Outlet'}
                   </h3>
                   <p className="text-xs text-slate-300 font-mono">
-                    Requisition #{fulfillModalReq.requisition_code}
+                    Requisition #{fulfillModalReq.requisition_code} • {fulfillModalReq.is_so_purchase ? 'Wholesale Depot Transfer' : 'Fleet Delivery Assignment'}
                   </p>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => setFulfillModalReq(null)}
+                onClick={() => {
+                  setFulfillModalReq(null);
+                  setShowInlineNewTeam(false);
+                }}
                 className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center transition cursor-pointer"
               >
                 <X className="w-4 h-4" />
@@ -1005,12 +1212,12 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
             {/* Modal Body / Form */}
             <form onSubmit={handleFulfillSubmit} className="p-6 overflow-y-auto space-y-4 text-slate-800 dark:text-zinc-100">
               
-              {/* Product & Outlet Overview Card */}
+              {/* Product & Destination Overview Card */}
               <div className="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-800/60 border border-slate-200/80 dark:border-zinc-700/80 space-y-2.5">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400">Beverage Item</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400">Beverage Stock</span>
                       {fulfillModalReq.category && (
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
                           {fulfillModalReq.category}
@@ -1030,7 +1237,7 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
 
                 <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200/60 dark:border-zinc-700/60 text-xs">
                   <div>
-                    <span className="text-[10px] text-slate-400 block">Sales Officer (Channel):</span>
+                    <span className="text-[10px] text-slate-400 block">Sales Officer (Buffer Owner):</span>
                     <strong className="text-slate-800 dark:text-zinc-200 font-bold block truncate">
                       {fulfillModalReq.sales_officer_name || 'Assigned Sales Officer'}
                     </strong>
@@ -1043,7 +1250,7 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
                     <strong className="text-slate-800 dark:text-zinc-200 font-bold block truncate">
                       {fulfillModalReq.is_so_purchase
                         ? `Sales Officer Buffer Stock (${fulfillModalReq.sales_officer_name})`
-                        : fulfillModalReq.outlet_name}
+                        : (fulfillModalReq.franchise_name ? `${fulfillModalReq.franchise_name} — ${fulfillModalReq.branch_name || fulfillModalReq.outlet_name}` : fulfillModalReq.outlet_name)}
                     </strong>
                     <span className="text-[10px] text-slate-500 truncate block">
                       {fulfillModalReq.is_so_purchase
@@ -1054,152 +1261,375 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
                 </div>
 
                 <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-zinc-700/60 text-xs">
-                  <span className="text-slate-500">Requested: <strong className="text-slate-900 dark:text-white">{fulfillModalReq.quantity} cases</strong></span>
+                  <span className="text-slate-500">Demanded Volume: <strong className="text-slate-900 dark:text-white font-mono">{fulfillModalReq.quantity} cases</strong></span>
                   <div className="flex items-center gap-3">
                     <span className="text-teal-600 dark:text-teal-400 font-bold">
-                      Depot: <strong className="font-mono text-sm">{fulfillModalReq.supplier_available_stock}</strong> cases
+                      Depot Stock: <strong className="font-mono text-sm">{fulfillModalReq.supplier_available_stock}</strong> cases
                     </span>
                     {!fulfillModalReq.is_so_purchase && (
-                      <span className={`${(fulfillModalReq.so_purchased_stock ?? 0) > 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-rose-600'} font-bold`}>
+                      <span className={`${(fulfillModalReq.so_purchased_stock ?? 0) >= fulfillModalReq.quantity ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600'} font-bold`}>
                         SO Buffer: <strong className="font-mono text-sm">{fulfillModalReq.so_purchased_stock ?? 0}</strong> cases
                       </span>
                     )}
                   </div>
                 </div>
 
-                {/* Warning if unpurchased by SO */}
-                {!fulfillModalReq.is_so_purchase && (!fulfillModalReq.so_has_purchased || (fulfillModalReq.so_purchased_stock ?? 0) <= 0) && (
+                {/* Warning if unpurchased by SO for outlet orders */}
+                {!fulfillModalReq.is_so_purchase && (!fulfillModalReq.so_has_purchased || (fulfillModalReq.so_purchased_stock ?? 0) < fulfillModalReq.quantity) && (
                   <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2">
                     <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0" />
-                    <span>Cannot dispatch: Product has not been purchased by Sales Officer <strong>{fulfillModalReq.sales_officer_name}</strong>. The SO must purchase stock from the Supplier first.</span>
+                    <span>Cannot dispatch: Product has not been purchased in sufficient quantity by Sales Officer <strong>{fulfillModalReq.sales_officer_name}</strong> (holds {fulfillModalReq.so_purchased_stock ?? 0}/{fulfillModalReq.quantity} cases). The SO must purchase buffer stock first.</span>
                   </div>
                 )}
               </div>
 
-              {/* Input 1: Quantity Handling (Strictly Locked for Outlet Requisitions, Configurable for SO Buffer Purchases) */}
+              {/* SPECIFIC FORM FOR OUTLET DEMAND: ASSIGN DELIVERY TEAM, STOCKS & SUB-ROUTE */}
               {!fulfillModalReq.is_so_purchase ? (
-                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-zinc-300">
-                      Dispatch Quantity (Locked to Outlet Demand)
+                <div className="space-y-4">
+                  {/* Outlet Name & Sub-Route Details */}
+                  <div className="p-4 rounded-2xl bg-emerald-50/60 dark:bg-zinc-800/80 border border-emerald-200/80 dark:border-zinc-700 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 dark:text-emerald-400 flex items-center gap-1.5">
+                        <Store className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Outlet Destination & Sub-Route</span>
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-500 font-mono">
+                        {fulfillModalReq.city} • {fulfillModalReq.area}
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-zinc-300 block mb-1">
+                        Outlet Name
+                      </label>
+                      <input
+                        type="text"
+                        disabled
+                        value={fulfillModalReq.franchise_name ? `${fulfillModalReq.franchise_name} — ${fulfillModalReq.branch_name || fulfillModalReq.outlet_name}` : fulfillModalReq.outlet_name}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-100 dark:bg-zinc-800/90 text-slate-900 dark:text-zinc-100 text-xs font-bold cursor-not-allowed"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-zinc-300 flex items-center gap-1">
+                          <Route className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Outlet Sub-Route *</span>
+                        </label>
+                        <span className="text-[10px] text-slate-400">Route for navigation & live transit</span>
+                      </div>
+                      <input
+                        type="text"
+                        value={dispatchSubRoute}
+                        onChange={(e) => setDispatchSubRoute(e.target.value)}
+                        placeholder="e.g. Gulshan2-Circle North Route"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-900 dark:text-white text-xs font-bold focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Stocks to Assign & Deliver */}
+                  <div className="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
+                        <Package className="w-3.5 h-3.5 text-blue-600" />
+                        <span>Stocks Demanded & Assigned to Vehicle</span>
+                      </label>
+                      <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-950/80 px-2.5 py-0.5 rounded-full">
+                        Locked to Demand
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800">
+                      <div>
+                        <strong className="text-sm font-black text-slate-900 dark:text-white block">
+                          {fulfillModalReq.product_name}
+                        </strong>
+                        <span className="text-xs text-slate-500">
+                          Wholesale: ৳{Number(fulfillPrice).toFixed(2)}/case • Total: ৳{Number(fulfillModalReq.quantity * fulfillPrice).toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-2xl font-black font-mono text-teal-700 dark:text-teal-400">
+                          {fulfillModalReq.quantity}
+                        </span>
+                        <span className="text-xs font-bold text-slate-500 ml-1">cases</span>
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-slate-500 dark:text-zinc-400 flex items-center gap-1">
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      Dispatched strictly from stock purchased by Sales Officer <strong>{fulfillModalReq.sales_officer_name}</strong>.
+                    </p>
+                  </div>
+
+                  {/* Assign Delivery Team Selector */}
+                  <div className="p-4 rounded-2xl bg-blue-50/50 dark:bg-zinc-800/80 border border-blue-200/70 dark:border-zinc-700 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-black uppercase tracking-wider text-blue-900 dark:text-blue-300 flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5 text-blue-600" />
+                        <span>Assign Delivery Team / Fleet Vehicle *</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setShowInlineNewTeam((prev) => !prev)}
+                        className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>{showInlineNewTeam ? 'Select Existing Team' : '+ Add Delivery Team'}</span>
+                      </button>
+                    </div>
+
+                    {!showInlineNewTeam ? (
+                      <>
+                        {deliveryTeams.length === 0 ? (
+                          <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs space-y-2">
+                            <p className="font-bold flex items-center gap-1.5">
+                              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                              <span>No delivery team currently registered.</span>
+                            </p>
+                            <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                              Please register a delivery team below to dispatch this order.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => setShowInlineNewTeam(true)}
+                              className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center gap-1 transition"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>Register Delivery Team Now</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <select
+                              value={selectedDeliveryTeamId}
+                              onChange={(e) => setSelectedDeliveryTeamId(e.target.value ? Number(e.target.value) : '')}
+                              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-900 dark:text-white text-xs font-bold focus:ring-2 focus:ring-blue-500 focus:outline-hidden cursor-pointer"
+                              required
+                            >
+                              <option value="">-- Choose Assigned Delivery Team & Vehicle --</option>
+                              {deliveryTeams.map((t) => (
+                                <option key={t.id} value={t.id}>
+                                  {t.team_name} — {t.vehicle_registration_no} ({t.vehicle_type} • Driver: {t.driver_name} • Cap: {t.max_capacity_cases} cases) [{t.status}]
+                                </option>
+                              ))}
+                            </select>
+
+                            {/* Details of Selected Team */}
+                            {selectedDeliveryTeamId && (
+                              (() => {
+                                const team = deliveryTeams.find((t) => t.id === Number(selectedDeliveryTeamId));
+                                if (!team) return null;
+                                return (
+                                  <div className="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-blue-200/80 dark:border-zinc-800 grid grid-cols-2 gap-2 text-xs">
+                                    <div>
+                                      <span className="text-[10px] text-slate-400 block uppercase font-bold">Vehicle Reg & Type</span>
+                                      <strong className="text-slate-900 dark:text-white font-mono">{team.vehicle_registration_no}</strong>
+                                      <span className="text-[10px] text-slate-500 block">{team.vehicle_type} (Cap: {team.max_capacity_cases} cases)</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-[10px] text-slate-400 block uppercase font-bold">Lead Driver & Status</span>
+                                      <strong className="text-slate-900 dark:text-white">{team.driver_name}</strong>
+                                      <span className="text-[10px] text-slate-500 block">{team.driver_phone || 'No phone'} • <strong className={team.status === 'AVAILABLE' ? 'text-emerald-600' : 'text-blue-600'}>{team.status}</strong></span>
+                                    </div>
+                                  </div>
+                                );
+                              })()
+                            )}
+                          </>
+                        )}
+                      </>
+                    ) : (
+                      /* Inline Quick Team Registration Form */
+                      <div className="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-blue-200/80 dark:border-zinc-800 space-y-2.5">
+                        <span className="text-[11px] font-bold text-blue-700 dark:text-blue-300 block">
+                          Register New Delivery Team & Vehicle
+                        </span>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Team Name</label>
+                            <input
+                              type="text"
+                              value={inlineTeamForm.team_name}
+                              onChange={(e) => setInlineTeamForm({ ...inlineTeamForm, team_name: e.target.value })}
+                              className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Vehicle Reg No</label>
+                            <input
+                              type="text"
+                              value={inlineTeamForm.vehicle_registration_no}
+                              onChange={(e) => setInlineTeamForm({ ...inlineTeamForm, vehicle_registration_no: e.target.value })}
+                              className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 font-mono"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Driver Name</label>
+                            <input
+                              type="text"
+                              value={inlineTeamForm.driver_name}
+                              onChange={(e) => setInlineTeamForm({ ...inlineTeamForm, driver_name: e.target.value })}
+                              className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Driver Phone</label>
+                            <input
+                              type="text"
+                              value={inlineTeamForm.driver_phone}
+                              onChange={(e) => setInlineTeamForm({ ...inlineTeamForm, driver_phone: e.target.value })}
+                              className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-end gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => setShowInlineNewTeam(false)}
+                            className="px-3 py-1 text-xs rounded-lg border border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-400"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleCreateInlineTeam}
+                            disabled={inlineTeamCreating}
+                            className="px-3 py-1 text-xs rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold transition flex items-center gap-1"
+                          >
+                            {inlineTeamCreating ? 'Saving...' : 'Save & Select Team'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Dispatch Notes */}
+                  <div>
+                    <label className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-zinc-300 block mb-1">
+                      Dispatch Instructions / Delivery Notes
                     </label>
-                    <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
-                      SO Buffer Available: {fulfillModalReq.so_purchased_stock ?? 0} cases
-                    </span>
+                    <input
+                      type="text"
+                      value={fulfillNotes}
+                      onChange={(e) => setFulfillNotes(e.target.value)}
+                      placeholder="e.g. Morning delivery priority, hand over invoice to store manager"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-900 dark:text-white text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                    />
                   </div>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-black font-mono text-teal-700 dark:text-teal-400">
-                      {fulfillModalReq.quantity}
-                    </span>
-                    <span className="text-xs font-bold text-slate-500">cases (Exact outlet requisition)</span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-2 flex items-center gap-1.5">
-                    <CheckCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                    Dispatched strictly from stock purchased by Sales Officer {fulfillModalReq.sales_officer_name || ''}. Outlet orders cannot be modified to more or less.
-                  </p>
                 </div>
               ) : (
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-zinc-300">
-                      Dispatch Quantity (Cases)
-                    </label>
-                    <span className="text-xs text-slate-400">
-                      Depot Max: <strong className="text-teal-600">{fulfillModalReq.supplier_available_stock} cases</strong>
-                    </span>
+                /* SO BUFFER PURCHASE FORM (Dispatched from Depot to SO Buffer) */
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-zinc-300">
+                        Dispatch Quantity (Cases)
+                      </label>
+                      <span className="text-xs text-slate-400">
+                        Depot Max: <strong className="text-teal-600">{fulfillModalReq.supplier_available_stock} cases</strong>
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="1"
+                        max={fulfillModalReq.supplier_available_stock}
+                        value={fulfillQty}
+                        onChange={(e) => setFulfillQty(Math.max(1, parseInt(e.target.value) || 0))}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-900 dark:text-white font-bold text-base focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                        required
+                      />
+                      <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setFulfillQty(Math.min(fulfillModalReq.quantity, fulfillModalReq.supplier_available_stock))}
+                          className="px-2 py-1 text-[11px] font-bold rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-zinc-700 text-slate-700 dark:text-zinc-200 transition cursor-pointer"
+                        >
+                          Requested ({fulfillModalReq.quantity})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFulfillQty(fulfillModalReq.supplier_available_stock)}
+                          className="px-2 py-1 text-[11px] font-bold rounded-lg bg-teal-50 hover:bg-teal-100 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 transition cursor-pointer"
+                        >
+                          Max Available
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <div className="relative">
+
+                  {/* Wholesale Price */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-zinc-300">
+                        Wholesale Unit Price (৳ per Case)
+                      </label>
+                      <span className="text-xs text-slate-400">
+                        Original: ৳{Number(fulfillModalReq.unit_price || 35).toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-slate-400">৳</span>
+                      <input
+                        type="number"
+                        step="0.50"
+                        min="1"
+                        value={fulfillPrice}
+                        onChange={(e) => setFulfillPrice(parseFloat(e.target.value) || 0)}
+                        className="w-full pl-8 pr-4 py-3 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-900 dark:text-white font-bold text-base focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Notes */}
+                  <div>
+                    <label className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-zinc-300 block mb-1.5">
+                      Fulfillment Notes / Dispatch Remarks
+                    </label>
                     <input
-                      type="number"
-                      min="1"
-                      max={fulfillModalReq.supplier_available_stock}
-                      value={fulfillQty}
-                      onChange={(e) => setFulfillQty(Math.max(1, parseInt(e.target.value) || 0))}
-                      className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-900 dark:text-white font-bold text-base focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
-                      required
+                      type="text"
+                      value={fulfillNotes}
+                      onChange={(e) => setFulfillNotes(e.target.value)}
+                      placeholder="e.g. Batch 402 dispatched to Sales Officer for route distribution"
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-900 dark:text-white text-xs focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                     />
-                    <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setFulfillQty(Math.min(fulfillModalReq.quantity, fulfillModalReq.supplier_available_stock))}
-                        className="px-2 py-1 text-[11px] font-bold rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-zinc-700 text-slate-700 dark:text-zinc-200 transition cursor-pointer"
-                      >
-                        Requested ({fulfillModalReq.quantity})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFulfillQty(fulfillModalReq.supplier_available_stock)}
-                        className="px-2 py-1 text-[11px] font-bold rounded-lg bg-teal-50 hover:bg-teal-100 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 transition cursor-pointer"
-                      >
-                        Max Available
-                      </button>
+                  </div>
+
+                  {/* Financial Calculation Summary Box */}
+                  <div className="p-4 rounded-2xl bg-gradient-to-br from-teal-50 via-emerald-50 to-cyan-50 dark:from-teal-950/40 dark:via-emerald-950/40 dark:to-cyan-950/40 border border-teal-200 dark:border-teal-800/60">
+                    <div className="flex items-center justify-between text-xs text-slate-600 dark:text-zinc-400 mb-1">
+                      <span>Calculation:</span>
+                      <span className="font-mono">{fulfillQty} cases × ৳{Number(fulfillPrice).toFixed(2)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-[10px] uppercase font-black tracking-wider text-teal-700 dark:text-teal-300 block">
+                          Total Wholesale Invoice
+                        </span>
+                        <span className="text-xs text-slate-500">Credited directly to Supplier Wallet</span>
+                      </div>
+                      <strong className="text-2xl font-black text-teal-700 dark:text-teal-300">
+                        ৳{Number(fulfillQty * fulfillPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </strong>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Input 2: Adjustable Wholesale Case Price */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-zinc-300">
-                    Wholesale Unit Price (৳ per Case)
-                  </label>
-                  <span className="text-xs text-slate-400">
-                    Original: ৳{Number(fulfillModalReq.unit_price || 35).toFixed(2)}
-                  </span>
-                </div>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-slate-400">৳</span>
-                  <input
-                    type="number"
-                    step="0.50"
-                    min="1"
-                    value={fulfillPrice}
-                    onChange={(e) => setFulfillPrice(parseFloat(e.target.value) || 0)}
-                    className="w-full pl-8 pr-4 py-3 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-900 dark:text-white font-bold text-base focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Fulfillment Notes */}
-              <div>
-                <label className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-zinc-300 block mb-1.5">
-                  Fulfillment Notes / Dispatch Remarks
-                </label>
-                <input
-                  type="text"
-                  value={fulfillNotes}
-                  onChange={(e) => setFulfillNotes(e.target.value)}
-                  placeholder="e.g. Batch 402 dispatched to Sales Officer for route distribution"
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-900 dark:text-white text-xs focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
-                />
-              </div>
-
-              {/* Financial Calculation Summary Box */}
-              <div className="p-4 rounded-2xl bg-gradient-to-br from-teal-50 via-emerald-50 to-cyan-50 dark:from-teal-950/40 dark:via-emerald-950/40 dark:to-cyan-950/40 border border-teal-200 dark:border-teal-800/60">
-                <div className="flex items-center justify-between text-xs text-slate-600 dark:text-zinc-400 mb-1">
-                  <span>Calculation:</span>
-                  <span className="font-mono">{fulfillQty} cases × ৳{Number(fulfillPrice).toFixed(2)}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] uppercase font-black tracking-wider text-teal-700 dark:text-teal-300 block">
-                      Total Wholesale Invoice
-                    </span>
-                    <span className="text-xs text-slate-500">Credited directly to Supplier Wallet</span>
-                  </div>
-                  <strong className="text-2xl font-black text-teal-700 dark:text-teal-300">
-                    ৳{Number(fulfillQty * fulfillPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </strong>
-                </div>
-              </div>
-
               {/* Submit Buttons */}
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-zinc-800">
                 <button
                   type="button"
-                  onClick={() => setFulfillModalReq(null)}
+                  onClick={() => {
+                    setFulfillModalReq(null);
+                    setShowInlineNewTeam(false);
+                  }}
                   disabled={fulfillSubmitting}
                   className="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-300 text-xs font-bold hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer disabled:opacity-50"
                 >
@@ -1210,7 +1640,7 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
                   disabled={
                     fulfillSubmitting ||
                     (fulfillModalReq.is_so_purchase && (fulfillQty <= 0 || fulfillQty > fulfillModalReq.supplier_available_stock)) ||
-                    (!fulfillModalReq.is_so_purchase && (!fulfillModalReq.so_has_purchased || (fulfillModalReq.so_purchased_stock ?? 0) < fulfillModalReq.quantity))
+                    (!fulfillModalReq.is_so_purchase && (!fulfillModalReq.so_has_purchased || (fulfillModalReq.so_purchased_stock ?? 0) < fulfillModalReq.quantity || (!selectedDeliveryTeamId && !showInlineNewTeam)))
                   }
                   className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 via-emerald-600 to-cyan-600 hover:from-teal-700 hover:to-emerald-700 text-white text-xs font-black shadow-lg shadow-teal-600/25 flex items-center gap-2 transition cursor-pointer disabled:opacity-50 active:scale-95"
                 >
@@ -1225,7 +1655,7 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
                       <span>
                         {fulfillModalReq.is_so_purchase
                           ? `Confirm & Dispatch to Sales Officer (${fulfillQty} Cases)`
-                          : `Confirm & Dispatch to Outlet (${fulfillModalReq.quantity} Cases)`}
+                          : `Assign Delivery Team & Dispatch (${fulfillModalReq.quantity} Cases)`}
                       </span>
                     </>
                   )}

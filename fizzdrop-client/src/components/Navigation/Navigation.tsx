@@ -78,6 +78,22 @@ const Navigation: React.FC<NavigationProps> = ({
               <Crown className="w-3.5 h-3.5 text-emerald-500" />
               <span>Superadmin</span>
             </Link>
+
+            {/* Regional Sales Manager (RSM) Link */}
+            <Link
+              to="/rsm"
+              className="px-2.5 py-1 rounded-xl bg-purple-50 dark:bg-purple-950/60 border border-purple-200/70 dark:border-purple-800/70 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/40 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-xs"
+            >
+              <span>RSM (6 Divisions)</span>
+            </Link>
+
+            {/* Area Sales Manager (ASM) Link */}
+            <Link
+              to="/asm"
+              className="px-2.5 py-1 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200/70 dark:border-blue-800/70 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-xs"
+            >
+              <span>ASM (64 Districts)</span>
+            </Link>
           </nav>
 
           {/* Search, Outlet Selector & User Actions */}
@@ -218,6 +234,20 @@ const Navigation: React.FC<NavigationProps> = ({
             className="block text-sm font-bold text-purple-600 dark:text-purple-400 py-1"
           >
             👑 Superadmin (Outlets & Database)
+          </Link>
+          <Link
+            to="/rsm"
+            onClick={() => setMobileMenuOpen(false)}
+            className="block text-sm font-bold text-indigo-600 dark:text-indigo-400 py-1"
+          >
+            📊 Regional Sales Manager (RSM) Portal
+          </Link>
+          <Link
+            to="/asm"
+            onClick={() => setMobileMenuOpen(false)}
+            className="block text-sm font-bold text-blue-600 dark:text-blue-400 py-1"
+          >
+            🗺️ Area Sales Manager (ASM) Portal
           </Link>
         </div>
       )}

@@ -104,7 +104,11 @@ public class SalesOfficerController {
             return ResponseEntity.ok(Collections.emptyList());
         }
 
-        List<SalesOfficer> list = salesOfficerRepository.findBySupplierId(profile.getId());
+        final Long currentProfId = profile.getId();
+        List<SalesOfficer> list = salesOfficerRepository.findAll().stream()
+                .filter(so -> (so.getSupplierId() != null && so.getSupplierId().equals(currentProfId))
+                        || (so.getAllocatedSupplierIds() != null && Arrays.asList(so.getAllocatedSupplierIds().split(",")).contains(String.valueOf(currentProfId))))
+                .collect(Collectors.toList());
         enrichSalesOfficers(list);
 
         Map<String, Object> response = new HashMap<>();
@@ -226,6 +230,13 @@ public class SalesOfficerController {
                 so.setNotes(payload.get("notes").toString());
             }
 
+            if (payload.get("allocated_supplier_ids") != null || payload.get("allocatedSupplierIds") != null) {
+                Object alloc = payload.get("allocated_supplier_ids") != null ? payload.get("allocated_supplier_ids") : payload.get("allocatedSupplierIds");
+                if (alloc != null) so.setAllocatedSupplierIds(alloc.toString().trim());
+            } else {
+                so.setAllocatedSupplierIds(String.valueOf(supplierId));
+            }
+
             SalesOfficer saved = salesOfficerRepository.save(so);
             enrichSalesOfficers(Collections.singletonList(saved));
             return ResponseEntity.status(HttpStatus.CREATED).body(saved);
@@ -304,6 +315,11 @@ public class SalesOfficerController {
                 so.setDistrictId(supplier.getPrimaryDistrictId());
             }
 
+            if (payload.containsKey("allocated_supplier_ids") || payload.containsKey("allocatedSupplierIds")) {
+                Object alloc = payload.get("allocated_supplier_ids") != null ? payload.get("allocated_supplier_ids") : payload.get("allocatedSupplierIds");
+                if (alloc != null) so.setAllocatedSupplierIds(alloc.toString().trim());
+            }
+
             SalesOfficer updated = salesOfficerRepository.save(so);
             enrichSalesOfficers(Collections.singletonList(updated));
             return ResponseEntity.ok(updated);
@@ -340,7 +356,8 @@ public class SalesOfficerController {
     public ResponseEntity<?> getSalesOfficerDashboard(
             @RequestParam(required = false) Long officerId,
             @RequestParam(required = false) Long userId,
-            @RequestParam(required = false) String email) {
+            @RequestParam(required = false) String email,
+            @RequestParam(required = false) Long supplierId) {
 
         SalesOfficer officer = null;
         if (officerId != null) {
@@ -364,8 +381,49 @@ public class SalesOfficerController {
 
         enrichSalesOfficers(Collections.singletonList(officer));
 
-        // Linked Supplier Profile
-        SupplierProfile supplier = supplierProfileRepository.findById(officer.getSupplierId()).orElse(null);
+        // Available Suppliers
+        List<SupplierProfile> allSuppliers = supplierProfileRepository.findAll();
+        SupplierProfile supplier = null;
+        if (supplierId != null) {
+            supplier = supplierProfileRepository.findById(supplierId).orElse(null);
+        }
+        if (supplier == null && officer.getSupplierId() != null) {
+            supplier = supplierProfileRepository.findById(officer.getSupplierId()).orElse(null);
+        }
+        if (supplier == null && !allSuppliers.isEmpty()) {
+            supplier = allSuppliers.get(0);
+        }
+        Long activeSupplierId = supplier != null ? supplier.getId() : 1L;
+
+        // Purchased stock quantities specific to this particular chosen supplier
+        List<Map<String, Object>> supplierPurchasedStocks = new ArrayList<>();
+        int supplierTotalCasesPurchased = 0;
+        try {
+            supplierPurchasedStocks = jdbcTemplate.queryForList(
+                "SELECT product_id, product_name, COALESCE(SUM(quantity), 0) as purchased_cases, COALESCE(SUM(total_amount), 0) as total_spent " +
+                "FROM outlet_requisitions " +
+                "WHERE sales_officer_id = ? AND (supplier_id = ? OR (supplier_id IS NULL AND ? = 1)) " +
+                "AND requisition_code LIKE 'SO-REQ-%' AND status IN ('DISPATCHED', 'COMPLETED') " +
+                "GROUP BY product_id, product_name",
+                officer.getId(), activeSupplierId, activeSupplierId
+            );
+            for (Map<String, Object> sp : supplierPurchasedStocks) {
+                if (sp.get("purchased_cases") != null) {
+                    supplierTotalCasesPurchased += ((Number) sp.get("purchased_cases")).intValue();
+                }
+            }
+        } catch (Exception ignored) {}
+
+        // PSRs affiliated with this selected supplier
+        List<Map<String, Object>> supplierPsrs = new ArrayList<>();
+        try {
+            supplierPsrs = jdbcTemplate.queryForList(
+                "SELECT id, psr_code, name, phone, email, sub_route, assigned_area, status, target_cases, target_sku_ounces, supplier_id, supplier_name " +
+                "FROM pre_sales_officers " +
+                "WHERE sales_officer_id = ? AND (supplier_id = ? OR (supplier_id IS NULL AND ? = 1))",
+                officer.getId(), activeSupplierId, activeSupplierId
+            );
+        } catch (Exception ignored) {}
 
         // Retail Outlets in this Sales Officer's Area
         List<Outlet> allOutlets = outletRepository.findAll();
@@ -582,6 +640,65 @@ public class SalesOfficerController {
         Map<String, Object> response = new HashMap<>();
         response.put("sales_officer", officer);
         response.put("supplier", supplier);
+        response.put("selected_supplier", supplier);
+        response.put("suppliers", (officer.getAllocatedSuppliers() != null && !officer.getAllocatedSuppliers().isEmpty()) ? officer.getAllocatedSuppliers() : allSuppliers);
+        response.put("allocated_suppliers", (officer.getAllocatedSuppliers() != null && !officer.getAllocatedSuppliers().isEmpty()) ? officer.getAllocatedSuppliers() : allSuppliers);
+
+        // Build allocated suppliers hierarchy with nested PSRs and transactions
+        List<Map<String, Object>> allocatedSuppliersWithPsrs = new ArrayList<>();
+        List<SupplierProfile> effectiveSuppliers = (officer.getAllocatedSuppliers() != null && !officer.getAllocatedSuppliers().isEmpty())
+                ? officer.getAllocatedSuppliers()
+                : allSuppliers;
+
+        for (SupplierProfile sp : effectiveSuppliers) {
+            Map<String, Object> supData = new HashMap<>();
+            supData.put("id", sp.getId());
+            supData.put("supplier_id", sp.getId());
+            supData.put("business_name", sp.getBusinessName());
+            supData.put("trade_license_number", sp.getTradeLicenseNumber());
+            supData.put("depot_address", sp.getDepotAddress());
+            supData.put("phone_number", sp.getPhoneNumber());
+            supData.put("division_name", sp.getDivisionName());
+            supData.put("is_verified", sp.getIsVerified());
+
+            List<Map<String, Object>> psrsUnderSup = jdbcTemplate.queryForList(
+                "SELECT id, psr_code, name, phone, email, sub_route, assigned_area, status, target_cases, target_sku_ounces, supplier_id, supplier_name " +
+                "FROM pre_sales_officers WHERE sales_officer_id = ? AND (supplier_id = ? OR (supplier_id IS NULL AND ? = 1))",
+                officer.getId(), sp.getId(), sp.getId()
+            );
+
+            List<Map<String, Object>> ordersUnderSup = jdbcTemplate.queryForList(
+                "SELECT id, order_code, psr_id, psr_name, sales_officer_id, outlet_id, outlet_name, sub_route, " +
+                "product_id, product_name, quantity, unit_price, total_amount, urgency, status, supplier_id, supplier_name, created_at, updated_at " +
+                "FROM psr_orders WHERE sales_officer_id = ? AND (supplier_id = ? OR (supplier_id IS NULL AND ? = 1)) ORDER BY id DESC LIMIT 50",
+                officer.getId(), sp.getId(), sp.getId()
+            );
+
+            int totalCases = 0;
+            BigDecimal totalAmt = BigDecimal.ZERO;
+            for (Map<String, Object> ord : ordersUnderSup) {
+                if (ord.get("quantity") != null) totalCases += ((Number) ord.get("quantity")).intValue();
+                if (ord.get("total_amount") != null) {
+                    try {
+                        totalAmt = totalAmt.add(new BigDecimal(ord.get("total_amount").toString()));
+                    } catch (Exception ignored) {}
+                }
+            }
+
+            supData.put("psrs", psrsUnderSup);
+            supData.put("psr_count", psrsUnderSup.size());
+            supData.put("transactions", ordersUnderSup);
+            supData.put("transactions_count", ordersUnderSup.size());
+            supData.put("total_cases_ordered", totalCases);
+            supData.put("total_order_amount", totalAmt);
+
+            allocatedSuppliersWithPsrs.add(supData);
+        }
+        response.put("allocated_suppliers_hierarchy", allocatedSuppliersWithPsrs);
+
+        response.put("supplier_purchased_stocks", supplierPurchasedStocks);
+        response.put("supplier_total_cases_purchased", supplierTotalCasesPurchased);
+        response.put("supplier_psrs", supplierPsrs);
         response.put("outlets", territoryOutlets);
         response.put("outlet_count", territoryOutlets.size());
         response.put("products", productCatalog);
@@ -616,15 +733,39 @@ public class SalesOfficerController {
         if (list.isEmpty()) return;
 
         Map<Long, String> supplierNames = new HashMap<>();
+        Map<Long, SupplierProfile> supplierMap = new HashMap<>();
         List<SupplierProfile> suppliers = supplierProfileRepository.findAll();
         for (SupplierProfile sp : suppliers) {
             supplierNames.put(sp.getId(), sp.getBusinessName());
+            supplierMap.put(sp.getId(), sp);
         }
 
         List<Outlet> allOutlets = outletRepository.findAll();
 
         for (SalesOfficer so : list) {
             so.setSupplierName(supplierNames.getOrDefault(so.getSupplierId(), "Regional Logistics Hub"));
+
+            List<SupplierProfile> allocSups = new ArrayList<>();
+            if (so.getAllocatedSupplierIds() != null && !so.getAllocatedSupplierIds().trim().isEmpty()) {
+                String[] parts = so.getAllocatedSupplierIds().split(",");
+                for (String p : parts) {
+                    try {
+                        Long sid = Long.parseLong(p.trim());
+                        if (supplierMap.containsKey(sid)) {
+                            allocSups.add(supplierMap.get(sid));
+                        }
+                    } catch (Exception ignored) {}
+                }
+            }
+            if (allocSups.isEmpty()) {
+                if (so.getSupplierId() != null && supplierMap.containsKey(so.getSupplierId())) {
+                    allocSups.add(supplierMap.get(so.getSupplierId()));
+                }
+                for (SupplierProfile sp : suppliers) {
+                    if (!allocSups.contains(sp)) allocSups.add(sp);
+                }
+            }
+            so.setAllocatedSuppliers(allocSups);
 
             // Count outlets in this sales officer's assigned area
             String soArea = so.getAssignedArea() != null ? so.getAssignedArea().toLowerCase() : "";
@@ -715,8 +856,16 @@ public class SalesOfficerController {
             Product product = productRepository.findById(productId)
                     .orElseThrow(() -> new IllegalArgumentException("Product not found"));
 
-            SupplierProfile supplier = supplierProfileRepository.findById(officer.getSupplierId())
-                    .orElseThrow(() -> new IllegalArgumentException("Linked Supplier not found"));
+            Long targetSupplierId = null;
+            if (payload.containsKey("supplier_id") && payload.get("supplier_id") != null) {
+                try {
+                    targetSupplierId = Long.parseLong(payload.get("supplier_id").toString());
+                } catch (Exception ignored) {}
+            }
+            final Long finalSupplierId = targetSupplierId != null ? targetSupplierId : officer.getSupplierId();
+
+            SupplierProfile supplier = supplierProfileRepository.findById(finalSupplierId)
+                    .orElseThrow(() -> new IllegalArgumentException("Target Supplier not found with ID: " + finalSupplierId));
 
             String reqCode = "SO-REQ-" + (100000 + new Random().nextInt(900000));
             BigDecimal unitPrice = product.getOutletPrice() != null ? product.getOutletPrice() : (product.getBasePrice() != null ? product.getBasePrice() : BigDecimal.ZERO);
@@ -725,14 +874,14 @@ public class SalesOfficerController {
             // Sales Officer buffer stock purchase is separate and not assigned to any outlet yet
             String area = officer.getAssignedArea() != null ? officer.getAssignedArea() : "Territory";
 
-            // Save requisition with outlet_id = null so it is held separate as SO purchased buffer stock
+            // Save requisition with outlet_id = null and supplier_id so it is held separate as SO purchased buffer stock from that supplier
             jdbcTemplate.update(
-                "INSERT INTO outlet_requisitions (requisition_code, outlet_id, product_id, product_name, quantity, unit_price, total_amount, urgency, status, outlet_remarks, sales_officer_id, created_date, updated_date) " +
-                "VALUES (?, NULL, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, NOW(), NOW())",
+                "INSERT INTO outlet_requisitions (requisition_code, outlet_id, product_id, product_name, quantity, unit_price, total_amount, urgency, status, outlet_remarks, sales_officer_id, supplier_id, created_date, updated_date) " +
+                "VALUES (?, NULL, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, ?, NOW(), NOW())",
                 reqCode, productId, product.getBrand() + " " + product.getFlavorVariant(),
                 quantity, unitPrice, totalAmount, urgency,
-                "Sales Officer Buffer Purchase [" + officer.getName() + " - " + area + "]: " + notes,
-                officer.getId()
+                "Sales Officer Buffer Purchase [" + officer.getName() + " - " + area + " via " + supplier.getBusinessName() + "]: " + notes,
+                officer.getId(), supplier.getId()
             );
 
             // Create notification for Supplier

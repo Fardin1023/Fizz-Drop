@@ -1026,15 +1026,21 @@ public class InventoryController {
 
         List<Map<String, Object>> list;
         try {
+            Long currentSupplierId = (sp != null) ? sp.getId() : -1L;
             list = jdbcTemplate.queryForList(
                 "SELECT r.id, r.requisition_code, r.outlet_id, r.product_id, r.product_name, " +
                 "COALESCE(p.category, 'Beverages') AS category, " +
                 "r.quantity, r.unit_price, r.total_amount, r.urgency, r.status, r.sales_officer_id, r.outlet_remarks, r.created_date, r.updated_date, " +
-                "o.outlet_name, o.franchise_name, o.branch_name, o.city, o.area, o.location_address, o.contact_phone, o.district_id " +
+                "o.outlet_name, o.franchise_name, o.branch_name, o.city, o.area, o.sub_route, o.location_address, o.contact_phone, o.district_id " +
                 "FROM outlet_requisitions r " +
                 "LEFT JOIN outlets o ON r.outlet_id = o.outlet_id " +
                 "LEFT JOIN products p ON r.product_id = p.product_id " +
-                "ORDER BY r.created_date DESC LIMIT 100"
+                "LEFT JOIN psr_orders po ON r.requisition_code = po.order_code " +
+                "WHERE (COALESCE(r.supplier_id, po.supplier_id) = ? OR (r.supplier_id IS NULL AND po.supplier_id IS NULL AND r.sales_officer_id IN (" +
+                "    SELECT so.id FROM sales_officers so WHERE so.supplier_id = ? OR FIND_IN_SET(?, so.allocated_supplier_ids) > 0" +
+                "))) " +
+                "ORDER BY r.created_date DESC LIMIT 100",
+                currentSupplierId, currentSupplierId, String.valueOf(currentSupplierId)
             );
         } catch (Exception e) {
             return ResponseEntity.ok(Collections.emptyList());
@@ -1046,7 +1052,13 @@ public class InventoryController {
             distStockMap.put(di.getDistrictId() + "_" + di.getProductId(), di.getCurrentStock());
         }
 
-        List<SalesOfficer> officers = (sp != null) ? salesOfficerRepository.findBySupplierId(sp.getId()) : Collections.emptyList();
+        final Long currentSpId = (sp != null) ? sp.getId() : null;
+        List<SalesOfficer> officers = (currentSpId != null)
+                ? salesOfficerRepository.findAll().stream()
+                    .filter(so -> (so.getSupplierId() != null && so.getSupplierId().equals(currentSpId))
+                            || (so.getAllocatedSupplierIds() != null && Arrays.asList(so.getAllocatedSupplierIds().split(",")).contains(String.valueOf(currentSpId))))
+                    .collect(Collectors.toList())
+                : Collections.emptyList();
 
         List<Map<String, Object>> response = new ArrayList<>();
         for (Map<String, Object> row : list) {
@@ -1056,10 +1068,35 @@ public class InventoryController {
             boolean isSoPurchase = reqCode.startsWith("SO-REQ-") || row.get("outlet_id") == null;
             map.put("is_so_purchase", isSoPurchase);
 
-            // Calculate supplier's available depot stock for this product
+            // Calculate supplier's individual available depot stock for this product
             int availableStock = 0;
-            for (Long distId : districtIds) {
-                availableStock += distStockMap.getOrDefault(distId + "_" + prodId, 0);
+            if (sp != null && sp.getId().equals(1L)) {
+                for (Long distId : districtIds) {
+                    availableStock += distStockMap.getOrDefault(distId + "_" + prodId, 0);
+                }
+            } else if (sp != null) {
+                int purchased = 0;
+                try {
+                    Integer pCases = jdbcTemplate.queryForObject(
+                        "SELECT COALESCE(SUM(CASE WHEN approved_quantity > 0 THEN approved_quantity ELSE requested_quantity END), 0) " +
+                        "FROM stock_requisition_items sri JOIN stock_requisitions sr ON sri.requisition_id = sr.id " +
+                        "WHERE sr.supplier_id = ? AND sri.product_id = ? AND sr.status IN ('APPROVED', 'COMPLETED', 'DISPATCHED')",
+                        Integer.class, sp.getId(), prodId
+                    );
+                    purchased = (pCases != null) ? pCases : 0;
+                } catch (Exception ignored) {}
+
+                int sold = 0;
+                try {
+                    Integer sCases = jdbcTemplate.queryForObject(
+                        "SELECT COALESCE(SUM(quantity), 0) FROM outlet_requisitions " +
+                        "WHERE supplier_id = ? AND product_id = ? AND status IN ('DISPATCHED', 'FULFILLED', 'DELIVERED', 'COMPLETED')",
+                        Integer.class, sp.getId(), prodId
+                    );
+                    sold = (sCases != null) ? sCases : 0;
+                } catch (Exception ignored) {}
+
+                availableStock = Math.max(0, purchased - sold);
             }
             map.put("supplier_available_stock", availableStock);
 
@@ -1086,6 +1123,11 @@ public class InventoryController {
                 map.put("franchise_name", "Sales Officer Stock Buffer");
                 map.put("area", soArea);
                 map.put("city", (matchedSO != null && matchedSO.getCity() != null) ? matchedSO.getCity() : "Dhaka");
+            } else {
+                String subRoute = (row.get("sub_route") != null && !row.get("sub_route").toString().trim().isEmpty())
+                        ? row.get("sub_route").toString().trim()
+                        : ((row.get("area") != null && !row.get("area").toString().trim().isEmpty()) ? row.get("area").toString().trim() + " Sub-Route" : "Main Territory Route");
+                map.put("sub_route", subRoute);
             }
 
             int soPurchasedStock = 0;
@@ -1243,9 +1285,10 @@ public class InventoryController {
 
             BigDecimal unitPrice = reqRow.get("unit_price") != null ? new BigDecimal(reqRow.get("unit_price").toString()) : (product.getOutletPrice() != null ? product.getOutletPrice() : BigDecimal.ZERO);
             BigDecimal totalAmt = unitPrice.multiply(BigDecimal.valueOf(dispatchQty));
+            Long fulfillerSupplierId = (sp != null) ? sp.getId() : null;
             jdbcTemplate.update(
-                "UPDATE outlet_requisitions SET status = 'DISPATCHED', quantity = ?, unit_price = ?, total_amount = ?, updated_date = NOW() WHERE id = ?",
-                dispatchQty, unitPrice, totalAmt, id
+                "UPDATE outlet_requisitions SET status = 'DISPATCHED', quantity = ?, unit_price = ?, total_amount = ?, supplier_id = COALESCE(supplier_id, ?), updated_date = NOW() WHERE id = ?",
+                dispatchQty, unitPrice, totalAmt, fulfillerSupplierId, id
             );
 
             // Record transaction ledger for Supplier
@@ -1348,36 +1391,45 @@ public class InventoryController {
         try {
             // 1. Resolve Supplier & District
             SupplierProfile supplier = null;
-            if (userId != null) {
+            if (userId != null && userId > 0) {
                 supplier = supplierProfileRepository.findByUserId(userId).orElse(null);
             }
-            if (supplier == null && supplierId != null) {
+            if (supplier == null && supplierId != null && supplierId > 0) {
                 supplier = supplierProfileRepository.findById(supplierId).orElse(null);
             }
-            if (supplier == null) {
+            if (supplier == null && userId == null && supplierId == null) {
                 supplier = supplierProfileRepository.findAll().stream().findFirst().orElse(null);
             }
             Long districtId = (supplier != null && supplier.getPrimaryDistrictId() != null) ? supplier.getPrimaryDistrictId() : 1L;
+            final Long currentSupplierId = (supplier != null) ? supplier.getId() : -1L;
 
             // 2. Fetch all products
             List<Product> products = productRepository.findAll();
 
-            // 3. Fetch all Sales Officers
-            List<SalesOfficer> officers = salesOfficerRepository.findAll();
+            // 3. Fetch Sales Officers assigned or allocated to THIS supplier
+            List<SalesOfficer> officers = (supplier != null)
+                ? salesOfficerRepository.findAll().stream()
+                    .filter(so -> (so.getSupplierId() != null && so.getSupplierId().equals(currentSupplierId))
+                            || (so.getAllocatedSupplierIds() != null && Arrays.asList(so.getAllocatedSupplierIds().split(",")).contains(String.valueOf(currentSupplierId))))
+                    .collect(Collectors.toList())
+                : Collections.emptyList();
 
-            // 4. Query sold requisitions (fulfilled by supplier to SO / outlets)
-            List<Map<String, Object>> soldRequisitions = jdbcTemplate.queryForList(
+            // 4. Query sold requisitions (fulfilled by THIS supplier to SO / outlets)
+            List<Map<String, Object>> soldRequisitions = (supplier != null) ? jdbcTemplate.queryForList(
                 "SELECT r.id, r.requisition_code, r.product_id, r.product_name, r.quantity, r.unit_price, r.total_amount, " +
                 "r.sales_officer_id, r.outlet_id, r.status, r.created_date, r.updated_date, " +
                 "o.outlet_name, o.branch_name, o.area, o.sub_route " +
                 "FROM outlet_requisitions r " +
                 "LEFT JOIN outlets o ON r.outlet_id = o.outlet_id " +
-                "WHERE r.status IN ('DISPATCHED', 'FULFILLED', 'DELIVERED', 'COMPLETED') " +
-                "ORDER BY r.updated_date DESC, r.created_date DESC"
-            );
+                "WHERE (r.supplier_id = ? OR (r.supplier_id IS NULL AND r.sales_officer_id IN (" +
+                "    SELECT so.id FROM sales_officers so WHERE so.supplier_id = ? OR FIND_IN_SET(?, so.allocated_supplier_ids) > 0" +
+                "))) AND r.status IN ('DISPATCHED', 'FULFILLED', 'DELIVERED', 'COMPLETED') " +
+                "ORDER BY r.updated_date DESC, r.created_date DESC",
+                currentSupplierId, currentSupplierId, String.valueOf(currentSupplierId)
+            ) : Collections.emptyList();
 
-            // 5. Query all outlet distributions (dispatched from SO to Outlets)
-            List<Map<String, Object>> distributions = jdbcTemplate.queryForList(
+            // 5. Query all outlet distributions (dispatched from SO to Outlets for THIS supplier)
+            List<Map<String, Object>> distributions = (supplier != null) ? jdbcTemplate.queryForList(
                 "SELECT d.id, d.sales_officer_id, d.outlet_id, d.product_id, d.quantity, " +
                 "d.cost_price, d.sale_price, d.total_cost, d.total_revenue, d.profit_earned, " +
                 "d.notes, d.distribution_date, " +
@@ -1386,16 +1438,26 @@ public class InventoryController {
                 "FROM sales_officer_distributions d " +
                 "LEFT JOIN outlets o ON d.outlet_id = o.outlet_id " +
                 "LEFT JOIN products p ON d.product_id = p.product_id " +
-                "ORDER BY d.distribution_date DESC"
-            );
+                "WHERE (d.notes IS NOT NULL AND (" +
+                "    EXISTS (SELECT 1 FROM supplier_delivery_dispatches sdd WHERE d.notes LIKE CONCAT('%', sdd.dispatch_code, '%') AND sdd.supplier_id = ?) " +
+                "    OR EXISTS (SELECT 1 FROM outlet_requisitions req WHERE d.notes LIKE CONCAT('%', req.requisition_code, '%') AND req.supplier_id = ?)" +
+                ")) " +
+                "ORDER BY d.distribution_date DESC",
+                currentSupplierId, currentSupplierId
+            ) : Collections.emptyList();
 
-            // 6. Query dispatched PSR orders
-            List<Map<String, Object>> psrDispatchedOrders = jdbcTemplate.queryForList(
+            // 6. Query dispatched PSR orders for THIS supplier
+            List<Map<String, Object>> psrDispatchedOrders = (supplier != null) ? jdbcTemplate.queryForList(
                 "SELECT id, order_code, psr_id, psr_name, sales_officer_id, outlet_id, outlet_name, sub_route, " +
                 "product_id, product_name, quantity, unit_price, total_amount, urgency, status, updated_at " +
-                "FROM psr_orders WHERE status = 'DISPATCHED' " +
-                "ORDER BY updated_at DESC"
-            );
+                "FROM psr_orders WHERE status = 'DISPATCHED' AND (" +
+                "    supplier_id = ? OR (supplier_id IS NULL AND sales_officer_id IN (" +
+                "        SELECT so.id FROM sales_officers so WHERE so.supplier_id = ? OR FIND_IN_SET(?, so.allocated_supplier_ids) > 0" +
+                "    ))" +
+                ") " +
+                "ORDER BY updated_at DESC",
+                currentSupplierId, currentSupplierId, String.valueOf(currentSupplierId)
+            ) : Collections.emptyList();
 
             // 7. Calculate Aggregates
             int totalSoldUnits = 0;
@@ -1454,6 +1516,16 @@ public class InventoryController {
                 }
             }
 
+            // Calculate sold quantity per product by this supplier
+            Map<Long, Integer> supplierSoldPerProduct = new HashMap<>();
+            for (Map<String, Object> req : soldRequisitions) {
+                if (req.get("product_id") != null) {
+                    Long pid = ((Number) req.get("product_id")).longValue();
+                    int q = req.get("quantity") != null ? ((Number) req.get("quantity")).intValue() : 0;
+                    supplierSoldPerProduct.put(pid, supplierSoldPerProduct.getOrDefault(pid, 0) + q);
+                }
+            }
+
             // Build Superadmin Purchased Inventory breakdown
             List<Map<String, Object>> superadminPurchasedInventory = new ArrayList<>();
             int totalPurchasedFromSuperadminCases = 0;
@@ -1464,7 +1536,16 @@ public class InventoryController {
 
             for (Product p : products) {
                 int purchased = superadminPurchasedMap.getOrDefault(p.getProductId(), 0);
-                int depotStock = districtStockMap.getOrDefault(p.getProductId(), 0);
+                int soldQty = supplierSoldPerProduct.getOrDefault(p.getProductId(), 0);
+                int depotStock;
+                if (supplier != null && supplier.getId().equals(1L)) {
+                    // Legacy initial depot inventory seeded for Dhaka Metropolitan Hub
+                    depotStock = districtStockMap.getOrDefault(p.getProductId(), 0);
+                } else {
+                    // For individual suppliers, depot stock is what they have purchased from Superadmin minus what they sold
+                    depotStock = Math.max(0, purchased - soldQty);
+                }
+
                 String cat = p.getCategory() != null && !p.getCategory().trim().isEmpty() ? p.getCategory().trim() : "Beverages";
 
                 Map<String, Object> item = new HashMap<>();
@@ -1512,8 +1593,14 @@ public class InventoryController {
                 pm.put("remaining_quantity", 0);
                 pm.put("fulfillment_pct", 0.0);
 
-                int depotStock = districtStockMap.getOrDefault(p.getProductId(), 0);
                 int superadminPurchased = superadminPurchasedMap.getOrDefault(p.getProductId(), 0);
+                int soldQty = supplierSoldPerProduct.getOrDefault(p.getProductId(), 0);
+                int depotStock;
+                if (supplier != null && supplier.getId().equals(1L)) {
+                    depotStock = districtStockMap.getOrDefault(p.getProductId(), 0);
+                } else {
+                    depotStock = Math.max(0, superadminPurchased - soldQty);
+                }
                 pm.put("depot_stock", depotStock);
                 pm.put("superadmin_purchased_stock", superadminPurchased);
 
@@ -1560,7 +1647,7 @@ public class InventoryController {
                 double pct = sold > 0 ? Math.min(100.0, ((double) dispatched / sold) * 100.0) : 0.0;
                 pm.put("remaining_quantity", rem);
                 pm.put("fulfillment_pct", Math.round(pct * 10.0) / 10.0);
-                if (sold > 0 || dispatched > 0 || ((int) pm.get("depot_stock")) > 0) {
+                if (sold > 0 || dispatched > 0 || ((int) pm.get("depot_stock")) > 0 || ((int) pm.get("superadmin_purchased_stock")) > 0) {
                     productBreakdown.add(pm);
                 }
             }
@@ -1623,6 +1710,11 @@ public class InventoryController {
             }
 
             // Summary Map
+            int activeCategoriesCount = (int) categoryPurchasedCases.values().stream().filter(c -> c > 0).count();
+            if (activeCategoriesCount == 0 && currentTotalDepotStock > 0) {
+                activeCategoriesCount = (int) categoryDepotStock.values().stream().filter(c -> c > 0).count();
+            }
+
             Map<String, Object> summary = new HashMap<>();
             summary.put("total_sold_units", totalSoldUnits);
             summary.put("total_sold_value", totalSoldValue);
@@ -1633,17 +1725,19 @@ public class InventoryController {
             summary.put("total_purchased_from_superadmin_cases", totalPurchasedFromSuperadminCases);
             summary.put("total_purchased_from_superadmin_value", totalPurchasedFromSuperadminValue);
             summary.put("current_total_depot_stock", currentTotalDepotStock);
-            summary.put("categories_count", categoryPurchasedCases.size());
+            summary.put("categories_count", activeCategoriesCount);
 
             Map<String, Object> response = new HashMap<>();
             response.put("summary", summary);
             response.put("product_breakdown", productBreakdown);
             response.put("superadmin_purchased_inventory", superadminPurchasedInventory);
-            response.put("category_breakdown", categoryPurchasedCases.entrySet().stream().map(e -> Map.of(
-                "category", e.getKey(),
-                "total_purchased_cases", e.getValue(),
-                "current_depot_stock", categoryDepotStock.getOrDefault(e.getKey(), 0)
-            )).toList());
+            response.put("category_breakdown", categoryPurchasedCases.entrySet().stream()
+                .filter(e -> e.getValue() > 0 || categoryDepotStock.getOrDefault(e.getKey(), 0) > 0)
+                .map(e -> Map.of(
+                    "category", e.getKey(),
+                    "total_purchased_cases", e.getValue(),
+                    "current_depot_stock", categoryDepotStock.getOrDefault(e.getKey(), 0)
+                )).toList());
             response.put("officer_breakdown", officerBreakdown);
             response.put("recent_dispatches", distributions);
             response.put("dispatched_psr_orders", psrDispatchedOrders);

@@ -38,6 +38,15 @@ public class DataInitializer {
             } catch (Exception ignored) {}
 
             try {
+                jdbcTemplate.execute("ALTER TABLE sales_officers ADD COLUMN allocated_supplier_ids VARCHAR(500) NULL");
+            } catch (Exception ignored) {}
+
+            try {
+                // Ensure all existing active suppliers (e.g. 1,37) are allocated to existing SOs if unset
+                jdbcTemplate.execute("UPDATE sales_officers SET allocated_supplier_ids = '1,37' WHERE allocated_supplier_ids IS NULL OR allocated_supplier_ids = ''");
+            } catch (Exception ignored) {}
+
+            try {
                 jdbcTemplate.execute("ALTER TABLE outlet_requisitions ADD COLUMN sales_officer_id BIGINT NULL");
             } catch (Exception ignored) {}
 
@@ -101,6 +110,34 @@ public class DataInitializer {
             } catch (Exception ignored) {}
             try {
                 jdbcTemplate.execute("ALTER TABLE pre_sales_officers ADD COLUMN target_notes VARCHAR(255) NULL");
+            } catch (Exception ignored) {}
+            try {
+                jdbcTemplate.execute("ALTER TABLE pre_sales_officers ADD COLUMN targets_json TEXT NULL");
+            } catch (Exception ignored) {}
+            try {
+                jdbcTemplate.execute("ALTER TABLE pre_sales_officers ADD COLUMN supplier_id BIGINT NULL");
+            } catch (Exception ignored) {}
+            try {
+                jdbcTemplate.execute("ALTER TABLE pre_sales_officers ADD COLUMN supplier_name VARCHAR(150) NULL");
+            } catch (Exception ignored) {}
+            try {
+                jdbcTemplate.execute("ALTER TABLE psr_orders ADD COLUMN supplier_id BIGINT NULL");
+            } catch (Exception ignored) {}
+            try {
+                jdbcTemplate.execute("ALTER TABLE psr_orders ADD COLUMN supplier_name VARCHAR(150) NULL");
+            } catch (Exception ignored) {}
+            try {
+                jdbcTemplate.execute("ALTER TABLE outlet_requisitions ADD COLUMN supplier_id BIGINT NULL");
+            } catch (Exception ignored) {}
+
+            try {
+                jdbcTemplate.execute("UPDATE pre_sales_officers SET supplier_id = 1, supplier_name = 'Dhaka Metropolitan & Central Beverage Logistics Hub' WHERE supplier_id IS NULL");
+            } catch (Exception ignored) {}
+            try {
+                jdbcTemplate.execute("UPDATE psr_orders SET supplier_id = 1, supplier_name = 'Dhaka Metropolitan & Central Beverage Logistics Hub' WHERE supplier_id IS NULL");
+            } catch (Exception ignored) {}
+            try {
+                jdbcTemplate.execute("UPDATE outlet_requisitions SET supplier_id = 1 WHERE supplier_id IS NULL");
             } catch (Exception ignored) {}
 
             try {
@@ -263,6 +300,164 @@ public class DataInitializer {
             } catch (Exception ignored) {}
             try {
                 jdbcTemplate.execute("ALTER TABLE supplier_delivery_dispatches ADD COLUMN total_profit_earned DECIMAL(12,2) NOT NULL DEFAULT 0.00");
+            } catch (Exception ignored) {}
+
+            // ==========================================
+            // 6 DIVISIONS & 64 DISTRICTS DISTRIBUTION
+            // 6 REGIONAL SALES MANAGERS (RSM)
+            // 64 AREA SALES MANAGERS (ASM)
+            // ==========================================
+            try {
+                jdbcTemplate.execute("UPDATE districts SET division = 'Dhaka' WHERE division = 'Mymensingh'");
+                jdbcTemplate.execute("UPDATE districts SET division = 'Rajshahi' WHERE division = 'Rangpur'");
+                jdbcTemplate.execute("UPDATE districts SET division = 'Barishal' WHERE division = 'Barisal'");
+            } catch (Exception ignored) {}
+
+            // Regional Sales Managers (RSM) Table - 6 Divisions
+            try {
+                jdbcTemplate.execute(
+                    "CREATE TABLE IF NOT EXISTS regional_sales_managers (" +
+                    "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
+                    "code VARCHAR(50) NOT NULL UNIQUE, " +
+                    "name VARCHAR(150) NOT NULL, " +
+                    "email VARCHAR(100) NOT NULL UNIQUE, " +
+                    "phone VARCHAR(50) NOT NULL, " +
+                    "division VARCHAR(100) NOT NULL UNIQUE, " +
+                    "target_sales DECIMAL(15,2) NOT NULL DEFAULT 15000000.00, " +
+                    "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP" +
+                    ")"
+                );
+            } catch (Exception ignored) {}
+
+            // Area Sales Managers (ASM) Table - 64 Districts under RSM
+            try {
+                jdbcTemplate.execute(
+                    "CREATE TABLE IF NOT EXISTS area_sales_managers (" +
+                    "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
+                    "code VARCHAR(50) NOT NULL UNIQUE, " +
+                    "name VARCHAR(150) NOT NULL, " +
+                    "email VARCHAR(100) NOT NULL UNIQUE, " +
+                    "phone VARCHAR(50) NOT NULL, " +
+                    "district_id BIGINT NOT NULL, " +
+                    "district_name VARCHAR(100) NOT NULL, " +
+                    "division VARCHAR(100) NOT NULL, " +
+                    "rsm_id BIGINT NOT NULL, " +
+                    "target_sales DECIMAL(15,2) NOT NULL DEFAULT 2500000.00, " +
+                    "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, " +
+                    "INDEX idx_asm_rsm (rsm_id), " +
+                    "INDEX idx_asm_district (district_id), " +
+                    "INDEX idx_asm_division (division)" +
+                    ")"
+                );
+            } catch (Exception ignored) {}
+
+            // Sales Manager Reports Table (ASM to RSM reports & aggregated insights)
+            try {
+                jdbcTemplate.execute(
+                    "CREATE TABLE IF NOT EXISTS sales_manager_reports (" +
+                    "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
+                    "report_type VARCHAR(50) NOT NULL DEFAULT 'ASM_TO_RSM', " +
+                    "asm_id BIGINT NOT NULL, " +
+                    "rsm_id BIGINT NOT NULL, " +
+                    "district_id BIGINT NOT NULL, " +
+                    "district_name VARCHAR(100) NOT NULL, " +
+                    "division VARCHAR(100) NOT NULL, " +
+                    "reporting_period VARCHAR(50) NOT NULL, " +
+                    "total_sales_cases INT NOT NULL DEFAULT 0, " +
+                    "total_revenue DECIMAL(15,2) NOT NULL DEFAULT 0.00, " +
+                    "overall_profit DECIMAL(15,2) NOT NULL DEFAULT 0.00, " +
+                    "overall_loss DECIMAL(15,2) NOT NULL DEFAULT 0.00, " +
+                    "so_count INT NOT NULL DEFAULT 0, " +
+                    "active_orders_count INT NOT NULL DEFAULT 0, " +
+                    "product_demands_json TEXT, " +
+                    "so_activities_json TEXT, " +
+                    "notes TEXT, " +
+                    "status VARCHAR(50) NOT NULL DEFAULT 'SUBMITTED', " +
+                    "submitted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, " +
+                    "INDEX idx_smr_asm (asm_id), " +
+                    "INDEX idx_smr_rsm (rsm_id), " +
+                    "INDEX idx_smr_period (reporting_period)" +
+                    ")"
+                );
+            } catch (Exception ignored) {}
+
+            try {
+                jdbcTemplate.execute("ALTER TABLE sales_officers ADD COLUMN asm_id BIGINT NULL");
+            } catch (Exception ignored) {}
+
+            // Seed 6 Regional Sales Managers if empty
+            try {
+                Integer rsmCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM regional_sales_managers", Integer.class);
+                if (rsmCount == null || rsmCount == 0) {
+                    jdbcTemplate.update("INSERT INTO regional_sales_managers (code, name, email, phone, division, target_sales) VALUES (?, ?, ?, ?, ?, ?)",
+                            "RSM-DHA-01", "Kazi Tariqul Islam", "rsm.dhaka@fizzdrop.com", "+8801711-100201", "Dhaka", new java.math.BigDecimal("15000000.00"));
+                    jdbcTemplate.update("INSERT INTO regional_sales_managers (code, name, email, phone, division, target_sales) VALUES (?, ?, ?, ?, ?, ?)",
+                            "RSM-CTG-02", "Mohammad Rafiqul Alam", "rsm.ctg@fizzdrop.com", "+8801711-100202", "Chittagong", new java.math.BigDecimal("12000000.00"));
+                    jdbcTemplate.update("INSERT INTO regional_sales_managers (code, name, email, phone, division, target_sales) VALUES (?, ?, ?, ?, ?, ?)",
+                            "RSM-RAJ-03", "Asif Mahmud Chowdhury", "rsm.rajshahi@fizzdrop.com", "+8801711-100203", "Rajshahi", new java.math.BigDecimal("14000000.00"));
+                    jdbcTemplate.update("INSERT INTO regional_sales_managers (code, name, email, phone, division, target_sales) VALUES (?, ?, ?, ?, ?, ?)",
+                            "RSM-KHU-04", "Shahriar Kabir", "rsm.khulna@fizzdrop.com", "+8801711-100204", "Khulna", new java.math.BigDecimal("10000000.00"));
+                    jdbcTemplate.update("INSERT INTO regional_sales_managers (code, name, email, phone, division, target_sales) VALUES (?, ?, ?, ?, ?, ?)",
+                            "RSM-BAR-05", "Mahbubur Rahman", "rsm.barishal@fizzdrop.com", "+8801711-100205", "Barishal", new java.math.BigDecimal("7000000.00"));
+                    jdbcTemplate.update("INSERT INTO regional_sales_managers (code, name, email, phone, division, target_sales) VALUES (?, ?, ?, ?, ?, ?)",
+                            "RSM-SYL-06", "Syed Tanvir Ahmed", "rsm.sylhet@fizzdrop.com", "+8801711-100206", "Sylhet", new java.math.BigDecimal("6000000.00"));
+                    System.out.println("[DataInitializer] 6 Regional Sales Managers (RSM) created for 6 divisions.");
+                }
+            } catch (Exception e) {
+                System.err.println("[DataInitializer] Error seeding RSMs: " + e.getMessage());
+            }
+
+            // Seed 64 Area Sales Managers (ASM) - 1 for each of the 64 districts
+            try {
+                Integer asmCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM area_sales_managers", Integer.class);
+                if (asmCount == null || asmCount == 0) {
+                    java.util.List<java.util.Map<String, Object>> districtRows = jdbcTemplate.queryForList("SELECT id, name, division FROM districts ORDER BY division, id");
+                    java.util.List<java.util.Map<String, Object>> rsmRows = jdbcTemplate.queryForList("SELECT id, division FROM regional_sales_managers");
+                    java.util.Map<String, Long> rsmDivMap = new java.util.HashMap<>();
+                    for (java.util.Map<String, Object> r : rsmRows) {
+                        rsmDivMap.put(r.get("division").toString().toLowerCase(), ((Number) r.get("id")).longValue());
+                    }
+
+                    String[] asmFirstNames = {
+                        "Tanvir", "Sajjad", "Farhan", "Rashed", "Naimur", "Zahid", "Kamrul", "Nazmul", "Arifur",
+                        "Mustafizur", "Habibur", "Shafiqul", "Enamul", "Mahfuzur", "Moshiur", "Ashraful", "Shakil",
+                        "Imran", "Mehedi", "Faisal", "Tawhid", "Shahadat", "Rokon", "Jubair", "Aminul", "Babar"
+                    };
+                    String[] asmLastNames = {
+                        "Hassan", "Hossain", "Rahman", "Ahmed", "Islam", "Khan", "Karim", "Sikder", "Molla",
+                        "Chowdhury", "Talukder", "Bhuiyan", "Sarker", "Majumder", "Howlader", "Mia", "Uddin"
+                    };
+
+                    int idx = 1;
+                    for (java.util.Map<String, Object> dist : districtRows) {
+                        Long distId = ((Number) dist.get("id")).longValue();
+                        String distName = dist.get("name").toString();
+                        String division = dist.get("division").toString();
+                        Long rsmId = rsmDivMap.getOrDefault(division.toLowerCase(), 1L);
+
+                        String code = String.format("ASM-%s-%02d", division.substring(0, Math.min(3, division.length())).toUpperCase(), idx);
+                        String fName = asmFirstNames[(idx * 3) % asmFirstNames.length];
+                        String lName = asmLastNames[(idx * 5) % asmLastNames.length];
+                        String name = fName + " " + lName;
+                        String cleanDist = distName.toLowerCase().replaceAll("[^a-z0-9]", "");
+                        String email = "asm." + cleanDist + "@fizzdrop.com";
+                        String phone = String.format("+88017%02d-%06d", (idx % 80) + 10, (idx * 11451) % 900000 + 100000);
+
+                        jdbcTemplate.update(
+                            "INSERT INTO area_sales_managers (code, name, email, phone, district_id, district_name, division, rsm_id, target_sales) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                            code, name, email, phone, distId, distName, division, rsmId, new java.math.BigDecimal("2500000.00")
+                        );
+                        idx++;
+                    }
+                    System.out.println("[DataInitializer] 64 Area Sales Managers (ASM) created across 64 districts.");
+                }
+            } catch (Exception e) {
+                System.err.println("[DataInitializer] Error seeding ASMs: " + e.getMessage());
+            }
+
+            // Map Sales Officers to their district ASM
+            try {
+                jdbcTemplate.execute("UPDATE sales_officers so JOIN area_sales_managers asm ON so.district_id = asm.district_id SET so.asm_id = asm.id WHERE so.asm_id IS NULL");
             } catch (Exception ignored) {}
 
             // Pre-Sales Officers and Outlets are cleanly created and assigned by the Superadmin and Sales Officers.

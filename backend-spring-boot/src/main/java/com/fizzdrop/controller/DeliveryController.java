@@ -398,8 +398,44 @@ public class DeliveryController {
             dispatchCode, sId, teamId, subRoute, totalCases, uniqueOutlets.size(), itemsJson, notes
         );
 
+        Long newDispatchId = null;
+        try {
+            newDispatchId = jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+        } catch (Exception ignored) {}
+
         // Update team status to ON_DELIVERY
         jdbcTemplate.update("UPDATE supplier_delivery_teams SET status = 'ON_DELIVERY', updated_at = NOW() WHERE id = ?", teamId);
+
+        // Update assigned outlet requisitions to DISPATCHED
+        for (Map<String, Object> it : items) {
+            if (it.containsKey("requisition_id") && it.get("requisition_id") != null) {
+                try {
+                    Long reqId = Long.parseLong(it.get("requisition_id").toString());
+                    jdbcTemplate.update(
+                        "UPDATE outlet_requisitions SET status = 'DISPATCHED', admin_supplier_notes = ?, updated_date = NOW() WHERE id = ?",
+                        "Assigned to Delivery Fleet (" + dispatchCode + ")", reqId
+                    );
+                } catch (Exception ignored) {}
+            }
+            if (it.containsKey("requisition_code") && it.get("requisition_code") != null) {
+                try {
+                    String rCode = it.get("requisition_code").toString();
+                    jdbcTemplate.update(
+                        "UPDATE psr_orders SET status = 'DISPATCHED', updated_at = NOW() WHERE order_code = ?",
+                        rCode
+                    );
+                } catch (Exception ignored) {}
+            }
+        }
+
+        // Fetch team details for response
+        Map<String, Object> teamInfo = null;
+        try {
+            List<Map<String, Object>> tRows = jdbcTemplate.queryForList(
+                "SELECT team_name, vehicle_registration_no, driver_name FROM supplier_delivery_teams WHERE id = ?", teamId
+            );
+            if (!tRows.isEmpty()) teamInfo = tRows.get(0);
+        } catch (Exception ignored) {}
 
         // Notify outlets in this trip
         for (Object outIdObj : uniqueOutlets) {
@@ -425,15 +461,23 @@ public class DeliveryController {
                 "Vehicle dispatched for subroute '" + subRoute + "' with " + totalCases + " cases across " + uniqueOutlets.size() + " stores. Live map tracking active.",
                 "SO_FLEET_DISPATCHED",
                 dispatchCode,
-                null
+                newDispatchId
             );
         } catch (Exception ignored) {}
 
-        return ResponseEntity.ok(Map.of(
-            "success", true,
-            "dispatch_code", dispatchCode,
-            "message", "Successfully dispatched delivery vehicle on route '" + subRoute + "' with " + totalCases + " cases assigned to " + uniqueOutlets.size() + " outlets!"
-        ));
+        Map<String, Object> respMap = new HashMap<>();
+        respMap.put("success", true);
+        respMap.put("dispatch_id", newDispatchId);
+        respMap.put("dispatch_code", dispatchCode);
+        respMap.put("delivery_team_id", teamId);
+        if (teamInfo != null) {
+            respMap.put("team_name", teamInfo.get("team_name"));
+            respMap.put("vehicle_registration_no", teamInfo.get("vehicle_registration_no"));
+            respMap.put("driver_name", teamInfo.get("driver_name"));
+        }
+        respMap.put("message", "Successfully dispatched delivery vehicle on route '" + subRoute + "' with " + totalCases + " cases assigned to " + uniqueOutlets.size() + " outlets!");
+
+        return ResponseEntity.ok(respMap);
     }
 
     @PutMapping("/dispatches/{id}/status")

@@ -36,6 +36,8 @@ export interface PsrItem {
   sales_officer_id: number;
   sales_officer_name?: string;
   sales_officer_code?: string;
+  supplier_id?: number;
+  supplier_name?: string;
   sub_route: string;
   assigned_area: string;
   status: string;
@@ -54,14 +56,25 @@ export interface SalesOfficerOption {
   city: string;
   phone: string;
   email?: string;
+  supplier_id?: number;
+}
+
+export interface SupplierOption {
+  id: number;
+  business_name: string;
+  division_name?: string;
+  depot_address?: string;
+  phone_number?: string;
 }
 
 export const SuperadminPsrManagement: React.FC = () => {
   const [psrs, setPsrs] = useState<PsrItem[]>([]);
   const [salesOfficers, setSalesOfficers] = useState<SalesOfficerOption[]>([]);
+  const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedOfficerFilter, setSelectedOfficerFilter] = useState('ALL');
+  const [selectedSupplierFilter, setSelectedSupplierFilter] = useState('ALL');
   const [selectedAreaFilter, setSelectedAreaFilter] = useState('ALL');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState('ALL');
 
@@ -79,20 +92,23 @@ export const SuperadminPsrManagement: React.FC = () => {
   const [formPassword, setFormPassword] = useState('Psr123!');
   const [formPhone, setFormPhone] = useState('');
   const [formSalesOfficerId, setFormSalesOfficerId] = useState<number | string>('');
+  const [formSupplierId, setFormSupplierId] = useState<number | string>('');
   const [formArea, setFormArea] = useState('');
   const [formSubRoute, setFormSubRoute] = useState('');
   const [formNotes, setFormNotes] = useState('');
 
-  // Reassign Sales Officer Quick Modal
+  // Reassign Quick Modal
   const [reassignModalPsr, setReassignModalPsr] = useState<PsrItem | null>(null);
   const [reassignTargetOfficerId, setReassignTargetOfficerId] = useState<number | string>('');
+  const [reassignTargetSupplierId, setReassignTargetSupplierId] = useState<number | string>('');
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [psrRes, soRes] = await Promise.all([
+      const [psrRes, soRes, supRes] = await Promise.all([
         fetch('http://localhost:8080/api/v1/psr/all'),
         fetch('http://localhost:8080/api/v1/sales-officers'),
+        fetch('http://localhost:8080/api/v1/suppliers'),
       ]);
 
       if (psrRes.ok) {
@@ -105,6 +121,14 @@ export const SuperadminPsrManagement: React.FC = () => {
         if (soData.length > 0 && !formSalesOfficerId) {
           setFormSalesOfficerId(soData[0].id);
           setFormArea(soData[0].assigned_area);
+        }
+      }
+      if (supRes.ok) {
+        const supData = await supRes.json();
+        const supArr = Array.isArray(supData) ? supData : [];
+        setSuppliers(supArr);
+        if (supArr.length > 0 && !formSupplierId) {
+          setFormSupplierId(supArr[0].id);
         }
       }
     } catch (err) {
@@ -127,6 +151,8 @@ export const SuperadminPsrManagement: React.FC = () => {
     const defaultSo = salesOfficers[0];
     setFormSalesOfficerId(defaultSo ? defaultSo.id : '');
     setFormArea(defaultSo ? defaultSo.assigned_area : '');
+    const defaultSup = suppliers[0];
+    setFormSupplierId(defaultSup ? defaultSup.id : '');
     setFormSubRoute('');
     setFormNotes('');
     setErrorMsg(null);
@@ -141,6 +167,7 @@ export const SuperadminPsrManagement: React.FC = () => {
     setFormPassword('');
     setFormPhone(psr.phone);
     setFormSalesOfficerId(psr.sales_officer_id);
+    setFormSupplierId(psr.supplier_id || (suppliers[0] ? suppliers[0].id : ''));
     setFormArea(psr.assigned_area);
     setFormSubRoute(psr.sub_route);
     setFormNotes(psr.notes || '');
@@ -154,13 +181,16 @@ export const SuperadminPsrManagement: React.FC = () => {
     const so = salesOfficers.find((o) => String(o.id) === String(officerId));
     if (so) {
       setFormArea(so.assigned_area);
+      if (so.supplier_id && !formSupplierId) {
+        setFormSupplierId(so.supplier_id);
+      }
     }
   };
 
   const handleSavePsr = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formName.trim() || !formPhone.trim() || !formEmail.trim() || !formSalesOfficerId || !formSubRoute.trim()) {
-      setErrorMsg('Please complete all required fields (Name, Phone, Email, Sales Officer, Sub-Route).');
+    if (!formName.trim() || !formPhone.trim() || !formEmail.trim() || !formSalesOfficerId || !formSupplierId || !formSubRoute.trim()) {
+      setErrorMsg('Please complete all required fields (Name, Phone, Email, Sales Officer, Wholesale Supplier, Sub-Route).');
       return;
     }
 
@@ -173,6 +203,7 @@ export const SuperadminPsrManagement: React.FC = () => {
       phone: formPhone.trim(),
       email: formEmail.trim().toLowerCase(),
       sales_officer_id: Number(formSalesOfficerId),
+      supplier_id: Number(formSupplierId),
       sub_route: formSubRoute.trim(),
       assigned_area: formArea.trim(),
       notes: formNotes.trim(),
@@ -200,8 +231,8 @@ export const SuperadminPsrManagement: React.FC = () => {
 
       setSuccessMsg(
         editingPsr
-          ? `PSR account for ${formName} successfully updated & assigned!`
-          : `New PSR account created & assigned to Sales Officer successfully!`
+          ? `PSR account for ${formName} successfully updated & allocated to SO and Supplier!`
+          : `New PSR account created & allocated to Sales Officer and Wholesale Supplier successfully!`
       );
 
       setTimeout(() => {
@@ -215,16 +246,20 @@ export const SuperadminPsrManagement: React.FC = () => {
     }
   };
 
-  // Quick Reassign Sales Officer
+  // Quick Reassign Sales Officer & Supplier
   const handleQuickReassign = async () => {
-    if (!reassignModalPsr || !reassignTargetOfficerId) return;
+    if (!reassignModalPsr) return;
 
     setSubmitting(true);
     try {
+      const payload: any = {};
+      if (reassignTargetOfficerId) payload.sales_officer_id = Number(reassignTargetOfficerId);
+      if (reassignTargetSupplierId) payload.supplier_id = Number(reassignTargetSupplierId);
+
       const res = await fetch(`http://localhost:8080/api/v1/psr/${reassignModalPsr.id}/assign-sales-officer`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sales_officer_id: Number(reassignTargetOfficerId) }),
+        body: JSON.stringify(payload),
       });
 
       const resJson = await res.json();
@@ -233,7 +268,7 @@ export const SuperadminPsrManagement: React.FC = () => {
       setReassignModalPsr(null);
       fetchData();
     } catch (err: any) {
-      alert(err.message || 'Error reassigning Sales Officer');
+      alert(err.message || 'Error reassigning Sales Officer & Supplier');
     } finally {
       setSubmitting(false);
     }
@@ -278,14 +313,16 @@ export const SuperadminPsrManagement: React.FC = () => {
 
       const matchesOfficer =
         selectedOfficerFilter === 'ALL' || String(p.sales_officer_id) === String(selectedOfficerFilter);
+      const matchesSupplier =
+        selectedSupplierFilter === 'ALL' || String(p.supplier_id) === String(selectedSupplierFilter);
       const matchesArea =
         selectedAreaFilter === 'ALL' || p.assigned_area.toLowerCase() === selectedAreaFilter.toLowerCase();
       const matchesStatus =
         selectedStatusFilter === 'ALL' || p.status.toUpperCase() === selectedStatusFilter.toUpperCase();
 
-      return matchesSearch && matchesOfficer && matchesArea && matchesStatus;
+      return matchesSearch && matchesOfficer && matchesSupplier && matchesArea && matchesStatus;
     });
-  }, [psrs, search, selectedOfficerFilter, selectedAreaFilter, selectedStatusFilter]);
+  }, [psrs, search, selectedOfficerFilter, selectedSupplierFilter, selectedAreaFilter, selectedStatusFilter]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -410,6 +447,23 @@ export const SuperadminPsrManagement: React.FC = () => {
               </select>
             </div>
 
+            {/* Filter by Wholesale Supplier */}
+            <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs">
+              <Building2 className="w-3.5 h-3.5 text-indigo-600" />
+              <select
+                value={selectedSupplierFilter}
+                onChange={(e) => setSelectedSupplierFilter(e.target.value)}
+                className="bg-transparent font-medium text-slate-700 focus:outline-none cursor-pointer"
+              >
+                <option value="ALL">All Suppliers</option>
+                {suppliers.map((sup) => (
+                  <option key={sup.id} value={sup.id}>
+                    {sup.business_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* Filter by Area */}
             {distinctAreas.length > 0 && (
               <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs">
@@ -474,6 +528,7 @@ export const SuperadminPsrManagement: React.FC = () => {
                   <th className="p-3">Representative Name</th>
                   <th className="p-3">Contact Info</th>
                   <th className="p-3">Assigned Sales Officer</th>
+                  <th className="p-3">Allocated Supplier</th>
                   <th className="p-3">Designated Sub-Route</th>
                   <th className="p-3">Territory Area</th>
                   <th className="p-3 text-center">Outlets</th>
@@ -529,6 +584,22 @@ export const SuperadminPsrManagement: React.FC = () => {
                       </td>
 
                       <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
+                            <Building2 className="w-3.5 h-3.5" />
+                          </div>
+                          <div>
+                            <span className="font-bold text-slate-900 block truncate max-w-[150px]" title={psr.supplier_name || 'Dhaka Metropolitan'}>
+                              {psr.supplier_name || 'Central Supplier'}
+                            </span>
+                            <span className="text-[10px] font-mono text-indigo-600 block">
+                              Depot #{psr.supplier_id || 1}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="p-3">
                         <span className="font-semibold text-slate-800 block max-w-xs truncate" title={psr.sub_route}>
                           {psr.sub_route}
                         </span>
@@ -562,18 +633,19 @@ export const SuperadminPsrManagement: React.FC = () => {
 
                       <td className="p-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          {/* Reassign Sales Officer Trigger */}
+                          {/* Reassign Sales Officer & Supplier Trigger */}
                           <button
                             type="button"
                             onClick={() => {
                               setReassignModalPsr(psr);
                               setReassignTargetOfficerId(psr.sales_officer_id);
+                              setReassignTargetSupplierId(psr.supplier_id || (suppliers[0] ? suppliers[0].id : ''));
                             }}
                             className="px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[11px] transition flex items-center gap-1 cursor-pointer"
-                            title="Reassign to another Sales Officer"
+                            title="Reassign to another Sales Officer or Supplier"
                           >
                             <UserCheck className="w-3 h-3" />
-                            <span>Reassign SO</span>
+                            <span>Reallocate</span>
                           </button>
 
                           {/* Edit PSR Trigger */}
@@ -731,6 +803,30 @@ export const SuperadminPsrManagement: React.FC = () => {
                 </select>
               </div>
 
+              {/* ALLOCATE TO WHOLESALE SUPPLIER (INDIVIDUAL SUPPLIER ALLOTMENT) */}
+              <div className="p-3.5 rounded-2xl bg-indigo-50/60 border border-indigo-200/80 space-y-2">
+                <div className="flex items-center gap-1.5 text-indigo-900 font-bold">
+                  <Building2 className="w-4 h-4 text-indigo-600" />
+                  <span>Allocate to Wholesale Supplier *</span>
+                </div>
+                <p className="text-[11px] text-indigo-700">
+                  Each PSR is allocated to an individual Wholesale Supplier. Stock demands and beat orders booked by this PSR will route through this supplier.
+                </p>
+                <select
+                  required
+                  value={formSupplierId}
+                  onChange={(e) => setFormSupplierId(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-indigo-300 bg-white font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="">-- Choose Wholesale Supplier --</option>
+                  {suppliers.map((sup) => (
+                    <option key={sup.id} value={sup.id}>
+                      {sup.business_name} (Depot #{sup.id} — {sup.division_name || 'Regional Logistics Hub'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               {/* Territory Area & Designated Sub-Route */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -804,7 +900,7 @@ export const SuperadminPsrManagement: React.FC = () => {
               <div className="flex items-center gap-2">
                 <UserCheck className="w-5 h-5 text-blue-600" />
                 <h3 className="font-oswald text-base font-bold uppercase tracking-wide text-slate-900">
-                  Reassign Sales Officer
+                  Reallocate Sales Officer & Supplier
                 </h3>
               </div>
               <button
@@ -820,26 +916,46 @@ export const SuperadminPsrManagement: React.FC = () => {
               <p className="text-slate-500">
                 Code: <span className="font-mono font-bold text-orange-600">{reassignModalPsr.psr_code}</span> • Sub-Route: {reassignModalPsr.sub_route}
               </p>
-              <p className="text-slate-500">
-                Current Sales Officer: <strong className="text-blue-700">{reassignModalPsr.sales_officer_name || 'Assigned Officer'}</strong>
-              </p>
+              <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-200/60 mt-1">
+                <span className="text-slate-600">Current SO: <strong className="text-blue-700">{reassignModalPsr.sales_officer_name || 'Assigned Officer'}</strong></span>
+                <span className="text-slate-600">Current Supplier: <strong className="text-indigo-700">{reassignModalPsr.supplier_name || 'Central Supplier'}</strong></span>
+              </div>
             </div>
 
-            <div>
-              <label className="block font-bold text-slate-700 mb-1">
-                Select New Sales Officer *
-              </label>
-              <select
-                value={reassignTargetOfficerId}
-                onChange={(e) => setReassignTargetOfficerId(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-300 bg-white font-bold text-slate-800 focus:ring-2 focus:ring-blue-500"
-              >
-                {salesOfficers.map((so) => (
-                  <option key={so.id} value={so.id}>
-                    {so.name} ({so.officer_code}) — {so.assigned_area} ({so.city})
-                  </option>
-                ))}
-              </select>
+            <div className="space-y-3">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  Select Sales Officer *
+                </label>
+                <select
+                  value={reassignTargetOfficerId}
+                  onChange={(e) => setReassignTargetOfficerId(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white font-bold text-slate-800 focus:ring-2 focus:ring-blue-500"
+                >
+                  {salesOfficers.map((so) => (
+                    <option key={so.id} value={so.id}>
+                      {so.name} ({so.officer_code}) — {so.assigned_area} ({so.city})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  Select Wholesale Supplier *
+                </label>
+                <select
+                  value={reassignTargetSupplierId}
+                  onChange={(e) => setReassignTargetSupplierId(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500"
+                >
+                  {suppliers.map((sup) => (
+                    <option key={sup.id} value={sup.id}>
+                      {sup.business_name} (Depot #{sup.id})
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
@@ -856,7 +972,7 @@ export const SuperadminPsrManagement: React.FC = () => {
                 onClick={handleQuickReassign}
                 className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-md shadow-blue-600/20 transition cursor-pointer disabled:opacity-50"
               >
-                {submitting ? 'Reassigning...' : 'Confirm Reassignment'}
+                {submitting ? 'Reassigning...' : 'Confirm Allocation'}
               </button>
             </div>
           </div>

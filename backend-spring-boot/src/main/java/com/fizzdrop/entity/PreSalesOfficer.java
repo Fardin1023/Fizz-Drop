@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.util.*;
 
 @Entity
 @Table(name = "pre_sales_officers")
@@ -77,6 +78,21 @@ public class PreSalesOfficer {
     @JsonAlias({"target_notes", "targetNotes"})
     private String targetNotes;
 
+    @Column(name = "targets_json", columnDefinition = "TEXT")
+    @JsonProperty("targets_json")
+    @JsonAlias({"targets_json", "targetsJson"})
+    private String targetsJson;
+
+    @Column(name = "supplier_id")
+    @JsonProperty("supplier_id")
+    @JsonAlias({"supplier_id", "supplierId"})
+    private Long supplierId;
+
+    @Column(name = "supplier_name", length = 150)
+    @JsonProperty("supplier_name")
+    @JsonAlias({"supplier_name", "supplierName"})
+    private String supplierName;
+
     @Column(name = "created_at", nullable = false)
     @JsonProperty("created_at")
     @JsonAlias({"created_at", "createdAt"})
@@ -110,6 +126,10 @@ public class PreSalesOfficer {
     @Transient
     @JsonProperty("achieved_cases")
     private Integer achievedCases = 0;
+
+    @Transient
+    @JsonProperty("targets")
+    private List<Map<String, Object>> targets = new ArrayList<>();
 
     public PreSalesOfficer() {
     }
@@ -195,6 +215,18 @@ public class PreSalesOfficer {
 
     public String getTargetNotes() { return targetNotes; }
     public void setTargetNotes(String targetNotes) { this.targetNotes = targetNotes; }
+
+    public String getTargetsJson() { return targetsJson; }
+    public void setTargetsJson(String targetsJson) { this.targetsJson = targetsJson; }
+
+    public List<Map<String, Object>> getTargets() { return targets != null ? targets : Collections.emptyList(); }
+    public void setTargets(List<Map<String, Object>> targets) { this.targets = targets; }
+
+    public Long getSupplierId() { return supplierId; }
+    public void setSupplierId(Long supplierId) { this.supplierId = supplierId; }
+
+    public String getSupplierName() { return supplierName; }
+    public void setSupplierName(String supplierName) { this.supplierName = supplierName; }
 
     public Integer getAchievedCases() { return achievedCases != null ? achievedCases : 0; }
     public void setAchievedCases(Integer achievedCases) { this.achievedCases = achievedCases; }

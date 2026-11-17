@@ -47,7 +47,7 @@ import { NotificationDropdown } from '../../components/Notifications/Notificatio
 import { StripePaymentModal } from '../../components/Payment/StripePaymentModal';
 
 export const OutletDashboard: React.FC = () => {
-  const { user, outlet: authOutlet, isAuthenticated, isOutlet, logout, isLoading } = useAuth();
+  const { user, outlet: authOutlet, isAuthenticated, isOutlet, loginAsOutlet, logout, isLoading } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const validTabs = ['inventory', 'pos', 'request', 'deliveries', 'ledger', 'profile'];
@@ -65,7 +65,11 @@ export const OutletDashboard: React.FC = () => {
 
   const handleTabChange = (newTab: any) => {
     setActiveTab(newTab);
-    setSearchParams({ tab: newTab }, { replace: true });
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev);
+      p.set('tab', newTab);
+      return p;
+    }, { replace: true });
   };
 
   const handleNotificationClick = (n: any) => {
@@ -84,10 +88,12 @@ export const OutletDashboard: React.FC = () => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   // Active Outlet Data
-  const effectiveOutletId = authOutlet?.outlet_id || user?.branch_id || 2;
   const [outlet, setOutlet] = useState<any>(authOutlet || null);
-  const [preSalesOfficer, setPreSalesOfficer] = useState<any | null>(null);
   const [allOutlets, setAllOutlets] = useState<any[]>([]);
+  const paramOutletId = searchParams.get('outletId') ? Number(searchParams.get('outletId')) : null;
+  const authOutletId = authOutlet?.outlet_id || user?.branch_id;
+  const activeOutletId = paramOutletId || authOutletId || outlet?.outlet_id || (allOutlets.length > 0 ? allOutlets[0].outlet_id : 2);
+  const [preSalesOfficer, setPreSalesOfficer] = useState<any | null>(null);
   const [products, setProducts] = useState<OutletProductItem[]>([]);
   const [kpi, setKpi] = useState<any>({
     total_products: 0,
@@ -130,7 +136,7 @@ export const OutletDashboard: React.FC = () => {
     markAllAsRead,
     deleteNotification,
     clearOldNotifications,
-  } = useNotifications('OUTLET', Number(effectiveOutletId));
+  } = useNotifications('OUTLET', Number(outlet?.outlet_id || activeOutletId));
 
   // Customer order alert banner state
   const [customerOrderAlert, setCustomerOrderAlert] = useState<any | null>(null);
@@ -138,9 +144,9 @@ export const OutletDashboard: React.FC = () => {
   // Auto-refresh shelf stock and delivery tracker when a dispatch notification arrives
   useEffect(() => {
     if (popupNotification && (popupNotification.recipient_role as any) === 'OUTLET') {
-      fetchDashboardData(outlet?.outlet_id || effectiveOutletId, true);
+      fetchDashboardData(outlet?.outlet_id || activeOutletId, true);
     }
-  }, [popupNotification, effectiveOutletId]);
+  }, [popupNotification, activeOutletId, outlet?.outlet_id]);
 
   // Real-time listener for Customer Purchases from Customer UI via BroadcastChannel & LocalStorage
   useEffect(() => {
@@ -149,13 +155,13 @@ export const OutletDashboard: React.FC = () => {
       channel = new BroadcastChannel('fizzdrop_realtime_events');
       channel.onmessage = (event) => {
         if (event.data?.type === 'CUSTOMER_PURCHASE') {
-          const currentId = Number(outlet?.outlet_id || effectiveOutletId);
+          const currentId = Number(outlet?.outlet_id || activeOutletId);
           if (Number(event.data.outlet_id) === currentId) {
             setCustomerOrderAlert(event.data);
             fetchDashboardData(currentId, true);
           }
         } else if (event.data?.type === 'PSR_STOCK_DISPATCHED') {
-          const currentId = Number(outlet?.outlet_id || effectiveOutletId);
+          const currentId = Number(outlet?.outlet_id || activeOutletId);
           if (!event.data.outlet_id || Number(event.data.outlet_id) === currentId) {
             fetchDashboardData(currentId, true);
           }
@@ -165,7 +171,7 @@ export const OutletDashboard: React.FC = () => {
 
     const handleStorage = (e: StorageEvent) => {
       if (e.key === 'fizzdrop_last_sale_event') {
-        const currentId = Number(outlet?.outlet_id || effectiveOutletId);
+        const currentId = Number(outlet?.outlet_id || activeOutletId);
         fetchDashboardData(currentId, true);
       }
     };
@@ -173,7 +179,7 @@ export const OutletDashboard: React.FC = () => {
 
     // Periodic silent background sync every 25 seconds to keep shelf stock updated without flashing the screen
     const pollInterval = setInterval(() => {
-      fetchDashboardData(outlet?.outlet_id || effectiveOutletId, true);
+      fetchDashboardData(outlet?.outlet_id || activeOutletId, true);
     }, 25000);
 
     return () => {
@@ -181,7 +187,7 @@ export const OutletDashboard: React.FC = () => {
       window.removeEventListener('storage', handleStorage);
       clearInterval(pollInterval);
     };
-  }, [effectiveOutletId]);
+  }, [activeOutletId, outlet?.outlet_id]);
 
   // Auto-dismiss customer order alert banner after 10s
   useEffect(() => {
@@ -216,7 +222,8 @@ export const OutletDashboard: React.FC = () => {
   const [showPosReceipt, setShowPosReceipt] = useState<boolean>(false);
 
   // Fetch all branch data (supports silent background re-fetching so UI never flickers)
-  const fetchDashboardData = async (targetOutletId = effectiveOutletId, isSilent = false) => {
+  const fetchDashboardData = async (targetOutletId = activeOutletId, isSilent = false) => {
+    if (!targetOutletId) return;
     if (!isSilent && !hasLoadedOnceRef.current) {
       setLoadingData(true);
     }
@@ -284,16 +291,21 @@ export const OutletDashboard: React.FC = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          outlet_id: outlet?.outlet_id || effectiveOutletId,
+          outlet_id: outlet?.outlet_id || activeOutletId,
           dispatch_id: dispatchId,
         }),
       });
       const data = await res.json();
       if (res.ok && data.success) {
         setReceiptSuccessMsg(data.message || 'Stock delivery confirmed! Shelf inventory updated and profit credited to supplier.');
-        localStorage.setItem('fizzdrop_supplier_wallet', Date.now().toString());
+        localStorage.setItem('fizzdrop_supplier_wallet_refresh', Date.now().toString());
+        try {
+          const channel = new BroadcastChannel('fizzdrop_realtime_events');
+          channel.postMessage({ type: 'SUPPLIER_WALLET_UPDATED' });
+          channel.close();
+        } catch {}
         window.dispatchEvent(new Event('storage'));
-        fetchDashboardData(outlet?.outlet_id || effectiveOutletId);
+        fetchDashboardData(outlet?.outlet_id || activeOutletId);
       } else {
         alert(data.message || 'Failed to confirm delivery receipt.');
       }
@@ -305,8 +317,14 @@ export const OutletDashboard: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchDashboardData(effectiveOutletId);
-  }, [effectiveOutletId]);
+    fetchDashboardData(activeOutletId);
+  }, [activeOutletId]);
+
+  useEffect(() => {
+    if (paramOutletId && outlet?.outlet_id && paramOutletId !== outlet.outlet_id) {
+      fetchDashboardData(paramOutletId);
+    }
+  }, [paramOutletId, outlet?.outlet_id]);
 
   // Auth navigation guard
   useEffect(() => {
@@ -316,8 +334,35 @@ export const OutletDashboard: React.FC = () => {
   }, [isLoading, isAuthenticated, navigate]);
 
   // Switch branch
-  const handleSwitchBranch = (newOutletId: number) => {
-    fetchDashboardData(newOutletId);
+  const handleSwitchBranch = async (newOutletId: number) => {
+    const selected = allOutlets.find((o) => o.outlet_id === newOutletId);
+    if (!selected) return;
+
+    // Reset modals, cart, and search state
+    setIsSaleModalOpen(false);
+    setSelectedProductIdForSale(null);
+    setIsAdjustModalOpen(false);
+    setSelectedProductForAdjust(null);
+    setIsRequisitionModalOpen(false);
+    setSelectedProductIdForReq(null);
+    setPosCart([]);
+    setPosReceipt(null);
+    setShowPosReceipt(false);
+    setSearchQuery('');
+    setConfirmingReceiptId(null);
+    setReceiptSuccessMsg(null);
+    setCustomerOrderAlert(null);
+
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev);
+      p.set('outletId', String(newOutletId));
+      return p;
+    }, { replace: true });
+
+    if (loginAsOutlet) {
+      await loginAsOutlet(newOutletId, selected.email);
+    }
+    await fetchDashboardData(newOutletId);
   };
 
   // Filtered Products for Inventory Tab (declared before any returns to strictly adhere to React Rules of Hooks)
@@ -400,7 +445,7 @@ export const OutletDashboard: React.FC = () => {
     try {
       // Execute each cart item sale
       for (const item of posCart) {
-        const res = await fetch(`http://localhost:8080/api/inventory/outlet/${outlet?.outlet_id || effectiveOutletId}/sell`, {
+        const res = await fetch(`http://localhost:8080/api/inventory/outlet/${outlet?.outlet_id || activeOutletId}/sell`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -440,7 +485,7 @@ export const OutletDashboard: React.FC = () => {
       setShowPosReceipt(true);
       setPosCart([]);
       setPosCustomerNote('');
-      fetchDashboardData(outlet?.outlet_id || effectiveOutletId);
+      fetchDashboardData(outlet?.outlet_id || activeOutletId);
     } catch (err: any) {
       setPosError(err.message || 'Checkout failed');
     } finally {
@@ -571,9 +616,9 @@ export const OutletDashboard: React.FC = () => {
             {/* Branch Switcher Dropdown */}
             {allOutlets.length > 1 && (
               <select
-                value={outlet?.outlet_id || effectiveOutletId}
+                value={outlet?.outlet_id || activeOutletId}
                 onChange={(e) => handleSwitchBranch(Number(e.target.value))}
-                className="py-1.5 px-2.5 rounded-xl border border-slate-200 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold focus:outline-none cursor-pointer hidden lg:block"
+                className="py-1.5 px-2.5 rounded-xl border border-slate-200 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold focus:outline-none cursor-pointer"
               >
                 {allOutlets.map((o) => (
                   <option key={o.outlet_id} value={o.outlet_id}>
@@ -1295,7 +1340,7 @@ export const OutletDashboard: React.FC = () => {
                   </div>
                   <button
                     type="button"
-                    onClick={() => fetchDashboardData(outlet?.outlet_id || effectiveOutletId)}
+                    onClick={() => fetchDashboardData(outlet?.outlet_id || activeOutletId)}
                     className="p-2 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 transition-colors"
                   >
                     <RefreshCw className="w-4 h-4" />
@@ -1672,34 +1717,34 @@ export const OutletDashboard: React.FC = () => {
       <OutletSaleModal
         isOpen={isSaleModalOpen}
         onClose={() => setIsSaleModalOpen(false)}
-        outletId={outlet?.outlet_id || effectiveOutletId}
+        outletId={outlet?.outlet_id || activeOutletId}
         outletName={outlet?.outlet_name || 'Outlet Branch'}
         outletAddress={outlet?.location_address}
         outletPhone={outlet?.contact_phone}
         products={products}
         initialProductId={selectedProductIdForSale}
-        onSaleCompleted={() => fetchDashboardData(outlet?.outlet_id || effectiveOutletId)}
+        onSaleCompleted={() => fetchDashboardData(outlet?.outlet_id || activeOutletId)}
       />
 
       {/* MODAL 2: Adjust Stock Count Modal */}
       <OutletAdjustStockModal
         isOpen={isAdjustModalOpen}
         onClose={() => setIsAdjustModalOpen(false)}
-        outletId={outlet?.outlet_id || effectiveOutletId}
+        outletId={outlet?.outlet_id || activeOutletId}
         product={selectedProductForAdjust}
-        onUpdated={() => fetchDashboardData(outlet?.outlet_id || effectiveOutletId)}
+        onUpdated={() => fetchDashboardData(outlet?.outlet_id || activeOutletId)}
       />
 
       {/* MODAL 3: Requisition via Route Pre-Sales Officer Modal */}
       <OutletRequisitionModal
         isOpen={isRequisitionModalOpen}
         onClose={() => setIsRequisitionModalOpen(false)}
-        outletId={outlet?.outlet_id || effectiveOutletId}
+        outletId={outlet?.outlet_id || activeOutletId}
         outletName={outlet?.outlet_name || 'Outlet Branch'}
         products={products}
         preSalesOfficer={preSalesOfficer}
         initialProductId={selectedProductIdForReq}
-        onSubmitted={() => fetchDashboardData(outlet?.outlet_id || effectiveOutletId)}
+        onSubmitted={() => fetchDashboardData(outlet?.outlet_id || activeOutletId)}
       />
 
       {/* MODAL 4: Full POS Cart Receipt */}
@@ -1727,14 +1772,14 @@ export const OutletDashboard: React.FC = () => {
         referenceId={stripePaymentData.requisitionId}
         metadata={{
           outlet_requisition_id: String(stripePaymentData.requisitionId),
-          outlet_id: String(outlet?.outlet_id || effectiveOutletId),
+          outlet_id: String(outlet?.outlet_id || activeOutletId),
         }}
         payloadData={{
           outlet_requisition_id: stripePaymentData.requisitionId,
-          outlet_id: outlet?.outlet_id || effectiveOutletId,
+          outlet_id: outlet?.outlet_id || activeOutletId,
         }}
         onSuccess={() => {
-          fetchDashboardData(outlet?.outlet_id || effectiveOutletId);
+          fetchDashboardData(outlet?.outlet_id || activeOutletId);
         }}
       />
     </div>

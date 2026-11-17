@@ -89,7 +89,13 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
   const [walletBalance, setWalletBalance] = useState<number>(() => {
     try {
       const cached = localStorage.getItem('fizzdrop_supplier_wallet');
-      return cached ? parseFloat(cached) : 0;
+      if (cached) {
+        const val = parseFloat(cached);
+        if (!isNaN(val) && val < 100000000000) {
+          return val;
+        }
+      }
+      return 0;
     } catch {
       return 0;
     }

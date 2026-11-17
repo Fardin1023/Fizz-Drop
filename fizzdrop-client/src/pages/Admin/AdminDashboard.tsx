@@ -73,7 +73,13 @@ export const AdminDashboard: React.FC = () => {
   const [walletBalance, setWalletBalance] = useState<number>(() => {
     try {
       const cached = localStorage.getItem('fizzdrop_supplier_wallet');
-      return cached ? parseFloat(cached) : 0;
+      if (cached) {
+        const val = parseFloat(cached);
+        if (!isNaN(val) && val < 100000000000) {
+          return val;
+        }
+      }
+      return 0;
     } catch {
       return 0;
     }
@@ -82,7 +88,7 @@ export const AdminDashboard: React.FC = () => {
 
   const fetchWallet = async () => {
     try {
-      const targetUserId = user?.user_id || 1;
+      const targetUserId = user?.user_id || 4;
       const res = await fetch(`http://localhost:8080/api/v1/supplier/wallet?userId=${targetUserId}`);
       if (res.ok) {
         const text = await res.text();
@@ -108,12 +114,37 @@ export const AdminDashboard: React.FC = () => {
 
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
-      if (e.key === 'fizzdrop_supplier_wallet' && e.newValue) {
-        setWalletBalance(parseFloat(e.newValue));
+      if (e.key === 'fizzdrop_supplier_wallet_refresh') {
+        fetchWallet();
+      } else if (e.key === 'fizzdrop_supplier_wallet') {
+        if (e.newValue) {
+          const val = parseFloat(e.newValue);
+          if (!isNaN(val) && val < 100000000000) {
+            setWalletBalance(val);
+          } else {
+            fetchWallet();
+          }
+        } else {
+          fetchWallet();
+        }
       }
     };
     window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
+
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel('fizzdrop_realtime_events');
+      channel.onmessage = (event) => {
+        if (event.data?.type === 'SUPPLIER_WALLET_UPDATED' || event.data?.type === 'OUTLET_DELIVERY_CONFIRMED') {
+          fetchWallet();
+        }
+      };
+    } catch (ignored) {}
+
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      if (channel) channel.close();
+    };
   }, []);
 
   const {
@@ -246,7 +277,7 @@ export const AdminDashboard: React.FC = () => {
               <img
                 src={supplierLogo}
                 alt="Regional Supplier Logo"
-                className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl object-cover shadow-md shadow-indigo-500/25 border border-indigo-400/40 shrink-0"
+                className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl object-cover shadow-md shadow-indigo-500/25 border border-indigo-400/40 shrink-0 transform hover:scale-105 transition-transform"
               />
 
               <span className="font-oswald font-bold tracking-tight uppercase text-zinc-900 text-xs sm:text-sm truncate">

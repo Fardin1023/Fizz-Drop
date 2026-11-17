@@ -10,6 +10,8 @@ import { OutletAuth } from './pages/Outlet/OutletAuth';
 import SalesOfficerDashboard from './pages/SalesOfficer/SalesOfficerDashboard';
 import PsrDashboard from './pages/PSR/PsrDashboard';
 import DeliveryTeamPortal from './pages/Delivery/DeliveryTeamPortal';
+import RsmDashboard from './pages/SalesManagement/RsmDashboard';
+import AsmDashboard from './pages/SalesManagement/AsmDashboard';
 import { AuthProvider } from './context/AuthContext';
 
 function App() {
@@ -25,7 +27,9 @@ function App() {
     location.pathname.startsWith('/outlet') ||
     location.pathname.startsWith('/sales-officer') ||
     location.pathname.startsWith('/psr') ||
-    location.pathname.startsWith('/delivery-team');
+    location.pathname.startsWith('/delivery-team') ||
+    location.pathname.startsWith('/rsm') ||
+    location.pathname.startsWith('/asm');
 
   useEffect(() => {
     const fetchOutlets = async () => {
@@ -146,6 +150,22 @@ function App() {
             <Route
               path="/delivery-team/*"
               element={<DeliveryTeamPortal />}
+            />
+            <Route
+              path="/rsm"
+              element={<RsmDashboard />}
+            />
+            <Route
+              path="/rsm/*"
+              element={<RsmDashboard />}
+            />
+            <Route
+              path="/asm"
+              element={<AsmDashboard />}
+            />
+            <Route
+              path="/asm/*"
+              element={<AsmDashboard />}
             />
           </Routes>
         </main>

@@ -484,10 +484,10 @@ export const DeliveryTeamPortal: React.FC = () => {
                   </div>
                   <div>
                     <h4 className="font-oswald text-sm font-bold text-white uppercase tracking-wider">
-                      Step 1: Confirm Stocks Boarded on Truck
+                      Step 1: Confirm Order & Verify Stocks Boarded
                     </h4>
                     <p className="text-[11px] text-slate-400">
-                      Verify physical inventory loaded onto vehicle {team?.vehicle_registration_no} matches the cargo manifest.
+                      Verify physical inventory loaded onto vehicle {team?.vehicle_registration_no} matches the cargo manifest for destination outlets.
                     </p>
                   </div>
                 </div>
@@ -500,7 +500,7 @@ export const DeliveryTeamPortal: React.FC = () => {
                     className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 bg-slate-800 border-slate-600 cursor-pointer"
                   />
                   <span>
-                    I confirm that all <strong className="text-white">{activeTrip.total_cases} beverage cases</strong> have been inspected and boarded on the vehicle.
+                    I confirm this delivery order and that all <strong className="text-white">{activeTrip.total_cases} beverage cases</strong> have been inspected and boarded on vehicle.
                   </span>
                 </label>
 
@@ -515,7 +515,7 @@ export const DeliveryTeamPortal: React.FC = () => {
                   }`}
                 >
                   <PackageCheck className="w-4 h-4" />
-                  <span>Confirm Stocks Boarded on Truck</span>
+                  <span>Confirm Order & Stocks Boarded on Vehicle</span>
                 </button>
               </div>
             )}
@@ -531,10 +531,10 @@ export const DeliveryTeamPortal: React.FC = () => {
                   </div>
                   <div>
                     <h4 className="font-oswald text-sm font-bold text-white uppercase tracking-wider">
-                      Step 2: Start Delivery Route
+                      Step 2: Go for Delivery (Start Ride)
                     </h4>
                     <p className="text-[11px] text-slate-400">
-                      Stocks boarded! Click below to start the ride. Supplier will track your truck's progression in real time.
+                      Order confirmed and stocks boarded! Click below to begin delivery to assigned outlets. Real-time GPS and status tracking active.
                     </p>
                   </div>
                 </div>
@@ -546,7 +546,7 @@ export const DeliveryTeamPortal: React.FC = () => {
                   className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md shadow-purple-600/30"
                 >
                   <Navigation className="w-4 h-4" />
-                  <span>Start Ride / Begin Delivery Route 🚚</span>
+                  <span>Go for Delivery / Start Ride 🚚</span>
                 </button>
               </div>
             )}

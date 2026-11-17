@@ -10,6 +10,7 @@ import java.util.Optional;
 @Repository
 public interface PreSalesOfficerRepository extends JpaRepository<PreSalesOfficer, Long> {
     List<PreSalesOfficer> findBySalesOfficerId(Long salesOfficerId);
+    List<PreSalesOfficer> findBySupplierId(Long supplierId);
     Optional<PreSalesOfficer> findByPsrCode(String psrCode);
     Optional<PreSalesOfficer> findByEmailIgnoreCase(String email);
     Optional<PreSalesOfficer> findByUserId(Long userId);

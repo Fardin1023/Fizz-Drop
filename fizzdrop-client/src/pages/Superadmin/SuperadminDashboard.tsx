@@ -312,7 +312,7 @@ export const SuperadminDashboard: React.FC = () => {
               <img
                 src={superadminLogo}
                 alt="Superadmin Logo"
-                className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl object-cover shadow-md shadow-indigo-500/25 border border-indigo-400/40 shrink-0"
+                className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl object-cover shadow-md shadow-indigo-500/25 border border-indigo-400/40 shrink-0 transform hover:scale-105 transition-transform"
               />
 
               <span className="font-oswald font-bold tracking-tight uppercase text-zinc-900 text-xs sm:text-sm truncate">

@@ -95,7 +95,11 @@ export default function PsrDashboard() {
 
   const handleTabChange = (newTab: any) => {
     setActiveTab(newTab);
-    setSearchParams({ tab: newTab }, { replace: true });
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev);
+      p.set('tab', newTab);
+      return p;
+    }, { replace: true });
   };
 
   const handleNotificationClick = (n: any) => {
@@ -133,8 +137,10 @@ export default function PsrDashboard() {
   const [visitNotes, setVisitNotes] = useState<string>('');
   const [visitSubmitting, setVisitSubmitting] = useState<boolean>(false);
 
-  const psrId = user?.pre_sales_officer?.id || 1;
-  const psrUserId = user?.user_id || (user?.pre_sales_officer?.id ? 200 + user.pre_sales_officer.id : 201);
+  const paramPsrId = searchParams.get('psrId') ? Number(searchParams.get('psrId')) : null;
+  const authPsrId = user?.pre_sales_officer?.id;
+  const activePsrId = paramPsrId || authPsrId || data?.psr?.id || (allPsrs.length > 0 ? allPsrs[0].id : 9);
+  const activeUserId = data?.psr?.user_id || user?.user_id || (activePsrId ? 200 + activePsrId : 209);
 
   // Notifications
   const {
@@ -146,24 +152,14 @@ export default function PsrDashboard() {
     markAllAsRead,
     deleteNotification,
     clearOldNotifications,
-  } = useNotifications('PSR', psrUserId);
+  } = useNotifications('PSR', activeUserId);
 
-  // Fetch all PSRs for quick demo switcher
-  useEffect(() => {
-    fetch('http://localhost:8080/api/v1/psr/all')
-      .then((res) => res.json())
-      .then((resData) => {
-        if (Array.isArray(resData)) setAllPsrs(resData);
-      })
-      .catch(() => {});
-  }, []);
-
-  const loadDashboard = useCallback(async () => {
+  const loadDashboard = useCallback(async (overrideId?: number) => {
+    const idToFetch = overrideId || activePsrId;
+    if (!idToFetch) return;
     setLoading(true);
     try {
-      const url = psrId
-        ? `http://localhost:8080/api/v1/psr/dashboard?psrId=${psrId}`
-        : 'http://localhost:8080/api/v1/psr/dashboard';
+      const url = `http://localhost:8080/api/v1/psr/dashboard?psrId=${idToFetch}`;
       const res = await fetch(url);
       if (res.ok) {
         const json = await res.json();
@@ -174,7 +170,53 @@ export default function PsrDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [psrId]);
+  }, [activePsrId]);
+
+  // Fetch all PSRs for quick demo switcher
+  useEffect(() => {
+    fetch('http://localhost:8080/api/v1/psr/all')
+      .then((res) => res.json())
+      .then((resData) => {
+        if (Array.isArray(resData) && resData.length > 0) {
+          setAllPsrs(resData);
+          if (!paramPsrId && !authPsrId) {
+            loadDashboard(resData[0].id);
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (paramPsrId && data?.psr?.id && paramPsrId !== data.psr.id) {
+      loadDashboard(paramPsrId);
+    }
+  }, [paramPsrId, data?.psr?.id, loadDashboard]);
+
+  const handleSwitchPsr = async (selectedId: number) => {
+    const selected = allPsrs.find((p) => p.id === selectedId);
+    if (!selected) return;
+
+    setOrderModalOutlet(null);
+    setRefundModalOutlet(null);
+    setVisitModalOutlet(null);
+    setSelectedProductId('');
+    setQuantity(1);
+    setCustomPrice('');
+    setRemarks('');
+    setActionSuccess(null);
+    setActionError(null);
+    setSearchQuery('');
+
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev);
+      p.set('psrId', String(selectedId));
+      return p;
+    }, { replace: true });
+
+    await loginAsPsr(selectedId, selected.email);
+    await loadDashboard(selectedId);
+  };
 
   const [submittingToSoId, setSubmittingToSoId] = useState<number | null>(null);
 
@@ -302,7 +344,7 @@ export default function PsrDashboard() {
     setActionError(null);
     try {
       const payload: any = {
-        psr_id: data?.psr?.id || psrId,
+        psr_id: data?.psr?.id || activePsrId,
         outlet_id: orderModalOutlet.outlet_id,
         product_id: Number(selectedProductId),
         quantity: quantity,
@@ -368,7 +410,7 @@ export default function PsrDashboard() {
     setActionError(null);
     try {
       const payload: any = {
-        psr_id: data?.psr?.id || psrId,
+        psr_id: data?.psr?.id || activePsrId,
         outlet_id: refundModalOutlet.outlet_id,
         product_id: Number(selectedProductId),
         quantity: quantity,
@@ -479,7 +521,7 @@ export default function PsrDashboard() {
             <img
               src={psrLogo}
               alt="PSR Portal Logo"
-              className="h-10 w-10 sm:h-11 sm:w-11 rounded-2xl object-cover shadow-md shadow-orange-500/25 border border-orange-400/40 shrink-0"
+              className="h-10 w-10 sm:h-11 sm:w-11 rounded-2xl object-cover shadow-md shadow-orange-500/25 border border-orange-400/40 shrink-0 transform hover:scale-105 transition-transform"
             />
             <div>
               <div className="flex items-center gap-2">
@@ -506,10 +548,10 @@ export default function PsrDashboard() {
                 <User className="h-3.5 w-3.5 text-slate-500" />
                 <select
                   className="bg-transparent font-medium text-slate-700 dark:text-zinc-200 focus:outline-none cursor-pointer"
-                  value={data?.psr?.id || ''}
+                  value={data?.psr?.id || activePsrId || ''}
                   onChange={(e) => {
                     const selId = Number(e.target.value);
-                    loginAsPsr(selId);
+                    handleSwitchPsr(selId);
                   }}
                 >
                   {allPsrs.map((p) => (
@@ -797,6 +839,51 @@ export default function PsrDashboard() {
                     </span>
                   </div>
                 </div>
+
+                {/* Category & Brand Targets Breakdown */}
+                {Boolean(data?.psr?.targets && Array.isArray(data.psr.targets) && data.psr.targets.length > 0) && (
+                  <div className="pt-3 border-t border-white/20 space-y-2">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-orange-100 flex items-center justify-between">
+                      <span>Category & Brand Targets Breakdown</span>
+                      <span className="font-mono">{data.psr.targets.length} Target Lines</span>
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                      {data.psr.targets.map((tgt: any, idx: number) => {
+                        const tCases = Number(tgt.target_cases) || 0;
+                        const aCases = Number(tgt.achieved_cases) || 0;
+                        const pct = tgt.achievement_percentage !== undefined ? tgt.achievement_percentage : (tCases > 0 ? Math.min(100, Math.round((aCases * 100) / tCases)) : 0);
+                        return (
+                          <div
+                            key={idx}
+                            className="bg-black/20 rounded-xl p-2.5 space-y-1.5 border border-white/10"
+                          >
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-bold text-white truncate max-w-[140px]" title={tgt.brand || tgt.category}>
+                                {tgt.brand ? `${tgt.brand}` : tgt.category}
+                              </span>
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/20 font-mono font-bold">
+                                {aCases}/{tCases} cs
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-orange-200 truncate" title={tgt.category}>
+                              {tgt.category} {tgt.target_sku_ounces ? `• ${tgt.target_sku_ounces}` : ''}
+                            </div>
+                            <div className="w-full h-1.5 rounded-full bg-white/20 overflow-hidden">
+                              <div
+                                className="h-full bg-white rounded-full transition-all duration-300"
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                            <div className="flex items-center justify-between text-[9px] text-orange-200">
+                              <span>{pct}% Achieved</span>
+                              <span>{Math.max(0, tCases - aCases)} cs left</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1546,8 +1633,16 @@ export default function PsrDashboard() {
                     <tbody className="divide-y divide-slate-100 dark:divide-zinc-800">
                       {(visitModalOutlet.inventory || data?.products || []).map((prod: any) => {
                         const stock = prod.stock_quantity ?? prod.branch_stock ?? 0;
-                        const isTargetSku = data?.psr?.target_sku_ounces && 
-                          (prod.sku && data.psr.target_sku_ounces.includes(prod.sku));
+                        const isTargetSku =
+                          (data?.psr?.target_sku_ounces && prod.sku && data.psr.target_sku_ounces.includes(prod.sku)) ||
+                          (data?.psr?.targets &&
+                            Array.isArray(data.psr.targets) &&
+                            data.psr.targets.some(
+                              (t: any) =>
+                                (t.product_id && String(t.product_id) === String(prod.product_id)) ||
+                                (t.brand && prod.brand && t.brand.toLowerCase() === prod.brand.toLowerCase()) ||
+                                (t.category && prod.category && t.category.toLowerCase() === prod.category.toLowerCase())
+                            ));
                         return (
                           <tr key={prod.product_id} className={`hover:bg-slate-50/50 dark:hover:bg-zinc-800/50 ${isTargetSku ? 'bg-amber-50/40 dark:bg-amber-950/20' : ''}`}>
                             <td className="p-2.5">

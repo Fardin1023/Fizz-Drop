@@ -118,9 +118,23 @@ interface OfficerProfile {
 interface SupplierInfo {
   id: number;
   business_name: string;
+  trade_license_number?: string;
+  primary_district_id?: number;
   depot_address?: string;
   phone_number?: string;
   allocated_areas?: string;
+  division_name?: string;
+  district_name?: string;
+  user_id?: number;
+  user_email?: string;
+  wallet_balance?: number;
+}
+
+export interface SupplierPurchasedStockItem {
+  product_id: number;
+  product_name: string;
+  purchased_cases: number;
+  total_spent: number;
 }
 
 export interface FinancialTargetData {
@@ -164,16 +178,18 @@ export const SalesOfficerDashboard: React.FC = () => {
   const { user, isAuthenticated, logout, loginAsSalesOfficer, isSalesOfficer, isSuperadmin } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const validTabs = ['overview', 'fleet-tracking', 'psr-team', 'profit-ledger', 'distributions', 'outlets', 'demands', 'supplier-link'];
-  const initialTab = (searchParams.get('tab') as any) || 'overview';
-  const [activeTab, setActiveTab] = useState<'overview' | 'fleet-tracking' | 'psr-team' | 'profit-ledger' | 'distributions' | 'outlets' | 'demands' | 'supplier-link'>(
+  const validTabs = ['overview', 'orders-tracking', 'network', 'fleet-tracking', 'profit-ledger', 'distributions', 'outlets', 'demands', 'psr-team', 'supplier-link'];
+  const rawTab = searchParams.get('tab');
+  const initialTab = (rawTab === 'psr-team' || rawTab === 'supplier-link') ? 'network' : ((rawTab as any) || 'overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'orders-tracking' | 'network' | 'fleet-tracking' | 'profit-ledger' | 'distributions' | 'outlets' | 'demands' | 'psr-team' | 'supplier-link'>(
     validTabs.includes(initialTab) ? initialTab : 'overview'
   );
 
   useEffect(() => {
     const t = searchParams.get('tab') as any;
-    if (t && validTabs.includes(t) && t !== activeTab) {
-      setActiveTab(t);
+    const effTab = (t === 'psr-team' || t === 'supplier-link') ? 'network' : t;
+    if (effTab && validTabs.includes(effTab) && effTab !== activeTab) {
+      setActiveTab(effTab);
     }
   }, [searchParams]);
 
@@ -197,6 +213,17 @@ export const SalesOfficerDashboard: React.FC = () => {
   // Dashboard Data State
   const [officer, setOfficer] = useState<OfficerProfile | null>(null);
   const [supplier, setSupplier] = useState<SupplierInfo | null>(null);
+  const [suppliers, setSuppliers] = useState<SupplierInfo[]>([]);
+  const [selectedSupplierId, setSelectedSupplierId] = useState<number | null>(null);
+  const [supplierPurchasedStocks, setSupplierPurchasedStocks] = useState<SupplierPurchasedStockItem[]>([]);
+  const [supplierTotalCasesPurchased, setSupplierTotalCasesPurchased] = useState<number>(0);
+  const [supplierPsrs, setSupplierPsrs] = useState<any[]>([]);
+
+  // Order Tracking Filter State
+  const [orderTrackingFilter, setOrderTrackingFilter] = useState<'ALL' | 'SUBMITTED_TO_SO' | 'REQUESTED_FROM_SUPPLIER' | 'DISPATCHED' | 'DELIVERED'>('ALL');
+  const [orderSupplierFilter, setOrderSupplierFilter] = useState<'CURRENT' | 'ALL'>('CURRENT');
+  const [orderSearchQuery, setOrderSearchQuery] = useState<string>('');
+
   const [outlets, setOutlets] = useState<TerritoryOutlet[]>([]);
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [requisitions, setRequisitions] = useState<any[]>([]);
@@ -240,6 +267,7 @@ export const SalesOfficerDashboard: React.FC = () => {
   // PSR Allotment & Target Modal State
   const [isAllotModalOpen, setIsAllotModalOpen] = useState(false);
   const [allotPsr, setAllotPsr] = useState<any | null>(null);
+  const [allotSupplierId, setAllotSupplierId] = useState<number | string>('');
   const [allotSubRoute, setAllotSubRoute] = useState<string>('');
   const [allotCustomSubRoute, setAllotCustomSubRoute] = useState<string>('');
   const [availableSubRoutes, setAvailableSubRoutes] = useState<string[]>([]);
@@ -252,6 +280,13 @@ export const SalesOfficerDashboard: React.FC = () => {
   const [allotTargetNotes, setAllotTargetNotes] = useState<string>('');
   const [allotLoadingShops, setAllotLoadingShops] = useState(false);
   const [allotSubmitting, setAllotSubmitting] = useState(false);
+
+  // Quick Re-allot Supplier Modal State
+  const [reallotModalPsr, setReallotModalPsr] = useState<any | null>(null);
+  const [reallotSupplierId, setReallotSupplierId] = useState<number | string>('');
+  const [reallotSubmitting, setReallotSubmitting] = useState(false);
+  const [activeSupplierNetworkTab, setActiveSupplierNetworkTab] = useState<'ALL' | number>('ALL');
+  const [psrNetworkSearch, setPsrNetworkSearch] = useState<string>('');
 
   // Request Products from Supplier Modal State
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
@@ -295,19 +330,35 @@ export const SalesOfficerDashboard: React.FC = () => {
     }
   };
 
-  const fetchDashboardData = async (targetOfficerId?: number) => {
+  const fetchDashboardData = async (targetOfficerId?: number, targetSupplierId?: number) => {
     setLoading(true);
     try {
       const officerParam = targetOfficerId ? `officerId=${targetOfficerId}` : (user?.user_id ? `userId=${user.user_id}` : '');
-      const [dashRes, allOffRes] = await Promise.all([
-        fetch(`http://localhost:8080/api/v1/sales-officer/dashboard?${officerParam}`),
+      const supParam = targetSupplierId ? `&supplierId=${targetSupplierId}` : (selectedSupplierId ? `&supplierId=${selectedSupplierId}` : '');
+      const [dashRes, allOffRes, allSuppliersRes] = await Promise.all([
+        fetch(`http://localhost:8080/api/v1/sales-officer/dashboard?${officerParam}${supParam}`),
         fetch('http://localhost:8080/api/v1/sales-officers'),
+        fetch('http://localhost:8080/api/v1/suppliers'),
       ]);
+
+      let activeSupId = targetSupplierId || selectedSupplierId;
 
       if (dashRes.ok) {
         const data = await dashRes.json();
         setOfficer(data.sales_officer || null);
-        setSupplier(data.supplier || null);
+        const resolvedSupplier = data.selected_supplier || data.supplier || null;
+        setSupplier(resolvedSupplier);
+        if (resolvedSupplier?.id) {
+          activeSupId = resolvedSupplier.id;
+          setSelectedSupplierId(resolvedSupplier.id);
+        }
+        if (data.suppliers && Array.isArray(data.suppliers)) {
+          setSuppliers(data.suppliers);
+        }
+        setSupplierPurchasedStocks(data.supplier_purchased_stocks || []);
+        setSupplierTotalCasesPurchased(data.supplier_total_cases_purchased || 0);
+        setSupplierPsrs(data.supplier_psrs || []);
+
         setOutlets(data.outlets || []);
         setProducts(data.products || []);
         setRequisitions(data.requisitions || []);
@@ -315,8 +366,15 @@ export const SalesOfficerDashboard: React.FC = () => {
         setDistributions(data.distributions || []);
 
         if (data.sales_officer?.id) {
-          fetchPsrData(data.sales_officer.id);
+          fetchPsrData(data.sales_officer.id, activeSupId);
           fetchFleetDispatches(data.sales_officer.id);
+        }
+      }
+
+      if (allSuppliersRes.ok) {
+        const supList = await allSuppliersRes.json();
+        if (Array.isArray(supList) && supList.length > 0) {
+          setSuppliers(supList);
         }
       }
 
@@ -331,9 +389,10 @@ export const SalesOfficerDashboard: React.FC = () => {
     }
   };
 
-  const fetchPsrData = async (officerId: number) => {
+  const fetchPsrData = async (officerId: number, supId?: number | null) => {
     try {
-      const res = await fetch(`http://localhost:8080/api/v1/psr/so-summary/${officerId}`);
+      const supQuery = supId ? `?supplierId=${supId}` : '';
+      const res = await fetch(`http://localhost:8080/api/v1/psr/so-summary/${officerId}${supQuery}`);
       if (res.ok) {
         const json = await res.json();
         setPsrs(json.psrs || []);
@@ -343,6 +402,15 @@ export const SalesOfficerDashboard: React.FC = () => {
       }
     } catch (e) {
       console.error('Error fetching PSR data:', e);
+    }
+  };
+
+  const handleSelectSupplier = (supId: number) => {
+    setSelectedSupplierId(supId);
+    const chosen = suppliers.find((s) => s.id === supId);
+    if (chosen) setSupplier(chosen);
+    if (officer?.id) {
+      fetchDashboardData(officer.id, supId);
     }
   };
 
@@ -436,13 +504,22 @@ export const SalesOfficerDashboard: React.FC = () => {
     setActionErrorMsg(null);
     setActionSuccessMsg(null);
     try {
+      // Find the PSR who collected/received this order
+      const psrObj = psrs.find((p: any) => p.id === ord.psr_id || p.name === ord.psr_name || p.psr_code === ord.psr_code);
+      const targetSupplierId = psrObj?.supplier_id || ord.supplier_id || selectedSupplierId || supplier?.id || officer?.supplier_id;
+
       const res = await fetch(`http://localhost:8080/api/v1/psr/orders/${ord.id}/so-request-supplier`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sales_officer_id: officer?.id }),
+        body: JSON.stringify({
+          sales_officer_id: officer?.id,
+          supplier_id: targetSupplierId,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || data.message || 'Failed to notify supplier');
+
+      const targetSupplierName = data.supplier_name || psrObj?.supplier_name || 'Regional Supplier';
 
       // Real-time broadcast to Supplier
       try {
@@ -451,6 +528,7 @@ export const SalesOfficerDashboard: React.FC = () => {
           type: 'SO_STOCK_REQUEST_FOR_OUTLET',
           recipientRole: 'SUPPLIER',
           recipientUserId: data.supplier_user_id || 4,
+          supplier_id: data.supplier_id || targetSupplierId,
           order_id: ord.id,
           order_code: ord.order_code,
           outlet_id: ord.outlet_id,
@@ -461,13 +539,13 @@ export const SalesOfficerDashboard: React.FC = () => {
           sales_officer_id: officer?.id,
           sales_officer_name: officer?.name,
           title: `Stock Needed: ${ord.quantity} cases in ${ord.outlet_name}`,
-          message: `Sales Officer ${officer?.name || 'Tariq Rahman'} notified you: ${ord.quantity} cases of ${ord.product_name} is needed in ${ord.outlet_name}. Please dispatch to outlet from SO purchased stock.`,
+          message: `Sales Officer ${officer?.name || 'Sales Officer'} notified you: ${ord.quantity} cases of ${ord.product_name} is needed in ${ord.outlet_name}. Please dispatch to outlet from SO purchased stock.`,
         });
         setTimeout(() => bc.close(), 100);
       } catch (ignored) {}
 
       setActionSuccessMsg(
-        `Notified Supplier: ${ord.quantity} cases of ${ord.product_name} needed at ${ord.outlet_name}. Awaiting supplier dispatch from purchased stock.`
+        `Notified Supplier (${targetSupplierName}): ${ord.quantity} cases of ${ord.product_name} needed at ${ord.outlet_name}. Awaiting supplier dispatch from purchased stock.`
       );
 
       if (officer?.id) {
@@ -554,6 +632,7 @@ export const SalesOfficerDashboard: React.FC = () => {
 
   const openAllotModal = async (psr: any) => {
     setAllotPsr(psr);
+    setAllotSupplierId(psr.supplier_id || selectedSupplierId || (suppliers[0] ? suppliers[0].id : 1));
     const initialRoute = psr.sub_route || '';
     setAllotSubRoute(initialRoute);
     setAllotCustomSubRoute('');
@@ -663,6 +742,7 @@ export const SalesOfficerDashboard: React.FC = () => {
           target_sku_ounces: allotTargetSkuOunces,
           target_product_id: allotTargetProductId ? Number(allotTargetProductId) : null,
           target_notes: allotTargetNotes,
+          supplier_id: allotSupplierId ? Number(allotSupplierId) : null,
         }),
       });
 
@@ -684,6 +764,38 @@ export const SalesOfficerDashboard: React.FC = () => {
     }
   };
 
+  const openReallotModal = (psr: any) => {
+    setReallotModalPsr(psr);
+    setReallotSupplierId(psr.supplier_id || (suppliers[0] ? suppliers[0].id : ''));
+  };
+
+  const handleQuickReallotSupplier = async () => {
+    if (!reallotModalPsr || !reallotSupplierId) return;
+    setReallotSubmitting(true);
+    setActionErrorMsg(null);
+    setActionSuccessMsg(null);
+    try {
+      const res = await fetch(`http://localhost:8080/api/v1/psr/${reallotModalPsr.id}/allocate-supplier`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ supplier_id: Number(reallotSupplierId) }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || data.error || 'Failed to reallot supplier');
+      const targetSup = suppliers.find((s) => s.id === Number(reallotSupplierId));
+      setActionSuccessMsg(`PSR ${reallotModalPsr.name} successfully reallocated to Supplier: ${targetSup?.business_name || `Supplier #${reallotSupplierId}`}!`);
+      setReallotModalPsr(null);
+      if (officer?.id) {
+        fetchPsrData(officer.id);
+        fetchDashboardData(officer.id);
+      }
+    } catch (err: any) {
+      setActionErrorMsg(err.message || 'Error reallotting supplier');
+    } finally {
+      setReallotSubmitting(false);
+    }
+  };
+
   const handleRequestStockFromSupplier = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!officer?.id || !reqProductId || reqQuantity <= 0) {
@@ -701,6 +813,7 @@ export const SalesOfficerDashboard: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sales_officer_id: officer.id,
+          supplier_id: selectedSupplierId || supplier?.id || officer.supplier_id,
           product_id: Number(reqProductId),
           quantity: reqQuantity,
           urgency: reqUrgency,
@@ -739,6 +852,49 @@ export const SalesOfficerDashboard: React.FC = () => {
       setReqSubmitting(false);
     }
   };
+
+  // Filtered orders for clean and organized order tracking
+  const filteredTrackedOrders = useMemo(() => {
+    return psrOrders.filter((ord) => {
+      // 1. Supplier filter
+      if (orderSupplierFilter === 'CURRENT' && selectedSupplierId) {
+        const psrObj = psrs.find((p) => p.id === ord.psr_id || p.name === ord.psr_name || p.psr_code === ord.psr_code);
+        const ordSupId = ord.supplier_id ? Number(ord.supplier_id) : (psrObj?.supplier_id ? Number(psrObj.supplier_id) : null);
+        if (ordSupId && ordSupId !== Number(selectedSupplierId)) return false;
+      }
+
+      // 2. Status filter
+      if (orderTrackingFilter !== 'ALL') {
+        if (orderTrackingFilter === 'SUBMITTED_TO_SO' && ord.status !== 'SUBMITTED_TO_SO' && ord.status !== 'PENDING') {
+          return false;
+        }
+        if (orderTrackingFilter === 'REQUESTED_FROM_SUPPLIER' && ord.status !== 'REQUESTED_FROM_SUPPLIER' && ord.status !== 'APPROVED_BY_SO') {
+          return false;
+        }
+        if (orderTrackingFilter === 'DISPATCHED' && ord.status !== 'DISPATCHED') {
+          return false;
+        }
+        if (orderTrackingFilter === 'DELIVERED' && ord.status !== 'DELIVERED') {
+          return false;
+        }
+      }
+
+      // 3. Search query
+      if (orderSearchQuery.trim()) {
+        const q = orderSearchQuery.toLowerCase();
+        const code = (ord.order_code || '').toLowerCase();
+        const outlet = (ord.outlet_name || '').toLowerCase();
+        const psr = (ord.psr_name || '').toLowerCase();
+        const product = (ord.product_name || '').toLowerCase();
+        const route = (ord.sub_route || '').toLowerCase();
+        if (!code.includes(q) && !outlet.includes(q) && !psr.includes(q) && !product.includes(q) && !route.includes(q)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [psrOrders, orderSupplierFilter, selectedSupplierId, orderTrackingFilter, orderSearchQuery]);
 
   // Filtered Territory Outlets
   const filteredOutlets = useMemo(() => {
@@ -799,7 +955,7 @@ export const SalesOfficerDashboard: React.FC = () => {
                 <img
                   src={salesOfficerLogo}
                   alt="Sales Officer Logo"
-                  className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl object-cover shadow-md shadow-indigo-500/25 border border-indigo-400/40 shrink-0"
+                  className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl object-cover shadow-md shadow-indigo-500/25 border border-indigo-400/40 shrink-0 transform hover:scale-105 transition-transform"
                 />
                 <div>
                   <div className="flex items-center gap-1.5">
@@ -948,20 +1104,47 @@ export const SalesOfficerDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Linked Supplier Hub Pill */}
-            <div className="p-4 rounded-2xl bg-white/10 backdrop-blur-md border border-white/15 space-y-1 shrink-0 max-w-sm">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-blue-300 block">
-                Assigned Wholesale Supplier Hub
-              </span>
-              <p className="font-bold text-sm text-white flex items-center gap-1.5">
-                <Building2 className="w-4 h-4 text-indigo-400 shrink-0" />
-                <span className="truncate">{supplier?.business_name || officer?.supplier_name || 'Central Regional Supplier'}</span>
-              </p>
-              {supplier?.depot_address && (
-                <p className="text-[11px] text-blue-200/80 truncate">
-                  Depot: {supplier.depot_address}
+            {/* Active Supplier Hub Selector & Status */}
+            <div className="p-4 rounded-3xl bg-slate-900/80 backdrop-blur-md border border-indigo-400/30 space-y-2 shrink-0 max-w-md w-full shadow-lg">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-300 flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-cyan-400" />
+                  Dealing With Supplier (1 At A Time)
+                </span>
+                <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                  Active Partner
+                </span>
+              </div>
+
+              {suppliers.length > 1 ? (
+                <div className="relative">
+                  <select
+                    value={selectedSupplierId || supplier?.id || ''}
+                    onChange={(e) => handleSelectSupplier(Number(e.target.value))}
+                    className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-slate-800 text-white border border-indigo-400/40 focus:outline-none focus:ring-2 focus:ring-cyan-400 cursor-pointer"
+                    title="Choose from which supplier to ask for stocks"
+                  >
+                    {suppliers.map((s) => (
+                      <option key={s.id} value={s.id} className="bg-slate-900 text-white">
+                        {s.business_name} ({s.district_name || 'Depot'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <p className="font-bold text-sm text-white flex items-center gap-1.5 truncate">
+                  {supplier?.business_name || officer?.supplier_name || 'Central Regional Supplier'}
                 </p>
               )}
+
+              <div className="flex items-center justify-between text-[11px] text-blue-200/80 pt-1 border-t border-white/10">
+                <span className="truncate" title={supplier?.depot_address}>
+                  📍 {supplier?.depot_address || 'Regional Logistics Hub'}
+                </span>
+                <span className="shrink-0 font-mono text-[10px] bg-indigo-500/30 text-indigo-200 px-2 py-0.5 rounded-full font-bold ml-2">
+                  Purchased: {supplierTotalCasesPurchased} cs
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -1144,11 +1327,11 @@ export const SalesOfficerDashboard: React.FC = () => {
               </button>
 
               <button
-                onClick={() => setActiveTab('psr-team')}
+                onClick={() => setActiveTab('network')}
                 className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs cursor-pointer transition-all active:scale-95"
               >
-                <UserCheck className="w-3.5 h-3.5" />
-                <span>Review PSR Field Demands ({psrs.length} Active PSRs)</span>
+                <Building2 className="w-3.5 h-3.5" />
+                <span>Allocated Suppliers & PSR Network ({suppliers.length} Suppliers • {psrs.length} Active PSRs)</span>
               </button>
             </div>
           </div>
@@ -1198,14 +1381,15 @@ export const SalesOfficerDashboard: React.FC = () => {
           <div className="flex items-center gap-1.5 overflow-x-auto">
             {[
               { id: 'overview', label: 'Territory Hub & Stock Buffer', icon: Boxes },
+              { id: 'orders-tracking', label: `Track Orders (${psrOrders.length})`, icon: Target },
+              { id: 'network', label: `Allocated Suppliers & PSR Network (${suppliers.length} Suppliers • ${psrs.length} PSRs)`, icon: Building2 },
               { id: 'fleet-tracking', label: `Live Fleet Map Tracking (${fleetDispatches.length})`, icon: Navigation },
-              { id: 'psr-team', label: `Pre-Sales (PSR) Team & Sub-Routes (${psrs.length})`, icon: UserCheck },
+              { id: 'demands', label: `Store Demands (${requisitions.length})`, icon: Clock },
               { id: 'distributions', label: `Outlet Restock Distributions (${distributions.length})`, icon: Truck },
               { id: 'outlets', label: `Retail Stores (${outlets.length})`, icon: Store },
-              { id: 'supplier-link', label: 'Supplier Depot & Logistics', icon: Building2 },
             ].map((tab) => {
               const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
+              const isActive = activeTab === tab.id || (tab.id === 'network' && (activeTab === 'psr-team' || activeTab === 'supplier-link'));
               return (
                 <button
                   key={tab.id}
@@ -1227,6 +1411,74 @@ export const SalesOfficerDashboard: React.FC = () => {
         {/* 5. TAB 1: OVERVIEW & WHOLESALE STOCK BUFFER */}
         {activeTab === 'overview' && (
           <div className="space-y-4">
+            {/* SUPPLIER-SPECIFIC PURCHASED INVENTORY SUMMARY */}
+            <div className="rounded-3xl bg-gradient-to-r from-blue-900 via-indigo-950 to-slate-900 text-white p-5 shadow-sm border border-indigo-500/30">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] uppercase font-bold tracking-wider bg-cyan-400/20 text-cyan-300 px-2.5 py-0.5 rounded-full border border-cyan-400/30">
+                      Purchased Stocks Quantity
+                    </span>
+                    <span className="text-xs font-semibold text-blue-200">
+                      Partner: <strong className="text-white">{supplier?.business_name || 'Regional Supplier'}</strong>
+                    </span>
+                  </div>
+                  <h3 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                    <span>Purchased Cases Available:</span>
+                    <span className="text-2xl font-black font-mono text-cyan-300">{supplierTotalCasesPurchased} Cases</span>
+                  </h3>
+                  <p className="text-xs text-blue-200/80 max-w-2xl">
+                    Live record of wholesale stock quantities purchased by you from <strong>{supplier?.business_name}</strong>. Outlets order from your buffer via their route PSR.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (products.length > 0 && !reqProductId) setReqProductId(products[0].product_id);
+                      setIsRequestModalOpen(true);
+                    }}
+                    className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-bold text-xs flex items-center gap-2 shadow-md transition active:scale-95 cursor-pointer"
+                  >
+                    <Truck className="w-3.5 h-3.5" />
+                    <span>Request Stock from {supplier?.business_name?.split(' ')[0] || 'Supplier'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Per-product purchased breakdown */}
+              {supplierPurchasedStocks.length > 0 ? (
+                <div className="mt-4 pt-3 border-t border-white/10 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
+                  {supplierPurchasedStocks.map((item) => (
+                    <div key={item.product_id} className="p-2.5 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between text-xs">
+                      <div>
+                        <span className="font-semibold text-white block text-[11px] truncate max-w-[120px]">{item.product_name}</span>
+                        <span className="text-[10px] text-cyan-300 font-mono">৳{Number(item.total_spent).toLocaleString()} spent</span>
+                      </div>
+                      <span className="font-mono font-black text-sm text-cyan-300 px-2 py-0.5 rounded bg-cyan-500/20 border border-cyan-400/30">
+                        {item.purchased_cases} cs
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-3 pt-3 border-t border-white/10 text-xs text-blue-200/70 flex items-center justify-between">
+                  <span>No purchased stocks from <strong>{supplier?.business_name}</strong> in this cycle.</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (products.length > 0 && !reqProductId) setReqProductId(products[0].product_id);
+                      setIsRequestModalOpen(true);
+                    }}
+                    className="text-cyan-300 font-bold hover:underline"
+                  >
+                    Procure Stock Now →
+                  </button>
+                </div>
+              )}
+            </div>
+
             <div className="rounded-3xl bg-white border border-slate-200/90 p-5 shadow-xs">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2.5">
@@ -1497,350 +1749,1044 @@ export const SalesOfficerDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* TAB: PRE-SALES (PSR) TEAM & SUB-ROUTES */}
-        {activeTab === 'psr-team' && (
-          <div className="space-y-6">
+        {/* TAB: COMPREHENSIVE ORDERS TRACKING & LIFECYCLE */}
+        {activeTab === 'orders-tracking' && (
+          <div className="space-y-5 animate-fade-in">
+            {/* Top Stat Summary Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+              <div className="p-4 rounded-3xl bg-white border border-slate-200/90 shadow-2xs">
+                <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Total Field Orders</p>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-2xl font-black text-slate-900 font-mono">{psrOrders.length}</span>
+                  <span className="text-xs text-slate-500 font-medium">orders</span>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-0.5">Across assigned sub-routes</p>
+              </div>
+
+              <div className="p-4 rounded-3xl bg-white border border-slate-200/90 shadow-2xs">
+                <p className="text-[10px] uppercase font-bold tracking-wider text-orange-600">Awaiting SO Approval</p>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-2xl font-black text-orange-600 font-mono">
+                    {psrOrders.filter((o) => o.status === 'SUBMITTED_TO_SO' || o.status === 'PENDING').length}
+                  </span>
+                  <span className="text-xs text-orange-500 font-medium">pending</span>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-0.5">Booked by field PSRs</p>
+              </div>
+
+              <div className="p-4 rounded-3xl bg-white border border-slate-200/90 shadow-2xs">
+                <p className="text-[10px] uppercase font-bold tracking-wider text-amber-600">Sent to Supplier</p>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-2xl font-black text-amber-600 font-mono">
+                    {psrOrders.filter((o) => o.status === 'REQUESTED_FROM_SUPPLIER' || o.status === 'APPROVED_BY_SO').length}
+                  </span>
+                  <span className="text-xs text-amber-500 font-medium">in queue</span>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-0.5">Awaiting supplier fleet dispatch</p>
+              </div>
+
+              <div className="p-4 rounded-3xl bg-white border border-slate-200/90 shadow-2xs">
+                <p className="text-[10px] uppercase font-bold tracking-wider text-emerald-600">Dispatched & Delivered</p>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-2xl font-black text-emerald-600 font-mono">
+                    {psrOrders.filter((o) => o.status === 'DISPATCHED' || o.status === 'DELIVERED').length}
+                  </span>
+                  <span className="text-xs text-emerald-500 font-medium">fulfilled</span>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-0.5">Delivered to retail shelves</p>
+              </div>
+            </div>
+
+            {/* Filter and Search Bar */}
+            <div className="p-5 rounded-3xl bg-white border border-slate-200/90 shadow-xs space-y-4">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Target className="w-5 h-5 text-indigo-600" />
+                    <h3 className="font-oswald text-lg font-bold uppercase tracking-wide text-slate-900">
+                      Field Orders & Outlet Delivery Tracker
+                    </h3>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Track the full lifecycle: PSR books order from outlet &rarr; SO reviews & requests supplier &rarr; Supplier dispatches fleet &rarr; Outlet receives stock.
+                  </p>
+                </div>
+
+                {/* Supplier Binding Filter */}
+                <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-2xl border border-slate-200 text-xs shrink-0">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 px-2">Supplier Scope:</span>
+                  <button
+                    type="button"
+                    onClick={() => setOrderSupplierFilter('CURRENT')}
+                    className={`px-3 py-1 rounded-xl font-bold transition-all cursor-pointer ${
+                      orderSupplierFilter === 'CURRENT'
+                        ? 'bg-white text-indigo-700 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Dealing Supplier ({supplier?.business_name?.split(' ')[0] || 'Current'})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setOrderSupplierFilter('ALL')}
+                    className={`px-3 py-1 rounded-xl font-bold transition-all cursor-pointer ${
+                      orderSupplierFilter === 'ALL'
+                        ? 'bg-white text-indigo-700 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    All Suppliers
+                  </button>
+                </div>
+              </div>
+
+              {/* Search & Status Filter Strip */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3 border-t border-slate-100">
+                <div className="relative flex-1 max-w-md">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={orderSearchQuery}
+                    onChange={(e) => setOrderSearchQuery(e.target.value)}
+                    placeholder="Search by order code, outlet, route, PSR, or product..."
+                    className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                  />
+                  {orderSearchQuery && (
+                    <button
+                      onClick={() => setOrderSearchQuery('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0">
+                  {[
+                    { id: 'ALL', label: 'All Orders' },
+                    { id: 'SUBMITTED_TO_SO', label: 'Awaiting SO' },
+                    { id: 'REQUESTED_FROM_SUPPLIER', label: 'Sent to Supplier' },
+                    { id: 'DISPATCHED', label: 'Dispatched' },
+                    { id: 'DELIVERED', label: 'Delivered' },
+                  ].map((f) => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      onClick={() => setOrderTrackingFilter(f.id as any)}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap ${
+                        orderTrackingFilter === f.id
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Orders Lifecycle List */}
+            {filteredTrackedOrders.length === 0 ? (
+              <div className="p-12 text-center text-slate-400 bg-white rounded-3xl border border-slate-200 space-y-2">
+                <Target className="w-12 h-12 mx-auto text-slate-300" />
+                <h4 className="font-bold text-slate-700 text-base">No Orders Matching Filter</h4>
+                <p className="text-xs text-slate-400 max-w-md mx-auto">
+                  {orderSearchQuery || orderTrackingFilter !== 'ALL' || orderSupplierFilter === 'CURRENT'
+                    ? 'Try clearing the search query or switching the supplier/status filter to view other orders.'
+                    : 'When PSR field agents collect demand orders from retail outlets along their route, they will appear here in real-time.'}
+                </p>
+                {(orderSearchQuery || orderTrackingFilter !== 'ALL' || orderSupplierFilter === 'CURRENT') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOrderSearchQuery('');
+                      setOrderTrackingFilter('ALL');
+                      setOrderSupplierFilter('ALL');
+                    }}
+                    className="mt-2 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold cursor-pointer"
+                  >
+                    Reset All Filters
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {filteredTrackedOrders.map((ord) => {
+                  const isSubmittedToSo = ord.status === 'SUBMITTED_TO_SO' || ord.status === 'PENDING';
+                  const isRequestedFromSupplier = ord.status === 'REQUESTED_FROM_SUPPLIER' || ord.status === 'APPROVED_BY_SO';
+                  const isDispatched = ord.status === 'DISPATCHED';
+                  const isDelivered = ord.status === 'DELIVERED';
+
+                  const linkedPsr = psrs.find((p) => p.id === ord.psr_id || p.name === ord.psr_name || p.psr_code === ord.psr_code);
+                  const linkedSupplierName = ord.supplier_name || linkedPsr?.supplier_name || supplier?.business_name || 'Regional Supplier Hub';
+
+                  // Lifecycle Stage Numbers: 1 (Booked) -> 2 (SO Approved) -> 3 (Requested to Supplier) -> 4 (Dispatched) -> 5 (Delivered)
+                  let currentStage = 1;
+                  if (isDelivered) currentStage = 5;
+                  else if (isDispatched) currentStage = 4;
+                  else if (isRequestedFromSupplier) currentStage = 3;
+                  else if (isSubmittedToSo) currentStage = 1;
+
+                  return (
+                    <div
+                      key={ord.id}
+                      className="p-5 rounded-3xl bg-white border border-slate-200/90 hover:border-indigo-300 transition-all shadow-xs space-y-4"
+                    >
+                      {/* Top Bar: Code, Supplier, PSR, Status */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-mono text-xs font-black text-indigo-700 px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-200">
+                            {ord.order_code}
+                          </span>
+                          <span className="text-[11px] text-slate-400 font-mono">
+                            {ord.created_at ? new Date(ord.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : 'Recent'}
+                          </span>
+                          <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-mono">
+                            {ord.urgency || 'NORMAL'}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                              isDelivered
+                                ? 'bg-teal-100 text-teal-800 border border-teal-300'
+                                : isDispatched
+                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                : isRequestedFromSupplier
+                                ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                : 'bg-orange-100 text-orange-800 border border-orange-300'
+                            }`}
+                          >
+                            {isDelivered
+                              ? 'Delivered & Confirmed'
+                              : isDispatched
+                              ? 'Dispatched to Outlet'
+                              : isRequestedFromSupplier
+                              ? 'Stock Requested from Supplier'
+                              : 'Awaiting SO Approval'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Main Details Grid */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                        {/* Target Outlet & Sub-Route */}
+                        <div className="p-3.5 rounded-2xl bg-slate-50/70 border border-slate-200/80 space-y-1.5">
+                          <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block flex items-center gap-1">
+                            <Store className="w-3.5 h-3.5 text-emerald-600" />
+                            Target Retail Outlet
+                          </span>
+                          <h5 className="font-bold text-slate-900 text-sm">{ord.outlet_name}</h5>
+                          <p className="text-[11px] text-slate-500 font-medium flex items-center gap-1">
+                            <Navigation className="w-3 h-3 text-slate-400 shrink-0" />
+                            <span className="truncate" title={ord.sub_route}>{ord.sub_route}</span>
+                          </p>
+                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 inline-block">
+                            Exclusive Dispatch Destination
+                          </span>
+                        </div>
+
+                        {/* Route PSR & Linked Supplier */}
+                        <div className="p-3.5 rounded-2xl bg-slate-50/70 border border-slate-200/80 space-y-1.5">
+                          <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block flex items-center gap-1">
+                            <UserCheck className="w-3.5 h-3.5 text-orange-600" />
+                            Route Pre-Sales Officer (PSR)
+                          </span>
+                          <h5 className="font-bold text-slate-900 text-sm">{ord.psr_name || 'Assigned PSR'}</h5>
+                          <div className="pt-1 border-t border-slate-200/60 space-y-0.5">
+                            <span className="text-[10px] uppercase font-bold text-indigo-700 block flex items-center gap-1">
+                              <Building2 className="w-3 h-3 text-indigo-600" />
+                              Providing Supplier Hub
+                            </span>
+                            <p className="text-[11px] font-bold text-slate-800 truncate" title={linkedSupplierName}>
+                              {linkedSupplierName}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Beverage & Quantity */}
+                        <div className="p-3.5 rounded-2xl bg-indigo-50/50 border border-indigo-200/70 space-y-1.5 flex flex-col justify-between">
+                          <div>
+                            <span className="text-[10px] uppercase font-bold tracking-wider text-indigo-600 block flex items-center gap-1">
+                              <Package className="w-3.5 h-3.5 text-indigo-600" />
+                              Beverage Order Details
+                            </span>
+                            <h5 className="font-bold text-slate-900 text-sm mt-0.5">{ord.product_name}</h5>
+                            <div className="flex items-center justify-between text-xs mt-1">
+                              <span className="text-slate-600 font-medium">Quantity:</span>
+                              <span className="font-mono font-black text-indigo-700 text-base">{ord.quantity} Cases</span>
+                            </div>
+                          </div>
+
+                          <div className="pt-2 border-t border-indigo-200/60 flex items-center justify-between text-[11px]">
+                            <span className="text-slate-500">Total Invoiced:</span>
+                            <span className="font-mono font-black text-slate-900 text-sm">৳{Number(ord.total_amount).toLocaleString()}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 5-Stage Lifecycle Progress Bar */}
+                      <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/70 space-y-2">
+                        <div className="flex items-center justify-between text-[11px] font-bold text-slate-600">
+                          <span className="flex items-center gap-1.5">
+                            <span className={`w-2 h-2 rounded-full ${currentStage >= 1 ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                            1. Booked by PSR
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <span className={`w-2 h-2 rounded-full ${currentStage >= 2 ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                            2. Approved by SO
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <span className={`w-2 h-2 rounded-full ${currentStage >= 3 ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                            3. Sent to Supplier
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <span className={`w-2 h-2 rounded-full ${currentStage >= 4 ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                            4. Dispatched Fleet
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <span className={`w-2 h-2 rounded-full ${currentStage >= 5 ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                            5. Delivered
+                          </span>
+                        </div>
+
+                        <div className="w-full h-2 rounded-full bg-slate-200 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${
+                              isDelivered
+                                ? 'bg-gradient-to-r from-teal-500 to-emerald-500'
+                                : isDispatched
+                                ? 'bg-gradient-to-r from-blue-500 to-emerald-500'
+                                : isRequestedFromSupplier
+                                ? 'bg-gradient-to-r from-amber-500 to-blue-500'
+                                : 'bg-orange-500'
+                            }`}
+                            style={{
+                              width: `${
+                                currentStage === 5 ? 100 : currentStage === 4 ? 80 : currentStage === 3 ? 60 : currentStage === 2 ? 40 : 20
+                              }%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Action Bar */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+                        <div className="text-xs text-slate-500">
+                          {isDelivered ? (
+                            <span className="text-teal-700 font-semibold flex items-center gap-1">
+                              <CheckCircle2 className="w-4 h-4 text-teal-600" />
+                              Order fulfilled and shelf stock confirmed in {ord.outlet_name}.
+                            </span>
+                          ) : isDispatched ? (
+                            <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                              <Truck className="w-4 h-4 text-emerald-600" />
+                              Supplier dispatched fleet. Delivery team is en route to {ord.outlet_name}.
+                            </span>
+                          ) : isRequestedFromSupplier ? (
+                            <span className="text-amber-800 font-semibold flex items-center gap-1">
+                              <Clock className="w-4 h-4 text-amber-600 animate-pulse" />
+                              Awaiting {linkedSupplierName} logistics team to dispatch stock from SO purchased buffer to {ord.outlet_name}.
+                            </span>
+                          ) : (
+                            <span className="text-orange-800 font-semibold flex items-center gap-1">
+                              <AlertCircle className="w-4 h-4 text-orange-600" />
+                              Awaiting your approval to requisition stock from {linkedSupplierName}.
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          {isSubmittedToSo ? (
+                            <button
+                              type="button"
+                              disabled={loadingActionId === ord.id}
+                              onClick={() => handleTellSupplier(ord)}
+                              className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs transition shadow-sm cursor-pointer flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
+                              title={`Tell ${linkedSupplierName} that ${ord.quantity} cases of ${ord.product_name} is needed in ${ord.outlet_name}`}
+                            >
+                              <Send className="w-3.5 h-3.5" />
+                              <span>Tell Supplier (Stock Needed)</span>
+                            </button>
+                          ) : isRequestedFromSupplier ? (
+                            <span className="px-3 py-1.5 rounded-xl bg-amber-50 text-amber-800 font-bold text-xs border border-amber-200 flex items-center gap-1.5">
+                              <Clock className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
+                              <span>Supplier Notified (Pending Fleet)</span>
+                            </span>
+                          ) : (
+                            <span className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 font-bold text-xs border border-emerald-200 flex items-center gap-1.5">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>Consignment Dispatched</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB: ALLOCATED SUPPLIERS & DEDICATED PSR NETWORK */}
+        {(activeTab === 'network' || activeTab === 'psr-team' || activeTab === 'supplier-link') && (
+          <div className="space-y-6 animate-fade-in">
             {/* Operational Hierarchy Info Banner */}
             <div className="rounded-3xl bg-gradient-to-r from-orange-600 via-amber-600 to-yellow-600 text-white p-6 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="space-y-1">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="text-[10px] uppercase font-bold tracking-wider bg-white/20 px-2.5 py-0.5 rounded-full">
                     Field Distribution Hierarchy
                   </span>
-                  <span className="text-xs bg-black/20 text-white font-semibold px-2 py-0.5 rounded-full">
-                    Zone: {officer?.assigned_area || 'Territory'}
+                  <span className="text-xs bg-black/25 text-white font-semibold px-2 py-0.5 rounded-full">
+                    Territory: {officer?.assigned_area || 'Territory Zone'}
+                  </span>
+                  <span className="text-[11px] bg-white/20 text-white font-mono px-2 py-0.5 rounded-full">
+                    1 SO ↔ Multiple Suppliers ↔ Dedicated PSRs
                   </span>
                 </div>
-                <h3 className="text-xl font-black tracking-tight">
-                  Pre-Sales Representatives (PSR) & Field Sub-Routes
+                <h3 className="text-2xl font-black tracking-tight font-oswald uppercase">
+                  Allocated Suppliers & Dedicated PSR Network
                 </h3>
-                <p className="text-xs text-orange-100 max-w-2xl leading-relaxed">
-                  As Sales Officer, your assigned territory is partitioned into designated sub-routes. Dedicated Pre-Sales Officers visit retail shops along their route to book demand orders and verify refund claims. Review incoming field demands below and consolidate them into wholesale orders from your Central Supplier.
+                <p className="text-xs text-orange-100 max-w-3xl leading-relaxed">
+                  As Sales Officer, you manage the wholesale suppliers allocated to your territory. Under each supplier, individual Pre-Sales Representatives (PSRs) collect demand orders from retail outlets. Each PSR has an individual supplier who fulfills their field orders. Re-allot shops, targets, and supplier assignments directly below.
                 </p>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => {
                     if (products.length > 0 && !reqProductId) setReqProductId(products[0].product_id);
                     setIsRequestModalOpen(true);
                   }}
-                  className="px-4 py-2.5 rounded-xl bg-white text-orange-700 font-bold text-xs hover:bg-orange-50 shadow-md transition flex items-center gap-1.5 shrink-0"
+                  className="px-4 py-2.5 rounded-xl bg-white text-orange-700 font-bold text-xs hover:bg-orange-50 shadow-md transition flex items-center gap-1.5 cursor-pointer active:scale-95"
                 >
                   <Truck className="w-4 h-4" />
-                  <span>Request Supplier Stock</span>
+                  <span>Request Wholesale Stock</span>
                 </button>
               </div>
             </div>
 
-            {/* Sub-Route & PSR Representative Directory */}
-            <div className="rounded-3xl bg-white border border-slate-200/90 p-5 shadow-xs space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-oswald text-base font-bold uppercase tracking-wide text-slate-900">
-                    Assigned Field Representatives ({psrs.length})
-                  </h4>
-                  <p className="text-xs text-slate-500">
-                    PSRs deployed across sub-routes in {officer?.assigned_area || 'your area'}. Allot shops and assign SKU targets.
-                  </p>
+            {/* Network KPI Metric Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="rounded-2xl bg-white border border-slate-200/90 p-4 shadow-xs flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-700 flex items-center justify-center shrink-0">
+                  <Building2 className="w-6 h-6" />
                 </div>
-                <div className="flex items-center gap-2">
-                  {psrs.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => openAllotModal(psrs[0])}
-                      className="px-3.5 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-xs cursor-pointer active:scale-95"
-                    >
-                      <Target className="w-3.5 h-3.5" />
-                      <span>Allot Shops & Target</span>
-                    </button>
-                  )}
-                  <button
-                    onClick={() => officer?.id && fetchPsrData(officer.id)}
-                    className="p-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-500 text-xs flex items-center gap-1 transition"
-                    title="Refresh PSR team status"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    <span>Sync Routes</span>
-                  </button>
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                    Allocated Suppliers
+                  </span>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-2xl font-black font-mono text-slate-900">{suppliers.length}</span>
+                    <span className="text-xs text-slate-500 font-medium">Depots</span>
+                  </div>
                 </div>
               </div>
 
-              {psrs.length === 0 ? (
-                <div className="p-8 text-center text-slate-400 text-xs">
-                  No PSR field agents assigned yet.
+              <div className="rounded-2xl bg-white border border-slate-200/90 p-4 shadow-xs flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-orange-50 border border-orange-200 text-orange-600 flex items-center justify-center shrink-0">
+                  <UserCheck className="w-6 h-6" />
                 </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-                  {psrs.map((psr) => (
-                    <div
-                      key={psr.id}
-                      className="p-4 rounded-2xl border border-slate-200/90 bg-slate-50/50 hover:bg-white hover:border-orange-400 transition flex flex-col justify-between gap-3 shadow-2xs"
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                    Field PSRs Deployed
+                  </span>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-2xl font-black font-mono text-slate-900">{psrs.length}</span>
+                    <span className="text-xs text-slate-500 font-medium">Agents</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl bg-white border border-slate-200/90 p-4 shadow-xs flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 text-amber-700 flex items-center justify-center shrink-0">
+                  <Store className="w-6 h-6" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                    Allotted Retail Outlets
+                  </span>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-2xl font-black font-mono text-slate-900">
+                      {psrs.reduce((acc, p) => acc + (p.allotted_outlet_ids ? p.allotted_outlet_ids.length : (p.outlet_count || 0)), 0)}
+                    </span>
+                    <span className="text-xs text-slate-500 font-medium">Outlets Covered</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl bg-white border border-slate-200/90 p-4 shadow-xs flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center shrink-0">
+                  <Boxes className="w-6 h-6" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                    PSR Field Orders
+                  </span>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-2xl font-black font-mono text-slate-900">
+                      {(psrOrders.length > 0 ? psrOrders : requisitions).length}
+                    </span>
+                    <span className="text-xs text-emerald-700 font-bold font-mono">
+                      ৳{(psrOrders.length > 0 ? psrOrders : requisitions).reduce((sum, d) => sum + (Number(d.total_amount || d.total_price) || 0), 0).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Supplier Navigation Filter Pills & Search */}
+            <div className="rounded-3xl bg-white border border-slate-200/90 p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mr-1 flex items-center gap-1">
+                  <Filter className="w-3.5 h-3.5" />
+                  <span>Depot Filter:</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setActiveSupplierNetworkTab('ALL')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                    activeSupplierNetworkTab === 'ALL'
+                      ? 'bg-slate-900 text-white shadow-xs'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                  }`}
+                >
+                  <Building2 className="w-3.5 h-3.5" />
+                  <span>All Allocated Suppliers ({suppliers.length})</span>
+                </button>
+
+                {suppliers.map((s) => {
+                  const countUnderSupplier = psrs.filter((p) => Number(p.supplier_id) === Number(s.id)).length;
+                  const isCurrent = activeSupplierNetworkTab === s.id;
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => setActiveSupplierNetworkTab(s.id)}
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                        isCurrent
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : 'bg-indigo-50/80 hover:bg-indigo-100 text-indigo-900 border border-indigo-200/50'
+                      }`}
                     >
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-orange-100 text-orange-800 border border-orange-200">
+                      <span>{s.business_name.split(' ')[0]}</span>
+                      <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${isCurrent ? 'bg-white/25 text-white' : 'bg-indigo-200/70 text-indigo-800'}`}>
+                        {countUnderSupplier} PSR{countUnderSupplier !== 1 ? 's' : ''}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="relative min-w-[240px]">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={psrNetworkSearch}
+                  onChange={(e) => setPsrNetworkSearch(e.target.value)}
+                  placeholder="Search PSR name, route, phone..."
+                  className="w-full pl-9 pr-3.5 py-1.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/30"
+                />
+              </div>
+            </div>
+
+            {/* UNALLOCATED PSRs ALERT (If any PSR has no supplier assigned) */}
+            {(() => {
+              const unallocated = psrs.filter((p) => !p.supplier_id || Number(p.supplier_id) === 0);
+              if (unallocated.length === 0) return null;
+              return (
+                <div className="rounded-2xl bg-amber-50 border border-amber-300/80 p-4 shadow-xs space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+                      <div>
+                        <h4 className="font-bold text-sm text-amber-900">
+                          {unallocated.length} PSR(s) Awaiting Wholesale Supplier Allotment
+                        </h4>
+                        <p className="text-xs text-amber-800">
+                          These Pre-Sales Representatives belong to your sales officer zone but have not yet been assigned to an individual supplier depot.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {unallocated.map((psr) => (
+                      <div key={psr.id} className="p-3 rounded-xl bg-white border border-amber-200 flex items-center justify-between gap-2 shadow-2xs">
+                        <div className="min-w-0">
+                          <span className="text-[10px] font-mono font-bold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded">
                             {psr.psr_code}
                           </span>
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                            {psr.status || 'ACTIVE'}
-                          </span>
+                          <h5 className="font-bold text-xs text-slate-900 truncate mt-1">{psr.name}</h5>
+                          <p className="text-[10px] text-slate-500 font-mono">{psr.phone}</p>
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => openReallotModal(psr)}
+                          className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] shrink-0 transition shadow-xs cursor-pointer"
+                        >
+                          Allot Supplier →
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
 
-                        <div>
-                          <h5 className="font-bold text-slate-900 text-sm">{psr.name}</h5>
-                          <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                            <Phone className="w-3 h-3 text-slate-400" />
-                            <span>{psr.phone}</span>
-                          </p>
+            {/* HIERARCHICAL SUPPLIER SECTIONS WITH NESTED PSRs & TRANSACTIONS */}
+            {suppliers
+              .filter((s) => activeSupplierNetworkTab === 'ALL' || Number(activeSupplierNetworkTab) === Number(s.id))
+              .map((s) => {
+                const isSelectedForDealing = (selectedSupplierId || supplier?.id) === s.id;
+                // PSRs under this specific supplier
+                const matchingPsrs = psrs.filter((p) => {
+                  const belongsToSupplier = Number(p.supplier_id) === Number(s.id);
+                  if (!belongsToSupplier) return false;
+                  if (!psrNetworkSearch.trim()) return true;
+                  const q = psrNetworkSearch.toLowerCase();
+                  return (
+                    p.name?.toLowerCase().includes(q) ||
+                    p.psr_code?.toLowerCase().includes(q) ||
+                    p.sub_route?.toLowerCase().includes(q) ||
+                    p.phone?.toLowerCase().includes(q)
+                  );
+                });
+
+                // Field demand orders for this supplier's PSRs
+                const activeOrdersList = psrOrders.length > 0 ? psrOrders : requisitions;
+                const supplierOrders = activeOrdersList.filter((d) => {
+                  const p = psrs.find((psr) => psr.id === d.psr_id || psr.name === d.psr_name || psr.psr_code === d.psr_code);
+                  if (p && p.supplier_id) {
+                    return Number(p.supplier_id) === Number(s.id);
+                  }
+                  if (d.supplier_id) return Number(d.supplier_id) === Number(s.id);
+                  return false;
+                });
+
+                const totalCasesOrdered = supplierOrders.reduce((sum, d) => sum + (Number(d.quantity) || 0), 0);
+                const totalAmountOrdered = supplierOrders.reduce((sum, d) => sum + (Number(d.total_amount || d.total_price) || 0), 0);
+
+                return (
+                  <div
+                    key={s.id}
+                    className="rounded-3xl bg-white border border-slate-200/90 shadow-sm overflow-hidden transition-all hover:border-slate-300"
+                  >
+                    {/* SUPPLIER DEPOT HEADER */}
+                    <div className="p-6 bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 text-white flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div className="flex items-start gap-4">
+                        <div className="w-14 h-14 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-amber-400 shrink-0">
+                          <Building2 className="w-7 h-7" />
                         </div>
-
-                        <div className="p-2.5 rounded-xl bg-white border border-slate-200/80 space-y-1 text-xs">
-                          <p className="text-[10px] uppercase font-bold text-slate-400">Designated Sub-Route</p>
-                          <p className="font-semibold text-slate-800 truncate" title={psr.sub_route}>
-                            {psr.sub_route}
-                          </p>
-                        </div>
-
-                        {/* Allotted Sales Target Card */}
-                        <div className="p-2.5 rounded-xl bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 space-y-1.5 text-xs">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[10px] uppercase font-black text-amber-900 flex items-center gap-1">
-                              <Target className="w-3 h-3 text-amber-600" />
-                              Allotted Sales Target
+                        <div className="space-y-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-white/20 text-white uppercase tracking-wider">
+                              Wholesale Supplier #{s.id}
                             </span>
-                            <span className="font-mono font-bold text-xs text-orange-700 bg-white px-2 py-0.5 rounded border border-amber-200">
-                              {psr.target_cases > 0 ? `${psr.target_cases} Cases` : 'No Target Set'}
+                            {isSelectedForDealing && (
+                              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500 text-white flex items-center gap-1 shadow-xs">
+                                <CheckCircle2 className="w-3 h-3" /> Active Logistics Partner
+                              </span>
+                            )}
+                            <span className="text-[11px] text-slate-300">
+                              Zone: <strong className="text-white">{s.division_name || officer?.assigned_area || 'Regional'}</strong>
                             </span>
                           </div>
 
-                          {psr.target_sku_ounces ? (
-                            <p className="text-[11px] font-medium text-slate-700 truncate" title={psr.target_sku_ounces}>
-                              SKU (oz): <strong className="text-orange-950">{psr.target_sku_ounces}</strong>
-                            </p>
-                          ) : (
-                            <p className="text-[11px] text-slate-400 italic">No SKU target assigned</p>
-                          )}
+                          <h3 className="text-xl font-bold font-oswald tracking-wide text-white">
+                            {s.business_name}
+                          </h3>
 
-                          {psr.target_cases > 0 && (
-                            <div className="space-y-1 pt-1 border-t border-amber-200/60">
-                              <div className="flex items-center justify-between text-[10px] font-medium text-slate-600">
-                                <span>Achieved: <strong>{psr.achieved_cases || 0}</strong> Cases</span>
-                                <span>{Math.min(100, Math.round(((psr.achieved_cases || 0) / psr.target_cases) * 100))}%</span>
-                              </div>
-                              <div className="w-full h-1.5 rounded-full bg-amber-200/70 overflow-hidden">
-                                <div
-                                  className="h-full bg-gradient-to-r from-orange-500 to-amber-500 rounded-full transition-all"
-                                  style={{ width: `${Math.min(100, Math.round(((psr.achieved_cases || 0) / psr.target_cases) * 100))}%` }}
-                                />
-                              </div>
-                            </div>
-                          )}
+                          <div className="flex flex-wrap items-center gap-4 text-xs text-slate-300">
+                            <span className="flex items-center gap-1">
+                              <MapPin className="w-3.5 h-3.5 text-amber-400" />
+                              <span>{s.depot_address || 'Regional Logistics Hub'}</span>
+                            </span>
+                            {s.phone_number && (
+                              <span className="flex items-center gap-1 font-mono">
+                                <Phone className="w-3.5 h-3.5 text-amber-400" />
+                                <span>{s.phone_number}</span>
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Header Actions & Quick Metrics */}
+                      <div className="flex flex-wrap items-center gap-3">
+                        <div className="bg-white/10 border border-white/15 px-3 py-2 rounded-xl text-center min-w-[90px]">
+                          <span className="text-[10px] uppercase font-bold text-slate-400 block">Allocated PSRs</span>
+                          <span className="text-lg font-black font-mono text-amber-400">{matchingPsrs.length}</span>
+                        </div>
+                        <div className="bg-white/10 border border-white/15 px-3 py-2 rounded-xl text-center min-w-[100px]">
+                          <span className="text-[10px] uppercase font-bold text-slate-400 block">Booked Cases</span>
+                          <span className="text-lg font-black font-mono text-white">{totalCasesOrdered} cs</span>
+                        </div>
+                        <div className="bg-white/10 border border-white/15 px-3 py-2 rounded-xl text-center min-w-[110px]">
+                          <span className="text-[10px] uppercase font-bold text-slate-400 block">Transactions</span>
+                          <span className="text-lg font-black font-mono text-emerald-400">৳{totalAmountOrdered.toLocaleString()}</span>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() => openAllotModal(psr)}
-                          className="w-full mt-1 py-2 px-3 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition active:scale-95 cursor-pointer"
-                        >
-                          <Target className="w-3.5 h-3.5" />
-                          <span>Allot Shops & Set Target</span>
-                        </button>
-                      </div>
+                        <div className="flex flex-col gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedSupplierId(s.id);
+                              if (products.length > 0 && !reqProductId) setReqProductId(products[0].product_id);
+                              setIsRequestModalOpen(true);
+                            }}
+                            className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-xs shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                          >
+                            <Truck className="w-3.5 h-3.5" />
+                            <span>Procure Stock</span>
+                          </button>
 
-                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                        <span><strong>{psr.outlet_count ?? 0}</strong> outlets allotted</span>
-                        <span>•</span>
-                        <span><strong className="text-orange-600">{psr.active_orders_count ?? 0}</strong> active orders</span>
+                          {!isSelectedForDealing && (
+                            <button
+                              type="button"
+                              onClick={() => handleSelectSupplier(s.id)}
+                              className="px-3.5 py-1 rounded-xl bg-white/15 hover:bg-white/25 text-white font-bold text-[11px] transition text-center cursor-pointer"
+                            >
+                              Deal with Depot →
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
 
-            {/* Field Orders from Outlets (via PSR) */}
-            <div className="rounded-3xl bg-white border border-slate-200/90 p-5 shadow-xs space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div>
-                  <h4 className="font-oswald text-base font-bold uppercase tracking-wide text-slate-900">
-                    Incoming Outlet Orders from PSR Field Visits ({psrOrders.length})
-                  </h4>
-                  <p className="text-xs text-slate-500">
-                    Orders taken at store counters by PSRs. Consolidate into Supplier stock requests to fulfill.
-                  </p>
-                </div>
-                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-orange-100 text-orange-800 self-start sm:self-auto">
-                  {psrOrders.filter((o) => o.status === 'SUBMITTED_TO_SO').length} Awaiting SO Review
-                </span>
-              </div>
+                    {/* SUPPLIER BODY: DEDICATED PSRs + TRANSACTIONS */}
+                    <div className="p-6 space-y-6">
+                      {/* 1. DEDICATED PSR CARDS UNDER THIS SUPPLIER */}
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-lg bg-orange-100 text-orange-700 flex items-center justify-center font-bold text-xs">
+                              <UserCheck className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <h4 className="font-bold text-sm text-slate-900">
+                                Designated PSRs Operating Under {s.business_name} ({matchingPsrs.length})
+                              </h4>
+                              <p className="text-[11px] text-slate-500">
+                                This supplier fulfills demand orders exclusively for the retail outlets covered by these designated PSRs.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
 
-              {psrOrders.length === 0 ? (
-                <div className="p-8 text-center text-slate-400 text-xs">
-                  No outlet orders collected by PSRs yet. Orders taken in the PSR portal will show up here in real-time.
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50 text-slate-500 uppercase font-semibold border-b border-slate-200">
-                      <tr>
-                        <th className="p-3">Order Code</th>
-                        <th className="p-3">PSR Agent</th>
-                        <th className="p-3">Sub-Route / Outlet</th>
-                        <th className="p-3">Beverage Item</th>
-                        <th className="p-3 text-right">Cases</th>
-                        <th className="p-3 text-right">Unit Price</th>
-                        <th className="p-3 text-right">Total (৳)</th>
-                        <th className="p-3 text-center">Urgency</th>
-                        <th className="p-3 text-center">Status</th>
-                        <th className="p-3 text-right">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {psrOrders.map((ord) => {
-                        const isPending = ord.status === 'SUBMITTED_TO_SO';
-                        return (
-                          <tr key={ord.id} className="hover:bg-slate-50/70 transition">
-                            <td className="p-3 font-mono font-bold text-orange-600">{ord.order_code}</td>
-                            <td className="p-3 font-semibold text-slate-800">{ord.psr_name || 'PSR'}</td>
-                            <td className="p-3">
-                              <span className="font-bold text-slate-900 block">{ord.outlet_name}</span>
-                              <span className="text-[10px] text-slate-400 truncate block max-w-xs">{ord.sub_route}</span>
-                            </td>
-                            <td className="p-3 font-medium">{ord.product_name}</td>
-                            <td className="p-3 text-right font-black text-slate-900">{ord.quantity}</td>
-                            <td className="p-3 text-right text-slate-500">৳{Number(ord.unit_price).toFixed(2)}</td>
-                            <td className="p-3 text-right font-black text-slate-900">
-                              ৳{Number(ord.total_amount).toLocaleString()}
-                            </td>
-                            <td className="p-3 text-center">
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">
-                                {ord.urgency || 'NORMAL'}
-                              </span>
-                            </td>
-                            <td className="p-3 text-center">
-                              <span
-                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                  ord.status === 'DISPATCHED' || ord.status === 'DELIVERED'
-                                    ? 'bg-emerald-100 text-emerald-800'
-                                    : ord.status === 'REQUESTED_FROM_SUPPLIER'
-                                    ? 'bg-amber-100 text-amber-800'
-                                    : ord.status === 'APPROVED_BY_SO'
-                                    ? 'bg-blue-100 text-blue-800'
-                                    : 'bg-orange-100 text-orange-800'
-                                }`}
+                        {matchingPsrs.length === 0 ? (
+                          <div className="p-6 text-center rounded-2xl bg-slate-50 border border-dashed border-slate-200 text-xs text-slate-500 space-y-2">
+                            <p>No Pre-Sales Representatives are currently assigned to this wholesale depot.</p>
+                            <p className="text-[11px] text-slate-400">
+                              Use the button below or re-allot any field PSR from another supplier depot to this partner.
+                            </p>
+                            {psrs.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => openReallotModal(psrs[0])}
+                                className="px-3 py-1.5 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-700 font-bold text-xs transition cursor-pointer"
                               >
-                                {ord.status === 'REQUESTED_FROM_SUPPLIER' ? 'STOCK REQUESTED FROM SUPPLIER' : ord.status}
-                              </span>
-                            </td>
-                            <td className="p-3 text-right">
-                              <div className="flex items-center justify-end gap-1.5">
-                                {ord.status === 'DISPATCHED' || ord.status === 'DELIVERED' ? (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-[11px] font-bold border border-emerald-200">
-                                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                    Dispatched by Supplier to Outlet
-                                  </span>
-                                ) : ord.status === 'REQUESTED_FROM_SUPPLIER' ? (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 text-[11px] font-bold border border-amber-200">
-                                    <Clock className="w-3 h-3 text-amber-600 animate-pulse" />
-                                    Awaiting Supplier Dispatch
-                                  </span>
-                                ) : ord.status === 'APPROVED_BY_SO' ? (
-                                  <button
-                                    type="button"
-                                    disabled={loadingActionId === ord.id}
-                                    onClick={() => handleTellSupplier(ord)}
-                                    className="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white font-bold text-[11px] transition shadow-xs cursor-pointer flex items-center gap-1 active:scale-95 whitespace-nowrap disabled:opacity-50"
-                                    title="Tell Supplier stock is needed for outlet"
-                                  >
-                                    <Send className="w-3 h-3" />
-                                    <span>Tell Supplier (Stock Needed)</span>
-                                  </button>
-                                ) : isPending ? (
-                                  <button
-                                    type="button"
-                                    disabled={loadingActionId === ord.id}
-                                    onClick={() => handleTellSupplier(ord)}
-                                    className="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-[11px] transition shadow-xs cursor-pointer flex items-center gap-1 active:scale-95 whitespace-nowrap disabled:opacity-50"
-                                    title={`Tell Supplier that ${ord.quantity} cases of ${ord.product_name} is needed in ${ord.outlet_name}`}
-                                  >
-                                    <Send className="w-3 h-3" />
-                                    <span>Tell Supplier (Stock Needed)</span>
-                                  </button>
-                                ) : (
-                                  <span className="text-xs text-slate-400 font-medium">
-                                    {ord.status}
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
+                                Re-allot a PSR to this Depot
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {matchingPsrs.map((psr) => {
+                              const targetCases = psr.target_cases || 50;
+                              const currentAchievement = psr.current_month_achievement || psr.achieved_cases || 0;
+                              const progressPct = Math.min(100, Math.round((currentAchievement / targetCases) * 100));
+                              const outletsCount = psr.allotted_outlet_ids ? psr.allotted_outlet_ids.length : (psr.outlet_count || 0);
 
-            {/* Field Refund Claims & Damage Returns (via PSR) */}
-            <div className="rounded-3xl bg-white border border-slate-200/90 p-5 shadow-xs space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-oswald text-base font-bold uppercase tracking-wide text-slate-900">
-                    Outlet Damage & Refund Requests Logged by PSRs ({psrRefunds.length})
-                  </h4>
-                  <p className="text-xs text-slate-500">
-                    Defective, leaked, or expired stocks inspected in the field. Review and approve credit settlement.
-                  </p>
+                              return (
+                                <div
+                                  key={psr.id}
+                                  className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between space-y-3"
+                                >
+                                  <div className="space-y-2">
+                                    <div className="flex items-start justify-between gap-2">
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-9 h-9 rounded-xl bg-orange-100 text-orange-800 flex items-center justify-center font-bold text-xs font-mono shrink-0">
+                                          {psr.psr_code?.replace('PSR-', '') || psr.id}
+                                        </div>
+                                        <div>
+                                          <h5 className="font-bold text-slate-900 text-sm">{psr.name}</h5>
+                                          <span className="font-mono text-[10px] text-slate-500 font-semibold">{psr.psr_code}</span>
+                                        </div>
+                                      </div>
+
+                                      <span
+                                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                          psr.status === 'ACTIVE'
+                                            ? 'bg-emerald-100 text-emerald-800'
+                                            : 'bg-slate-100 text-slate-600'
+                                        }`}
+                                      >
+                                        {psr.status || 'ACTIVE'}
+                                      </span>
+                                    </div>
+
+                                    {/* Contact & Sub-Route Details */}
+                                    <div className="p-2.5 rounded-xl bg-slate-50/80 border border-slate-100 space-y-1 text-xs">
+                                      <div className="flex items-center justify-between text-slate-600">
+                                        <span className="text-[10px] uppercase font-bold text-slate-400">Field Sub-Route</span>
+                                        <span className="font-bold text-slate-800 truncate max-w-[150px]">
+                                          {psr.sub_route || 'Unassigned'}
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center justify-between text-slate-600">
+                                        <span className="text-[10px] uppercase font-bold text-slate-400">Allotted Shops</span>
+                                        <span className="font-bold text-orange-700 font-mono">
+                                          {outletsCount} Outlets
+                                        </span>
+                                      </div>
+                                      {psr.phone && (
+                                        <div className="flex items-center justify-between text-slate-600">
+                                          <span className="text-[10px] uppercase font-bold text-slate-400">Phone</span>
+                                          <span className="font-mono font-medium text-slate-700">{psr.phone}</span>
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {/* Monthly Sales Target Progress Bar */}
+                                    <div className="space-y-1">
+                                      <div className="flex items-center justify-between text-[11px]">
+                                        <span className="font-bold text-slate-700 flex items-center gap-1">
+                                          <Target className="w-3 h-3 text-orange-600" />
+                                          <span>Target Achievement</span>
+                                        </span>
+                                        <span className="font-mono font-black text-slate-900">
+                                          {currentAchievement} / {targetCases} cs ({progressPct}%)
+                                        </span>
+                                      </div>
+                                      <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                                        <div
+                                          className={`h-full rounded-full transition-all ${
+                                            progressPct >= 100
+                                              ? 'bg-emerald-600'
+                                              : progressPct >= 50
+                                              ? 'bg-amber-500'
+                                              : 'bg-orange-500'
+                                          }`}
+                                          style={{ width: `${Math.min(100, progressPct)}%` }}
+                                        />
+                                      </div>
+                                      {psr.target_sku_ounces && (
+                                        <p className="text-[10px] text-slate-400 truncate">
+                                          SKU: {psr.target_sku_ounces}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Action Buttons */}
+                                  <div className="pt-2 border-t border-slate-100 flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => openAllotModal(psr)}
+                                      className="flex-1 py-1.5 px-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs text-center transition shadow-xs cursor-pointer active:scale-95"
+                                    >
+                                      Allot Shops & Target
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => openReallotModal(psr)}
+                                      className="py-1.5 px-2.5 rounded-xl bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 font-bold text-xs transition cursor-pointer active:scale-95"
+                                      title="Switch this PSR to another wholesale supplier"
+                                    >
+                                      Switch Depot
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 2. LIVE FIELD DEMANDS & TRANSACTIONS FOR THIS SUPPLIER */}
+                      <div className="space-y-3 pt-2">
+                        <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs">
+                              <Boxes className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <h4 className="font-bold text-sm text-slate-900">
+                                Field Demands & Orders Fulfilled by {s.business_name} ({supplierOrders.length})
+                              </h4>
+                              <p className="text-[11px] text-slate-500">
+                                Retail orders booked by this depot's designated PSRs awaiting wholesale dispatch.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {supplierOrders.length === 0 ? (
+                          <div className="p-4 text-center rounded-xl bg-slate-50 text-slate-400 text-xs">
+                            No field demand orders recorded under this supplier yet.
+                          </div>
+                        ) : (
+                          <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                            <table className="w-full text-left text-xs">
+                              <thead className="bg-slate-50 text-slate-500 uppercase font-bold text-[10px] tracking-wider border-b border-slate-200">
+                                <tr>
+                                  <th className="p-3">Order / Date</th>
+                                  <th className="p-3">Booking PSR</th>
+                                  <th className="p-3">Retail Outlet</th>
+                                  <th className="p-3">Beverage Product</th>
+                                  <th className="p-3 text-right">Volume</th>
+                                  <th className="p-3 text-right">Amount (৳)</th>
+                                  <th className="p-3 text-center">Status</th>
+                                  <th className="p-3 text-right">SO Action</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {supplierOrders.slice(0, 10).map((ord) => {
+                                  const psr = psrs.find((p) => p.id === ord.psr_id || p.name === ord.psr_name);
+                                  const isPending = ord.status === 'SUBMITTED_TO_SO' || ord.status === 'PENDING' || ord.status === 'PENDING_SO_APPROVAL';
+                                  return (
+                                    <tr key={ord.id} className="hover:bg-slate-50/70 transition">
+                                      <td className="p-3">
+                                        <div className="font-mono font-bold text-slate-900">{ord.order_code || `ORD-${ord.id}`}</div>
+                                        <div className="text-[10px] text-slate-400">{ord.created_at ? new Date(ord.created_at).toLocaleDateString() : 'Today'}</div>
+                                      </td>
+                                      <td className="p-3">
+                                        <div className="font-bold text-slate-800">{psr?.name || ord.psr_name || 'Field PSR'}</div>
+                                        <div className="text-[10px] font-mono text-orange-700 font-semibold">{psr?.psr_code || 'PSR'}</div>
+                                      </td>
+                                      <td className="p-3">
+                                        <div className="font-bold text-slate-900">{ord.outlet_name || 'Retail Outlet'}</div>
+                                        <div className="text-[10px] text-slate-500 truncate max-w-[140px]">{ord.outlet_address || ord.sub_route}</div>
+                                      </td>
+                                      <td className="p-3">
+                                        <div className="font-semibold text-slate-800">{ord.product_name}</div>
+                                        <div className="text-[10px] text-slate-400 font-mono">{ord.sku || ord.urgency}</div>
+                                      </td>
+                                      <td className="p-3 text-right font-black font-mono text-slate-900">
+                                        {ord.quantity} cs
+                                      </td>
+                                      <td className="p-3 text-right font-bold text-indigo-700 font-mono">
+                                        ৳{Number(ord.total_amount || ord.total_price || 0).toLocaleString()}
+                                      </td>
+                                      <td className="p-3 text-center">
+                                        <span
+                                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                                            ord.status === 'DELIVERED' || ord.status === 'ORDER_CONFIRMED' || ord.status === 'DISPATCHED'
+                                              ? 'bg-emerald-100 text-emerald-800'
+                                              : isPending
+                                              ? 'bg-amber-100 text-amber-800'
+                                              : 'bg-blue-100 text-blue-800'
+                                          }`}
+                                        >
+                                          {ord.status || 'PENDING'}
+                                        </span>
+                                      </td>
+                                      <td className="p-3 text-right">
+                                        {isPending ? (
+                                          <button
+                                            type="button"
+                                            disabled={loadingActionId === ord.id}
+                                            onClick={() => handleTellSupplier(ord)}
+                                            className="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white font-bold text-[11px] shadow-xs cursor-pointer transition flex items-center gap-1 active:scale-95 whitespace-nowrap ml-auto disabled:opacity-50"
+                                            title="Verify and alert supplier that stock is needed"
+                                          >
+                                            <Send className="w-3 h-3" />
+                                            <span>Tell Supplier</span>
+                                          </button>
+                                        ) : (
+                                          <span className="text-[11px] text-slate-400 italic font-medium">Forwarded</span>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+            {/* FIELD REPLACEMENT & REFUND CLAIMS SUBMITTED BY PSRs */}
+            <div className="rounded-3xl bg-white border border-slate-200/90 p-6 shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-200 text-amber-700 flex items-center justify-center shrink-0">
+                    <AlertCircle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-oswald text-lg font-bold uppercase tracking-wide text-slate-900">
+                      Field Replacement & Refund Claims Verified by PSRs ({psrRefunds.length})
+                    </h4>
+                    <p className="text-xs text-slate-500">
+                      When PSRs encounter damaged bottles or expired cases in retail shops, they submit verified refund claims.
+                    </p>
+                  </div>
                 </div>
-                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-red-100 text-red-800">
-                  {psrRefunds.filter((r) => r.status === 'SUBMITTED_TO_SO').length} Pending Review
-                </span>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono font-bold px-3 py-1 rounded-xl bg-amber-50 text-amber-800 border border-amber-200">
+                    Pending Claims: {psrRefunds.filter((r) => r.status === 'SUBMITTED_TO_SO' || r.status === 'SUBMITTED_BY_PSR' || r.status === 'PENDING').length}
+                  </span>
+                </div>
               </div>
 
               {psrRefunds.length === 0 ? (
-                <div className="p-8 text-center text-slate-400 text-xs">
-                  No return claims reported by PSRs along sub-routes.
+                <div className="p-8 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-xs">
+                  No replacement or refund claims submitted by PSRs for this territory.
                 </div>
               ) : (
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto rounded-2xl border border-slate-200">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50 text-slate-500 uppercase font-semibold border-b border-slate-200">
+                    <thead className="bg-slate-50 text-slate-500 uppercase font-bold text-[10px] tracking-wider border-b border-slate-200">
                       <tr>
-                        <th className="p-3">Claim Code</th>
-                        <th className="p-3">PSR Inspector</th>
-                        <th className="p-3">Outlet Store</th>
-                        <th className="p-3">Product</th>
-                        <th className="p-3 text-right">Units</th>
-                        <th className="p-3 text-right">Amount (৳)</th>
-                        <th className="p-3">Reason</th>
+                        <th className="p-3">Claim ID / Date</th>
+                        <th className="p-3">PSR Representative</th>
+                        <th className="p-3">Retail Outlet</th>
+                        <th className="p-3">Defective Product</th>
+                        <th className="p-3 text-right">Quantity</th>
+                        <th className="p-3 text-right">Estimated Amount</th>
                         <th className="p-3 text-center">Status</th>
-                        <th className="p-3 text-right">Action</th>
+                        <th className="p-3 text-right">SO Verification</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {psrRefunds.map((ref) => {
-                        const isPending = ref.status === 'SUBMITTED_TO_SO';
+                        const isPending = ref.status === 'SUBMITTED_TO_SO' || ref.status === 'SUBMITTED_BY_PSR' || ref.status === 'PENDING';
                         return (
                           <tr key={ref.id} className="hover:bg-slate-50/70 transition">
-                            <td className="p-3 font-mono font-bold text-red-600">{ref.refund_code}</td>
-                            <td className="p-3 font-medium text-slate-800">{ref.psr_name || 'PSR'}</td>
-                            <td className="p-3 font-bold text-slate-900">{ref.outlet_name}</td>
-                            <td className="p-3 font-medium">{ref.product_name}</td>
-                            <td className="p-3 text-right font-black text-red-600">{ref.quantity}</td>
-                            <td className="p-3 text-right font-black text-slate-900">
-                              ৳{Number(ref.refund_amount).toLocaleString()}
+                            <td className="p-3">
+                              <span className="font-mono font-bold text-slate-900">{ref.claim_code || `REF-${ref.id}`}</span>
+                              <div className="text-[10px] text-slate-400">{ref.created_at ? new Date(ref.created_at).toLocaleDateString() : 'Recent'}</div>
                             </td>
                             <td className="p-3">
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-700 border border-red-200">
-                                {ref.reason}
-                              </span>
+                              <span className="font-bold text-slate-800">{ref.psr_name || `PSR #${ref.psr_id}`}</span>
+                            </td>
+                            <td className="p-3">
+                              <span className="font-bold text-slate-900">{ref.outlet_name || 'Retail Shop'}</span>
+                              <div className="text-[10px] text-slate-500 truncate max-w-[140px]">{ref.outlet_address}</div>
+                            </td>
+                            <td className="p-3">
+                              <span className="font-semibold text-slate-800">{ref.product_name}</span>
+                              <div className="text-[10px] text-amber-700 italic">{ref.reason || 'Damaged seal / broken bottle'}</div>
+                            </td>
+                            <td className="p-3 text-right font-black font-mono text-slate-900">
+                              {ref.quantity} {ref.quantity_type || 'bottles'}
+                            </td>
+                            <td className="p-3 text-right font-bold text-orange-700 font-mono">
+                              ৳{Number(ref.refund_amount || ref.estimated_amount || 0).toLocaleString()}
                             </td>
                             <td className="p-3 text-center">
                               <span
-                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
                                   ref.status === 'SETTLED'
                                     ? 'bg-emerald-100 text-emerald-800'
                                     : ref.status === 'APPROVED_BY_SO'
@@ -1859,21 +2805,21 @@ export const SalesOfficerDashboard: React.FC = () => {
                                   <button
                                     type="button"
                                     onClick={() => handleUpdatePsrRefundStatus(ref.id, 'APPROVED_BY_SO', 'Verified by Sales Officer')}
-                                    className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] transition"
+                                    className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] transition cursor-pointer"
                                   >
                                     Approve
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => handleUpdatePsrRefundStatus(ref.id, 'SETTLED', 'Credit settled')}
-                                    className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] transition"
+                                    className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] transition cursor-pointer"
                                   >
                                     Settle
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => handleUpdatePsrRefundStatus(ref.id, 'REJECTED', 'Claim rejected')}
-                                    className="px-2 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 font-bold text-[11px] transition"
+                                    className="px-2 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 font-bold text-[11px] transition cursor-pointer"
                                   >
                                     Reject
                                   </button>
@@ -2308,52 +3254,6 @@ export const SalesOfficerDashboard: React.FC = () => {
             </div>
           </div>
         )}
-
-        {/* 8. TAB 4: SUPPLIER LOGISTICS & LINK */}
-        {activeTab === 'supplier-link' && (
-          <div className="space-y-4">
-            <div className="rounded-3xl bg-white border border-slate-200/90 p-6 shadow-xs space-y-5">
-              <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
-                <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-700 flex items-center justify-center shrink-0">
-                  <Building2 className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="font-oswald text-xl font-bold uppercase tracking-wide text-slate-900">
-                    Linked Supplier Regional Depot
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    Your assigned wholesale partner providing beverage cases for {officer?.assigned_area}.
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Supplier Enterprise</span>
-                  <h4 className="font-bold text-base text-slate-900">{supplier?.business_name || officer?.supplier_name}</h4>
-                  <p className="text-xs text-slate-600 flex items-start gap-1.5">
-                    <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                    <span>Depot: {supplier?.depot_address || 'Central Regional Warehouse Hub'}</span>
-                  </p>
-                  {supplier?.phone_number && (
-                    <p className="text-xs text-slate-600 flex items-center gap-1.5 font-mono">
-                      <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      <span>{supplier.phone_number}</span>
-                    </p>
-                  )}
-                </div>
-
-                <div className="p-4 rounded-2xl bg-blue-50/50 border border-blue-200 text-xs text-blue-900 space-y-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600">Distribution Mandate</span>
-                  <p className="leading-relaxed">
-                    As an authorized Sales Officer, you represent {supplier?.business_name} in the <strong>{officer?.assigned_area}</strong> territory zone. 
-                    Retail outlets place demand requisitions with you, and wholesale buffer inventory is dispatched directly from this supplier hub to your field accounts.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </main>
 
       {/* REQUEST STOCK FROM SUPPLIER MODAL */}
@@ -2383,6 +3283,24 @@ export const SalesOfficerDashboard: React.FC = () => {
             </div>
 
             <form onSubmit={handleRequestStockFromSupplier} className="p-6 space-y-4">
+              {/* Target Regional Supplier Selector */}
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+                  Target Regional Supplier *
+                </label>
+                <select
+                  value={selectedSupplierId || supplier?.id || ''}
+                  onChange={(e) => handleSelectSupplier(Number(e.target.value))}
+                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 cursor-pointer"
+                >
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.business_name} ({s.depot_address || 'Regional Depot'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               {/* Supplier Info */}
               <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
                 <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
@@ -2521,6 +3439,29 @@ export const SalesOfficerDashboard: React.FC = () => {
 
             {/* Modal Form */}
             <form onSubmit={handleAllotSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
+              {/* 0. Wholesale Supplier Allocation */}
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1">
+                  <Building2 className="w-3.5 h-3.5 text-orange-600" />
+                  <span>Wholesale Supplier (Designated Logistics Partner) *</span>
+                </label>
+                <select
+                  value={allotSupplierId}
+                  onChange={(e) => setAllotSupplierId(e.target.value)}
+                  className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/30"
+                >
+                  <option value="">-- No Wholesale Supplier Assigned --</option>
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.business_name} (Depot #{s.id} - {s.depot_address || 'Regional Depot'})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-slate-500">
+                  Each PSR operates under one dedicated wholesale supplier who fulfills their field orders.
+                </p>
+              </div>
+
               {/* 1. Sub-Route Selection */}
               <div className="space-y-1.5">
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1">
@@ -2813,6 +3754,101 @@ export const SalesOfficerDashboard: React.FC = () => {
                     <>
                       <CheckCircle2 className="w-3.5 h-3.5" />
                       <span>Save Allotment & Assign Target</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* QUICK RE-ALLOT WHOLESALE SUPPLIER MODAL */}
+      {reallotModalPsr && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden animate-scale-up">
+            <div className="px-6 py-5 bg-gradient-to-r from-orange-600 to-amber-600 text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center">
+                  <Building2 className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-oswald text-lg font-bold uppercase tracking-wide">
+                    Re-allot Wholesale Supplier
+                  </h3>
+                  <p className="text-xs text-orange-100">
+                    Assign a new Wholesale Supplier to {reallotModalPsr.name} ({reallotModalPsr.psr_code})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReallotModalPsr(null)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleQuickReallotSupplier} className="p-6 space-y-4">
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-600">Field Representative:</span>
+                  <span className="font-bold text-slate-900">{reallotModalPsr.name} ({reallotModalPsr.psr_code})</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-600">Current Assigned Supplier:</span>
+                  <span className="font-bold text-orange-700 font-mono">
+                    {reallotModalPsr.supplier_name || 'None Assigned'}
+                  </span>
+                </div>
+                {reallotModalPsr.sub_route && (
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-600">Sub-Route:</span>
+                    <span className="font-medium text-slate-800">{reallotModalPsr.sub_route}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700">
+                  Select New Wholesale Supplier *
+                </label>
+                <select
+                  value={reallotSupplierId}
+                  onChange={(e) => setReallotSupplierId(e.target.value)}
+                  className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/30"
+                >
+                  <option value="">-- Remove Supplier Allocation --</option>
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.business_name} (Depot #{s.id} - {s.depot_address || 'Logistics Hub'})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-slate-500">
+                  One PSR can only have one individual supplier. All future orders booked by this PSR will route to this supplier depot.
+                </p>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setReallotModalPsr(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={reallotSubmitting}
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 text-white font-bold text-xs shadow-md shadow-orange-600/20 flex items-center gap-2 hover:from-orange-700 hover:to-amber-700 disabled:opacity-50 transition cursor-pointer"
+                >
+                  {reallotSubmitting ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Confirm Supplier Allocation</span>
                     </>
                   )}
                 </button>
