@@ -568,8 +568,8 @@ export const SuperadminDashboard: React.FC = () => {
             {activeTab === 'suppliers' && <SuperadminSupplierManagement />}
             {activeTab === 'sales-officers' && <SuperadminSalesOfficerManagement />}
             {activeTab === 'psr-officers' && <SuperadminPsrManagement />}
-            {activeTab === 'deliveries' && <SuperadminDeliveryManagement initialSubTab="all" />}
-            {activeTab === 'fleet-tracker' && <SuperadminDeliveryManagement initialSubTab="map" />}
+            {activeTab === 'deliveries' && <SuperadminDeliveryManagement showMap={false} initialSubTab="trips" />}
+            {activeTab === 'fleet-tracker' && <SuperadminDeliveryManagement showMap={true} initialSubTab="map" />}
             {activeTab === 'logs' && <SuperadminCommercialLogs />}
             {activeTab === 'tables' && (
               <DatabaseExplorer onOpenQueryWithTable={handleOpenQueryWithTable} />

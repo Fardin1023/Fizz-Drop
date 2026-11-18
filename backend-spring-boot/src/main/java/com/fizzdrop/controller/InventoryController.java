@@ -969,7 +969,62 @@ public class InventoryController {
                 "FROM outlet_requisitions WHERE outlet_id = ? ORDER BY created_date DESC LIMIT 50",
                 outletId
             );
-            return ResponseEntity.ok(reqs);
+
+            // Fetch recent dispatches for this outlet to correlate live tracking & delivery progression
+            List<Map<String, Object>> dispatches = jdbcTemplate.queryForList(
+                "SELECT d.id, d.dispatch_code, d.status as dispatch_status, d.boarded_at, d.ride_started_at, d.delivered_at, d.items_json, " +
+                "t.vehicle_registration_no, t.driver_name, t.driver_phone, d.sub_route " +
+                "FROM supplier_delivery_dispatches d " +
+                "LEFT JOIN supplier_delivery_teams t ON d.delivery_team_id = t.id " +
+                "WHERE d.items_json LIKE CONCAT('%\"outlet_id\":', ?, '%') " +
+                "ORDER BY d.id DESC LIMIT 20",
+                outletId
+            );
+
+            List<Map<String, Object>> enriched = new ArrayList<>();
+            for (Map<String, Object> r : reqs) {
+                Map<String, Object> row = new HashMap<>(r);
+                Long rId = ((Number) r.get("id")).longValue();
+                String rCode = r.get("requisition_code") != null ? r.get("requisition_code").toString() : "";
+
+                for (Map<String, Object> disp : dispatches) {
+                    if (disp.get("items_json") != null) {
+                        String itemsStr = disp.get("items_json").toString();
+                        if (itemsStr.contains("\"requisition_id\":" + rId) || (!rCode.isEmpty() && itemsStr.contains(rCode))) {
+                            String dStatus = (String) disp.get("dispatch_status");
+                            String regNo = (String) disp.get("vehicle_registration_no");
+                            String driver = (String) disp.get("driver_name");
+                            String phone = (String) disp.get("driver_phone");
+
+                            row.put("dispatch_id", disp.get("id"));
+                            row.put("dispatch_code", disp.get("dispatch_code"));
+                            row.put("vehicle_registration_no", regNo);
+                            row.put("driver_name", driver);
+                            row.put("driver_phone", phone);
+                            row.put("sub_route", disp.get("sub_route"));
+                            row.put("boarded_at", disp.get("boarded_at"));
+                            row.put("ride_started_at", disp.get("ride_started_at"));
+
+                            String currentRStatus = String.valueOf(r.get("status"));
+                            if (!"COMPLETED".equalsIgnoreCase(currentRStatus) && !currentRStatus.toUpperCase().startsWith("CANCEL")) {
+                                if ("IN_TRANSIT".equalsIgnoreCase(dStatus)) {
+                                    row.put("status", "IN_TRANSIT");
+                                    row.put("admin_supplier_notes", "On the way to outlet via " + (regNo != null ? regNo : "Truck") + " (Driver: " + (driver != null ? driver : "Assigned") + ")");
+                                } else if ("BOARDED".equalsIgnoreCase(dStatus)) {
+                                    row.put("status", "BOARDED");
+                                    row.put("admin_supplier_notes", "Verified & Boarded on truck " + (regNo != null ? regNo : "Truck") + " (Driver: " + (driver != null ? driver : "Assigned") + ")");
+                                } else if ("DELIVERED".equalsIgnoreCase(dStatus)) {
+                                    row.put("status", "DELIVERED");
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+                enriched.add(row);
+            }
+
+            return ResponseEntity.ok(enriched);
         } catch (Exception e) {
             return ResponseEntity.ok(Collections.emptyList());
         }

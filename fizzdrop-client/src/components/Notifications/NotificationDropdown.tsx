@@ -10,6 +10,7 @@ import {
   Clock,
   Sparkles,
   Trash2,
+  Zap,
 } from 'lucide-react';
 import type { AppNotification } from '../../types/notification';
 import { getNotificationDestination } from '../../utils/notificationRouter';
@@ -37,6 +38,41 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [respondingOfferId, setRespondingOfferId] = useState<string | null>(null);
+  const [offerStatuses, setOfferStatuses] = useState<Record<string, string>>({});
+
+  const handleDropdownRespondOffer = async (e: React.MouseEvent, n: AppNotification, action: 'ACCEPT' | 'DENY') => {
+    e.stopPropagation();
+    const code = n.reference_code || n.reference_id;
+    if (!code) return;
+    setRespondingOfferId(String(code));
+    try {
+      const res = await fetch(`http://localhost:8080/api/v1/delivery/stock-offers/${code}/respond`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setOfferStatuses((prev) => ({ ...prev, [String(code)]: action }));
+        onMarkAsRead(n.id);
+        try {
+          const ch = new BroadcastChannel('fizzdrop_realtime_events');
+          ch.postMessage({
+            type: 'STOCK_OFFER_RESPONDED',
+            action,
+            code,
+            outlet_id: n.recipient_user_id,
+          });
+          ch.close();
+        } catch (ignored) {}
+      }
+    } catch (err) {
+      console.error('Error in dropdown stock offer response', err);
+    } finally {
+      setRespondingOfferId(null);
+    }
+  };
 
   // Close when clicking outside
   useEffect(() => {
@@ -147,8 +183,9 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
               </div>
             ) : (
               notifications.map((n) => {
+                const isStockOffer = n.type === 'STOCK_OFFER_RECEIVED';
                 const isDirectDispatch = n.type === 'DIRECT_DISPATCH' || n.type === 'DIRECT_SUPPLY';
-            const isApproved = n.type === 'APPROVED';
+                const isApproved = n.type === 'APPROVED';
                 const isPartial = n.type === 'PARTIALLY_APPROVED';
                 const isRejected = n.type === 'REJECTED';
                 const isNewReq = n.type === 'NEW_REQUISITION';
@@ -172,7 +209,9 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
                     {/* Icon */}
                     <div
                       className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
-                        isDirectDispatch
+                        isStockOffer
+                          ? 'bg-purple-100 text-purple-700 border border-purple-200'
+                          : isDirectDispatch
                           ? 'bg-purple-100 text-purple-700 border border-purple-200'
                           : isApproved
                           ? 'bg-emerald-100 text-emerald-700'
@@ -185,7 +224,9 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
                           : 'bg-slate-100 text-slate-700'
                       }`}
                     >
-                      {isDirectDispatch ? (
+                      {isStockOffer ? (
+                        <Zap className="w-4 h-4 text-purple-600" />
+                      ) : isDirectDispatch ? (
                         <PackageCheck className="w-4 h-4 text-purple-600" />
                       ) : isApproved ? (
                         <CheckCircle2 className="w-4 h-4" />
@@ -233,6 +274,42 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
                       <p className="text-[11px] text-slate-500 line-clamp-2 mt-0.5 leading-snug">
                         {n.message}
                       </p>
+
+                      {/* Stock Offer Interactive Accept / Deny Buttons */}
+                      {isStockOffer && (
+                        <div className="mt-2 flex items-center gap-2">
+                          {offerStatuses[String(n.reference_code || n.reference_id)] === 'ACCEPT' ? (
+                            <span className="px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                              ✓ Stock Offer Accepted
+                            </span>
+                          ) : offerStatuses[String(n.reference_code || n.reference_id)] === 'DENY' ? (
+                            <span className="px-2 py-0.5 rounded-lg bg-rose-100 text-rose-800 text-[10px] font-bold">
+                              ✕ Stock Offer Denied
+                            </span>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                onClick={(e) => handleDropdownRespondOffer(e, n, 'ACCEPT')}
+                                disabled={respondingOfferId === String(n.reference_code || n.reference_id)}
+                                className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] flex items-center gap-1 shadow-xs transition-all active:scale-95 cursor-pointer"
+                              >
+                                <CheckCircle2 className="w-3 h-3" />
+                                <span>{respondingOfferId === String(n.reference_code || n.reference_id) ? 'Accepting...' : 'Accept'}</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => handleDropdownRespondOffer(e, n, 'DENY')}
+                                disabled={respondingOfferId === String(n.reference_code || n.reference_id)}
+                                className="px-2.5 py-1 rounded-lg border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-[10px] flex items-center gap-1 shadow-xs transition-all active:scale-95 cursor-pointer"
+                              >
+                                <XCircle className="w-3 h-3" />
+                                <span>{respondingOfferId === String(n.reference_code || n.reference_id) ? 'Denying...' : 'Deny'}</span>
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      )}
 
                       <div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-slate-400 font-mono">
                         <div className="flex items-center gap-1.5 flex-wrap">

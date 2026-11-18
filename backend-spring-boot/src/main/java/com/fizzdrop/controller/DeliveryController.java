@@ -576,6 +576,44 @@ public class DeliveryController {
             );
         } catch (Exception ignored) {}
 
+        // Update assigned outlet requisitions to BOARDED and notify outlets in real time
+        if (trip.get("items_json") != null) {
+            try {
+                List<Map<String, Object>> items = objectMapper.readValue(
+                    trip.get("items_json").toString(),
+                    new TypeReference<List<Map<String, Object>>>() {}
+                );
+                Set<Long> notifiedOutlets = new HashSet<>();
+                for (Map<String, Object> it : items) {
+                    if (it.get("requisition_id") != null) {
+                        try {
+                            Long rId = Long.parseLong(it.get("requisition_id").toString());
+                            jdbcTemplate.update(
+                                "UPDATE outlet_requisitions SET status = 'BOARDED', admin_supplier_notes = ?, updated_date = NOW() WHERE id = ?",
+                                "Verified & Boarded on truck " + regNo + " (" + driver + ")", rId
+                            );
+                        } catch (Exception ignored) {}
+                    }
+                    if (it.get("outlet_id") != null) {
+                        try {
+                            Long outId = Long.parseLong(it.get("outlet_id").toString());
+                            if (notifiedOutlets.add(outId)) {
+                                AppNotification outNotif = new AppNotification();
+                                outNotif.setRecipientRole("OUTLET");
+                                outNotif.setRecipientUserId(outId);
+                                outNotif.setTitle("📦 Order Boarded on Delivery Truck (" + regNo + ")");
+                                outNotif.setMessage("Your restock consignment has been verified and loaded onto vehicle " + regNo + " by driver " + driver + ". Departure shortly.");
+                                outNotif.setType("OUTLET_STOCKS_BOARDED");
+                                outNotif.setReferenceCode((String) trip.get("dispatch_code"));
+                                outNotif.setReferenceId(id);
+                                notificationRepository.save(outNotif);
+                            }
+                        } catch (Exception ignored) {}
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+
         return ResponseEntity.ok(Map.of(
             "success", true,
             "status", "BOARDED",
@@ -629,6 +667,44 @@ public class DeliveryController {
                 id
             );
         } catch (Exception ignored) {}
+
+        // Update assigned outlet requisitions to IN_TRANSIT and notify outlets in real time
+        if (trip.get("items_json") != null) {
+            try {
+                List<Map<String, Object>> items = objectMapper.readValue(
+                    trip.get("items_json").toString(),
+                    new TypeReference<List<Map<String, Object>>>() {}
+                );
+                Set<Long> notifiedOutlets = new HashSet<>();
+                for (Map<String, Object> it : items) {
+                    if (it.get("requisition_id") != null) {
+                        try {
+                            Long rId = Long.parseLong(it.get("requisition_id").toString());
+                            jdbcTemplate.update(
+                                "UPDATE outlet_requisitions SET status = 'IN_TRANSIT', admin_supplier_notes = ?, updated_date = NOW() WHERE id = ?",
+                                "On the way to outlet via " + regNo + " (Driver: " + driver + ")", rId
+                            );
+                        } catch (Exception ignored) {}
+                    }
+                    if (it.get("outlet_id") != null) {
+                        try {
+                            Long outId = Long.parseLong(it.get("outlet_id").toString());
+                            if (notifiedOutlets.add(outId)) {
+                                AppNotification outNotif = new AppNotification();
+                                outNotif.setRecipientRole("OUTLET");
+                                outNotif.setRecipientUserId(outId);
+                                outNotif.setTitle("🚚 Delivery Truck On The Way! (" + regNo + ")");
+                                outNotif.setMessage("Delivery truck " + regNo + " (driver " + driver + ") has departed depot and is now on the way to your outlet along " + route + "!");
+                                outNotif.setType("OUTLET_RIDE_STARTED");
+                                outNotif.setReferenceCode((String) trip.get("dispatch_code"));
+                                outNotif.setReferenceId(id);
+                                notificationRepository.save(outNotif);
+                            }
+                        } catch (Exception ignored) {}
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
 
         return ResponseEntity.ok(Map.of(
             "success", true,
@@ -1045,6 +1121,615 @@ public class DeliveryController {
         ));
     }
 
+    @PostMapping("/cancel-outlet-order")
+    public ResponseEntity<?> cancelOutletOrder(@RequestBody Map<String, Object> body) {
+        if (!body.containsKey("outlet_id") || body.get("outlet_id") == null) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("Missing outlet_id."));
+        }
+        Long outletId = Long.parseLong(body.get("outlet_id").toString());
+        Long dispatchId = body.containsKey("dispatch_id") && body.get("dispatch_id") != null
+                ? Long.parseLong(body.get("dispatch_id").toString()) : null;
+        Long requisitionId = body.containsKey("requisition_id") && body.get("requisition_id") != null
+                ? Long.parseLong(body.get("requisition_id").toString()) : null;
+        String reason = body.containsKey("reason") && body.get("reason") != null
+                ? body.get("reason").toString() : "Cancelled by outlet while vehicle in transit";
+
+        // 1. Fetch Outlet details
+        String outletName = "Outlet #" + outletId;
+        try {
+            List<Map<String, Object>> outRows = jdbcTemplate.queryForList("SELECT outlet_name, branch_name FROM outlets WHERE outlet_id = ?", outletId);
+            if (!outRows.isEmpty()) {
+                outletName = (String) outRows.get(0).get("outlet_name");
+                if (outRows.get(0).get("branch_name") != null) {
+                    outletName += " (" + outRows.get(0).get("branch_name") + ")";
+                }
+            }
+        } catch (Exception ignored) {}
+
+        BigDecimal totalRefundAmount = BigDecimal.ZERO;
+        int totalCancelledCases = 0;
+        String refCode = "CANCEL-" + System.currentTimeMillis();
+
+        // 2. Identify and Cancel Requisitions
+        List<Map<String, Object>> targetReqs = new ArrayList<>();
+        if (requisitionId != null) {
+            targetReqs = jdbcTemplate.queryForList("SELECT * FROM outlet_requisitions WHERE id = ? AND outlet_id = ?", requisitionId, outletId);
+        } else if (dispatchId != null) {
+            List<Map<String, Object>> dispRows = jdbcTemplate.queryForList("SELECT * FROM supplier_delivery_dispatches WHERE id = ?", dispatchId);
+            if (!dispRows.isEmpty() && dispRows.get(0).get("items_json") != null) {
+                try {
+                    List<Map<String, Object>> its = objectMapper.readValue(dispRows.get(0).get("items_json").toString(), new TypeReference<List<Map<String, Object>>>() {});
+                    for (Map<String, Object> it : its) {
+                        Long oid = it.get("outlet_id") != null ? Long.parseLong(it.get("outlet_id").toString()) : -1L;
+                        if (oid.equals(outletId)) {
+                            Long rId = it.get("requisition_id") != null ? Long.parseLong(it.get("requisition_id").toString()) : null;
+                            if (rId != null) {
+                                targetReqs.addAll(jdbcTemplate.queryForList("SELECT * FROM outlet_requisitions WHERE id = ?", rId));
+                            }
+                        }
+                    }
+                } catch (Exception ignored) {}
+            }
+        }
+
+        if (targetReqs.isEmpty() && requisitionId != null) {
+            targetReqs = jdbcTemplate.queryForList("SELECT * FROM outlet_requisitions WHERE id = ?", requisitionId);
+        }
+
+        List<String> prodNames = new ArrayList<>();
+        for (Map<String, Object> req : targetReqs) {
+            Long reqId = ((Number) req.get("id")).longValue();
+            String rCode = req.get("requisition_code") != null ? req.get("requisition_code").toString() : ("REQ-" + reqId);
+            refCode = rCode;
+            int qty = ((Number) req.getOrDefault("quantity", 0)).intValue();
+            totalCancelledCases += qty;
+            BigDecimal amt = req.get("total_amount") != null ? new BigDecimal(req.get("total_amount").toString()) : BigDecimal.valueOf(qty * 35.0);
+            totalRefundAmount = totalRefundAmount.add(amt);
+            if (req.get("product_name") != null) prodNames.add(req.get("product_name").toString());
+
+            jdbcTemplate.update(
+                "UPDATE outlet_requisitions SET status = 'CANCELLED_REFUNDED', " +
+                "admin_supplier_notes = CONCAT('CANCELLED & REFUNDED (৳', ?, ') - ', ?), " +
+                "updated_date = NOW() WHERE id = ?",
+                amt, reason, reqId
+            );
+        }
+        String affectedProducts = String.join(", ", prodNames);
+        if (affectedProducts.isEmpty()) affectedProducts = "Assigned Beverages";
+
+        // 3. Update the Delivery Dispatch items_json and stop status
+        List<Map<String, Object>> candidateDispatches = new ArrayList<>();
+        if (dispatchId != null) {
+            candidateDispatches = jdbcTemplate.queryForList(
+                "SELECT d.*, t.vehicle_registration_no, t.driver_name, t.driver_phone, t.id as team_id " +
+                "FROM supplier_delivery_dispatches d " +
+                "LEFT JOIN supplier_delivery_teams t ON d.delivery_team_id = t.id " +
+                "WHERE d.id = ?", dispatchId
+            );
+        } else {
+            candidateDispatches = jdbcTemplate.queryForList(
+                "SELECT d.*, t.vehicle_registration_no, t.driver_name, t.driver_phone, t.id as team_id " +
+                "FROM supplier_delivery_dispatches d " +
+                "LEFT JOIN supplier_delivery_teams t ON d.delivery_team_id = t.id " +
+                "WHERE d.items_json LIKE CONCAT('%\"outlet_id\":', ?, '%') " +
+                "AND d.status IN ('DISPATCHED', 'BOARDED', 'IN_TRANSIT', 'DELIVERING') ORDER BY d.id DESC LIMIT 5",
+                outletId
+            );
+        }
+
+        for (Map<String, Object> trip : candidateDispatches) {
+            Long tripId = ((Number) trip.get("id")).longValue();
+            Long teamId = trip.get("team_id") != null ? ((Number) trip.get("team_id")).longValue() : null;
+            Long supplierId = trip.get("supplier_id") != null ? ((Number) trip.get("supplier_id")).longValue() : 1L;
+            String regNo = (String) trip.getOrDefault("vehicle_registration_no", "FLEET");
+            String driver = (String) trip.getOrDefault("driver_name", "Driver");
+            String route = (String) trip.getOrDefault("sub_route", "Route");
+            String dispCode = (String) trip.getOrDefault("dispatch_code", "DSP-" + tripId);
+
+            if (trip.get("items_json") != null) {
+                try {
+                    List<Map<String, Object>> items = objectMapper.readValue(
+                        trip.get("items_json").toString(),
+                        new TypeReference<List<Map<String, Object>>>() {}
+                    );
+                    boolean modified = false;
+                    int activeStopsCount = 0;
+                    for (Map<String, Object> it : items) {
+                        Long oid = it.get("outlet_id") != null ? Long.parseLong(it.get("outlet_id").toString()) : -1L;
+                        if (oid.equals(outletId)) {
+                            it.put("stop_status", "CANCELLED");
+                            it.put("is_cancelled", true);
+                            it.put("cancelled_at", LocalDateTime.now().toString());
+                            it.put("cancellation_reason", reason);
+                            it.put("refund_amount", totalRefundAmount.doubleValue());
+                            modified = true;
+                        } else if (!"CANCELLED".equalsIgnoreCase(String.valueOf(it.get("stop_status")))
+                                && !"CONFIRMED_BY_OUTLET".equalsIgnoreCase(String.valueOf(it.get("stop_status")))) {
+                            activeStopsCount++;
+                        }
+                    }
+
+                    if (modified) {
+                        String updatedJson = objectMapper.writeValueAsString(items);
+                        String newDispStatus = (activeStopsCount == 0) ? "CANCELLED" : trip.get("status").toString();
+                        jdbcTemplate.update(
+                            "UPDATE supplier_delivery_dispatches SET items_json = ?, status = ?, updated_at = NOW() WHERE id = ?",
+                            updatedJson, newDispStatus, tripId
+                        );
+
+                        if ("CANCELLED".equals(newDispStatus) && teamId != null) {
+                            jdbcTemplate.update("UPDATE supplier_delivery_teams SET status = 'AVAILABLE', updated_at = NOW() WHERE id = ?", teamId);
+                        }
+                    }
+                } catch (Exception ignored) {}
+            }
+
+            // 4. Send Cancellation Notification directly to DELIVERY TEAM
+            try {
+                if (teamId != null) {
+                    AppNotification teamNotif = new AppNotification();
+                    teamNotif.setRecipientRole("DELIVERY_TEAM");
+                    teamNotif.setRecipientUserId(teamId);
+                    teamNotif.setTitle("🚨 STOP CANCELLED: Order Cancelled by " + outletName);
+                    teamNotif.setMessage("Outlet " + outletName + " has cancelled order (" + totalCancelledCases + " cases of " + affectedProducts + ") on route '" + route + "' and received a full refund (৳" + String.format(Locale.US, "%.2f", totalRefundAmount.doubleValue()) + "). DO NOT deliver this consignment. Skip this stop.");
+                    teamNotif.setType("DELIVERY_ORDER_CANCELLED");
+                    teamNotif.setReferenceCode(dispCode);
+                    teamNotif.setReferenceId(tripId);
+                    notificationRepository.save(teamNotif);
+                }
+
+                AppNotification teamBroadcast = new AppNotification();
+                teamBroadcast.setRecipientRole("DELIVERY_TEAM");
+                teamBroadcast.setRecipientUserId(null);
+                teamBroadcast.setTitle("🚨 STOP CANCELLED: " + outletName + " (" + regNo + ")");
+                teamBroadcast.setMessage("Order cancelled and refunded for " + outletName + " (" + totalCancelledCases + " cases). Driver " + driver + " on vehicle " + regNo + ": do not deliver to this store.");
+                teamBroadcast.setType("DELIVERY_ORDER_CANCELLED");
+                teamBroadcast.setReferenceCode(dispCode);
+                teamBroadcast.setReferenceId(tripId);
+                notificationRepository.save(teamBroadcast);
+            } catch (Exception ignored) {}
+
+            // 5. Notify Supplier
+            try {
+                AppNotification supNotif = new AppNotification();
+                supNotif.setRecipientRole("SUPPLIER");
+                supNotif.setRecipientUserId(supplierId);
+                supNotif.setTitle("Order Cancelled & Refunded by " + outletName);
+                supNotif.setMessage("Outlet " + outletName + " cancelled order (" + totalCancelledCases + " cases) while vehicle " + regNo + " was en route. Full refund of ৳" + String.format(Locale.US, "%.2f", totalRefundAmount.doubleValue()) + " processed. Delivery team notified.");
+                supNotif.setType("DELIVERY_ORDER_CANCELLED");
+                supNotif.setReferenceCode(dispCode);
+                supNotif.setReferenceId(tripId);
+                notificationRepository.save(supNotif);
+            } catch (Exception ignored) {}
+        }
+
+        // 6. Notify Outlet confirming cancellation & refund
+        try {
+            AppNotification outNotif = new AppNotification();
+            outNotif.setRecipientRole("OUTLET");
+            outNotif.setRecipientUserId(outletId);
+            outNotif.setTitle("Order Cancelled & Full Refund Processed");
+            outNotif.setMessage("Your order (" + totalCancelledCases + " cases of " + affectedProducts + ") has been successfully cancelled. A full refund of ৳" + String.format(Locale.US, "%.2f", totalRefundAmount.doubleValue()) + " has been processed. The delivery team has been notified to skip delivery.");
+            outNotif.setType("ORDER_CANCELLED_REFUNDED");
+            outNotif.setReferenceCode(refCode);
+            outNotif.setReferenceId(outletId);
+            notificationRepository.save(outNotif);
+        } catch (Exception ignored) {}
+
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "refund_amount", totalRefundAmount,
+            "cancelled_cases", totalCancelledCases,
+            "status", "CANCELLED_REFUNDED",
+            "message", "Order successfully cancelled! Full refund of ৳" + String.format(Locale.US, "%.2f", totalRefundAmount.doubleValue()) + " processed. Delivery team has been notified to skip delivery."
+        ));
+    }
+
+    @PostMapping("/dispatches/{id}/offer-stock")
+    public ResponseEntity<?> offerStockToOutlet(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> body) {
+
+        if (!body.containsKey("target_outlet_id") || body.get("target_outlet_id") == null) {
+            return ResponseEntity.badRequest().body(ApiResponse.fail("Missing target_outlet_id."));
+        }
+        Long targetOutletId = Long.parseLong(body.get("target_outlet_id").toString());
+        int casesToOffer = body.containsKey("cases") && body.get("cases") != null
+                ? Integer.parseInt(body.get("cases").toString()) : 1;
+        String driverNotes = body.containsKey("driver_notes") && body.get("driver_notes") != null
+                ? body.get("driver_notes").toString() : "Direct in-transit stock offer";
+
+        // 1. Fetch dispatch
+        List<Map<String, Object>> dispRows = jdbcTemplate.queryForList(
+            "SELECT d.*, t.vehicle_registration_no, t.driver_name, t.driver_phone, t.id as team_id " +
+            "FROM supplier_delivery_dispatches d " +
+            "LEFT JOIN supplier_delivery_teams t ON d.delivery_team_id = t.id " +
+            "WHERE d.id = ?", id
+        );
+        if (dispRows.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail("Dispatch trip not found."));
+        }
+        Map<String, Object> trip = dispRows.get(0);
+        Long teamId = trip.get("team_id") != null ? ((Number) trip.get("team_id")).longValue() : null;
+        Long supplierId = ((Number) trip.get("supplier_id")).longValue();
+        String regNo = (String) trip.getOrDefault("vehicle_registration_no", "FLEET");
+        String driver = (String) trip.getOrDefault("driver_name", "Driver");
+        String driverPhone = (String) trip.getOrDefault("driver_phone", "");
+
+        // 2. Fetch target outlet details
+        List<Map<String, Object>> outRows = jdbcTemplate.queryForList("SELECT * FROM outlets WHERE outlet_id = ?", targetOutletId);
+        if (outRows.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail("Target outlet not found."));
+        }
+        Map<String, Object> targetOutlet = outRows.get(0);
+        String targetOutletName = (String) targetOutlet.get("outlet_name");
+        String targetBranch = targetOutlet.get("branch_name") != null ? targetOutlet.get("branch_name").toString() : "";
+        String targetAddress = targetOutlet.get("location_address") != null ? targetOutlet.get("location_address").toString() : "";
+        String targetPhone = targetOutlet.get("contact_phone") != null ? targetOutlet.get("contact_phone").toString() : "";
+
+        // 3. Find cancelled item to offer
+        List<Map<String, Object>> items = new ArrayList<>();
+        if (trip.get("items_json") != null) {
+            try {
+                items = objectMapper.readValue(
+                    trip.get("items_json").toString(),
+                    new TypeReference<List<Map<String, Object>>>() {}
+                );
+            } catch (Exception ignored) {}
+        }
+
+        Map<String, Object> sourceItem = null;
+        Long prodId = null;
+        String prodName = "Pepsi Regular";
+        String catName = "Pepsi";
+        BigDecimal unitPrice = BigDecimal.valueOf(42.0);
+
+        for (Map<String, Object> it : items) {
+            if ("CANCELLED".equalsIgnoreCase(String.valueOf(it.get("stop_status")))
+                    || Boolean.TRUE.equals(it.get("is_cancelled"))) {
+                sourceItem = it;
+                prodId = it.get("product_id") != null ? Long.parseLong(it.get("product_id").toString()) : null;
+                if (it.get("product_name") != null) prodName = it.get("product_name").toString();
+                if (it.get("category") != null) catName = it.get("category").toString();
+                if (it.get("unit_price") != null) unitPrice = new BigDecimal(it.get("unit_price").toString());
+                break;
+            }
+        }
+
+        if (sourceItem == null && !items.isEmpty()) {
+            sourceItem = items.get(0);
+            prodId = sourceItem.get("product_id") != null ? Long.parseLong(sourceItem.get("product_id").toString()) : null;
+            if (sourceItem.get("product_name") != null) prodName = sourceItem.get("product_name").toString();
+            if (sourceItem.get("unit_price") != null) unitPrice = new BigDecimal(sourceItem.get("unit_price").toString());
+        }
+
+        if (prodId == null) {
+            prodId = 21L;
+        }
+
+        // 4. Create new outlet requisition for target outlet with DIRECT_SUPPLY urgency
+        String newReqCode = "OUT-OFFER-" + (System.currentTimeMillis() % 1000000);
+        BigDecimal totalAmt = unitPrice.multiply(BigDecimal.valueOf(casesToOffer));
+        String memo = "⚡ In-Transit Stock Offer from Driver " + driver + " (" + regNo + ") - Onboarded stock reallocated to " + targetOutletName;
+
+        Long newReqId = null;
+        try {
+            jdbcTemplate.update(
+                "INSERT INTO outlet_requisitions " +
+                "(requisition_code, outlet_id, product_id, product_name, quantity, unit_price, total_amount, urgency, status, admin_supplier_notes, outlet_remarks, supplier_id, created_date, updated_date) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, 'DIRECT_SUPPLY', 'OFFER_PENDING', ?, ?, ?, NOW(), NOW())",
+                newReqCode, targetOutletId, prodId, prodName, casesToOffer, unitPrice, totalAmt, memo, driverNotes, supplierId
+            );
+            List<Map<String, Object>> lastId = jdbcTemplate.queryForList("SELECT LAST_INSERT_ID() as id");
+            if (!lastId.isEmpty() && lastId.get(0).get("id") != null) {
+                newReqId = ((Number) lastId.get(0).get("id")).longValue();
+            }
+        } catch (Exception ex) {
+            System.err.println("[DeliveryController] Error creating offer requisition: " + ex.getMessage());
+        }
+
+        // 5. Update items_json in the dispatch
+        if (sourceItem != null) {
+            sourceItem.put("reallocated_to_outlet_id", targetOutletId);
+            sourceItem.put("reallocated_to_outlet_name", targetOutletName);
+            sourceItem.put("reallocated_at", LocalDateTime.now().toString());
+        }
+
+        boolean targetExists = false;
+        for (Map<String, Object> it : items) {
+            Long oid = it.get("outlet_id") != null ? Long.parseLong(it.get("outlet_id").toString()) : -1L;
+            if (oid.equals(targetOutletId) && !"CANCELLED".equalsIgnoreCase(String.valueOf(it.get("stop_status")))) {
+                int curAssigned = it.get("assigned_cases") != null ? Integer.parseInt(it.get("assigned_cases").toString()) : 0;
+                it.put("assigned_cases", curAssigned + casesToOffer);
+                it.put("offered_cases", casesToOffer);
+                it.put("offered_from_vehicle", true);
+                it.put("offer_status", "PENDING");
+                it.put("requisition_id", newReqId);
+                it.put("requisition_code", newReqCode);
+                targetExists = true;
+                break;
+            }
+        }
+
+        if (!targetExists) {
+            Map<String, Object> newItem = new HashMap<>();
+            newItem.put("outlet_id", targetOutletId);
+            newItem.put("outlet_name", targetOutletName);
+            newItem.put("branch_name", targetBranch);
+            newItem.put("location_address", targetAddress);
+            newItem.put("contact_phone", targetPhone);
+            newItem.put("product_id", prodId);
+            newItem.put("product_name", prodName);
+            newItem.put("category", catName);
+            newItem.put("demanded_cases", casesToOffer);
+            newItem.put("assigned_cases", casesToOffer);
+            newItem.put("unit_price", unitPrice.doubleValue());
+            newItem.put("requisition_id", newReqId);
+            newItem.put("requisition_code", newReqCode);
+            newItem.put("stop_status", "OFFER_PENDING");
+            newItem.put("is_offered_stock", true);
+            newItem.put("offer_status", "PENDING");
+            newItem.put("urgency", "DIRECT_SUPPLY");
+            items.add(newItem);
+        }
+
+        Set<Object> activeOutlets = new HashSet<>();
+        for (Map<String, Object> it : items) {
+            if (!"CANCELLED".equalsIgnoreCase(String.valueOf(it.get("stop_status")))) {
+                activeOutlets.add(it.get("outlet_id"));
+            }
+        }
+
+        String updatedJson;
+        try {
+            updatedJson = objectMapper.writeValueAsString(items);
+        } catch (Exception e) {
+            updatedJson = trip.get("items_json").toString();
+        }
+
+        jdbcTemplate.update(
+            "UPDATE supplier_delivery_dispatches SET items_json = ?, status = 'IN_TRANSIT', total_outlets = ?, updated_at = NOW() WHERE id = ?",
+            updatedJson, activeOutlets.size(), id
+        );
+
+        if (teamId != null) {
+            jdbcTemplate.update("UPDATE supplier_delivery_teams SET status = 'ON_DELIVERY', updated_at = NOW() WHERE id = ?", teamId);
+        }
+
+        // 6. Notify recipient outlet
+        try {
+            AppNotification outNotif = new AppNotification();
+            outNotif.setRecipientRole("OUTLET");
+            outNotif.setRecipientUserId(targetOutletId);
+            outNotif.setTitle("⚡ In-Transit Stock Offer: " + casesToOffer + " Cases of " + prodName);
+            outNotif.setMessage("Delivery vehicle " + regNo + " (Driver " + driver + ") is in transit nearby and has offered " + casesToOffer + " cases of " + prodName + " for immediate delivery. Would you like to accept or deny this stock offer?");
+            outNotif.setType("STOCK_OFFER_RECEIVED");
+            outNotif.setReferenceCode(newReqCode);
+            outNotif.setReferenceId(newReqId != null ? newReqId : targetOutletId);
+            notificationRepository.save(outNotif);
+        } catch (Exception ignored) {}
+
+        // 7. Notify supplier
+        try {
+            AppNotification supNotif = new AppNotification();
+            supNotif.setRecipientRole("SUPPLIER");
+            supNotif.setRecipientUserId(supplierId);
+            supNotif.setTitle("Onboarded Stock Reassigned to " + targetOutletName);
+            supNotif.setMessage("Driver " + driver + " on vehicle " + regNo + " offered " + casesToOffer + " cases of " + prodName + " to " + targetOutletName + " (" + targetBranch + "). Consignment #" + newReqCode + " created.");
+            supNotif.setType("STOCK_REASSIGNED");
+            supNotif.setReferenceCode(newReqCode);
+            supNotif.setReferenceId(id);
+            notificationRepository.save(supNotif);
+        } catch (Exception ignored) {}
+
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "target_outlet_id", targetOutletId,
+            "target_outlet_name", targetOutletName,
+            "cases_offered", casesToOffer,
+            "requisition_code", newReqCode,
+            "message", "Successfully offered " + casesToOffer + " cases of " + prodName + " to " + targetOutletName + "! Waiting for outlet acceptance."
+        ));
+    }
+
+    @PostMapping("/stock-offers/{code}/respond")
+    public ResponseEntity<?> respondStockOffer(
+            @PathVariable String code,
+            @RequestBody(required = false) Map<String, Object> body) {
+        String action = body != null && body.get("action") != null 
+            ? body.get("action").toString().trim().toUpperCase() 
+            : "ACCEPT";
+        boolean isAccept = "ACCEPT".equals(action) || "ACCEPTED".equals(action);
+        return doHandleOfferResponse(code, isAccept);
+    }
+
+    @PostMapping("/stock-offers/{code}/accept")
+    public ResponseEntity<?> acceptStockOffer(@PathVariable String code) {
+        return doHandleOfferResponse(code, true);
+    }
+
+    @PostMapping("/stock-offers/{code}/deny")
+    public ResponseEntity<?> denyStockOffer(@PathVariable String code) {
+        return doHandleOfferResponse(code, false);
+    }
+
+    private ResponseEntity<?> doHandleOfferResponse(String code, boolean isAccept) {
+        if (code == null || code.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid offer code."));
+        }
+        String cleanCode = code.trim();
+
+        List<Map<String, Object>> reqRows = jdbcTemplate.queryForList(
+            "SELECT * FROM outlet_requisitions WHERE requisition_code = ? OR CAST(id AS CHAR) = ? LIMIT 1",
+            cleanCode, cleanCode
+        );
+
+        if (reqRows.isEmpty()) {
+            // Also check dispatches for an item with this code or requisition_id
+            List<Map<String, Object>> dispMatches = jdbcTemplate.queryForList(
+                "SELECT id, items_json FROM supplier_delivery_dispatches WHERE items_json LIKE ?",
+                "%" + cleanCode + "%"
+            );
+            if (dispMatches.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Stock offer not found for code: " + cleanCode));
+            }
+        }
+
+        Map<String, Object> req = !reqRows.isEmpty() ? reqRows.get(0) : Collections.emptyMap();
+        Long reqId = req.get("id") != null ? ((Number) req.get("id")).longValue() : null;
+        String reqCode = req.get("requisition_code") != null ? req.get("requisition_code").toString() : cleanCode;
+        Long outletId = req.get("outlet_id") != null ? ((Number) req.get("outlet_id")).longValue() : null;
+        String prodName = req.get("product_name") != null ? req.get("product_name").toString() : "Beverages";
+        int cases = req.get("quantity") != null ? ((Number) req.get("quantity")).intValue() : 0;
+        Long supplierId = req.get("supplier_id") != null ? ((Number) req.get("supplier_id")).longValue() : 1L;
+
+        String outletName = "Franchise Store";
+        String branchName = "";
+        if (outletId != null) {
+            List<Map<String, Object>> oRows = jdbcTemplate.queryForList(
+                "SELECT outlet_name, branch_name FROM outlets WHERE outlet_id = ?", outletId
+            );
+            if (!oRows.isEmpty()) {
+                outletName = oRows.get(0).get("outlet_name") != null ? oRows.get(0).get("outlet_name").toString() : outletName;
+                branchName = oRows.get(0).get("branch_name") != null ? oRows.get(0).get("branch_name").toString() : branchName;
+            }
+        }
+
+        // 1. Update outlet_requisitions
+        if (reqId != null) {
+            if (isAccept) {
+                jdbcTemplate.update(
+                    "UPDATE outlet_requisitions SET status = 'IN_TRANSIT', admin_supplier_notes = CONCAT(COALESCE(admin_supplier_notes, ''), ' [ACCEPTED BY OUTLET]'), updated_date = NOW() WHERE id = ?",
+                    reqId
+                );
+            } else {
+                jdbcTemplate.update(
+                    "UPDATE outlet_requisitions SET status = 'DENIED', admin_supplier_notes = CONCAT(COALESCE(admin_supplier_notes, ''), ' [DENIED BY OUTLET]'), updated_date = NOW() WHERE id = ?",
+                    reqId
+                );
+            }
+        }
+
+        // 2. Update dispatch items_json and recalculate active stops
+        List<Map<String, Object>> dispatches = jdbcTemplate.queryForList(
+            "SELECT d.id, d.items_json, d.delivery_team_id, d.supplier_id, t.vehicle_registration_no, t.driver_name " +
+            "FROM supplier_delivery_dispatches d " +
+            "LEFT JOIN supplier_delivery_teams t ON d.delivery_team_id = t.id " +
+            "WHERE d.items_json LIKE ? OR d.items_json LIKE ?",
+            "%" + cleanCode + "%", reqId != null ? "%\"requisition_id\":" + reqId + "%" : "%" + cleanCode + "%"
+        );
+
+        Long matchedTeamId = null;
+        String matchedRegNo = "Delivery Vehicle";
+        String matchedDriver = "Lead Driver";
+        Long matchedDispatchId = null;
+
+        for (Map<String, Object> disp : dispatches) {
+            Long dId = ((Number) disp.get("id")).longValue();
+            matchedDispatchId = dId;
+            matchedTeamId = disp.get("delivery_team_id") != null ? ((Number) disp.get("delivery_team_id")).longValue() : matchedTeamId;
+            matchedRegNo = disp.get("vehicle_registration_no") != null ? disp.get("vehicle_registration_no").toString() : matchedRegNo;
+            matchedDriver = disp.get("driver_name") != null ? disp.get("driver_name").toString() : matchedDriver;
+
+            if (disp.get("items_json") != null) {
+                try {
+                    List<Map<String, Object>> items = objectMapper.readValue(
+                        disp.get("items_json").toString(),
+                        new TypeReference<List<Map<String, Object>>>() {}
+                    );
+
+                    for (Map<String, Object> it : items) {
+                        boolean match = false;
+                        if (it.get("requisition_code") != null && it.get("requisition_code").toString().equalsIgnoreCase(reqCode)) match = true;
+                        if (reqId != null && it.get("requisition_id") != null && it.get("requisition_id").toString().equals(String.valueOf(reqId))) match = true;
+                        if (outletId != null && outletId.equals(it.get("outlet_id")) && Boolean.TRUE.equals(it.get("is_offered_stock"))) match = true;
+
+                        if (match) {
+                            if (isAccept) {
+                                it.put("offer_status", "ACCEPTED");
+                                it.put("stop_status", "ASSIGNED");
+                            } else {
+                                it.put("offer_status", "DENIED");
+                                it.put("stop_status", "OFFER_DENIED");
+                                it.put("denied_at", LocalDateTime.now().toString());
+                            }
+                        }
+                    }
+
+                    Set<Object> activeOutlets = new HashSet<>();
+                    for (Map<String, Object> it : items) {
+                        String st = String.valueOf(it.get("stop_status"));
+                        if (!"CANCELLED".equalsIgnoreCase(st) && !"OFFER_DENIED".equalsIgnoreCase(st)) {
+                            activeOutlets.add(it.get("outlet_id"));
+                        }
+                    }
+
+                    String updatedJson = objectMapper.writeValueAsString(items);
+                    jdbcTemplate.update(
+                        "UPDATE supplier_delivery_dispatches SET items_json = ?, total_outlets = ?, updated_at = NOW() WHERE id = ?",
+                        updatedJson, activeOutlets.size(), dId
+                    );
+                } catch (Exception ex) {
+                    System.err.println("[DeliveryController] Error updating dispatch on offer response: " + ex.getMessage());
+                }
+            }
+        }
+
+        // 3. Send Notification to Delivery Team
+        try {
+            AppNotification teamNotif = new AppNotification();
+            teamNotif.setRecipientRole("DELIVERY_TEAM");
+            teamNotif.setRecipientUserId(matchedTeamId);
+            if (isAccept) {
+                teamNotif.setTitle("⚡ Stock Offer Accepted by " + outletName);
+                teamNotif.setMessage(outletName + (branchName != null && !branchName.isEmpty() ? " (" + branchName + ")" : "") + " has ACCEPTED your offer of " + cases + " cases of " + prodName + "! Stop is confirmed on your vehicle " + matchedRegNo + ". Proceed to deliver.");
+                teamNotif.setType("STOCK_OFFER_ACCEPTED");
+            } else {
+                teamNotif.setTitle("⚠️ Stock Offer Denied by " + outletName);
+                teamNotif.setMessage(outletName + (branchName != null && !branchName.isEmpty() ? " (" + branchName + ")" : "") + " DECLINED your offer of " + cases + " cases of " + prodName + ". This stock remains in vehicle " + matchedRegNo + " and can be offered to another outlet.");
+                teamNotif.setType("STOCK_OFFER_DENIED");
+            }
+            teamNotif.setReferenceCode(reqCode);
+            teamNotif.setReferenceId(matchedDispatchId);
+            notificationRepository.save(teamNotif);
+        } catch (Exception ignored) {}
+
+        // 4. Send Notification to Regional Supplier
+        try {
+            AppNotification supNotif = new AppNotification();
+            supNotif.setRecipientRole("SUPPLIER");
+            supNotif.setRecipientUserId(supplierId);
+            if (isAccept) {
+                supNotif.setTitle("Stock Offer Accepted by " + outletName);
+                supNotif.setMessage(outletName + " accepted " + cases + " cases of " + prodName + " offered by Driver " + matchedDriver + " (" + matchedRegNo + ").");
+                supNotif.setType("STOCK_OFFER_ACCEPTED");
+            } else {
+                supNotif.setTitle("Stock Offer Denied by " + outletName);
+                supNotif.setMessage(outletName + " declined " + cases + " cases of " + prodName + " offered by Driver " + matchedDriver + " (" + matchedRegNo + "). Stock available for reallocation.");
+                supNotif.setType("STOCK_OFFER_DENIED");
+            }
+            supNotif.setReferenceCode(reqCode);
+            supNotif.setReferenceId(matchedDispatchId);
+            notificationRepository.save(supNotif);
+        } catch (Exception ignored) {}
+
+        // 5. Mark the outlet's notification as read
+        try {
+            jdbcTemplate.update(
+                "UPDATE app_notifications SET is_read = true WHERE reference_code = ? AND UPPER(recipient_role) = 'OUTLET'",
+                reqCode
+            );
+        } catch (Exception ignored) {}
+
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "status", isAccept ? "ACCEPTED" : "DENIED",
+            "requisition_code", reqCode,
+            "outlet_name", outletName,
+            "message", isAccept ? "Stock offer accepted! Consignment is on the way." : "Stock offer was denied."
+        ));
+    }
+
     @GetMapping("/outlet-pending-deliveries/{outletId}")
     public ResponseEntity<?> getOutletPendingDeliveries(@PathVariable Long outletId) {
         List<Map<String, Object>> activeTrips = jdbcTemplate.queryForList(
@@ -1052,7 +1737,7 @@ public class DeliveryController {
             "FROM supplier_delivery_dispatches d " +
             "LEFT JOIN supplier_delivery_teams t ON d.delivery_team_id = t.id " +
             "LEFT JOIN supplier_profiles s ON d.supplier_id = s.id " +
-            "WHERE d.status IN ('DISPATCHED', 'BOARDED', 'IN_TRANSIT', 'DELIVERED', 'COMPLETED') " +
+            "WHERE d.status IN ('DISPATCHED', 'BOARDED', 'IN_TRANSIT', 'DELIVERED', 'COMPLETED', 'CANCELLED') " +
             "ORDER BY d.dispatched_at DESC LIMIT 30"
         );
 
@@ -1074,8 +1759,14 @@ public class DeliveryController {
                         outDelivery.put("outlet_items", myItems);
                         boolean isDeliveredByDriver = myItems.stream().anyMatch(it -> "DELIVERED_BY_DRIVER".equalsIgnoreCase(String.valueOf(it.get("stop_status"))));
                         boolean isConfirmed = myItems.stream().allMatch(it -> "CONFIRMED_BY_OUTLET".equalsIgnoreCase(String.valueOf(it.get("stop_status"))));
+                        boolean isCancelled = myItems.stream().allMatch(it -> "CANCELLED".equalsIgnoreCase(String.valueOf(it.get("stop_status"))));
+                        boolean isOfferDenied = myItems.stream().allMatch(it -> "OFFER_DENIED".equalsIgnoreCase(String.valueOf(it.get("stop_status"))) || "DENIED".equalsIgnoreCase(String.valueOf(it.get("offer_status"))));
+                        boolean isOfferPending = myItems.stream().anyMatch(it -> "OFFER_PENDING".equalsIgnoreCase(String.valueOf(it.get("stop_status"))) || "PENDING".equalsIgnoreCase(String.valueOf(it.get("offer_status"))));
                         outDelivery.put("is_delivered_by_driver", isDeliveredByDriver);
                         outDelivery.put("is_confirmed_by_outlet", isConfirmed);
+                        outDelivery.put("is_cancelled", isCancelled);
+                        outDelivery.put("is_offer_denied", isOfferDenied);
+                        outDelivery.put("is_offer_pending", isOfferPending);
                         outletDeliveries.add(outDelivery);
                     }
                 } catch (Exception ignored) {}

@@ -15,9 +15,15 @@ import {
   PackageCheck,
   Check,
   AlertTriangle,
+  XCircle,
+  Zap,
+  Send,
+  X,
 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import type { VehicleDispatch, DeliveryTeam } from '../Admin/SupplierDeliveryManagement';
+import { useNotifications } from '../../hooks/useNotifications';
+import { NotificationPopup } from '../../components/Notifications/NotificationPopup';
 
 export const DeliveryTeamPortal: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -34,6 +40,23 @@ export const DeliveryTeamPortal: React.FC = () => {
   const [activeTrip, setActiveTrip] = useState<VehicleDispatch | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Reallocate / Offer Onboarded Stock state
+  const [availableOutlets, setAvailableOutlets] = useState<any[]>([]);
+  const [isOfferModalOpen, setIsOfferModalOpen] = useState<boolean>(false);
+  const [offerSourceStop, setOfferSourceStop] = useState<any | null>(null);
+  const [selectedRecipientOutletId, setSelectedRecipientOutletId] = useState<number | ''>('');
+  const [offerCases, setOfferCases] = useState<number>(10);
+  const [offerNotes, setOfferNotes] = useState<string>('');
+  const [offeringLoading, setOfferingLoading] = useState<boolean>(false);
+
+  // Real-time Delivery Team Notifications (for stop cancellations and alerts)
+  const {
+    notifications,
+    unreadCount,
+    popupNotification,
+    dismissPopup,
+  } = useNotifications('DELIVERY_TEAM', team?.id);
 
   // Boarding verification confirmation state
   const [isBoardingVerified, setIsBoardingVerified] = useState<boolean>(false);
@@ -107,8 +130,91 @@ export const DeliveryTeamPortal: React.FC = () => {
     const interval = setInterval(() => {
       fetchPortalData(currentRegNoRef.current);
     }, 6000);
-    return () => clearInterval(interval);
+
+    // Real-time broadcast channel for instant cancellation alerts
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel('fizzdrop_realtime_events');
+      channel.onmessage = (event) => {
+        if (event.data?.type === 'DELIVERY_ORDER_CANCELLED' || event.data?.type === 'DELIVERY_STOCK_OFFERED' || event.data?.type === 'STOCK_OFFER_RESPONDED') {
+          fetchPortalData(currentRegNoRef.current);
+        }
+      };
+    } catch {}
+
+    return () => {
+      clearInterval(interval);
+      if (channel) channel.close();
+    };
   }, []);
+
+  // Fetch available outlets for stock re-offering
+  useEffect(() => {
+    fetch('http://localhost:8080/api/outlets')
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) setAvailableOutlets(data);
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleOpenOfferModal = (stop: any) => {
+    setOfferSourceStop(stop);
+    const defaultQty = stop?.total_assigned_cases || stop?.items?.[0]?.assigned_cases || 10;
+    setOfferCases(defaultQty);
+    // Find candidate outlet that is not the cancelled outlet
+    const candidate = availableOutlets.find((o) => o.outlet_id !== stop?.outlet_id);
+    if (candidate) {
+      setSelectedRecipientOutletId(candidate.outlet_id);
+    }
+    setOfferNotes(`⚡ Driver ${team?.driver_name || ''} offering onboarded stock directly to your store`);
+    setIsOfferModalOpen(true);
+  };
+
+  const handleSubmitOfferStock = async () => {
+    if (!activeTrip || !selectedRecipientOutletId) {
+      alert('Please select a recipient outlet.');
+      return;
+    }
+    if (offerCases <= 0) {
+      alert('Please specify a positive quantity of cases to offer.');
+      return;
+    }
+
+    setOfferingLoading(true);
+    try {
+      const res = await fetch(`http://localhost:8080/api/v1/delivery/dispatches/${activeTrip.id}/offer-stock`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          target_outlet_id: Number(selectedRecipientOutletId),
+          cases: offerCases,
+          driver_notes: offerNotes,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSuccessMsg(data.message || `Successfully offered ${offerCases} cases to outlet! Route updated.`);
+        setIsOfferModalOpen(false);
+        try {
+          const channel = new BroadcastChannel('fizzdrop_realtime_events');
+          channel.postMessage({
+            type: 'DELIVERY_STOCK_OFFERED',
+            dispatchId: activeTrip.id,
+            targetOutletId: selectedRecipientOutletId,
+          });
+          channel.close();
+        } catch {}
+        fetchPortalData();
+      } else {
+        alert(data.message || 'Failed to offer stock.');
+      }
+    } catch {
+      alert('Network error offering stock to outlet.');
+    } finally {
+      setOfferingLoading(false);
+    }
+  };
 
   const handleSelectTeam = (newRegNo: string) => {
     setRegNo(newRegNo);
@@ -284,7 +390,7 @@ export const DeliveryTeamPortal: React.FC = () => {
 
   const outletsList = Object.values(outletGroups);
   const allOutletsDelivered = outletsList.length > 0 && outletsList.every(
-    (o) => o.stop_status === 'DELIVERED_BY_DRIVER' || o.stop_status === 'CONFIRMED_BY_OUTLET'
+    (o) => o.stop_status === 'DELIVERED_BY_DRIVER' || o.stop_status === 'CONFIRMED_BY_OUTLET' || o.stop_status === 'CANCELLED'
   );
 
   return (
@@ -585,47 +691,125 @@ export const DeliveryTeamPortal: React.FC = () => {
                 <p className="text-xs text-slate-400">No stores assigned on this trip manifest.</p>
               ) : (
                 <div className="space-y-3">
+                  {outletsList.some((o) => o.stop_status === 'CANCELLED') && (
+                    <div className="p-4 rounded-2xl bg-gradient-to-r from-rose-950/90 via-slate-900 to-amber-950/80 border-2 border-rose-500/70 text-rose-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg animate-pulse">
+                      <div className="flex items-center gap-3">
+                        <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0" />
+                        <div className="text-xs">
+                          <span className="font-bold text-rose-100 uppercase tracking-wider block">🚨 Alert: Order Cancelled — Onboarded Stock Available</span>
+                          <span>A store on this manifest cancelled their order. You have onboarded stock on your truck that can be reallocated to nearby stores!</span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenOfferModal(outletsList.find((o) => o.stop_status === 'CANCELLED') || outletsList[0])}
+                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5 active:scale-95 shrink-0"
+                      >
+                        <Zap className="w-4 h-4 fill-slate-950 text-slate-950" />
+                        <span>Offer Stock to Nearby Outlets ⚡</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {outletsList.some((o) => o.items.some((it: any) => it.offer_status === 'ACCEPTED') && o.stop_status !== 'DELIVERED_BY_DRIVER' && o.stop_status !== 'CONFIRMED_BY_OUTLET') && (
+                    <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/90 via-slate-900 to-teal-950/80 border-2 border-emerald-500/70 text-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-emerald-500 text-slate-950 flex items-center justify-center font-black shrink-0">
+                          <Navigation className="w-5 h-5 animate-pulse" />
+                        </div>
+                        <div className="text-xs">
+                          <span className="font-bold text-emerald-300 uppercase tracking-wider block">
+                            ⚡ Stock Offer Accepted — Head to Destination
+                          </span>
+                          <span>
+                            {outletsList.find((o) => o.items.some((it: any) => it.offer_status === 'ACCEPTED'))?.outlet_name} accepted your stock offer! Go directly to this store to deliver the cargo.
+                          </span>
+                        </div>
+                      </div>
+                      <span className="px-3 py-1.5 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-mono font-bold shrink-0 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                        <span>En Route to Store</span>
+                      </span>
+                    </div>
+                  )}
+
                   {outletsList.map((outlet, idx) => {
+                    const isCancelled = outlet.stop_status === 'CANCELLED';
+                    const isOfferDenied = outlet.stop_status === 'OFFER_DENIED' || outlet.items.some((it: any) => it.offer_status === 'DENIED');
+                    const isOfferPending = outlet.stop_status === 'OFFER_PENDING' || outlet.items.some((it: any) => it.offer_status === 'PENDING');
+                    const isOfferAccepted = outlet.items.some((it: any) => it.offer_status === 'ACCEPTED');
                     const isDeliveredByDriver = outlet.stop_status === 'DELIVERED_BY_DRIVER';
                     const isConfirmedByOutlet = outlet.stop_status === 'CONFIRMED_BY_OUTLET';
-                    const isDone = isDeliveredByDriver || isConfirmedByOutlet;
+                    const isDone = isDeliveredByDriver || isConfirmedByOutlet || isCancelled || isOfferDenied;
+                    const isOfferedStock = outlet.items.some((it: any) => it.is_offered_stock || it.offered_from_vehicle || it.urgency === 'DIRECT_SUPPLY');
 
                     return (
                       <div
                         key={outlet.outlet_id}
                         className={`p-4 rounded-2xl border transition-all space-y-3 ${
-                          isConfirmedByOutlet
+                          isCancelled
+                            ? 'bg-rose-950/40 border-rose-500/50'
+                            : isOfferDenied
+                            ? 'bg-rose-950/40 border-rose-500/50'
+                            : isConfirmedByOutlet
                             ? 'bg-emerald-950/40 border-emerald-500/50'
                             : isDeliveredByDriver
                             ? 'bg-cyan-950/40 border-cyan-500/50'
+                            : isOfferPending
+                            ? 'bg-slate-900/90 border-amber-500/60 shadow-md'
+                            : isOfferedStock
+                            ? 'bg-gradient-to-r from-purple-950/50 via-slate-900 to-indigo-950/50 border-purple-500/60 shadow-md'
                             : 'bg-slate-900/80 border-slate-700/80 hover:border-slate-600'
                         }`}
                       >
                         {/* Stop Header */}
                         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2.5">
                           <div className="space-y-1">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <span className={`w-6 h-6 rounded-lg flex items-center justify-center font-mono text-xs font-bold ${
-                                isDone ? 'bg-emerald-500 text-slate-950' : 'bg-blue-500/20 text-blue-400'
+                                isCancelled || isOfferDenied ? 'bg-rose-500 text-white' : isDone ? 'bg-emerald-500 text-slate-950' : 'bg-blue-500/20 text-blue-400'
                               }`}>
-                                {isDone ? '✓' : idx + 1}
+                                {isCancelled || isOfferDenied ? '✕' : isDone ? '✓' : idx + 1}
                               </span>
                               <h5 className="font-bold text-sm text-white">
                                 {outlet.outlet_name} {outlet.branch_name && `(${outlet.branch_name})`}
                               </h5>
                               <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase font-mono ${
-                                isConfirmedByOutlet
+                                isCancelled
+                                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                                  : isOfferDenied
+                                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                                  : isOfferPending
+                                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse'
+                                  : isOfferAccepted
+                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                                  : isConfirmedByOutlet
                                   ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
                                   : isDeliveredByDriver
                                   ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
                                   : 'bg-slate-800 text-slate-400 border border-slate-700'
                               }`}>
-                                {isConfirmedByOutlet
+                                {isCancelled
+                                  ? '⛔ Order Cancelled & Refunded'
+                                  : isOfferDenied
+                                  ? '⛔ Offer Denied by Outlet'
+                                  : isOfferPending
+                                  ? '⏳ Offer Sent (Awaiting Outlet)'
+                                  : isOfferAccepted
+                                  ? '✓ Offer Accepted by Outlet'
+                                  : isConfirmedByOutlet
                                   ? 'Outlet Confirmed & Accepted'
                                   : isDeliveredByDriver
                                   ? 'Delivered by Driver (Pending Outlet)'
                                   : 'En Route / Not Delivered Yet'}
                               </span>
+
+                              {isOfferedStock && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase font-mono bg-purple-500/20 text-purple-300 border border-purple-500/40 flex items-center gap-1">
+                                  <Zap className="w-3 h-3 fill-purple-300" />
+                                  <span>In-Transit Direct Offer</span>
+                                </span>
+                              )}
                             </div>
 
                             <div className="flex items-center gap-3 text-xs text-slate-400 flex-wrap pl-8">
@@ -649,7 +833,7 @@ export const DeliveryTeamPortal: React.FC = () => {
 
                           <div className="text-right sm:self-center pl-8 sm:pl-0">
                             <span className="text-[10px] uppercase font-bold text-slate-400 block">Assigned Delivery</span>
-                            <span className="font-mono text-sm font-black text-cyan-300">
+                            <span className={`font-mono text-sm font-black ${isCancelled ? 'text-rose-400 line-through' : 'text-cyan-300'}`}>
                               {outlet.total_assigned_cases} Cases
                             </span>
                           </div>
@@ -662,10 +846,12 @@ export const DeliveryTeamPortal: React.FC = () => {
                             {outlet.items.map((it: any, itemIdx: number) => (
                               <span
                                 key={itemIdx}
-                                className="text-xs px-2.5 py-1 rounded-lg bg-slate-800/90 border border-slate-700 text-slate-300 flex items-center gap-1.5"
+                                className={`text-xs px-2.5 py-1 rounded-lg border flex items-center gap-1.5 ${
+                                  isCancelled ? 'bg-rose-950/40 border-rose-800/60 text-rose-300' : 'bg-slate-800/90 border-slate-700 text-slate-300'
+                                }`}
                               >
                                 <span className="text-white font-medium">{it.product_name}</span>
-                                <strong className="text-cyan-400 font-mono">
+                                <strong className={`font-mono ${isCancelled ? 'text-rose-300 line-through' : 'text-cyan-400'}`}>
                                   {it.assigned_cases || it.demanded_cases || 0} cases
                                 </strong>
                               </span>
@@ -675,7 +861,49 @@ export const DeliveryTeamPortal: React.FC = () => {
 
                         {/* Driver Delivery Action / Confirmation Area */}
                         <div className="pl-8 pt-2">
-                          {isConfirmedByOutlet ? (
+                          {isCancelled || isOfferDenied ? (
+                            <div className="p-3 rounded-xl bg-rose-950/70 border border-rose-500/40 text-rose-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                              <div className="flex items-center gap-2">
+                                <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                                <div>
+                                  <p className="font-bold text-rose-100">
+                                    {isOfferDenied ? 'Stock Offer Declined by Outlet' : 'Stop Cancelled & Refunded by Store'}
+                                  </p>
+                                  <p className="text-[11px] text-rose-300/80">
+                                    {isOfferDenied 
+                                      ? 'Outlet declined this stock offer. The cargo remains onboard your vehicle and can be reallocated to another store!'
+                                      : 'Order was cancelled and refunded while in transit. Do NOT unload cargo here. Reallocate this stock to nearby stores below.'}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="px-2.5 py-1.5 rounded-xl bg-rose-900/60 text-rose-300 font-bold text-[10px] uppercase border border-rose-700/60">
+                                  {isOfferDenied ? 'Offer Declined' : 'Skip Stop'}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenOfferModal(outlet)}
+                                  className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
+                                >
+                                  <Zap className="w-3.5 h-3.5 fill-slate-950" />
+                                  <span>Offer Stock to Other Outlet ⚡</span>
+                                </button>
+                              </div>
+                            </div>
+                          ) : isOfferPending ? (
+                            <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-500/40 text-amber-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                              <div className="flex items-center gap-2">
+                                <Clock className="w-4 h-4 text-amber-400 shrink-0 animate-pulse" />
+                                <div>
+                                  <p className="font-bold text-amber-100">In-Transit Offer Sent — Awaiting Store Decision</p>
+                                  <p className="text-[11px] text-amber-300/80">A notification has been delivered to {outlet.outlet_name}. They have the option to accept or deny this stock offer.</p>
+                                </div>
+                              </div>
+                              <span className="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 font-mono text-[11px] font-bold border border-amber-500/40 shrink-0">
+                                Pending Acceptance
+                              </span>
+                            </div>
+                          ) : isConfirmedByOutlet ? (
                             <div className="p-2.5 rounded-xl bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
                               <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                               <span>Outlet has confirmed receipt of stock! Profit updated on supplier portal.</span>
@@ -744,6 +972,119 @@ export const DeliveryTeamPortal: React.FC = () => {
           </div>
         )}
       </main>
+
+      {/* MODAL: Offer Onboarded Stock to Nearby Outlets */}
+      {isOfferModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-lg bg-slate-900 rounded-3xl border border-slate-700 p-6 shadow-2xl space-y-4 text-left">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center font-bold">
+                  <Zap className="w-5 h-5 fill-amber-400" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Offer Onboarded Stock to Outlets</h3>
+                  <p className="text-xs text-slate-400">Reassign loaded vehicle cargo to nearby stores</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsOfferModalOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg text-lg font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs space-y-1">
+              <p className="font-bold text-amber-100 flex items-center gap-1.5 flex-wrap">
+                <span>📦 Physical Cargo on Vehicle:</span>
+                <span className="font-mono text-white bg-slate-950 px-2 py-0.5 rounded border border-amber-500/40">{team?.vehicle_registration_no}</span>
+                <span className="text-amber-300 font-bold">({offerCases} Cases Available)</span>
+              </p>
+              <p className="text-slate-300">
+                This stock was already inspected and boarded on your delivery vehicle. Instead of dead freight returning to depot, offer it directly to other stores nearby or along your route.
+              </p>
+            </div>
+
+            <div className="space-y-3.5 text-xs">
+              <div>
+                <label className="block text-slate-300 font-bold mb-1.5">
+                  Select Recipient Outlet (Nearby / Route Stores):
+                </label>
+                <select
+                  value={selectedRecipientOutletId}
+                  onChange={(e) => setSelectedRecipientOutletId(Number(e.target.value))}
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white font-medium focus:ring-2 focus:ring-amber-500 cursor-pointer"
+                >
+                  <option value="">-- Choose Recipient Store --</option>
+                  {availableOutlets
+                    .filter((o) => o.outlet_id !== offerSourceStop?.outlet_id)
+                    .map((o) => (
+                      <option key={o.outlet_id} value={o.outlet_id}>
+                        {o.outlet_name} ({o.branch_name || o.area || 'Branch'}) • {o.sub_route || o.location_address || 'Nearby'}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">Cases to Offer:</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={offerCases}
+                    onChange={(e) => setOfferCases(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white font-mono font-bold focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">Assigned Vehicle:</label>
+                  <input
+                    type="text"
+                    disabled
+                    value={`${team?.vehicle_registration_no || 'FLEET'} (${team?.driver_name || 'Driver'})`}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-800/60 border border-slate-700 text-slate-400 font-mono text-xs"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">Delivery Notes / Offer Memo:</label>
+                <input
+                  type="text"
+                  value={offerNotes}
+                  onChange={(e) => setOfferNotes(e.target.value)}
+                  placeholder="e.g. In-transit direct stock offer from Driver"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsOfferModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmitOfferStock}
+                disabled={offeringLoading || !selectedRecipientOutletId}
+                className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Zap className="w-4 h-4 fill-slate-950" />
+                <span>{offeringLoading ? 'Dispatching Offer...' : '🚀 Confirm & Dispatch Stock Offer'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Real-time Order Cancellation & Route Alerts Pop-up */}
+      <NotificationPopup notification={popupNotification} onClose={dismissPopup} />
     </div>
   );
 };

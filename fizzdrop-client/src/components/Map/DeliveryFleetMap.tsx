@@ -233,6 +233,21 @@ function buildFlightPath(waypoints: [number, number][], stepsPerSegment = 10): [
   return fullPath;
 }
 
+// Generate smooth curved road segment between two points
+function buildSegmentPath(p1: [number, number], p2: [number, number], steps = 14): [number, number][] {
+  const segment: [number, number][] = [];
+  const dLat = p2[0] - p1[0];
+  const dLng = p2[1] - p1[1];
+  for (let s = 0; s <= steps; s++) {
+    const t = s / steps;
+    const midT = Math.sin(t * Math.PI);
+    const normalLat = -dLng * 0.12 * midT;
+    const normalLng = dLat * 0.12 * midT;
+    segment.push([p1[0] + dLat * t + normalLat, p1[1] + dLng * t + normalLng]);
+  }
+  return segment;
+}
+
 export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
   dispatches,
   selectedDispatchId,
@@ -268,8 +283,57 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
     coords: [number, number] | null;
   } | null>(null);
 
+  // Registered outlets fetched from server
+  const [registeredOutlets, setRegisteredOutlets] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetch('http://localhost:8080/api/outlets')
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setRegisteredOutlets(data);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Check if any dispatches are currently active on route (IN_TRANSIT, BOARDED, or DISPATCHED)
+  const hasActiveOrders = useMemo(() => {
+    return dispatches.some(
+      (d) => d.status === 'IN_TRANSIT' || d.status === 'BOARDED' || d.status === 'DISPATCHED' || d.status === 'DELIVERING'
+    );
+  }, [dispatches]);
+
+  // Outlets to display when orders are completed or in standby
+  const outletsToDisplay = useMemo(() => {
+    if (registeredOutlets.length > 0) {
+      return registeredOutlets;
+    }
+    const list: any[] = [];
+    const seen = new Set<number>();
+    dispatches.forEach((d) => {
+      (d.items || []).forEach((it) => {
+        if (it.outlet_id && !seen.has(it.outlet_id)) {
+          seen.add(it.outlet_id);
+          list.push({
+            id: it.outlet_id,
+            outlet_name: it.outlet_name,
+            branch_name: (it as any).branch_name,
+            location_address: it.outlet_address || (it as any).location_address,
+            sub_route: d.sub_route,
+          });
+        }
+      });
+    });
+    return list;
+  }, [registeredOutlets, dispatches]);
+
   // 1. Group dispatches so all distinct active vehicles appear on the single map
   const activeVehicles = useMemo(() => {
+    if (!hasActiveOrders) {
+      return [];
+    }
+
     const map = new Map<string, VehicleDispatch>();
 
     // Priority ranking: IN_TRANSIT > BOARDED > DISPATCHED > DELIVERED > COMPLETED
@@ -290,14 +354,17 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
     });
 
     sorted.forEach((disp) => {
-      const key = disp.vehicle_registration_no || `TRIP-${disp.id}`;
-      if (!map.has(key)) {
-        map.set(key, disp);
+      // Only include vehicles that are currently active on route
+      if (disp.status === 'IN_TRANSIT' || disp.status === 'BOARDED' || disp.status === 'DISPATCHED' || disp.status === 'DELIVERING') {
+        const key = disp.vehicle_registration_no || `TRIP-${disp.id}`;
+        if (!map.has(key)) {
+          map.set(key, disp);
+        }
       }
     });
 
     return Array.from(map.values());
-  }, [dispatches]);
+  }, [dispatches, hasActiveOrders]);
 
   // Build merged routes data for each active vehicle
   const mergedVehiclesData = useMemo(() => {
@@ -308,21 +375,50 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
       const depotCoords = resolveDepotCoordinates(disp.sub_route, vIdx);
 
       // Group unique outlets
-      const uniqueOutlets: { outlet_id: number; outlet_name: string; items: DispatchItem[]; status: string }[] = [];
+      const uniqueOutlets: {
+        outlet_id: number;
+        outlet_name: string;
+        items: DispatchItem[];
+        status: string;
+        isCancelled: boolean;
+        isRedirected: boolean;
+        isOfferAccepted: boolean;
+        isOfferPending: boolean;
+        reallocatedToOutletId?: number;
+      }[] = [];
       const seen = new Set<number>();
 
       (disp.items || []).forEach((item) => {
         if (!seen.has(item.outlet_id)) {
           seen.add(item.outlet_id);
           const outletItems = (disp.items || []).filter((i) => i.outlet_id === item.outlet_id);
+          const isCancelled = outletItems.every((i) => i.stop_status === 'CANCELLED' || (i as any).is_cancelled);
+          const isOfferDenied = outletItems.every((i) => i.stop_status === 'OFFER_DENIED' || (i as any).offer_status === 'DENIED');
+          const isOfferPending = outletItems.some((i) => i.stop_status === 'OFFER_PENDING' || (i as any).offer_status === 'PENDING');
+          const isOfferAccepted = outletItems.some((i) => (i as any).offer_status === 'ACCEPTED');
           const isConfirmed = outletItems.every((i) => i.stop_status === 'CONFIRMED_BY_OUTLET');
           const isDelivered = outletItems.every((i) => i.stop_status === 'DELIVERED_BY_DRIVER' || i.stop_status === 'CONFIRMED_BY_OUTLET');
-          const status = isConfirmed ? 'CONFIRMED' : (isDelivered ? 'DELIVERED' : 'PENDING');
+          const isRedirected = outletItems.some((i) => (i as any).is_offered_stock || (i as any).urgency === 'DIRECT_SUPPLY' || (i as any).offer_status === 'ACCEPTED');
+          const reallocatedToOutletId = outletItems.find((i) => (i as any).reallocated_to_outlet_id)?.reallocated_to_outlet_id;
+
+          let status = 'PENDING';
+          if (isCancelled) status = 'CANCELLED';
+          else if (isOfferDenied) status = 'DENIED';
+          else if (isConfirmed) status = 'CONFIRMED';
+          else if (isDelivered) status = 'DELIVERED';
+          else if (isOfferPending) status = 'OFFER_PENDING';
+          else if (isOfferAccepted) status = 'OFFER_ACCEPTED';
+
           uniqueOutlets.push({
             outlet_id: item.outlet_id,
             outlet_name: item.outlet_name,
             items: outletItems,
             status,
+            isCancelled,
+            isRedirected,
+            isOfferAccepted,
+            isOfferPending,
+            reallocatedToOutletId,
           });
         }
       });
@@ -335,6 +431,11 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
         stopNumber?: number;
         outletId?: number;
         items?: DispatchItem[];
+        isCancelled?: boolean;
+        isRedirected?: boolean;
+        isOfferAccepted?: boolean;
+        isOfferPending?: boolean;
+        reallocatedToOutletId?: number;
       }[] = [
         {
           type: 'DEPOT',
@@ -358,11 +459,25 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
           stopNumber: stopNum,
           outletId: out.outlet_id,
           items: out.items,
+          isCancelled: out.isCancelled,
+          isRedirected: out.isRedirected,
+          isOfferAccepted: out.isOfferAccepted,
+          isOfferPending: out.isOfferPending,
+          reallocatedToOutletId: out.reallocatedToOutletId,
         });
       });
 
       const rawCoords = waypoints.map((w) => w.coords);
-      const flightPath = buildFlightPath(rawCoords, 12);
+      
+      // Animated vehicle movement path: navigate to active non-cancelled destinations
+      const activeWaypointCoords = waypoints
+        .filter((w) => w.type === 'DEPOT' || !w.isCancelled)
+        .map((w) => w.coords);
+
+      const flightPath = buildFlightPath(
+        activeWaypointCoords.length > 1 ? activeWaypointCoords : rawCoords,
+        12
+      );
 
       return {
         dispatch: disp,
@@ -426,7 +541,7 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
   useEffect(() => {
     const map = mapInstanceRef.current;
     const markersGroup = markersLayerRef.current;
-    if (!map || !markersGroup || mergedVehiclesData.length === 0) return;
+    if (!map || !markersGroup) return;
 
     markersGroup.clearLayers();
     truckMarkersMapRef.current.forEach((marker) => {
@@ -436,6 +551,106 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
     });
     truckMarkersMapRef.current.clear();
 
+    // =========================================================================
+    // WHEN ORDERS ARE COMPLETED: Clear map routes, display ONLY Depot & Outlets
+    // =========================================================================
+    if (!hasActiveOrders) {
+      // 1. Draw Central Depot Hub Marker
+      const depotCoord = resolveDepotCoordinates('Central Sub-Route', 0);
+      const depotIcon = L.divIcon({
+        className: 'custom-map-icon',
+        html: `
+          <div class="relative flex items-center justify-center w-10 h-10 rounded-2xl bg-indigo-950 border-2 border-indigo-400 shadow-xl text-white transform -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-transform hover:scale-110">
+            <svg class="w-5 h-5 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+            <span class="absolute -bottom-5 font-mono text-[9px] font-black uppercase px-2 py-0.5 rounded bg-indigo-950 text-indigo-200 border border-indigo-700 whitespace-nowrap shadow-xs">
+              Central Depot Hub
+            </span>
+          </div>
+        `,
+        iconSize: [40, 40],
+        iconAnchor: [20, 20],
+      });
+
+      const depotMarker = L.marker(depotCoord, { icon: depotIcon }).addTo(markersGroup);
+      depotMarker.bindPopup(`
+        <div class="p-2.5 text-xs font-sans">
+          <h4 class="font-bold text-indigo-900 text-sm">🏭 Central Logistics Depot Hub</h4>
+          <p class="text-slate-600 mt-1">Fleet base and central beverage supply terminal.</p>
+          <span class="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+            ✓ All Orders Completed • Fleet at Depot
+          </span>
+        </div>
+      `);
+
+      // 2. Draw Registered Outlets
+      const allCoords: [number, number][] = [depotCoord];
+
+      outletsToDisplay.forEach((outlet, idx) => {
+        const outletId = outlet.id || outlet.outlet_id || (idx + 1);
+        const subRoute = outlet.sub_route || 'Gulshan Sub-Route';
+        const coords = getOutletCoordinates(outletId, idx, subRoute, 0);
+        allCoords.push(coords);
+
+        const cleanName = (outlet.outlet_name || outlet.name || 'Retail Store')
+          .replace(/[ÔÇöâ€”?]/g, ' - ')
+          .replace(/\s+-\s+/g, ' — ')
+          .trim();
+
+        const outletIcon = L.divIcon({
+          className: 'custom-outlet-icon',
+          html: `
+            <div class="relative flex flex-col items-center transform -translate-x-1/2 -translate-y-[14px] cursor-pointer group">
+              <!-- Outlet Circle Pin -->
+              <div class="relative z-10 flex items-center justify-center w-7 h-7 rounded-full bg-slate-900 border-2 border-cyan-400 shadow-lg text-xs text-white transition-transform group-hover:scale-115">
+                🏪
+              </div>
+
+              <!-- Outlet Name Pill -->
+              <div class="mt-1 flex flex-col items-center z-20 pointer-events-none">
+                <div class="px-2 py-0.5 rounded-lg bg-slate-900/95 text-white shadow-md border border-slate-700/80 whitespace-nowrap flex items-center gap-1 max-w-[210px]">
+                  <span class="text-[9px] font-bold tracking-tight text-white truncate max-w-[170px]" title="${cleanName}">
+                    ${cleanName}
+                  </span>
+                </div>
+                ${
+                  outlet.branch_name
+                    ? `<span class="text-[8px] font-mono font-medium text-slate-300 bg-slate-800/90 px-1.5 py-0.2 rounded mt-0.5 border border-slate-700 shadow-2xs">
+                        ${outlet.branch_name}
+                      </span>`
+                    : ''
+                }
+              </div>
+            </div>
+          `,
+          iconSize: [210, 56],
+          iconAnchor: [105, 14],
+        });
+
+        const marker = L.marker(coords, { icon: outletIcon }).addTo(markersGroup);
+        marker.bindPopup(`
+          <div class="p-2.5 text-xs font-sans max-w-xs">
+            <h4 class="font-bold text-slate-900 text-sm">🏪 ${cleanName}</h4>
+            <p class="text-slate-600 mt-1">${outlet.location_address || 'Registered Retail Outlet'}</p>
+            <p class="text-slate-500 font-mono text-[11px] mt-0.5">Sub-Route: <strong>${subRoute}</strong></p>
+            <span class="inline-block mt-2 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+              Retail Store • Standing By
+            </span>
+          </div>
+        `);
+      });
+
+      // Auto-fit map to show depot and all outlets
+      try {
+        if (allCoords.length > 0) {
+          map.fitBounds(L.latLngBounds(allCoords), { padding: [50, 50], maxZoom: 15 });
+        }
+      } catch (e) {}
+
+      return;
+    }
+
+    if (mergedVehiclesData.length === 0) return;
+
     const allRouteCoordinates: [number, number][] = [];
 
     mergedVehiclesData.forEach((v) => {
@@ -444,13 +659,114 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
 
       v.rawCoords.forEach((c) => allRouteCoordinates.push(c));
 
-      // Draw Vehicle Route Polyline (Green)
-      L.polyline(v.flightPath, {
-        color: v.color.line,
-        weight: isFocused ? 6 : 5,
-        opacity: isFaded ? 0.6 : 0.9,
-        dashArray: (v.status === 'IN_TRANSIT' || isTestingMotion) ? '6, 8' : undefined,
-      }).addTo(markersGroup);
+      // 1. Draw Routes (Red for cancelled outlets, Green with direction for redirected outlets, Green for active routes)
+      const cancelledStops = v.waypoints.filter((w) => w.type === 'OUTLET' && w.isCancelled);
+      const redirectedStops = v.waypoints.filter((w) => w.type === 'OUTLET' && (w.isRedirected || w.isOfferAccepted));
+      const hasCancelledOrRedirected = cancelledStops.length > 0 || redirectedStops.length > 0;
+
+      if (hasCancelledOrRedirected) {
+        // A. Draw RED polyline to cancelled outlet:
+        // "on the map when a outlet cancels an order then the route color of the vehicle to the outlet turns red"
+        cancelledStops.forEach((cStop) => {
+          const cancelledPath = buildSegmentPath(v.depotCoords, cStop.coords, 14);
+          L.polyline(cancelledPath, {
+            color: '#ef4444',
+            weight: isFocused ? 6 : 5,
+            opacity: isFaded ? 0.6 : 0.95,
+            dashArray: '8, 8',
+          }).addTo(markersGroup);
+
+          // Midpoint cancellation pill
+          const midC = Math.floor(cancelledPath.length / 2);
+          const cancelIcon = L.divIcon({
+            className: 'custom-cancel-pill',
+            html: `
+              <div class="flex items-center justify-center transform -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+                <span class="px-2 py-0.5 rounded-full bg-rose-950/95 text-rose-300 font-mono text-[9px] font-bold border border-rose-500 shadow-md flex items-center gap-1 whitespace-nowrap">
+                  <span>❌ Cancelled Route</span>
+                </span>
+              </div>
+            `,
+            iconSize: [120, 24],
+            iconAnchor: [60, 12],
+          });
+          L.marker(cancelledPath[midC], { icon: cancelIcon }).addTo(markersGroup);
+        });
+
+        // B. Draw GREEN polyline with directional arrows to redirected outlet:
+        // "and when that same stock is redirected to another outlet then the route direction to that outlet will be green"
+        redirectedStops.forEach((rStop) => {
+          const originCoord = cancelledStops.length > 0 ? cancelledStops[0].coords : v.depotCoords;
+          const redirectedPath = buildSegmentPath(originCoord, rStop.coords, 16);
+          L.polyline(redirectedPath, {
+            color: '#10b981',
+            weight: isFocused ? 7 : 6,
+            opacity: 1.0,
+            dashArray: (v.status === 'IN_TRANSIT' && isTestingMotion) ? '6, 8' : undefined,
+          }).addTo(markersGroup);
+
+          // Green direction arrows along the redirected path pointing towards the redirected outlet
+          [Math.floor(redirectedPath.length * 0.35), Math.floor(redirectedPath.length * 0.65)].forEach((posIdx) => {
+            const p1 = redirectedPath[Math.max(0, posIdx - 1)];
+            const p2 = redirectedPath[Math.min(redirectedPath.length - 1, posIdx + 1)];
+            const dLat = p2[0] - p1[0];
+            const dLng = p2[1] - p1[1];
+            const angleDeg = (Math.atan2(dLng, dLat) * (180 / Math.PI) + 360) % 360;
+
+            const arrowIcon = L.divIcon({
+              className: 'custom-direction-arrow',
+              html: `
+                <div class="flex items-center justify-center transform -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+                  <div class="w-6 h-6 rounded-full bg-emerald-600/95 border-2 border-emerald-300 shadow-md flex items-center justify-center text-white">
+                    <svg style="transform: rotate(${angleDeg}deg); width: 14px; height: 14px;" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z" />
+                    </svg>
+                  </div>
+                </div>
+              `,
+              iconSize: [24, 24],
+              iconAnchor: [12, 12],
+            });
+            L.marker(redirectedPath[posIdx], { icon: arrowIcon }).addTo(markersGroup);
+          });
+
+          // Midpoint redirected stock badge
+          const midR = Math.floor(redirectedPath.length / 2);
+          const redirectBadgeIcon = L.divIcon({
+            className: 'custom-redirect-pill',
+            html: `
+              <div class="flex items-center justify-center transform -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+                <span class="px-2.5 py-0.5 rounded-full bg-emerald-600 text-white font-mono text-[9px] font-black border border-emerald-300 shadow-lg flex items-center gap-1 whitespace-nowrap animate-pulse">
+                  <span>⚡ Redirected Stock Route ➔</span>
+                </span>
+              </div>
+            `,
+            iconSize: [160, 24],
+            iconAnchor: [80, 12],
+          });
+          L.marker(redirectedPath[midR], { icon: redirectBadgeIcon }).addTo(markersGroup);
+        });
+
+        // C. Standard green polyline for other active normal stops
+        const normalActiveStops = v.waypoints.filter((w) => w.type === 'OUTLET' && !w.isCancelled && !w.isRedirected && !w.isOfferAccepted);
+        normalActiveStops.forEach((nStop) => {
+          const normalPath = buildSegmentPath(v.depotCoords, nStop.coords, 12);
+          L.polyline(normalPath, {
+            color: '#10b981',
+            weight: isFocused ? 6 : 5,
+            opacity: isFaded ? 0.6 : 0.9,
+            dashArray: (v.status === 'IN_TRANSIT' && isTestingMotion) ? '6, 8' : undefined,
+          }).addTo(markersGroup);
+        });
+      } else {
+        // Default route polyline (Green)
+        L.polyline(v.flightPath, {
+          color: v.color.line,
+          weight: isFocused ? 6 : 5,
+          opacity: isFaded ? 0.6 : 0.9,
+          dashArray: (v.status === 'IN_TRANSIT' && isTestingMotion) ? '6, 8' : undefined,
+        }).addTo(markersGroup);
+      }
 
       // Depot Hub Marker
       const depot = v.waypoints[0];
@@ -481,32 +797,64 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
       v.waypoints.slice(1).forEach((stop) => {
         const isConfirmed = stop.status === 'CONFIRMED';
         const isDelivered = stop.status === 'DELIVERED';
+        const isCancelled = stop.isCancelled;
+        const isRedirected = stop.isRedirected || stop.isOfferAccepted;
+
+        const pinBg = isCancelled
+          ? 'bg-rose-600'
+          : isRedirected
+          ? 'bg-emerald-600 ring-2 ring-emerald-300'
+          : isConfirmed
+          ? 'bg-emerald-600'
+          : isDelivered
+          ? 'bg-cyan-600'
+          : v.color.bg;
+
+        const pinText = isCancelled ? '✕' : isConfirmed ? '✓' : isRedirected ? '⚡' : stop.stopNumber;
 
         const stopIcon = L.divIcon({
           className: 'custom-outlet-icon',
           html: `
             <div class="relative flex flex-col items-center transform -translate-x-1/2 -translate-y-[14px] cursor-pointer group">
               <!-- Stop Circle Pin -->
-              <div class="relative z-10 flex items-center justify-center w-7 h-7 rounded-full ${v.color.bg} border-2 border-white shadow-lg font-black text-xs text-white transition-transform group-hover:scale-115">
-                ${isConfirmed ? '✓' : stop.stopNumber}
+              <div class="relative z-10 flex items-center justify-center w-7 h-7 rounded-full ${pinBg} border-2 border-white shadow-lg font-black text-xs text-white transition-transform group-hover:scale-115">
+                ${pinText}
               </div>
 
               <!-- Outlet Name & Stop Pill -->
               <div class="mt-1 flex flex-col items-center z-20 pointer-events-none">
-                <div class="px-2 py-0.5 rounded-lg bg-slate-900/95 text-white shadow-md border border-slate-700/80 whitespace-nowrap flex items-center gap-1 max-w-[190px]">
-                  <span class="text-[10px]">🏪</span>
-                  <span class="text-[9px] font-bold tracking-tight text-white truncate max-w-[150px]" title="${stop.name}">
+                <div class="px-2 py-0.5 rounded-lg ${
+                  isCancelled
+                    ? 'bg-rose-950/95 border-rose-600'
+                    : isRedirected
+                    ? 'bg-emerald-950/95 border-emerald-500'
+                    : 'bg-slate-900/95 border-slate-700/80'
+                } text-white shadow-md border whitespace-nowrap flex items-center gap-1 max-w-[210px]">
+                  <span class="text-[10px]">${isCancelled ? '❌' : isRedirected ? '⚡' : '🏪'}</span>
+                  <span class="text-[9px] font-bold tracking-tight text-white truncate max-w-[170px]" title="${stop.name}">
                     ${stop.name}
                   </span>
                 </div>
-                <span class="text-[8px] font-mono font-semibold text-slate-300 bg-slate-800/90 px-1.5 py-0.2 rounded mt-0.5 border border-slate-700 shadow-2xs">
-                  Stop #${stop.stopNumber} (${v.regNo})
+                <span class="text-[8px] font-mono font-semibold ${
+                  isCancelled
+                    ? 'text-rose-300 bg-rose-950/90 border-rose-700'
+                    : isRedirected
+                    ? 'text-emerald-300 bg-emerald-950/90 border-emerald-600'
+                    : 'text-slate-300 bg-slate-800/90 border-slate-700'
+                } px-1.5 py-0.2 rounded mt-0.5 border shadow-2xs">
+                  ${
+                    isCancelled
+                      ? `⛔ Cancelled • Stop #${stop.stopNumber} (Skipped)`
+                      : isRedirected
+                      ? `⚡ Redirected Stock Accepted • Stop #${stop.stopNumber}`
+                      : `Stop #${stop.stopNumber} (${v.regNo})`
+                  }
                 </span>
               </div>
             </div>
           `,
-          iconSize: [190, 56],
-          iconAnchor: [95, 14],
+          iconSize: [210, 56],
+          iconAnchor: [105, 14],
         });
 
         const totalCases = (stop.items || []).reduce((acc, it) => acc + (it.assigned_cases || it.demanded_cases || 0), 0);
@@ -536,7 +884,7 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
 
       // Initial truck marker position
       const initialCoord = v.flightPath[0] || v.depotCoords;
-      const isMoving = v.status === 'IN_TRANSIT' || isTestingMotion;
+      const isMoving = v.status === 'IN_TRANSIT' && isTestingMotion;
 
       const truckIcon = L.divIcon({
         className: 'custom-truck-icon',
@@ -629,9 +977,10 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
 
   // 3. Live Fluid Movement Engine Along Real Street Waypoints
   useEffect(() => {
+    if (!hasActiveOrders) return;
     const interval = setInterval(() => {
       mergedVehiclesData.forEach((v) => {
-        const isMoving = v.status === 'IN_TRANSIT' || isTestingMotion;
+        const isMoving = v.status === 'IN_TRANSIT' && isTestingMotion;
         if (!isMoving) return;
 
         const motion = motionStateRef.current.get(v.regNo);
@@ -651,10 +1000,12 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
 
         // If this vehicle is currently focused, update telemetry HUD in real time
         if (focusedVehicleReg === v.regNo || (focusedVehicleReg === null && mergedVehiclesData[0]?.regNo === v.regNo)) {
-          const nextStop = v.waypoints.find((w, i) => i > 0 && w.status !== 'CONFIRMED')?.name || v.waypoints[1]?.name || 'Depot Hub';
+          const redirected = v.waypoints.find((w, i) => i > 0 && (w.isRedirected || w.isOfferAccepted) && w.status !== 'CONFIRMED');
+          const nextActive = redirected || v.waypoints.find((w, i) => i > 0 && w.status !== 'CONFIRMED' && !w.isCancelled);
+          const nextStopName = nextActive ? (nextActive.isRedirected ? `${nextActive.name} (Redirected Stock)` : nextActive.name) : (v.waypoints[1]?.name || 'Depot Hub');
           setFocusedTelemetry({
             speed: motion.speed,
-            nextStopName: nextStop,
+            nextStopName,
             subRoute: v.subRoute,
             driver: v.driver,
             phone: v.phone,
@@ -668,7 +1019,24 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [mergedVehiclesData, focusedVehicleReg, isTestingMotion]);
+  }, [mergedVehiclesData, focusedVehicleReg, isTestingMotion, hasActiveOrders]);
+
+  // Telemetry HUD reset when orders are completed
+  useEffect(() => {
+    if (!hasActiveOrders) {
+      setFocusedTelemetry({
+        speed: 0,
+        nextStopName: 'All Orders Completed (Fleet at Depot)',
+        subRoute: 'Central Depot Base',
+        driver: 'Fleet Stationary',
+        phone: 'N/A',
+        cases: 0,
+        status: 'COMPLETED',
+        regNo: 'Central Fleet',
+        coords: [23.7925, 90.4078],
+      });
+    }
+  }, [hasActiveOrders]);
 
   // Recenter on focused truck or fit all
   const handleRecenterFocused = () => {
@@ -684,7 +1052,20 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
   };
 
   const handleFitAllFleet = () => {
-    if (!mapInstanceRef.current || mergedVehiclesData.length === 0) return;
+    if (!mapInstanceRef.current) return;
+    if (!hasActiveOrders) {
+      const depotCoord = resolveDepotCoordinates('Central Sub-Route', 0);
+      const allCoords: [number, number][] = [depotCoord];
+      outletsToDisplay.forEach((outlet, idx) => {
+        const outletId = outlet.id || outlet.outlet_id || (idx + 1);
+        allCoords.push(getOutletCoordinates(outletId, idx, outlet.sub_route || 'Gulshan Sub-Route', 0));
+      });
+      if (allCoords.length > 0) {
+        mapInstanceRef.current.fitBounds(L.latLngBounds(allCoords), { padding: [50, 50], animate: true });
+      }
+      return;
+    }
+    if (mergedVehiclesData.length === 0) return;
     const allCoords: [number, number][] = [];
     mergedVehiclesData.forEach((v) => v.rawCoords.forEach((c) => allCoords.push(c)));
     if (allCoords.length > 0) {
@@ -707,67 +1088,87 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
               <h3 className="font-oswald text-lg font-bold uppercase tracking-wide text-slate-900">
                 Live OpenStreetMap Fleet Telemetry
               </h3>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                LIVE GPS SYNC
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-mono flex items-center gap-1 ${
+                hasActiveOrders
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                  : 'bg-slate-100 text-slate-700 border border-slate-200'
+              }`}>
+                <span className={`w-2 h-2 rounded-full ${hasActiveOrders ? 'bg-emerald-500 animate-ping' : 'bg-slate-400'}`} />
+                {hasActiveOrders ? 'LIVE GPS SYNC' : 'ORDERS COMPLETED • DEPOT & OUTLETS VIEW'}
               </span>
             </div>
             <p className="text-xs text-slate-500">
-              Real-time route telemetry and checkpoint progression along sub-routes powered by OpenStreetMap API.
+              {hasActiveOrders
+                ? 'Real-time route telemetry and checkpoint progression along sub-routes powered by OpenStreetMap API.'
+                : 'All delivery orders are completed. Delivery routes cleared; displaying central depot hub and retail outlet locations.'}
             </p>
           </div>
         </div>
 
         {/* Multi-Vehicle Merged Fleet Selector Tabs */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0">
-          {/* Master All-Vehicles View Tab */}
-          <button
-            type="button"
-            onClick={() => {
-              setFocusedVehicleReg(null);
-              handleFitAllFleet();
-            }}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold font-mono transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-              focusedVehicleReg === null
-                ? 'bg-slate-900 text-white shadow-sm ring-2 ring-slate-700'
-                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-            }`}
-          >
-            <Eye className="w-3.5 h-3.5 text-cyan-400" />
-            <span>All Vehicles ({mergedVehiclesData.length})</span>
-            <span className="w-2 h-2 rounded-full bg-emerald-400" />
-          </button>
-
-          {/* Individual Vehicle Tabs */}
-          {mergedVehiclesData.map((v) => {
-            const isSelected = focusedVehicleReg === v.regNo;
-            const isMoving = v.status === 'IN_TRANSIT' || isTestingMotion;
-            return (
+          {!hasActiveOrders ? (
+            <button
+              type="button"
+              onClick={handleFitAllFleet}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold font-mono transition-all flex items-center gap-1.5 whitespace-nowrap bg-slate-900 text-white shadow-sm ring-2 ring-slate-700 cursor-pointer"
+            >
+              <Building2 className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Depot Hub & Outlets ({outletsToDisplay.length})</span>
+              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            </button>
+          ) : (
+            <>
+              {/* Master All-Vehicles View Tab */}
               <button
-                key={v.regNo}
                 type="button"
                 onClick={() => {
-                  setFocusedVehicleReg(v.regNo);
-                  if (onSelectDispatch) onSelectDispatch(v.dispatch);
-                  const marker = truckMarkersMapRef.current.get(v.regNo);
-                  if (marker && mapInstanceRef.current) {
-                    mapInstanceRef.current.flyTo(marker.getLatLng(), 15, { animate: true, duration: 1.0 });
-                  }
+                  setFocusedVehicleReg(null);
+                  handleFitAllFleet();
                 }}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold font-mono transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-                  isSelected
-                    ? `${v.color.bg} text-white shadow-md shadow-blue-600/20`
+                  focusedVehicleReg === null
+                    ? 'bg-slate-900 text-white shadow-sm ring-2 ring-slate-700'
                     : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
                 }`}
               >
-                <Truck className="w-3.5 h-3.5" />
-                <span>{v.regNo}</span>
-                <span className={`w-2 h-2 rounded-full ${
-                  isMoving ? 'bg-amber-400 animate-ping' : 'bg-slate-400'
-                }`} />
+                <Eye className="w-3.5 h-3.5 text-cyan-400" />
+                <span>All Vehicles ({mergedVehiclesData.length})</span>
+                <span className="w-2 h-2 rounded-full bg-emerald-400" />
               </button>
-            );
-          })}
+
+              {/* Individual Vehicle Tabs */}
+              {mergedVehiclesData.map((v) => {
+                const isSelected = focusedVehicleReg === v.regNo;
+                const isMoving = v.status === 'IN_TRANSIT' && isTestingMotion;
+                return (
+                  <button
+                    key={v.regNo}
+                    type="button"
+                    onClick={() => {
+                      setFocusedVehicleReg(v.regNo);
+                      if (onSelectDispatch) onSelectDispatch(v.dispatch);
+                      const marker = truckMarkersMapRef.current.get(v.regNo);
+                      if (marker && mapInstanceRef.current) {
+                        mapInstanceRef.current.flyTo(marker.getLatLng(), 15, { animate: true, duration: 1.0 });
+                      }
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold font-mono transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                      isSelected
+                        ? `${v.color.bg} text-white shadow-md shadow-blue-600/20`
+                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                    }`}
+                  >
+                    <Truck className="w-3.5 h-3.5" />
+                    <span>{v.regNo}</span>
+                    <span className={`w-2 h-2 rounded-full ${
+                      isMoving ? 'bg-amber-400 animate-ping' : 'bg-slate-400'
+                    }`} />
+                  </button>
+                );
+              })}
+            </>
+          )}
         </div>
       </div>
 
@@ -778,7 +1179,34 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
 
         {/* HUD Top Left: Active Vehicle or Merged Fleet Telemetry Card */}
         <div className="absolute top-4 left-4 z-10 max-w-xs sm:max-w-sm p-3.5 rounded-2xl bg-white/95 backdrop-blur-md border border-slate-200/90 shadow-xl space-y-2 pointer-events-auto">
-          {activeFocusedData ? (
+          {!hasActiveOrders ? (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                <div className="flex items-center gap-2">
+                  <span className="p-1.5 rounded-xl bg-indigo-900 text-white font-black text-sm">🏭</span>
+                  <div>
+                    <h4 className="font-black text-sm text-slate-900 tracking-tight leading-none">
+                      Depot & Outlets Standby
+                    </h4>
+                    <span className="text-[10px] text-slate-500 font-semibold">Central Logistics Depot</span>
+                  </div>
+                </div>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase font-mono bg-emerald-100 text-emerald-800 border border-emerald-300">
+                  Orders Completed
+                </span>
+              </div>
+
+              <div className="space-y-1 text-xs">
+                <p className="text-slate-600 text-[11px]">
+                  All beverage delivery orders are currently completed. Vehicles are resting at the central depot.
+                </p>
+                <div className="flex justify-between items-center text-[11px] pt-1 border-t border-slate-100 text-slate-600">
+                  <span className="font-medium text-slate-500">Retail Outlets:</span>
+                  <strong className="text-slate-900 font-bold">{outletsToDisplay.length} Registered Outlets</strong>
+                </div>
+              </div>
+            </div>
+          ) : activeFocusedData ? (
             <>
               <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
                 <div className="flex items-center gap-2">
@@ -873,48 +1301,52 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
 
         {/* HUD Top Right: Action Buttons & Testing Motion Controls */}
         <div className="absolute top-4 right-4 z-10 flex flex-col gap-2 pointer-events-auto">
-          {/* Test Motion Simulation Toggle (Requested by user) */}
-          <button
-            type="button"
-            onClick={() => setIsTestingMotion((prev) => !prev)}
-            className={`p-2.5 rounded-2xl backdrop-blur-md border shadow-lg transition-all active:scale-95 flex items-center gap-1.5 text-xs font-bold cursor-pointer ${
-              isTestingMotion
-                ? 'bg-emerald-600 text-white border-emerald-500 shadow-emerald-500/30'
-                : 'bg-white/95 text-slate-700 hover:text-blue-600 hover:bg-white border-slate-200/90'
-            }`}
-            title="Toggle Live Vehicle Motion Simulation along routes"
-          >
-            {isTestingMotion ? (
-              <>
-                <Pause className="w-4 h-4 text-white" />
-                <span className="hidden sm:inline">Motion: Active</span>
-              </>
-            ) : (
-              <>
-                <Play className="w-4 h-4 text-emerald-600" />
-                <span className="hidden sm:inline">Start Ride Test</span>
-              </>
-            )}
-          </button>
+          {/* Test Motion Simulation Toggle (Only active when dispatches are in transit) */}
+          {hasActiveOrders && (
+            <button
+              type="button"
+              onClick={() => setIsTestingMotion((prev) => !prev)}
+              className={`p-2.5 rounded-2xl backdrop-blur-md border shadow-lg transition-all active:scale-95 flex items-center gap-1.5 text-xs font-bold cursor-pointer ${
+                isTestingMotion
+                  ? 'bg-emerald-600 text-white border-emerald-500 shadow-emerald-500/30'
+                  : 'bg-white/95 text-slate-700 hover:text-blue-600 hover:bg-white border-slate-200/90'
+              }`}
+              title="Toggle Live Vehicle Motion Simulation along routes"
+            >
+              {isTestingMotion ? (
+                <>
+                  <Pause className="w-4 h-4 text-white" />
+                  <span className="hidden sm:inline">Motion: Active</span>
+                </>
+              ) : (
+                <>
+                  <Play className="w-4 h-4 text-emerald-600" />
+                  <span className="hidden sm:inline">Start Ride Test</span>
+                </>
+              )}
+            </button>
+          )}
 
-          <button
-            type="button"
-            onClick={handleRecenterFocused}
-            className="p-2.5 rounded-2xl bg-white/95 backdrop-blur-md text-slate-700 hover:text-blue-600 hover:bg-white border border-slate-200/90 shadow-lg transition-all active:scale-95 flex items-center gap-1.5 text-xs font-bold cursor-pointer"
-            title="Recenter on Focused Delivery Truck"
-          >
-            <Compass className="w-4 h-4 text-blue-600" />
-            <span className="hidden sm:inline">Center Truck</span>
-          </button>
+          {hasActiveOrders && (
+            <button
+              type="button"
+              onClick={handleRecenterFocused}
+              className="p-2.5 rounded-2xl bg-white/95 backdrop-blur-md text-slate-700 hover:text-blue-600 hover:bg-white border border-slate-200/90 shadow-lg transition-all active:scale-95 flex items-center gap-1.5 text-xs font-bold cursor-pointer"
+              title="Recenter on Focused Delivery Truck"
+            >
+              <Compass className="w-4 h-4 text-blue-600" />
+              <span className="hidden sm:inline">Center Truck</span>
+            </button>
+          )}
 
           <button
             type="button"
             onClick={handleFitAllFleet}
             className="p-2.5 rounded-2xl bg-white/95 backdrop-blur-md text-slate-700 hover:text-blue-600 hover:bg-white border border-slate-200/90 shadow-lg transition-all active:scale-95 flex items-center gap-1.5 text-xs font-bold cursor-pointer"
-            title="Fit Entire Fleet on Screen"
+            title={hasActiveOrders ? "Fit Entire Fleet on Screen" : "Fit Depot and Outlets"}
           >
             <Layers className="w-4 h-4 text-indigo-600" />
-            <span className="hidden sm:inline">Fit Route</span>
+            <span className="hidden sm:inline">{hasActiveOrders ? "Fit Route" : "Fit Outlets"}</span>
           </button>
         </div>
 
@@ -924,32 +1356,41 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
             <span className="w-3 h-3 rounded-md bg-indigo-900 border border-white inline-block" />
             <span className="font-bold">Depot Hub</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-full bg-blue-600 border border-white inline-block" />
-            <span>En Route</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-full bg-amber-500 border border-white inline-block" />
-            <span>Delivered by Driver</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-full bg-emerald-600 border border-white inline-block" />
-            <span>Confirmed by Outlet</span>
-          </div>
-
-          {/* Color Key for Each Vehicle */}
-          <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
-            {mergedVehiclesData.map((v) => (
-              <div
-                key={v.regNo}
-                onClick={() => setFocusedVehicleReg(v.regNo)}
-                className="flex items-center gap-1 cursor-pointer font-mono font-bold"
-              >
-                <span className={`w-2.5 h-2.5 rounded-full ${v.color.bg}`} />
-                <span>{v.regNo}</span>
+          {!hasActiveOrders ? (
+            <div className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-full bg-slate-900 border border-cyan-400 inline-block text-[8px] flex items-center justify-center">🏪</span>
+              <span className="font-bold">Retail Outlets</span>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-full bg-blue-600 border border-white inline-block" />
+                <span>En Route</span>
               </div>
-            ))}
-          </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-full bg-amber-500 border border-white inline-block" />
+                <span>Delivered by Driver</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-full bg-emerald-600 border border-white inline-block" />
+                <span>Confirmed by Outlet</span>
+              </div>
+
+              {/* Color Key for Each Vehicle */}
+              <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
+                {mergedVehiclesData.map((v) => (
+                  <div
+                    key={v.regNo}
+                    onClick={() => setFocusedVehicleReg(v.regNo)}
+                    className="flex items-center gap-1 cursor-pointer font-mono font-bold"
+                  >
+                    <span className={`w-2.5 h-2.5 rounded-full ${v.color.bg}`} />
+                    <span>{v.regNo}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
 
         {/* HUD Bottom Right: OpenStreetMap Attribution Badge */}

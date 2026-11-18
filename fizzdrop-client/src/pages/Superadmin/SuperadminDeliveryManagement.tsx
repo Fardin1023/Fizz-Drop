@@ -24,25 +24,31 @@ import type { VehicleDispatch, DeliveryTeam } from '../Admin/SupplierDeliveryMan
 
 export interface SuperadminDeliveryManagementProps {
   initialSubTab?: 'all' | 'map' | 'trips';
+  showMap?: boolean;
 }
 
 export const SuperadminDeliveryManagement: React.FC<SuperadminDeliveryManagementProps> = ({
   initialSubTab = 'all',
+  showMap = true,
 }) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [dispatches, setDispatches] = useState<VehicleDispatch[]>([]);
   const [teams, setTeams] = useState<DeliveryTeam[]>([]);
-  const [activeSubTab, setActiveSubTab] = useState<'all' | 'map' | 'trips'>(initialSubTab);
+  const [activeSubTab, setActiveSubTab] = useState<'all' | 'map' | 'trips'>(
+    !showMap ? 'trips' : initialSubTab
+  );
   const [search, setSearch] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [subrouteFilter, setSubrouteFilter] = useState<string>('ALL');
   const [expandedTripId, setExpandedTripId] = useState<number | null>(null);
 
   useEffect(() => {
-    if (initialSubTab) {
+    if (!showMap) {
+      setActiveSubTab('trips');
+    } else if (initialSubTab) {
       setActiveSubTab(initialSubTab);
     }
-  }, [initialSubTab]);
+  }, [initialSubTab, showMap]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -165,55 +171,57 @@ export const SuperadminDeliveryManagement: React.FC<SuperadminDeliveryManagement
         </div>
       </div>
 
-      {/* Section Switcher Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-200 pb-2 flex-wrap">
-        <button
-          type="button"
-          onClick={() => setActiveSubTab('map')}
-          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-            activeSubTab === 'map'
-              ? 'bg-purple-600 text-white shadow-xs'
-              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-          }`}
-        >
-          <Navigation className="w-3.5 h-3.5" />
-          <span>Live Fleet GPS Map Tracker</span>
-          <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold ${
-            activeSubTab === 'map' ? 'bg-purple-800 text-white' : 'bg-purple-100 text-purple-700'
-          }`}>
-            Live GPS
-          </span>
-        </button>
+      {/* Section Switcher Tabs (Only displayed when Map Telemetry is enabled) */}
+      {showMap && (
+        <div className="flex items-center gap-2 border-b border-slate-200 pb-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('map')}
+            className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeSubTab === 'map'
+                ? 'bg-purple-600 text-white shadow-xs'
+                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+            }`}
+          >
+            <Navigation className="w-3.5 h-3.5" />
+            <span>Live Fleet GPS Map Tracker</span>
+            <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold ${
+              activeSubTab === 'map' ? 'bg-purple-800 text-white' : 'bg-purple-100 text-purple-700'
+            }`}>
+              Live GPS
+            </span>
+          </button>
 
-        <button
-          type="button"
-          onClick={() => setActiveSubTab('all')}
-          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-            activeSubTab === 'all'
-              ? 'bg-purple-600 text-white shadow-xs'
-              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-          }`}
-        >
-          <Layers className="w-3.5 h-3.5" />
-          <span>Complete Operations (Map + Manifests)</span>
-        </button>
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('all')}
+            className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeSubTab === 'all'
+                ? 'bg-purple-600 text-white shadow-xs'
+                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>Complete Operations (Map + Manifests)</span>
+          </button>
 
-        <button
-          type="button"
-          onClick={() => setActiveSubTab('trips')}
-          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-            activeSubTab === 'trips'
-              ? 'bg-purple-600 text-white shadow-xs'
-              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-          }`}
-        >
-          <Truck className="w-3.5 h-3.5" />
-          <span>Vehicle Trips & Manifests ({dispatches.length})</span>
-        </button>
-      </div>
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('trips')}
+            className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeSubTab === 'trips'
+                ? 'bg-purple-600 text-white shadow-xs'
+                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+            }`}
+          >
+            <Truck className="w-3.5 h-3.5" />
+            <span>Vehicle Trips & Manifests ({dispatches.length})</span>
+          </button>
+        </div>
+      )}
 
-      {/* Live OpenStreetMap National Fleet Telemetry Map */}
-      {(activeSubTab === 'map' || activeSubTab === 'all') && (
+      {/* Live OpenStreetMap National Fleet Telemetry Map (Only rendered in Fleet Map Tracker) */}
+      {showMap && (activeSubTab === 'map' || activeSubTab === 'all') && (
         <div className="space-y-2">
           {dispatches.length > 0 ? (
             <DeliveryFleetMap
@@ -231,7 +239,7 @@ export const SuperadminDeliveryManagement: React.FC<SuperadminDeliveryManagement
       )}
 
       {/* Trips & Manifests Section */}
-      {(activeSubTab === 'trips' || activeSubTab === 'all') && (
+      {(!showMap || activeSubTab === 'trips' || activeSubTab === 'all') && (
         <div className="space-y-4">
           {/* Filters Strip */}
           <div className="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3">

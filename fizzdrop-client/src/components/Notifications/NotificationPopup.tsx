@@ -9,6 +9,7 @@ import {
   X,
   Sparkles,
   PackageCheck,
+  Zap,
 } from 'lucide-react';
 import type { AppNotification } from '../../types/notification';
 import { getNotificationDestination } from '../../utils/notificationRouter';
@@ -31,6 +32,8 @@ export const NotificationPopup: React.FC<NotificationPopupProps> = ({
   const handleClose = onDismiss || onClose || (() => {});
   const [progress, setProgress] = useState(100);
   const [isPaused, setIsPaused] = useState(false);
+  const [isResponding, setIsResponding] = useState<'ACCEPT' | 'DENY' | null>(null);
+  const [responseMsg, setResponseMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (!notification) return;
@@ -55,6 +58,7 @@ export const NotificationPopup: React.FC<NotificationPopupProps> = ({
   if (!notification) return null;
 
   const isSuperadminRecipient = notification.recipient_role === 'SUPERADMIN';
+  const isStockOffer = notification.type === 'STOCK_OFFER_RECEIVED';
   const isDirectDispatch = notification.type === 'DIRECT_DISPATCH' || notification.type === 'DIRECT_SUPPLY';
   const isApproved = notification.type === 'APPROVED';
   const isPartial = notification.type === 'PARTIALLY_APPROVED';
@@ -62,6 +66,39 @@ export const NotificationPopup: React.FC<NotificationPopupProps> = ({
   const isNewReq = notification.type === 'NEW_REQUISITION';
   const isSOReq = notification.type === 'SALES_OFFICER_REQUISITION';
   const destination = getNotificationDestination(notification);
+
+  const handleRespondOffer = async (action: 'ACCEPT' | 'DENY') => {
+    setIsResponding(action);
+    try {
+      const code = notification.reference_code || notification.reference_id;
+      const res = await fetch(`http://localhost:8080/api/v1/delivery/stock-offers/${code}/respond`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setResponseMsg(action === 'ACCEPT' ? '✓ Stock Accepted!' : '✕ Stock Denied');
+        try {
+          const ch = new BroadcastChannel('fizzdrop_realtime_events');
+          ch.postMessage({
+            type: 'STOCK_OFFER_RESPONDED',
+            action,
+            code,
+            outlet_id: notification.recipient_user_id,
+          });
+          ch.close();
+        } catch (ignored) {}
+        setTimeout(() => {
+          handleClose();
+        }, 1500);
+      }
+    } catch (err) {
+      console.error('Error responding to stock offer from popup:', err);
+    } finally {
+      setIsResponding(null);
+    }
+  };
 
   // Format relative time
   const getTimeString = () => {
@@ -86,7 +123,9 @@ export const NotificationPopup: React.FC<NotificationPopupProps> = ({
         {/* Subtle Tech Glow Accents */}
         <div
           className={`absolute -top-12 -right-12 w-28 h-28 rounded-full blur-2xl pointer-events-none opacity-40 ${
-            isApproved
+            isStockOffer
+              ? 'bg-purple-400'
+              : isApproved
               ? 'bg-emerald-400'
               : isRejected
               ? 'bg-rose-400'
@@ -101,7 +140,9 @@ export const NotificationPopup: React.FC<NotificationPopupProps> = ({
           <div className="flex items-center gap-2.5">
             <div
               className={`w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 shadow-sm ${
-                isDirectDispatch
+                isStockOffer
+                  ? 'bg-purple-50 text-purple-600 border border-purple-200'
+                  : isDirectDispatch
                   ? 'bg-purple-50 text-purple-600 border border-purple-200'
                   : isApproved
                   ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
@@ -112,7 +153,9 @@ export const NotificationPopup: React.FC<NotificationPopupProps> = ({
                   : 'bg-blue-50 text-blue-600 border border-blue-200'
               }`}
             >
-              {isDirectDispatch ? (
+              {isStockOffer ? (
+                <Zap className="w-5 h-5 text-purple-600" />
+              ) : isDirectDispatch ? (
                 <PackageCheck className="w-5 h-5 text-purple-600" />
               ) : isApproved ? (
                 <CheckCircle2 className="w-5 h-5 text-emerald-600" />
@@ -131,7 +174,9 @@ export const NotificationPopup: React.FC<NotificationPopupProps> = ({
               <div className="flex items-center gap-1.5 flex-wrap">
                 <span
                   className={`px-2 py-0.5 rounded-full text-[9px] font-mono font-bold tracking-wider uppercase inline-flex items-center gap-1 ${
-                    isDirectDispatch
+                    isStockOffer
+                      ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                      : isDirectDispatch
                       ? 'bg-purple-100 text-purple-800 border border-purple-200'
                       : isApproved
                       ? 'bg-emerald-100 text-emerald-800'
@@ -143,7 +188,9 @@ export const NotificationPopup: React.FC<NotificationPopupProps> = ({
                   }`}
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-current animate-ping" />
-                  {isDirectDispatch
+                  {isStockOffer
+                    ? 'IN-TRANSIT STOCK OFFER'
+                    : isDirectDispatch
                     ? 'DIRECT SHIPMENT (UNREQUESTED)'
                     : isApproved
                     ? 'STOCK PERMITTED'
@@ -186,23 +233,56 @@ export const NotificationPopup: React.FC<NotificationPopupProps> = ({
           )}
         </div>
 
-        {/* Action Button */}
+        {/* Action Button Row */}
         <div className="mt-3.5 pt-3 border-t border-slate-100 flex items-center justify-between gap-2 relative z-10 pl-11">
           <span className="text-[10px] text-slate-400 font-medium">
             {isPaused ? 'Auto-dismiss paused' : 'Auto-dismisses shortly'}
           </span>
 
-          <button
-            type="button"
-            onClick={() => {
-              if (onAction) onAction(notification);
-              handleClose();
-            }}
-            className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-blue-500/20 hover:opacity-95 active:scale-95 transition-all cursor-pointer"
-          >
-            <span>Open {destination.label}</span>
-            <ExternalLink className="w-3.5 h-3.5" />
-          </button>
+          {isStockOffer ? (
+            <div className="flex items-center gap-2">
+              {responseMsg ? (
+                <span className={`px-3 py-1 rounded-xl text-xs font-bold ${
+                  responseMsg.includes('Accepted') ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                }`}>
+                  {responseMsg}
+                </span>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => handleRespondOffer('ACCEPT')}
+                    disabled={isResponding !== null}
+                    className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-95 transition-all cursor-pointer"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>{isResponding === 'ACCEPT' ? 'Accepting...' : 'Accept Stock'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleRespondOffer('DENY')}
+                    disabled={isResponding !== null}
+                    className="px-3.5 py-1.5 rounded-xl border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs flex items-center gap-1.5 shadow-xs active:scale-95 transition-all cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    <span>{isResponding === 'DENY' ? 'Denying...' : 'Deny Stock'}</span>
+                  </button>
+                </>
+              )}
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                if (onAction) onAction(notification);
+                handleClose();
+              }}
+              className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-blue-500/20 hover:opacity-95 active:scale-95 transition-all cursor-pointer"
+            >
+              <span>Open {destination.label}</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
         {/* Dynamic Progress Bar */}

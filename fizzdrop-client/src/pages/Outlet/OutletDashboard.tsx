@@ -124,6 +124,7 @@ export const OutletDashboard: React.FC = () => {
   // Fleet Inbound Deliveries & Delivery Confirmation
   const [fleetDeliveries, setFleetDeliveries] = useState<any[]>([]);
   const [confirmingReceiptId, setConfirmingReceiptId] = useState<number | null>(null);
+  const [cancellingOrderId, setCancellingOrderId] = useState<number | string | null>(null);
   const [receiptSuccessMsg, setReceiptSuccessMsg] = useState<string | null>(null);
 
   // Real-time Notifications for this outlet
@@ -160,7 +161,7 @@ export const OutletDashboard: React.FC = () => {
             setCustomerOrderAlert(event.data);
             fetchDashboardData(currentId, true);
           }
-        } else if (event.data?.type === 'PSR_STOCK_DISPATCHED') {
+        } else if (event.data?.type === 'PSR_STOCK_DISPATCHED' || event.data?.type === 'DELIVERY_STOCK_OFFERED' || event.data?.type === 'STOCK_OFFER_RESPONDED' || event.data?.type === 'DELIVERY_ORDER_CANCELLED') {
           const currentId = Number(outlet?.outlet_id || activeOutletId);
           if (!event.data.outlet_id || Number(event.data.outlet_id) === currentId) {
             fetchDashboardData(currentId, true);
@@ -313,6 +314,91 @@ export const OutletDashboard: React.FC = () => {
       alert('Error connecting to delivery service.');
     } finally {
       setConfirmingReceiptId(null);
+    }
+  };
+
+  const handleCancelOrderAndRefund = async (opts: {
+    dispatchId?: number;
+    requisitionId?: number;
+    code: string;
+    refundEstimate?: number;
+  }) => {
+    const refundFormatted = (opts.refundEstimate || 0).toFixed(2);
+    const confirmMsg = `Are you sure you want to cancel ${opts.code}?\n\nA full refund of ৳${refundFormatted} will be issued to your account, and the delivery vehicle driver will be immediately alerted to skip this store.`;
+    if (!window.confirm(confirmMsg)) return;
+
+    const cancelKey = opts.dispatchId || opts.requisitionId || opts.code;
+    setCancellingOrderId(cancelKey);
+    try {
+      const res = await fetch('http://localhost:8080/api/v1/delivery/cancel-outlet-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          outlet_id: outlet?.outlet_id || activeOutletId,
+          dispatch_id: opts.dispatchId,
+          requisition_id: opts.requisitionId,
+          reason: 'Cancelled by outlet manager via dashboard',
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setReceiptSuccessMsg(data.message || `Order ${opts.code} cancelled! Full refund of ৳${refundFormatted} processed. Delivery team notified.`);
+        try {
+          const channel = new BroadcastChannel('fizzdrop_realtime_events');
+          channel.postMessage({
+            type: 'DELIVERY_ORDER_CANCELLED',
+            dispatchId: opts.dispatchId,
+            requisitionId: opts.requisitionId,
+            outletId: outlet?.outlet_id || activeOutletId,
+          });
+          channel.close();
+        } catch {}
+        window.dispatchEvent(new Event('storage'));
+        await fetchDashboardData(outlet?.outlet_id || activeOutletId);
+      } else {
+        alert(data.message || 'Failed to cancel order.');
+      }
+    } catch {
+      alert('Network error while cancelling order.');
+    } finally {
+      setCancellingOrderId(null);
+    }
+  };
+
+  const [respondingOfferId, setRespondingOfferId] = useState<string | number | null>(null);
+
+  const handleRespondStockOffer = async (offerCodeOrId: string | number, action: 'ACCEPT' | 'DENY') => {
+    setRespondingOfferId(offerCodeOrId);
+    try {
+      const res = await fetch(`http://localhost:8080/api/v1/delivery/stock-offers/${offerCodeOrId}/respond`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setReceiptSuccessMsg(action === 'ACCEPT' 
+          ? '✓ Stock offer accepted! Consignment is on the way to your store.' 
+          : 'Stock offer was declined and returned to truck cargo.');
+        setTimeout(() => setReceiptSuccessMsg(null), 6000);
+        try {
+          const ch = new BroadcastChannel('fizzdrop_realtime_events');
+          ch.postMessage({
+            type: 'STOCK_OFFER_RESPONDED',
+            action,
+            code: offerCodeOrId,
+            outlet_id: outlet?.outlet_id || activeOutletId,
+          });
+          ch.close();
+        } catch {}
+        await fetchDashboardData(outlet?.outlet_id || activeOutletId, true);
+      } else {
+        alert(data.message || 'Failed to process stock offer response.');
+      }
+    } catch {
+      alert('Error connecting to stock offer service.');
+    } finally {
+      setRespondingOfferId(null);
     }
   };
 
@@ -1357,6 +1443,30 @@ export const OutletDashboard: React.FC = () => {
                   </div>
                 )}
 
+                {/* Active Inbound Live Alert Banner */}
+                {fleetDeliveries.some((d) => !d.is_confirmed_by_outlet && (d.status === 'IN_TRANSIT' || d.status === 'BOARDED' || d.is_delivered_by_driver)) && (
+                  <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-teal-500/10 border-2 border-blue-400/50 shadow-sm flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md animate-pulse shrink-0">
+                        <Truck className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                          <span>Active Inbound Stock In Progress</span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-black uppercase">Live Tracking</span>
+                        </h4>
+                        <p className="text-xs text-slate-600 mt-0.5">
+                          {fleetDeliveries.find((d) => !d.is_confirmed_by_outlet && d.is_delivered_by_driver)
+                            ? 'A delivery vehicle has arrived at your store and unloaded cases. Please confirm stock receipt below.'
+                            : fleetDeliveries.find((d) => !d.is_confirmed_by_outlet && d.status === 'IN_TRANSIT')
+                            ? 'A delivery vehicle is currently on the way to your outlet. Track vehicle registration and driver hotline below.'
+                            : 'Your ordered consignment has been verified & boarded onto the delivery truck by the delivery team.'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Fleet Delivery Consignments */}
                 {fleetDeliveries.length > 0 && (
                   <div className="space-y-3">
@@ -1374,15 +1484,24 @@ export const OutletDashboard: React.FC = () => {
                       {fleetDeliveries.map((delivery) => {
                         const isDeliveredByDriver = delivery.is_delivered_by_driver;
                         const isConfirmedByOutlet = delivery.is_confirmed_by_outlet;
+                        const isCancelled = delivery.is_cancelled || delivery.status === 'CANCELLED';
+                        const isBoarded = delivery.status === 'BOARDED' || delivery.status === 'IN_TRANSIT' || isDeliveredByDriver || isConfirmedByOutlet;
+                        const isInTransit = delivery.status === 'IN_TRANSIT' || isDeliveredByDriver || isConfirmedByOutlet;
 
                         return (
                           <div
                             key={delivery.id}
                             className={`p-4 rounded-2xl border transition-all ${
-                              isConfirmedByOutlet
+                              isCancelled
+                                ? 'bg-rose-50/40 border-rose-300 shadow-xs'
+                                : isConfirmedByOutlet
                                 ? 'bg-white border-emerald-200 shadow-xs'
                                 : isDeliveredByDriver
                                 ? 'bg-gradient-to-r from-cyan-50/70 via-blue-50/40 to-emerald-50/50 border-2 border-cyan-400 shadow-md'
+                                : delivery.status === 'IN_TRANSIT'
+                                ? 'bg-gradient-to-r from-blue-50/70 via-indigo-50/30 to-sky-50/50 border-2 border-blue-400 shadow-md'
+                                : delivery.status === 'BOARDED'
+                                ? 'bg-gradient-to-r from-amber-50/70 via-yellow-50/30 to-amber-50/50 border-2 border-amber-300 shadow-sm'
                                 : 'bg-white border-slate-200/80 shadow-xs'
                             }`}
                           >
@@ -1396,17 +1515,29 @@ export const OutletDashboard: React.FC = () => {
                                     Vehicle: {delivery.vehicle_registration_no}
                                   </span>
                                   <span className={`text-[10px] px-2 py-0.5 rounded-full font-black uppercase ${
-                                    isConfirmedByOutlet
+                                    isCancelled
+                                      ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                                      : isConfirmedByOutlet
                                       ? 'bg-emerald-100 text-emerald-800'
                                       : isDeliveredByDriver
                                       ? 'bg-cyan-100 text-cyan-800 animate-pulse'
-                                      : 'bg-amber-100 text-amber-800'
+                                      : delivery.status === 'IN_TRANSIT'
+                                      ? 'bg-blue-100 text-blue-800 animate-pulse border border-blue-300'
+                                      : delivery.status === 'BOARDED'
+                                      ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                      : 'bg-slate-100 text-slate-800'
                                   }`}>
-                                    {isConfirmedByOutlet
+                                    {isCancelled
+                                      ? '⛔ Order Cancelled & Refunded'
+                                      : isConfirmedByOutlet
                                       ? '✓ Stock Received & Added to Shelf'
                                       : isDeliveredByDriver
                                       ? '🚚 Vehicle Arrived & Unloaded'
-                                      : '🚚 En Route'}
+                                      : delivery.status === 'IN_TRANSIT'
+                                      ? '🚚 On The Way to Outlet (In Transit)'
+                                      : delivery.status === 'BOARDED'
+                                      ? '📦 Cargo Boarded on Truck'
+                                      : '📋 Dispatched to Fleet'}
                                   </span>
                                 </div>
 
@@ -1427,28 +1558,178 @@ export const OutletDashboard: React.FC = () => {
                                 </div>
                               </div>
 
-                              {/* Outlet Confirmation Action Button */}
+                              {/* Outlet Confirmation / Cancellation Action Button */}
                               <div className="text-right sm:self-center">
-                                {isConfirmedByOutlet ? (
+                                {isCancelled ? (
+                                  <div className="flex items-center gap-1.5 text-xs text-rose-700 font-bold bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-200">
+                                    <AlertCircle className="w-4 h-4 text-rose-600" />
+                                    <span>Refund Processed</span>
+                                  </div>
+                                ) : isConfirmedByOutlet ? (
                                   <div className="flex items-center gap-1.5 text-xs text-emerald-700 font-bold bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
                                     <CheckCircle className="w-4 h-4 text-emerald-600" />
                                     <span>Consignment Accepted</span>
                                   </div>
                                 ) : isDeliveredByDriver ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleConfirmFleetDelivery(delivery.id)}
-                                    disabled={confirmingReceiptId === delivery.id}
-                                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-sm transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
-                                  >
-                                    <CheckCircle className="w-4 h-4" />
-                                    <span>{confirmingReceiptId === delivery.id ? 'Confirming...' : 'Confirm Stock Received'}</span>
-                                  </button>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleConfirmFleetDelivery(delivery.id)}
+                                      disabled={confirmingReceiptId === delivery.id || cancellingOrderId !== null}
+                                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-sm transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
+                                    >
+                                      <CheckCircle className="w-4 h-4" />
+                                      <span>{confirmingReceiptId === delivery.id ? 'Confirming...' : 'Confirm Stock Received'}</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCancelOrderAndRefund({
+                                        dispatchId: delivery.id,
+                                        code: delivery.dispatch_code,
+                                        refundEstimate: delivery.outlet_items?.reduce((s: number, it: any) => s + (it.assigned_cases || it.demanded_cases || 0) * (it.unit_price || 42), 0) || 0,
+                                      })}
+                                      disabled={cancellingOrderId === delivery.id}
+                                      className="px-3 py-2 rounded-xl border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs transition-all active:scale-95 cursor-pointer flex items-center gap-1"
+                                      title="Cancel order and request full refund"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                      <span>Cancel & Refund</span>
+                                    </button>
+                                  </div>
                                 ) : (
-                                  <span className="text-[11px] text-slate-400 italic">
-                                    Awaiting vehicle arrival
-                                  </span>
+                                  <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
+                                    {delivery.is_offer_pending ? (
+                                      <div className="flex items-center gap-1.5">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const code = delivery.outlet_items?.find((it: any) => it.is_offered_stock)?.requisition_code || delivery.id;
+                                            handleRespondStockOffer(code, 'ACCEPT');
+                                          }}
+                                          disabled={respondingOfferId !== null}
+                                          className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1 shadow-sm active:scale-95 transition-all cursor-pointer"
+                                        >
+                                          <CheckCircle className="w-3.5 h-3.5" />
+                                          <span>Accept Stock</span>
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const code = delivery.outlet_items?.find((it: any) => it.is_offered_stock)?.requisition_code || delivery.id;
+                                            handleRespondStockOffer(code, 'DENY');
+                                          }}
+                                          disabled={respondingOfferId !== null}
+                                          className="px-3 py-1.5 rounded-xl border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs flex items-center gap-1 shadow-sm active:scale-95 transition-all cursor-pointer"
+                                        >
+                                          <X className="w-3.5 h-3.5" />
+                                          <span>Deny Stock</span>
+                                        </button>
+                                      </div>
+                                    ) : delivery.is_offer_denied ? (
+                                      <span className="text-xs text-rose-700 font-bold bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-200">
+                                        Stock Offer Denied
+                                      </span>
+                                    ) : delivery.status === 'IN_TRANSIT' ? (
+                                      <span className="inline-flex items-center gap-1.5 text-xs text-blue-700 font-bold bg-blue-50 px-3 py-1.5 rounded-xl border border-blue-200 animate-pulse">
+                                        <Truck className="w-4 h-4 text-blue-600" />
+                                        <span>En Route to Store</span>
+                                      </span>
+                                    ) : (
+                                      <span className="text-[11px] text-slate-400 italic">
+                                        Awaiting vehicle departure
+                                      </span>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCancelOrderAndRefund({
+                                        dispatchId: delivery.id,
+                                        code: delivery.dispatch_code,
+                                        refundEstimate: delivery.outlet_items?.reduce((s: number, it: any) => s + (it.assigned_cases || it.demanded_cases || 0) * (it.unit_price || 42), 0) || 0,
+                                      })}
+                                      disabled={cancellingOrderId === delivery.id}
+                                      className="px-3 py-1.5 rounded-xl border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs transition-all active:scale-95 cursor-pointer flex items-center gap-1"
+                                      title="Cancel delivery order and get full refund"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                      <span>{cancellingOrderId === delivery.id ? 'Cancelling...' : 'Cancel Order & Refund'}</span>
+                                    </button>
+                                  </div>
                                 )}
+                              </div>
+                            </div>
+
+                            {/* 4-Step Visual Delivery Progress Stepper */}
+                            <div className="grid grid-cols-4 gap-2 pt-3 mt-3 border-t border-slate-100">
+                              {/* Step 1: Dispatched */}
+                              <div className="flex flex-col items-center text-center p-1.5 rounded-xl border bg-blue-50/70 border-blue-200 text-blue-900 font-bold text-[11px]">
+                                <div className="flex items-center gap-1">
+                                  <CheckCircle className="w-3.5 h-3.5 text-blue-600" />
+                                  <span>1. Dispatched</span>
+                                </div>
+                                <span className="text-[9px] text-slate-500 font-normal">By Supplier</span>
+                              </div>
+
+                              {/* Step 2: Boarded */}
+                              <div className={`flex flex-col items-center text-center p-1.5 rounded-xl border text-[11px] ${
+                                isBoarded
+                                  ? 'bg-amber-50/80 border-amber-300 text-amber-900 font-bold'
+                                  : 'bg-slate-50 border-slate-200 text-slate-400'
+                              }`}>
+                                <div className="flex items-center gap-1">
+                                  {isBoarded ? (
+                                    <CheckCircle className="w-3.5 h-3.5 text-amber-600" />
+                                  ) : (
+                                    <div className="w-3.5 h-3.5 rounded-full border border-slate-300 flex items-center justify-center text-[9px] text-slate-400 font-mono">2</div>
+                                  )}
+                                  <span>2. Boarded</span>
+                                </div>
+                                <span className="text-[9px] text-slate-500 font-normal">Onto Truck</span>
+                              </div>
+
+                              {/* Step 3: On The Way */}
+                              <div className={`flex flex-col items-center text-center p-1.5 rounded-xl border text-[11px] ${
+                                isCancelled
+                                  ? 'bg-rose-50 border-rose-300 text-rose-900 font-bold'
+                                  : isInTransit
+                                  ? 'bg-indigo-50/80 border-indigo-300 text-indigo-900 font-bold'
+                                  : 'bg-slate-50 border-slate-200 text-slate-400'
+                              }`}>
+                                <div className="flex items-center gap-1">
+                                  {isCancelled ? (
+                                    <X className="w-3.5 h-3.5 text-rose-600" />
+                                  ) : isInTransit ? (
+                                    <CheckCircle className="w-3.5 h-3.5 text-indigo-600" />
+                                  ) : (
+                                    <div className="w-3.5 h-3.5 rounded-full border border-slate-300 flex items-center justify-center text-[9px] text-slate-400 font-mono">3</div>
+                                  )}
+                                  <span>3. {isCancelled ? 'Cancelled' : 'On The Way'}</span>
+                                </div>
+                                <span className="text-[9px] text-slate-500 font-normal">{isCancelled ? 'Order Voided' : 'In Transit'}</span>
+                              </div>
+
+                              {/* Step 4: Arrived / Confirmed / Refunded */}
+                              <div className={`flex flex-col items-center text-center p-1.5 rounded-xl border text-[11px] ${
+                                isCancelled
+                                  ? 'bg-rose-50 border-rose-300 text-rose-900 font-bold'
+                                  : isConfirmedByOutlet
+                                  ? 'bg-emerald-50 border-emerald-300 text-emerald-900 font-bold'
+                                  : isDeliveredByDriver
+                                  ? 'bg-cyan-50 border-cyan-300 text-cyan-900 font-bold animate-pulse'
+                                  : 'bg-slate-50 border-slate-200 text-slate-400'
+                              }`}>
+                                <div className="flex items-center gap-1">
+                                  {isCancelled ? (
+                                    <CheckCircle className="w-3.5 h-3.5 text-rose-600" />
+                                  ) : isConfirmedByOutlet ? (
+                                    <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                                  ) : isDeliveredByDriver ? (
+                                    <Clock className="w-3.5 h-3.5 text-cyan-600 animate-spin" />
+                                  ) : (
+                                    <div className="w-3.5 h-3.5 rounded-full border border-slate-300 flex items-center justify-center text-[9px] text-slate-400 font-mono">4</div>
+                                  )}
+                                  <span>4. {isCancelled ? 'Refunded' : 'Confirmed'}</span>
+                                </div>
+                                <span className="text-[9px] text-slate-500 font-normal">{isCancelled ? 'Refund Issued' : isConfirmedByOutlet ? 'In Stock' : isDeliveredByDriver ? 'Unloaded' : 'Pending'}</span>
                               </div>
                             </div>
                           </div>
@@ -1468,75 +1749,199 @@ export const OutletDashboard: React.FC = () => {
                   </div>
                 ) : (
                   <div className="space-y-2.5">
-                    {requisitions.map((req) => (
-                      <div
-                        key={req.id}
-                        className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-blue-300 transition-all"
-                      >
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-black text-slate-900 font-mono">
-                              {req.requisition_code}
-                            </span>
-                            <span
-                              className={`text-[10px] px-2 py-0.5 rounded-full font-black uppercase ${
-                                req.status === 'DELIVERED' || req.status === 'COMPLETED'
-                                  ? 'bg-emerald-100 text-emerald-800'
-                                  : req.status === 'DISPATCHED'
-                                  ? 'bg-cyan-100 text-cyan-800'
-                                  : 'bg-amber-100 text-amber-800'
-                              }`}
-                            >
-                              {req.status}
-                            </span>
-                            {req.urgency === 'DIRECT_SUPPLY' ? (
-                              <span className="text-[10px] px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 font-black uppercase flex items-center gap-1 border border-purple-200">
-                                <span>⚡ Direct Push (Unrequested)</span>
+                    {requisitions.map((req) => {
+                      const isCompleted = req.status === 'COMPLETED';
+                      const isCancelled = req.status === 'CANCELLED' || req.status === 'CANCELLED_REFUNDED' || String(req.status).toUpperCase().startsWith('CANCEL');
+                      const isDelivered = req.status === 'DELIVERED';
+                      const isInTransit = req.status === 'IN_TRANSIT';
+                      const isBoarded = req.status === 'BOARDED';
+                      const isDispatched = req.status === 'DISPATCHED';
+
+                      return (
+                        <div
+                          key={req.id}
+                          className={`p-4 rounded-2xl bg-white border shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all ${
+                            isCancelled
+                              ? 'border-rose-300 bg-rose-50/20'
+                              : isInTransit
+                              ? 'border-blue-400 bg-blue-50/20'
+                              : isBoarded
+                              ? 'border-amber-300 bg-amber-50/20'
+                              : 'border-slate-200/80 hover:border-blue-300'
+                          }`}
+                        >
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-black text-slate-900 font-mono">
+                                {req.requisition_code}
                               </span>
-                            ) : (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 font-bold uppercase">
-                                {req.urgency} Urgency
+                              <span
+                                className={`text-[10px] px-2 py-0.5 rounded-full font-black uppercase ${
+                                  isCancelled
+                                    ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                                    : isCompleted
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : isDelivered
+                                    ? 'bg-cyan-100 text-cyan-800'
+                                    : isInTransit
+                                    ? 'bg-blue-100 text-blue-800 border border-blue-300 animate-pulse'
+                                    : isBoarded
+                                    ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                    : isDispatched
+                                    ? 'bg-sky-100 text-sky-800'
+                                    : 'bg-amber-100 text-amber-800'
+                                }`}
+                              >
+                                {isCancelled
+                                  ? '⛔ Cancelled & Refunded'
+                                  : isCompleted
+                                  ? '✓ Delivered & Confirmed'
+                                  : isDelivered
+                                  ? '📦 Unloaded at Outlet'
+                                  : isInTransit
+                                  ? '🚚 On The Way to Outlet'
+                                  : isBoarded
+                                  ? '📦 Boarded by Delivery Team'
+                                  : isDispatched
+                                  ? '📋 Dispatched to Fleet'
+                                  : '⏳ Order Placed (Pending Review)'}
+                              </span>
+                              {req.urgency === 'DIRECT_SUPPLY' ? (
+                                <span className="text-[10px] px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 font-black uppercase flex items-center gap-1 border border-purple-200">
+                                  <span>⚡ Direct Push (Unrequested)</span>
+                                </span>
+                              ) : (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 font-bold uppercase">
+                                  {req.urgency} Urgency
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm font-bold text-slate-800">
+                              {req.product_name} • <span className="text-blue-600 font-mono font-black">{req.quantity} units</span>
+                            </p>
+
+                            {/* Assigned Vehicle & Driver Details if Boarded / In Transit */}
+                            {(req.vehicle_registration_no || req.driver_name) && (
+                              <div className="flex items-center gap-2 text-xs text-slate-700 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200 w-fit">
+                                <Truck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                                <span>Vehicle: <strong className="font-mono text-slate-900">{req.vehicle_registration_no || 'Assigned'}</strong></span>
+                                {req.driver_name && (
+                                  <span>• Driver: <strong>{req.driver_name}</strong> {req.driver_phone ? `(${req.driver_phone})` : ''}</span>
+                                )}
+                              </div>
+                            )}
+
+                            {req.outlet_remarks && (
+                              <p className="text-xs text-slate-500 italic">Notes: {req.outlet_remarks}</p>
+                            )}
+                            {req.admin_supplier_notes && (
+                              <p className="text-xs text-indigo-600 font-medium">Supplier Memo: {req.admin_supplier_notes}</p>
+                            )}
+                          </div>
+
+                          <div className="text-right text-xs text-slate-400 font-mono flex flex-col items-end justify-between">
+                            <div>
+                              <p>{new Date(req.created_date).toLocaleDateString()}</p>
+                              <p>{new Date(req.created_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                            </div>
+                            {req.status === 'PENDING' && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const amt = Number(req.total_amount || (req.quantity * (req.unit_price || 35)));
+                                  setStripePaymentData({
+                                    isOpen: true,
+                                    amount: amt,
+                                    requisitionId: req.id,
+                                    title: `Settle Invoice: ${req.requisition_code}`,
+                                    description: `Restock consignment payment for ${req.quantity} units of ${req.product_name}`,
+                                  });
+                                }}
+                                className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-bold text-xs shadow-xs transition-all active:scale-95 cursor-pointer"
+                              >
+                                <CreditCard className="w-3.5 h-3.5" />
+                                <span>Pay ৳{Number(req.total_amount || (req.quantity * (req.unit_price || 35))).toFixed(2)} with Stripe</span>
+                              </button>
+                            )}
+
+                            {/* In-Transit Direct Stock Offer Accept / Deny Options */}
+                            {(() => {
+                              const isDirectOffer = req.urgency === 'DIRECT_SUPPLY' || String(req.requisition_code).startsWith('OUT-OFFER-');
+                              if (!isDirectOffer) return null;
+                              const isOfferAccepted = req.admin_supplier_notes?.includes('ACCEPTED') || req.status === 'ACCEPTED';
+                              const isOfferDenied = req.admin_supplier_notes?.includes('DENIED') || req.status === 'DENIED';
+                              const isPending = !isOfferAccepted && !isOfferDenied;
+
+                              if (isPending) {
+                                return (
+                                  <div className="mt-2 flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRespondStockOffer(req.requisition_code || req.id, 'ACCEPT')}
+                                      disabled={respondingOfferId === (req.requisition_code || req.id)}
+                                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-xs transition-all active:scale-95 cursor-pointer"
+                                    >
+                                      <CheckCircle className="w-3.5 h-3.5" />
+                                      <span>{respondingOfferId === (req.requisition_code || req.id) ? 'Accepting...' : 'Accept Stock'}</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRespondStockOffer(req.requisition_code || req.id, 'DENY')}
+                                      disabled={respondingOfferId === (req.requisition_code || req.id)}
+                                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs shadow-xs transition-all active:scale-95 cursor-pointer"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                      <span>{respondingOfferId === (req.requisition_code || req.id) ? 'Denying...' : 'Deny Stock'}</span>
+                                    </button>
+                                  </div>
+                                );
+                              }
+                              if (isOfferAccepted) {
+                                return (
+                                  <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                                    <CheckCircle className="w-3 h-3 text-emerald-600" />
+                                    <span>Stock Offer Accepted • In Transit</span>
+                                  </span>
+                                );
+                              }
+                              if (isOfferDenied) {
+                                return (
+                                  <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-rose-700 bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200">
+                                    <X className="w-3 h-3 text-rose-600" />
+                                    <span>Stock Offer Denied</span>
+                                  </span>
+                                );
+                              }
+                              return null;
+                            })()}
+
+                            {!isCompleted && !isCancelled && req.status !== 'OFFER_PENDING' && !req.admin_supplier_notes?.includes('DENIED') && req.status !== 'DENIED' && (isInTransit || isBoarded || isDispatched || isDelivered) && (
+                              <button
+                                type="button"
+                                onClick={() => handleCancelOrderAndRefund({
+                                  requisitionId: req.id,
+                                  dispatchId: req.dispatch_id,
+                                  code: req.requisition_code,
+                                  refundEstimate: Number(req.total_amount || (req.quantity * (req.unit_price || 35))),
+                                })}
+                                disabled={cancellingOrderId === req.id}
+                                className="mt-2 inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs shadow-xs transition-all active:scale-95 cursor-pointer"
+                                title="Cancel order and request full refund"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                                <span>{cancellingOrderId === req.id ? 'Cancelling...' : 'Cancel Order & Refund'}</span>
+                              </button>
+                            )}
+
+                            {isCancelled && (
+                              <span className="mt-2 text-[11px] font-bold text-rose-600 bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200">
+                                Refund Credited
                               </span>
                             )}
                           </div>
-                          <p className="text-sm font-bold text-slate-800">
-                            {req.product_name} • <span className="text-blue-600 font-mono font-black">{req.quantity} units</span>
-                          </p>
-                          {req.outlet_remarks && (
-                            <p className="text-xs text-slate-500 italic">Notes: {req.outlet_remarks}</p>
-                          )}
-                          {req.admin_supplier_notes && (
-                            <p className="text-xs text-indigo-600 font-medium">Supplier Memo: {req.admin_supplier_notes}</p>
-                          )}
                         </div>
-
-                        <div className="text-right text-xs text-slate-400 font-mono flex flex-col items-end justify-between">
-                          <div>
-                            <p>{new Date(req.created_date).toLocaleDateString()}</p>
-                            <p>{new Date(req.created_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                          </div>
-                          {req.status === 'PENDING' && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const amt = Number(req.total_amount || (req.quantity * (req.unit_price || 35)));
-                                setStripePaymentData({
-                                  isOpen: true,
-                                  amount: amt,
-                                  requisitionId: req.id,
-                                  title: `Settle Invoice: ${req.requisition_code}`,
-                                  description: `Restock consignment payment for ${req.quantity} units of ${req.product_name}`,
-                                });
-                              }}
-                              className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-bold text-xs shadow-xs transition-all active:scale-95 cursor-pointer"
-                            >
-                              <CreditCard className="w-3.5 h-3.5" />
-                              <span>Pay ৳{Number(req.total_amount || (req.quantity * (req.unit_price || 35))).toFixed(2)} with Stripe</span>
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
