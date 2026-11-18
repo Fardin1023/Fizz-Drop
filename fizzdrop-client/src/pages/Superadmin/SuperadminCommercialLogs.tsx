@@ -91,6 +91,8 @@ interface SupplierTxnRow {
   id?: number;
   supplier_id?: number;
   supplier_name?: string;
+  outlet_id?: number;
+  outlet_name?: string;
   transaction_type?: string;
   type?: string;
   reference_code?: string;
@@ -422,22 +424,13 @@ export const SuperadminCommercialLogs: React.FC = () => {
     return 0;
   };
 
-  // Fetch Commercial Logs Telemetry from Backend API
+  // Fetch Commercial Logs Telemetry from Backend API (loads full dataset once on mount)
   const fetchCommercialLogs = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      const params = new URLSearchParams();
-      if (selectedSupplierId !== 'ALL') params.append('supplierId', selectedSupplierId);
-      if (selectedSalesOfficerId !== 'ALL') params.append('salesOfficerId', selectedSalesOfficerId);
-      if (selectedPsrId !== 'ALL') params.append('psrId', selectedPsrId);
-      if (selectedOutletId !== 'ALL') params.append('outletId', selectedOutletId);
-      if (selectedProductId !== 'ALL') params.append('productId', selectedProductId);
-      if (startDate) params.append('startDate', startDate);
-      if (endDate) params.append('endDate', endDate);
-
-      const res = await fetch(`http://localhost:8080/api/admin/commercial-logs?${params.toString()}`);
+      const res = await fetch(`http://localhost:8080/api/admin/commercial-logs`);
       if (!res.ok) {
         throw new Error(`Failed to load commercial logs: HTTP ${res.status}`);
       }
@@ -466,7 +459,7 @@ export const SuperadminCommercialLogs: React.FC = () => {
 
   useEffect(() => {
     fetchCommercialLogs();
-  }, [selectedSupplierId, selectedSalesOfficerId, selectedPsrId, selectedOutletId, selectedProductId, startDate, endDate]);
+  }, []);
 
   // Handle Date Preset Changes
   const handleDatePreset = (preset: 'ALL' | 'TODAY' | 'WEEK' | 'MONTH') => {
@@ -614,6 +607,12 @@ export const SuperadminCommercialLogs: React.FC = () => {
       if (selectedProductId !== 'ALL' && String(ord.product_id) !== String(selectedProductId)) {
         return false;
       }
+      if (startDate && ord.created_at && String(ord.created_at).slice(0, 10) < startDate) {
+        return false;
+      }
+      if (endDate && ord.created_at && String(ord.created_at).slice(0, 10) > endDate) {
+        return false;
+      }
       if (!searchQuery.trim()) return true;
       const q = searchQuery.toLowerCase();
       return (
@@ -625,7 +624,7 @@ export const SuperadminCommercialLogs: React.FC = () => {
         (ord.status || '').toLowerCase().includes(q)
       );
     });
-  }, [psrOrders, selectedSupplierId, selectedSalesOfficerId, selectedPsrId, selectedOutletId, selectedProductId, searchQuery]);
+  }, [psrOrders, selectedSupplierId, selectedSalesOfficerId, selectedPsrId, selectedOutletId, selectedProductId, startDate, endDate, searchQuery]);
 
   const filteredHierarchySuppliers = useMemo(() => {
     let list = suppliers;
@@ -638,6 +637,15 @@ export const SuperadminCommercialLogs: React.FC = () => {
   // Filtered Ledger (Sub-tab: matrix)
   const filteredLedger = useMemo(() => {
     return ledger.filter((item) => {
+      if (selectedSupplierId !== 'ALL' && String(item.supplier_id) !== String(selectedSupplierId)) {
+        return false;
+      }
+      if (selectedOutletId !== 'ALL' && String(item.outlet_id) !== String(selectedOutletId)) {
+        return false;
+      }
+      if (selectedProductId !== 'ALL' && String(item.product_id) !== String(selectedProductId)) {
+        return false;
+      }
       if (searchQuery.trim() === '') return true;
       const query = searchQuery.toLowerCase();
       return (
@@ -649,11 +657,24 @@ export const SuperadminCommercialLogs: React.FC = () => {
         item.city.toLowerCase().includes(query)
       );
     });
-  }, [ledger, searchQuery]);
+  }, [ledger, selectedSupplierId, selectedOutletId, selectedProductId, searchQuery]);
 
   // Filtered Supplier Transactions
   const filteredSupplierTxns = useMemo(() => {
     return supplierTxns.filter((txn) => {
+      if (selectedSupplierId !== 'ALL' && String(txn.supplier_id) !== String(selectedSupplierId)) {
+        return false;
+      }
+      if (selectedOutletId !== 'ALL' && String(txn.outlet_id) !== String(selectedOutletId)) {
+        return false;
+      }
+      const txnDate = txn.transaction_date || txn.created_at;
+      if (startDate && txnDate && String(txnDate).slice(0, 10) < startDate) {
+        return false;
+      }
+      if (endDate && txnDate && String(txnDate).slice(0, 10) > endDate) {
+        return false;
+      }
       if (searchQuery.trim() === '') return true;
       const query = searchQuery.toLowerCase();
       const name = (txn.supplier_name || '').toLowerCase();
@@ -662,11 +683,24 @@ export const SuperadminCommercialLogs: React.FC = () => {
       const type = (txn.transaction_type || txn.type || '').toLowerCase();
       return name.includes(query) || ref.includes(query) || desc.includes(query) || type.includes(query);
     });
-  }, [supplierTxns, searchQuery]);
+  }, [supplierTxns, selectedSupplierId, selectedOutletId, startDate, endDate, searchQuery]);
 
   // Filtered Outlet Sales Receipts
   const filteredSalesLogs = useMemo(() => {
     return salesLogs.filter((sale) => {
+      if (selectedOutletId !== 'ALL' && String(sale.outlet_id) !== String(selectedOutletId)) {
+        return false;
+      }
+      if (selectedProductId !== 'ALL' && String(sale.product_id) !== String(selectedProductId)) {
+        return false;
+      }
+      const sDate = sale.sale_date;
+      if (startDate && sDate && String(sDate).slice(0, 10) < startDate) {
+        return false;
+      }
+      if (endDate && sDate && String(sDate).slice(0, 10) > endDate) {
+        return false;
+      }
       if (searchQuery.trim() === '') return true;
       const query = searchQuery.toLowerCase();
       const code = (sale.sale_code || sale.order_code || '').toLowerCase();
@@ -675,11 +709,24 @@ export const SuperadminCommercialLogs: React.FC = () => {
       const note = (sale.customer_notes || sale.customer_note || '').toLowerCase();
       return code.includes(query) || outlet.includes(query) || prod.includes(query) || note.includes(query);
     });
-  }, [salesLogs, searchQuery]);
+  }, [salesLogs, selectedOutletId, selectedProductId, startDate, endDate, searchQuery]);
 
   // Filtered Requisitions
   const filteredRequisitions = useMemo(() => {
     return requisitions.filter((req) => {
+      if (selectedOutletId !== 'ALL' && String(req.outlet_id) !== String(selectedOutletId)) {
+        return false;
+      }
+      if (selectedProductId !== 'ALL' && String(req.product_id) !== String(selectedProductId)) {
+        return false;
+      }
+      const rDate = req.created_date;
+      if (startDate && rDate && String(rDate).slice(0, 10) < startDate) {
+        return false;
+      }
+      if (endDate && rDate && String(rDate).slice(0, 10) > endDate) {
+        return false;
+      }
       if (searchQuery.trim() === '') return true;
       const query = searchQuery.toLowerCase();
       const code = (req.requisition_code || '').toLowerCase();
@@ -689,7 +736,7 @@ export const SuperadminCommercialLogs: React.FC = () => {
       const status = (req.status || '').toLowerCase();
       return code.includes(query) || outlet.includes(query) || sup.includes(query) || brand.includes(query) || status.includes(query);
     });
-  }, [requisitions, searchQuery]);
+  }, [requisitions, selectedOutletId, selectedProductId, startDate, endDate, searchQuery]);
 
   // Filtered Supplier Available Stocks
   const filteredSupplierStocks = useMemo(() => {
@@ -709,6 +756,74 @@ export const SuperadminCommercialLogs: React.FC = () => {
       return brand.includes(query) || flavor.includes(query) || sku.includes(query) || supplier.includes(query);
     });
   }, [allSupplierInventory, selectedSupplierId, selectedProductId, searchQuery]);
+
+  // Dynamic in-memory KPI Summary computed instantly from current active filters
+  const computedSummary = useMemo(() => {
+    const hasAnyFilter =
+      selectedSupplierId !== 'ALL' ||
+      selectedSalesOfficerId !== 'ALL' ||
+      selectedPsrId !== 'ALL' ||
+      selectedOutletId !== 'ALL' ||
+      selectedProductId !== 'ALL' ||
+      startDate !== '' ||
+      endDate !== '';
+
+    if (!hasAnyFilter && summary) {
+      return summary;
+    }
+
+    const total_retail_revenue = filteredLedger.reduce((acc, row) => acc + (Number(row.revenue_generated) || 0), 0);
+    const total_outlet_gross_profit = filteredLedger.reduce((acc, row) => acc + (Number(row.outlet_profit_earned) || 0), 0);
+    const total_units_sold = filteredLedger.reduce((acc, row) => acc + (Number(row.units_sold) || 0), 0);
+    const total_shelf_stock_units = filteredLedger.reduce((acc, row) => acc + (Number(row.current_shelf_stock) || 0), 0);
+
+    const total_supplier_gross_profit = filteredSupplierTxns.reduce((acc, txn) => {
+      const type = String(txn.transaction_type || txn.type || '');
+      if (type.toUpperCase() === 'OUTLET_SALE') {
+        return acc + (Number(txn.profit_amount ?? txn.supplier_profit_earned) || 0);
+      }
+      return acc;
+    }, 0);
+
+    const total_psr_cases_sold = filteredPsrOrders.reduce((acc, ord) => acc + (Number(ord.quantity) || 0), 0);
+    const total_psr_revenue = filteredPsrOrders.reduce((acc, ord) => acc + (Number(ord.total_amount) || 0), 0);
+    const psrSet = new Set(filteredPsrOrders.map((ord) => ord.psr_id).filter(Boolean));
+    const outletSet = new Set(filteredLedger.map((row) => row.outlet_id).filter(Boolean));
+    const supplierSet = new Set(filteredLedger.map((row) => row.supplier_id).filter(Boolean));
+
+    return {
+      total_retail_revenue: total_retail_revenue || (summary?.total_retail_revenue ?? 0),
+      total_outlet_gross_profit: total_outlet_gross_profit || (summary?.total_outlet_gross_profit ?? 0),
+      total_wholesale_revenue: summary?.total_wholesale_revenue ?? 0,
+      total_supplier_gross_profit: total_supplier_gross_profit || (summary?.total_supplier_gross_profit ?? 0),
+      total_units_sold: total_units_sold || (summary?.total_units_sold ?? 0),
+      total_shelf_stock_units: total_shelf_stock_units || (summary?.total_shelf_stock_units ?? 0),
+      total_supplier_depot_stock: summary?.total_supplier_depot_stock ?? 0,
+      total_central_depot_stock: summary?.total_central_depot_stock ?? 0,
+      active_outlets_count: outletSet.size || (summary?.active_outlets_count ?? 0),
+      active_suppliers_count: supplierSet.size || (summary?.active_suppliers_count ?? suppliers.length),
+      total_psr_cases_sold,
+      total_psr_revenue,
+      total_sales_officers_count: availableSalesOfficers.length,
+      total_psrs_count: psrSet.size || availablePsrs.length,
+      total_psr_orders_count: filteredPsrOrders.length,
+    };
+  }, [
+    summary,
+    filteredLedger,
+    filteredSupplierTxns,
+    filteredPsrOrders,
+    availableSalesOfficers,
+    availablePsrs,
+    selectedSupplierId,
+    selectedSalesOfficerId,
+    selectedPsrId,
+    selectedOutletId,
+    selectedProductId,
+    startDate,
+    endDate,
+    suppliers.length,
+  ]);
 
   // Export current table view as CSV
   const handleExportCSV = () => {
@@ -957,11 +1072,11 @@ export const SuperadminCommercialLogs: React.FC = () => {
             </div>
           </div>
           <div className="text-xl font-black text-slate-900 tracking-tight font-oswald">
-            ৳{summary ? summary.total_retail_revenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
+            ৳{computedSummary ? computedSummary.total_retail_revenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
           </div>
           <div className="flex items-center gap-1 mt-1 text-[10px] text-emerald-600 font-medium">
             <ArrowUpRight className="w-3 h-3 shrink-0" />
-            <span>{summary?.total_units_sold ?? 0} counter units sold</span>
+            <span>{computedSummary?.total_units_sold ?? 0} counter units sold</span>
           </div>
         </div>
 
@@ -974,11 +1089,11 @@ export const SuperadminCommercialLogs: React.FC = () => {
             </div>
           </div>
           <div className="text-xl font-black text-slate-900 tracking-tight font-oswald">
-            ৳{summary ? summary.total_outlet_gross_profit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
+            ৳{computedSummary ? computedSummary.total_outlet_gross_profit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
           </div>
           <div className="flex items-center gap-1 mt-1 text-[10px] text-slate-500">
             <Building2 className="w-3 h-3 text-teal-500 shrink-0" />
-            <span>Across {summary?.active_outlets_count ?? 0} franchise stores</span>
+            <span>Across {computedSummary?.active_outlets_count ?? 0} franchise stores</span>
           </div>
         </div>
 
@@ -991,11 +1106,11 @@ export const SuperadminCommercialLogs: React.FC = () => {
             </div>
           </div>
           <div className="text-xl font-black text-slate-900 tracking-tight font-oswald">
-            ৳{summary ? summary.total_supplier_gross_profit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
+            ৳{computedSummary ? computedSummary.total_supplier_gross_profit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
           </div>
           <div className="flex items-center gap-1 mt-1 text-[10px] text-slate-500">
             <Users className="w-3 h-3 text-indigo-500 shrink-0" />
-            <span>Across {summary?.active_suppliers_count ?? suppliers.length} suppliers</span>
+            <span>Across {computedSummary?.active_suppliers_count ?? suppliers.length} suppliers</span>
           </div>
         </div>
 
@@ -1008,12 +1123,12 @@ export const SuperadminCommercialLogs: React.FC = () => {
             </div>
           </div>
           <div className="text-xl font-black text-blue-900 tracking-tight font-oswald flex items-baseline gap-1">
-            <span>{summary?.total_psr_cases_sold ?? 0}</span>
+            <span>{computedSummary?.total_psr_cases_sold ?? 0}</span>
             <span className="text-xs font-sans font-bold text-blue-700">cases</span>
           </div>
           <div className="flex items-center justify-between mt-1 text-[10px] text-blue-700 font-semibold">
-            <span>৳{formatMoney(summary?.total_psr_revenue ?? 0)} order val</span>
-            <span>{summary?.total_psrs_count ?? psrs.length} PSRs</span>
+            <span>৳{formatMoney(computedSummary?.total_psr_revenue ?? 0)} order val</span>
+            <span>{computedSummary?.total_psrs_count ?? psrs.length} PSRs</span>
           </div>
         </div>
 
@@ -1026,12 +1141,12 @@ export const SuperadminCommercialLogs: React.FC = () => {
             </div>
           </div>
           <div className="text-xl font-black text-slate-900 tracking-tight font-oswald">
-            {summary ? summary.total_shelf_stock_units.toLocaleString() : '0'}{' '}
+            {computedSummary ? computedSummary.total_shelf_stock_units.toLocaleString() : '0'}{' '}
             <span className="text-xs font-sans font-normal text-slate-500">units</span>
           </div>
           <div className="flex items-center gap-1 mt-1 text-[10px] text-slate-500 truncate">
             <Layers className="w-3 h-3 text-amber-500 shrink-0" />
-            <span>Depot reserve: {summary?.total_central_depot_stock.toLocaleString() ?? 0} cases</span>
+            <span>Depot reserve: {computedSummary?.total_central_depot_stock.toLocaleString() ?? 0} cases</span>
           </div>
         </div>
       </div>

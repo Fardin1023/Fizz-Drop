@@ -272,13 +272,10 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
         return;
       }
     } else {
-      // Outlet requisition: Dispatched from SO purchased buffer stock via Delivery Team
-      if (!fulfillModalReq.so_has_purchased || (fulfillModalReq.so_purchased_stock ?? 0) <= 0) {
-        setActionErrorMsg(`Cannot dispatch: ${fulfillModalReq.product_name} has not been purchased by Sales Officer ${fulfillModalReq.sales_officer_name || ''}. The Sales Officer must purchase stock from the Regional Supplier first.`);
-        return;
-      }
-      if ((fulfillModalReq.so_purchased_stock ?? 0) < fulfillModalReq.quantity) {
-        setActionErrorMsg(`Cannot dispatch: Sales Officer holds only ${fulfillModalReq.so_purchased_stock ?? 0} cases in buffer, but outlet requested ${fulfillModalReq.quantity} cases. The SO must purchase additional stock first.`);
+      // Outlet requisition: Dispatched via Delivery Team (from SO purchased buffer or Supplier depot stock)
+      const hasEnoughStock = (fulfillModalReq.supplier_available_stock >= fulfillModalReq.quantity) || ((fulfillModalReq.so_purchased_stock ?? 0) >= fulfillModalReq.quantity);
+      if (!hasEnoughStock) {
+        setActionErrorMsg(`Cannot dispatch: Insufficient stock. Depot available: ${fulfillModalReq.supplier_available_stock} cases, SO buffer: ${fulfillModalReq.so_purchased_stock ?? 0} cases, but outlet requested ${fulfillModalReq.quantity} cases.`);
         return;
       }
       if (!selectedDeliveryTeamId) {
@@ -471,12 +468,9 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
       return;
     }
 
-    if (!req.is_so_purchase && (!req.so_has_purchased || (req.so_purchased_stock ?? 0) <= 0)) {
-      setActionErrorMsg(`Cannot dispatch: ${req.product_name} has not been purchased by Sales Officer ${req.sales_officer_name || ''}. The Sales Officer must purchase stock from the Regional Supplier first.`);
-      return;
-    }
-    if (!req.is_so_purchase && req.quantity > (req.so_purchased_stock ?? 0)) {
-      setActionErrorMsg(`Cannot dispatch beyond SO purchased stock: Sales Officer holds only ${req.so_purchased_stock ?? 0} cases in buffer, but outlet requested ${req.quantity} cases.`);
+    const hasEnoughStock = (req.supplier_available_stock >= req.quantity) || ((req.so_purchased_stock ?? 0) >= req.quantity);
+    if (!req.is_so_purchase && !hasEnoughStock) {
+      setActionErrorMsg(`Cannot dispatch: Insufficient stock. Depot holds ${req.supplier_available_stock} cases, Sales Officer holds ${req.so_purchased_stock ?? 0} cases in buffer, but outlet requested ${req.quantity} cases.`);
       return;
     }
 
@@ -1108,19 +1102,19 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
                             <ShieldAlert className="w-3.5 h-3.5 text-rose-600" />
                             <span>0 Stock in Depot</span>
                           </button>
-                        ) : !req.is_so_purchase && (!req.so_has_purchased || (req.so_purchased_stock ?? 0) < req.quantity) ? (
+                        ) : !req.is_so_purchase && req.supplier_available_stock < req.quantity && ((req.so_purchased_stock ?? 0) < req.quantity) ? (
                           <div className="flex flex-col items-end gap-1">
                             <button
                               type="button"
                               disabled
                               className="py-3 px-4 rounded-2xl font-black text-xs flex items-center justify-center gap-2 bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed shadow-none"
-                              title={`Cannot dispatch: Product has not been purchased by Sales Officer ${req.sales_officer_name || ''}. The Sales Officer must purchase stock from the Regional Supplier first.`}
+                              title={`Cannot dispatch: Insufficient stock. Depot holds ${req.supplier_available_stock} cases, SO buffer holds ${req.so_purchased_stock ?? 0} cases.`}
                             >
                               <ShieldAlert className="w-3.5 h-3.5 text-amber-500" />
-                              <span>Awaiting SO Purchase</span>
+                              <span>Insufficient Stock</span>
                             </button>
                             <span className="text-[10px] text-amber-700 font-semibold">
-                              SO must purchase {req.quantity} cases first
+                              Need {req.quantity} cases
                             </span>
                           </div>
                         ) : (
@@ -1274,11 +1268,11 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
                   </div>
                 </div>
 
-                {/* Warning if unpurchased by SO for outlet orders */}
-                {!fulfillModalReq.is_so_purchase && (!fulfillModalReq.so_has_purchased || (fulfillModalReq.so_purchased_stock ?? 0) < fulfillModalReq.quantity) && (
+                {/* Warning if insufficient stock in both SO buffer and depot */}
+                {!fulfillModalReq.is_so_purchase && fulfillModalReq.supplier_available_stock < fulfillModalReq.quantity && ((fulfillModalReq.so_purchased_stock ?? 0) < fulfillModalReq.quantity) && (
                   <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2">
                     <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0" />
-                    <span>Cannot dispatch: Product has not been purchased in sufficient quantity by Sales Officer <strong>{fulfillModalReq.sales_officer_name}</strong> (holds {fulfillModalReq.so_purchased_stock ?? 0}/{fulfillModalReq.quantity} cases). The SO must purchase buffer stock first.</span>
+                    <span>Cannot dispatch: Insufficient stock in depot ({fulfillModalReq.supplier_available_stock} cases) and Sales Officer <strong>{fulfillModalReq.sales_officer_name}</strong> buffer ({fulfillModalReq.so_purchased_stock ?? 0} cases) for requested {fulfillModalReq.quantity} cases.</span>
                   </div>
                 )}
               </div>
@@ -1640,7 +1634,10 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
                   disabled={
                     fulfillSubmitting ||
                     (fulfillModalReq.is_so_purchase && (fulfillQty <= 0 || fulfillQty > fulfillModalReq.supplier_available_stock)) ||
-                    (!fulfillModalReq.is_so_purchase && (!fulfillModalReq.so_has_purchased || (fulfillModalReq.so_purchased_stock ?? 0) < fulfillModalReq.quantity || (!selectedDeliveryTeamId && !showInlineNewTeam)))
+                    (!fulfillModalReq.is_so_purchase && (
+                      (fulfillModalReq.supplier_available_stock < fulfillModalReq.quantity && (fulfillModalReq.so_purchased_stock ?? 0) < fulfillModalReq.quantity) ||
+                      (!selectedDeliveryTeamId && !showInlineNewTeam)
+                    ))
                   }
                   className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 via-emerald-600 to-cyan-600 hover:from-teal-700 hover:to-emerald-700 text-white text-xs font-black shadow-lg shadow-teal-600/25 flex items-center gap-2 transition cursor-pointer disabled:opacity-50 active:scale-95"
                 >

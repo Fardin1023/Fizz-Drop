@@ -72,7 +72,7 @@ public class SupplierProfile {
     @JsonAlias({"mobile_banking_number", "mobileBankingNumber"})
     private String mobileBankingNumber;
 
-    @Column(name = "wallet_balance", precision = 15, scale = 2, nullable = false)
+    @Column(name = "wallet_balance", precision = 15, scale = 2, columnDefinition = "DECIMAL(15,2) DEFAULT 0.00")
     @JsonProperty("wallet_balance")
     @JsonAlias({"wallet_balance", "walletBalance"})
     private BigDecimal walletBalance = BigDecimal.ZERO;

@@ -51,6 +51,15 @@ public class ProductController {
         this.districtRepository = districtRepository;
     }
 
+    private static List<Product> cachedCatalog = null;
+    private static long lastCatalogFetch = 0;
+    private static final long CATALOG_CACHE_MS = 30000; // 30 seconds
+
+    public static synchronized void invalidateCatalogCache() {
+        cachedCatalog = null;
+        lastCatalogFetch = 0;
+    }
+
     private void populateProductMetadata(Product p, Long branchId, Long userId, List<Outlet> outlets) {
         batchPopulateProductMetadata(Collections.singletonList(p), branchId, userId, null);
     }
@@ -61,6 +70,28 @@ public class ProductController {
 
     private void batchPopulateProductMetadata(List<Product> products, Long branchId, Long userId, Long supplierId) {
         if (products == null || products.isEmpty()) return;
+
+        // Fast-path: When no branch, user or supplier filter is requested (e.g. Superadmin Catalog),
+        // we only need central inventory benchmarks. Avoid querying outlets, shop_inventory,
+        // supplier_profiles, districts, and district_inventory over the cloud connection!
+        if (branchId == null && userId == null && supplierId == null) {
+            List<CentralInventory> allCentral = centralInventoryRepository.findAll();
+            Map<Long, Integer> centralStockMap = new HashMap<>();
+            for (CentralInventory ci : allCentral) {
+                centralStockMap.put(ci.getProductId(), ci.getAvailableStock());
+            }
+
+            for (Product p : products) {
+                int centralStock = centralStockMap.getOrDefault(p.getProductId(), 0);
+                p.setCentralStock(centralStock);
+                p.setTotalStock(centralStock);
+                p.setBranchStock(centralStock);
+                p.setSupplierStock(centralStock);
+                p.setAvailableOutlets(Collections.emptyList());
+                p.setDepotBreakdown(Collections.emptyList());
+            }
+            return;
+        }
 
         List<Outlet> outlets = outletRepository.findAll();
         List<ShopInventory> allShopInv = inventoryRepository.findAll();
@@ -182,6 +213,18 @@ public class ProductController {
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String search) {
 
+        boolean isDefaultCatalogQuery = branchId == null && userId == null && supplierId == null &&
+                (brand == null || brand.equalsIgnoreCase("All Brands") || brand.trim().isEmpty()) &&
+                (category == null || category.equalsIgnoreCase("All Categories") || category.trim().isEmpty()) &&
+                (search == null || search.trim().isEmpty());
+
+        if (isDefaultCatalogQuery) {
+            long now = System.currentTimeMillis();
+            if (cachedCatalog != null && (now - lastCatalogFetch < CATALOG_CACHE_MS)) {
+                return ResponseEntity.ok(cachedCatalog);
+            }
+        }
+
         List<Product> products;
         if (search != null && !search.trim().isEmpty()) {
             products = productRepository.searchProducts(search.trim());
@@ -194,6 +237,11 @@ public class ProductController {
         }
 
         batchPopulateProductMetadata(products, branchId, userId, supplierId);
+
+        if (isDefaultCatalogQuery) {
+            cachedCatalog = products;
+            lastCatalogFetch = System.currentTimeMillis();
+        }
 
         return ResponseEntity.ok(products);
     }
@@ -280,6 +328,7 @@ public class ProductController {
             );
 
             populateProductMetadata(saved, null, null, outlets);
+            invalidateCatalogCache();
             return ResponseEntity.status(HttpStatus.CREATED).body(saved);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -303,6 +352,7 @@ public class ProductController {
                 product.setBasePrice(new BigDecimal(body.get("base_price").toString()));
             }
             Product saved = productRepository.save(product);
+            invalidateCatalogCache();
             return ResponseEntity.ok(Map.of(
                 "success", true,
                 "message", "Product pricing updated successfully by supplier!",
@@ -354,6 +404,7 @@ public class ProductController {
                 );
             }
 
+            invalidateCatalogCache();
             return ResponseEntity.ok(updated);
         }).orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(null));
@@ -370,6 +421,7 @@ public class ProductController {
             inventoryRepository.deleteAll(inventoryRepository.findAll().stream().filter(i -> id.equals(i.getProductId())).toList());
         } catch (Exception ignored) {}
         productRepository.deleteById(id);
+        invalidateCatalogCache();
         return ResponseEntity.ok(ApiResponse.ok("Product deleted successfully", id));
     }
 }

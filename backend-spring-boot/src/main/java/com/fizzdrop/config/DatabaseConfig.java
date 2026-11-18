@@ -23,6 +23,15 @@ public class DatabaseConfig {
     @Value("${spring.datasource.password:}")
     private String password;
 
+    public static String activeDbEngine = "Unknown";
+    public static String activeDbUrl = "";
+    public static String localDbUrl = "jdbc:mysql://localhost:3306/fizzdrop_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC";
+    public static String localDbUser = "root";
+    public static String localDbPass = "";
+    public static String cloudDbUrl = "";
+    public static String cloudDbUser = "";
+    public static String cloudDbPass = "";
+
     @Bean
     @Primary
     public DataSource dataSource() {
@@ -30,32 +39,45 @@ public class DatabaseConfig {
         String effectiveUser = username;
         String effectivePass = password;
 
-        // Fallback: check for .env file if DB_URL was not passed or defaulted to localhost
-        if (effectiveUrl == null || effectiveUrl.contains("localhost:3306")) {
-            java.io.File[] candidates = new java.io.File[]{
-                new java.io.File(".env"),
-                new java.io.File("../.env"),
-                new java.io.File(System.getProperty("user.dir"), ".env")
-            };
-            for (java.io.File envFile : candidates) {
-                if (envFile.exists()) {
-                    try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(envFile))) {
-                        String line;
-                        while ((line = reader.readLine()) != null) {
-                            line = line.trim();
-                            if (line.startsWith("DB_URL=")) {
-                                effectiveUrl = line.substring("DB_URL=".length()).trim();
-                                System.out.println("[DatabaseConfig] Read DB_URL from " + envFile.getAbsolutePath());
-                                break;
-                            }
+        String foundLocalPass = "";
+        String foundLocalUser = "root";
+        String foundCloudUrl = "";
+
+        // Check for .env file across standard lookup paths
+        java.io.File[] candidates = new java.io.File[]{
+            new java.io.File(".env"),
+            new java.io.File("../.env"),
+            new java.io.File(System.getProperty("user.dir"), ".env")
+        };
+        for (java.io.File envFile : candidates) {
+            if (envFile.exists()) {
+                try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(envFile))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        line = line.trim();
+                        if (line.startsWith("#")) continue;
+                        if (line.startsWith("DB_URL=")) {
+                            effectiveUrl = line.substring("DB_URL=".length()).trim();
+                        } else if (line.startsWith("DB_USER=")) {
+                            effectiveUser = line.substring("DB_USER=".length()).trim();
+                        } else if (line.startsWith("DB_PASSWORD=")) {
+                            effectivePass = line.substring("DB_PASSWORD=".length()).trim();
+                            foundLocalPass = effectivePass;
+                        } else if (line.startsWith("LOCAL_DB_PASSWORD=")) {
+                            foundLocalPass = line.substring("LOCAL_DB_PASSWORD=".length()).trim();
+                        } else if (line.startsWith("LOCAL_DB_USER=")) {
+                            foundLocalUser = line.substring("LOCAL_DB_USER=".length()).trim();
+                        } else if (line.startsWith("AIVEN_DB_URL=")) {
+                            foundCloudUrl = line.substring("AIVEN_DB_URL=".length()).trim();
                         }
-                    } catch (Exception ignored) {}
-                    if (effectiveUrl != null && !effectiveUrl.contains("localhost:3306")) {
-                        break;
                     }
-                }
+                } catch (Exception ignored) {}
+                break;
             }
         }
+
+        localDbUser = foundLocalUser;
+        localDbPass = foundLocalPass;
 
         // Auto-detect & convert Aiven service URI (e.g. mysql://user:pass@host:port/dbname?ssl-mode=REQUIRED)
         if (effectiveUrl != null && effectiveUrl.startsWith("mysql://")) {
@@ -64,17 +86,16 @@ public class DatabaseConfig {
                 String userInfo = uri.getUserInfo();
                 if (userInfo != null && userInfo.contains(":")) {
                     String[] userParts = userInfo.split(":", 2);
-                    if (effectiveUser == null || effectiveUser.equals("root") || effectiveUser.isEmpty()) {
-                        effectiveUser = java.net.URLDecoder.decode(userParts[0], java.nio.charset.StandardCharsets.UTF_8);
-                    }
-                    if (effectivePass == null || effectivePass.isEmpty()) {
-                        effectivePass = java.net.URLDecoder.decode(userParts[1], java.nio.charset.StandardCharsets.UTF_8);
-                    }
+                    effectiveUser = java.net.URLDecoder.decode(userParts[0], java.nio.charset.StandardCharsets.UTF_8);
+                    effectivePass = java.net.URLDecoder.decode(userParts[1], java.nio.charset.StandardCharsets.UTF_8);
                 }
                 String dbPath = uri.getPath() != null && uri.getPath().length() > 1 ? uri.getPath().substring(1) : "defaultdb";
                 int port = uri.getPort() != -1 ? uri.getPort() : 3306;
                 effectiveUrl = "jdbc:mysql://" + uri.getHost() + ":" + port + "/" + dbPath 
                         + "?sslMode=REQUIRED&useSSL=true&allowPublicKeyRetrieval=true&serverTimezone=UTC&connectTimeout=15000&socketTimeout=30000&cachePrepStmts=true&prepStmtCacheSize=250&prepStmtCacheSqlLimit=2048&useServerPrepStmts=true&rewriteBatchedStatements=true";
+                cloudDbUrl = effectiveUrl;
+                cloudDbUser = effectiveUser;
+                cloudDbPass = effectivePass;
                 System.out.println("[DatabaseConfig] Converted Aiven URI to Cloud JDBC URL: " + uri.getHost() + ":" + port + "/" + dbPath);
             } catch (Exception ex) {
                 System.err.println("[DatabaseConfig] Error parsing Aiven mysql:// URI: " + ex.getMessage());
@@ -84,13 +105,15 @@ public class DatabaseConfig {
         System.out.println("[DatabaseConfig] Testing connection to MySQL at: " + effectiveUrl);
         boolean mysqlAvailable = false;
 
-        // Try up to 2 attempts for cloud TLS handshake
+        // Try primary connection
         for (int attempt = 1; attempt <= 2; attempt++) {
             try {
                 DriverManager.setLoginTimeout(15);
                 try (Connection conn = DriverManager.getConnection(effectiveUrl, effectiveUser, effectivePass)) {
                     if (conn.isValid(5)) {
                         mysqlAvailable = true;
+                        activeDbEngine = effectiveUrl.contains("aivencloud.com") ? "Cloud MySQL (Aiven)" : "Local MySQL Server";
+                        activeDbUrl = effectiveUrl;
                         System.out.println("[DatabaseConfig] Successfully connected to live MySQL instance (" + effectiveUrl + ")!");
                         break;
                     }
@@ -103,7 +126,26 @@ public class DatabaseConfig {
             }
         }
 
+        // Seamless fallback to Local MySQL if Cloud was unreachable
+        if (!mysqlAvailable && effectiveUrl != null && !effectiveUrl.contains("localhost:3306") && !foundLocalPass.isEmpty()) {
+            System.out.println("[DatabaseConfig] Primary MySQL unreachable. Attempting connection to Local MySQL at localhost:3306...");
+            try (Connection conn = DriverManager.getConnection(localDbUrl, foundLocalUser, foundLocalPass)) {
+                if (conn.isValid(5)) {
+                    mysqlAvailable = true;
+                    effectiveUrl = localDbUrl;
+                    effectiveUser = foundLocalUser;
+                    effectivePass = foundLocalPass;
+                    activeDbEngine = "Local MySQL Server (localhost:3306)";
+                    activeDbUrl = effectiveUrl;
+                    System.out.println("[DatabaseConfig] Successfully connected to Local MySQL instance!");
+                }
+            } catch (Exception e) {
+                System.out.println("[DatabaseConfig] Local MySQL connection failed: " + e.getMessage());
+            }
+        }
+
         if (!mysqlAvailable) {
+            activeDbEngine = "H2 Relational Engine (MySQL-Compatible)";
             System.out.println("[DatabaseConfig] Activating resilient local relational engine (H2 MySQL-Compatible persistent store).");
         }
 
@@ -122,7 +164,6 @@ public class DatabaseConfig {
             config.setValidationTimeout(5000);
             config.setPoolName("FizzDropHikariPool");
         } else {
-            // Persistent file-backed relational database in MySQL mode (consistent directory location)
             java.io.File dataDir = new java.io.File("data");
             if (!dataDir.exists() && new java.io.File("backend-spring-boot/data").exists()) {
                 dataDir = new java.io.File("backend-spring-boot/data");
@@ -134,6 +175,7 @@ public class DatabaseConfig {
             config.setPassword("");
             config.setDriverClassName("org.h2.Driver");
             config.setMaximumPoolSize(5);
+            activeDbUrl = "jdbc:h2:file:" + h2Path;
         }
 
         return new HikariDataSource(config);

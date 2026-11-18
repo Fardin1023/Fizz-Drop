@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Truck,
   Users,
@@ -24,6 +24,8 @@ export const DeliveryTeamPortal: React.FC = () => {
   const initialRegNo = searchParams.get('regNo') || '';
 
   const [regNo, setRegNo] = useState<string>(initialRegNo);
+  const currentRegNoRef = useRef<string>(initialRegNo);
+
   const [loading, setLoading] = useState<boolean>(true);
   const [actionLoading, setActionLoading] = useState<boolean>(false);
   const [team, setTeam] = useState<DeliveryTeam | null>(null);
@@ -44,7 +46,7 @@ export const DeliveryTeamPortal: React.FC = () => {
     setLoading(true);
     setErrorMsg(null);
     try {
-      const q = targetRegNo || regNo;
+      const q = targetRegNo !== undefined ? targetRegNo : currentRegNoRef.current;
       const url = q
         ? `http://localhost:8080/api/v1/delivery/team-portal?regNo=${encodeURIComponent(q)}`
         : 'http://localhost:8080/api/v1/delivery/team-portal';
@@ -74,8 +76,10 @@ export const DeliveryTeamPortal: React.FC = () => {
           setDeliveredQuantities(initQty);
         }
 
-        if (data.team && !regNo) {
-          setRegNo(data.team.vehicle_registration_no);
+        if (data.team?.vehicle_registration_no) {
+          const loadedReg = data.team.vehicle_registration_no;
+          setRegNo(loadedReg);
+          currentRegNoRef.current = loadedReg;
         }
       } else {
         setErrorMsg('Delivery team or vehicle registration not found.');
@@ -87,18 +91,30 @@ export const DeliveryTeamPortal: React.FC = () => {
     }
   };
 
+  // Sync state if URL search param changes
   useEffect(() => {
-    fetchPortalData();
-    // Auto-poll trip status updates every 6 seconds
+    const urlReg = searchParams.get('regNo') || '';
+    if (urlReg && urlReg !== currentRegNoRef.current) {
+      setRegNo(urlReg);
+      currentRegNoRef.current = urlReg;
+      fetchPortalData(urlReg);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    fetchPortalData(currentRegNoRef.current);
+    // Auto-poll trip status updates every 6 seconds using active ref
     const interval = setInterval(() => {
-      fetchPortalData(regNo);
+      fetchPortalData(currentRegNoRef.current);
     }, 6000);
     return () => clearInterval(interval);
   }, []);
 
   const handleSelectTeam = (newRegNo: string) => {
     setRegNo(newRegNo);
+    currentRegNoRef.current = newRegNo;
     setSearchParams({ regNo: newRegNo });
+    setIsBoardingVerified(false);
     fetchPortalData(newRegNo);
   };
 
@@ -302,19 +318,19 @@ export const DeliveryTeamPortal: React.FC = () => {
           {/* Quick Team / Vehicle Registration Selector */}
           <div className="flex items-center gap-2">
             <select
-              value={team?.vehicle_registration_no || regNo}
+              value={regNo || team?.vehicle_registration_no || ''}
               onChange={(e) => handleSelectTeam(e.target.value)}
               className="px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-700 text-xs text-cyan-300 font-mono font-bold focus:ring-2 focus:ring-blue-500 cursor-pointer"
             >
               {allTeams.map((t) => (
                 <option key={t.id} value={t.vehicle_registration_no}>
-                  {t.vehicle_registration_no} ({t.team_name})
+                  {t.vehicle_registration_no} ({t.team_name}){t.supplier_name ? ` • ${t.supplier_name}` : ''}
                 </option>
               ))}
             </select>
 
             <button
-              onClick={() => fetchPortalData()}
+              onClick={() => fetchPortalData(currentRegNoRef.current)}
               disabled={loading}
               className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all cursor-pointer"
               title="Refresh Portal Data"

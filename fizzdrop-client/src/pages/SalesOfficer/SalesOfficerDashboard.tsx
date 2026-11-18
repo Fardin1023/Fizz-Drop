@@ -504,9 +504,9 @@ export const SalesOfficerDashboard: React.FC = () => {
     setActionErrorMsg(null);
     setActionSuccessMsg(null);
     try {
-      // Find the PSR who collected/received this order
+      // Find the PSR who collected/received this order (one PSR has only 1 supplier, so request stock from that PSR's supplier only)
       const psrObj = psrs.find((p: any) => p.id === ord.psr_id || p.name === ord.psr_name || p.psr_code === ord.psr_code);
-      const targetSupplierId = psrObj?.supplier_id || ord.supplier_id || selectedSupplierId || supplier?.id || officer?.supplier_id;
+      const targetSupplierId = psrObj?.supplier_id || ord.supplier_id || officer?.supplier_id || 1;
 
       const res = await fetch(`http://localhost:8080/api/v1/psr/orders/${ord.id}/so-request-supplier`, {
         method: 'POST',
@@ -1919,7 +1919,7 @@ export const SalesOfficerDashboard: React.FC = () => {
                   const isDelivered = ord.status === 'DELIVERED';
 
                   const linkedPsr = psrs.find((p) => p.id === ord.psr_id || p.name === ord.psr_name || p.psr_code === ord.psr_code);
-                  const linkedSupplierName = ord.supplier_name || linkedPsr?.supplier_name || supplier?.business_name || 'Regional Supplier Hub';
+                  const linkedSupplierName = linkedPsr?.supplier_name || ord.supplier_name || supplier?.business_name || 'Regional Supplier Hub';
 
                   // Lifecycle Stage Numbers: 1 (Booked) -> 2 (SO Approved) -> 3 (Requested to Supplier) -> 4 (Dispatched) -> 5 (Delivered)
                   let currentStage = 1;

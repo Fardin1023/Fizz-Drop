@@ -186,21 +186,27 @@ public class InventoryController {
                     .orElse(officers.isEmpty() ? null : officers.get(0));
         }
 
-        // ENFORCE RULE: The supplier should only dispatch the products to the outlet that has been purchased by the SO!
+        int availableDepotStock = 0;
+        if (sp != null) {
+            List<Long> districtIds = new ArrayList<>();
+            if (sp.getCoveredDistrictIds() != null && !sp.getCoveredDistrictIds().trim().isEmpty()) {
+                for (String sid : sp.getCoveredDistrictIds().split(",")) {
+                    try { districtIds.add(Long.parseLong(sid.trim())); } catch (Exception ignored) {}
+                }
+            }
+            if (districtIds.isEmpty() && sp.getPrimaryDistrictId() != null) districtIds.add(sp.getPrimaryDistrictId());
+            for (Long distId : districtIds) {
+                var distInv = districtInventoryRepository.findByDistrictIdAndProductId(distId, product.getProductId());
+                availableDepotStock += distInv.map(DistrictInventory::getCurrentStock).orElse(0);
+            }
+        }
+
+        // ENFORCE RULE: The supplier can dispatch products purchased by the SO or from Supplier depot stock
         if (targetOfficer != null) {
             int soPurchasedStock = getSalesOfficerPurchasedStock(targetOfficer.getId(), product.getProductId());
-            if (soPurchasedStock <= 0) {
+            if (soPurchasedStock < req.getQuantity() && availableDepotStock < req.getQuantity()) {
                 return ResponseEntity.badRequest().body(ApiResponse.fail(
-                    "Cannot dispatch: Product '" + product.getBrand() + " " + product.getFlavorVariant() + 
-                    "' has not been purchased by territory Sales Officer (" + targetOfficer.getName() + 
-                    "). The Sales Officer must purchase stock from the Regional Supplier first."
-                ));
-            }
-            if (req.getQuantity() > soPurchasedStock) {
-                return ResponseEntity.badRequest().body(ApiResponse.fail(
-                    "Cannot dispatch beyond SO purchased stock: Territory Sales Officer " + targetOfficer.getName() + 
-                    " holds only " + soPurchasedStock + " cases of '" + product.getBrand() + " " + product.getFlavorVariant() + 
-                    "' in buffer stock, but " + req.getQuantity() + " cases were requested."
+                    "Cannot dispatch: Insufficient stock. Supplier depot holds " + availableDepotStock + " cases, SO buffer holds " + soPurchasedStock + " cases, but " + req.getQuantity() + " cases were requested."
                 ));
             }
             // NOTE: Per requirement, the stock count on products purchased from supplier by the SO
@@ -888,12 +894,25 @@ public class InventoryController {
         Long soId = assignedPsr != null ? assignedPsr.getSalesOfficerId() : 1L;
         String subRoute = assignedPsr != null && assignedPsr.getSubRoute() != null ? assignedPsr.getSubRoute() : (outlet.getSubRoute() != null ? outlet.getSubRoute() : "Route-Default");
 
+        Long psrSupplierId = (assignedPsr != null && assignedPsr.getSupplierId() != null) ? assignedPsr.getSupplierId() : null;
+        String psrSupplierName = (assignedPsr != null && assignedPsr.getSupplierName() != null) ? assignedPsr.getSupplierName() : null;
+        if (psrSupplierId == null && assignedPsr != null && assignedPsr.getSalesOfficerId() != null) {
+            SalesOfficer so = salesOfficerRepository.findById(assignedPsr.getSalesOfficerId()).orElse(null);
+            if (so != null && so.getSupplierId() != null) {
+                psrSupplierId = so.getSupplierId();
+                SupplierProfile sp = supplierProfileRepository.findById(psrSupplierId).orElse(null);
+                if (sp != null) psrSupplierName = sp.getBusinessName();
+            }
+        }
+        if (psrSupplierId == null) psrSupplierId = 1L;
+        if (psrSupplierName == null) psrSupplierName = "Dhaka Metropolitan & Central Beverage Logistics Hub";
+
         // 1. Insert into psr_orders table (exclusive order channel)
         try {
             jdbcTemplate.update(
-                "INSERT INTO psr_orders (order_code, psr_id, psr_name, sales_officer_id, outlet_id, outlet_name, sub_route, product_id, product_name, quantity, unit_price, total_amount, urgency, status, outlet_remarks, psr_notes, created_at, updated_at) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'SUBMITTED_TO_PSR', ?, ?, NOW(), NOW())",
-                reqCode, psrId, psrName, soId, outletId, outlet.getOutletName(), subRoute, productId, prodName, qty, unitPrice, totalAmount, urgency, remarks, "Direct restock order from outlet branch"
+                "INSERT INTO psr_orders (order_code, psr_id, psr_name, sales_officer_id, outlet_id, outlet_name, sub_route, product_id, product_name, quantity, unit_price, total_amount, urgency, status, outlet_remarks, psr_notes, supplier_id, supplier_name, created_at, updated_at) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'SUBMITTED_TO_PSR', ?, ?, ?, ?, NOW(), NOW())",
+                reqCode, psrId, psrName, soId, outletId, outlet.getOutletName(), subRoute, productId, prodName, qty, unitPrice, totalAmount, urgency, remarks, "Direct restock order from outlet branch", psrSupplierId, psrSupplierName
             );
         } catch (Exception e) {
             System.err.println("[InventoryController] Failed to insert psr_orders: " + e.getMessage());
@@ -902,9 +921,9 @@ public class InventoryController {
         // 2. Also keep in outlet_requisitions for ledger compatibility
         try {
             jdbcTemplate.update(
-                "INSERT INTO outlet_requisitions (requisition_code, outlet_id, product_id, product_name, quantity, unit_price, total_amount, urgency, status, outlet_remarks, admin_supplier_notes, sales_officer_id, created_date, updated_date) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING_PSR', ?, ?, ?, NOW(), NOW())",
-                reqCode, outletId, productId, prodName, qty, unitPrice, totalAmount, urgency, remarks, "Assigned to PSR: " + psrName + " (" + (assignedPsr != null ? assignedPsr.getPsrCode() : "PSR") + ")", soId
+                "INSERT INTO outlet_requisitions (requisition_code, outlet_id, product_id, product_name, quantity, unit_price, total_amount, urgency, status, outlet_remarks, admin_supplier_notes, sales_officer_id, supplier_id, created_date, updated_date) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING_PSR', ?, ?, ?, ?, NOW(), NOW())",
+                reqCode, outletId, productId, prodName, qty, unitPrice, totalAmount, urgency, remarks, "Assigned to PSR: " + psrName + " (" + (assignedPsr != null ? assignedPsr.getPsrCode() : "PSR") + ")", soId, psrSupplierId
             );
         } catch (Exception ignored) {}
 
@@ -1151,11 +1170,11 @@ public class InventoryController {
 
             int reqQty = ((Number) row.get("quantity")).intValue();
 
-            // The supplier should only dispatch the products to the outlet that has been purchased by the SO!
+            // The supplier can dispatch products when either depot stock is available or SO has purchased buffer stock
             if (isSoPurchase) {
                 map.put("can_dispatch", availableStock > 0);
             } else {
-                map.put("can_dispatch", soPurchasedStock >= reqQty);
+                map.put("can_dispatch", availableStock >= reqQty || soPurchasedStock >= reqQty);
             }
 
             response.add(map);
@@ -1346,25 +1365,26 @@ public class InventoryController {
             ));
         }
 
-        // 2. Retail Outlet Requisition: MUST ONLY DISPATCH PRODUCTS PURCHASED BY THE SALES OFFICER!
-        if (targetOfficer == null) {
-            return ResponseEntity.badRequest().body(ApiResponse.fail("Cannot dispatch to outlet: No Sales Officer assigned to this outlet/territory."));
+        // 2. Retail Outlet Requisition: Dispatch from SO purchased stock or Supplier depot stock
+        int soPurchasedStock = targetOfficer != null ? getSalesOfficerPurchasedStock(targetOfficer.getId(), productId) : 0;
+        int availableDepotStock = 0;
+        if (sp != null) {
+            List<Long> districtIds = new ArrayList<>();
+            if (sp.getCoveredDistrictIds() != null && !sp.getCoveredDistrictIds().trim().isEmpty()) {
+                for (String sid : sp.getCoveredDistrictIds().split(",")) {
+                    try { districtIds.add(Long.parseLong(sid.trim())); } catch (Exception ignored) {}
+                }
+            }
+            if (districtIds.isEmpty() && sp.getPrimaryDistrictId() != null) districtIds.add(sp.getPrimaryDistrictId());
+            for (Long distId : districtIds) {
+                var distInv = districtInventoryRepository.findByDistrictIdAndProductId(distId, productId);
+                availableDepotStock += distInv.map(DistrictInventory::getCurrentStock).orElse(0);
+            }
         }
 
-        int soPurchasedStock = getSalesOfficerPurchasedStock(targetOfficer.getId(), productId);
-        if (soPurchasedStock <= 0) {
+        if (soPurchasedStock < dispatchQty && availableDepotStock < dispatchQty) {
             return ResponseEntity.badRequest().body(ApiResponse.fail(
-                "Cannot dispatch: Product '" + product.getBrand() + " " + product.getFlavorVariant() + 
-                "' has not been purchased by the territory Sales Officer (" + targetOfficer.getName() + 
-                "). The Sales Officer must purchase stock from the Regional Supplier first."
-            ));
-        }
-        if (dispatchQty > soPurchasedStock) {
-            return ResponseEntity.badRequest().body(ApiResponse.fail(
-                "Cannot dispatch beyond SO purchased stock: Sales Officer " + targetOfficer.getName() + 
-                " holds only " + soPurchasedStock + " cases of '" + product.getBrand() + " " + product.getFlavorVariant() + 
-                "' in buffer stock, but the outlet requested " + dispatchQty + " cases. Adjust the quantity to at most " + 
-                soPurchasedStock + " cases, or have the SO purchase additional stock first."
+                "Cannot dispatch: Insufficient stock. Supplier depot holds " + availableDepotStock + " cases, Sales Officer buffer holds " + soPurchasedStock + " cases, but outlet requested " + dispatchQty + " cases."
             ));
         }
 

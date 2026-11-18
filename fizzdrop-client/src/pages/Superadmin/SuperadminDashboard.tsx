@@ -1,19 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import AdminLogin from '../Admin/AdminLogin';
-import { OutletManagement } from '../Admin/OutletManagement';
-import { DatabaseExplorer } from '../Admin/DatabaseExplorer';
-import { SqlQueryConsole } from '../Admin/SqlQueryConsole';
-import { DatabaseConfigModal } from '../Admin/DatabaseConfigModal';
-import { StockDistributionView } from '../Admin/StockDistributionView';
-import { SuperadminRequisitionsHub } from './SuperadminRequisitionsHub';
-import { SuperadminProductCatalog } from './SuperadminProductCatalog';
-import { SuperadminMerchandiseCatalog } from './SuperadminMerchandiseCatalog';
-import { SuperadminSupplierManagement } from './SuperadminSupplierManagement';
-import { SuperadminSalesOfficerManagement } from './SuperadminSalesOfficerManagement';
-import { SuperadminPsrManagement } from './SuperadminPsrManagement';
-import { SuperadminCommercialLogs } from './SuperadminCommercialLogs';
-import { SuperadminDeliveryManagement } from './SuperadminDeliveryManagement';
 import {
   ShieldCheck,
   Building2,
@@ -44,6 +31,63 @@ import { useNotifications } from '../../hooks/useNotifications';
 import { NotificationDropdown } from '../../components/Notifications/NotificationDropdown';
 import { NotificationPopup } from '../../components/Notifications/NotificationPopup';
 import superadminLogo from '../../assets/img/superadmin-logo.jpg';
+
+// Code-split dynamic tabs with React.lazy to minimize initial JavaScript parse time and boost Lighthouse performance
+const SuperadminProductCatalog = lazy(() =>
+  import('./SuperadminProductCatalog').then((m) => ({ default: m.SuperadminProductCatalog }))
+);
+const SuperadminMerchandiseCatalog = lazy(() =>
+  import('./SuperadminMerchandiseCatalog').then((m) => ({ default: m.SuperadminMerchandiseCatalog }))
+);
+const SuperadminRequisitionsHub = lazy(() =>
+  import('./SuperadminRequisitionsHub').then((m) => ({ default: m.SuperadminRequisitionsHub }))
+);
+const SuperadminSupplierManagement = lazy(() =>
+  import('./SuperadminSupplierManagement').then((m) => ({ default: m.SuperadminSupplierManagement }))
+);
+const SuperadminSalesOfficerManagement = lazy(() =>
+  import('./SuperadminSalesOfficerManagement').then((m) => ({ default: m.SuperadminSalesOfficerManagement }))
+);
+const SuperadminPsrManagement = lazy(() =>
+  import('./SuperadminPsrManagement').then((m) => ({ default: m.SuperadminPsrManagement }))
+);
+const SuperadminCommercialLogs = lazy(() =>
+  import('./SuperadminCommercialLogs').then((m) => ({ default: m.SuperadminCommercialLogs }))
+);
+const SuperadminDeliveryManagement = lazy(() =>
+  import('./SuperadminDeliveryManagement').then((m) => ({ default: m.SuperadminDeliveryManagement }))
+);
+const OutletManagement = lazy(() =>
+  import('../Admin/OutletManagement').then((m) => ({ default: m.OutletManagement }))
+);
+const DatabaseExplorer = lazy(() =>
+  import('../Admin/DatabaseExplorer').then((m) => ({ default: m.DatabaseExplorer }))
+);
+const SqlQueryConsole = lazy(() =>
+  import('../Admin/SqlQueryConsole').then((m) => ({ default: m.SqlQueryConsole }))
+);
+const StockDistributionView = lazy(() =>
+  import('../Admin/StockDistributionView').then((m) => ({ default: m.StockDistributionView }))
+);
+const DatabaseConfigModal = lazy(() =>
+  import('../Admin/DatabaseConfigModal').then((m) => ({ default: m.DatabaseConfigModal }))
+);
+
+const TabLoadingSkeleton: React.FC = () => (
+  <div className="space-y-4 animate-pulse" role="status" aria-label="Loading module content">
+    <div className="h-28 bg-white rounded-3xl border border-slate-200/90 p-5 flex flex-col justify-center space-y-2.5 shadow-xs">
+      <div className="h-3.5 bg-slate-200 rounded-md w-1/4" />
+      <div className="h-6 bg-slate-200 rounded-lg w-1/2" />
+      <div className="h-3 bg-slate-100 rounded-md w-2/3" />
+    </div>
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="h-24 bg-white rounded-2xl border border-slate-200 p-4 shadow-xs" />
+      <div className="h-24 bg-white rounded-2xl border border-slate-200 p-4 shadow-xs" />
+      <div className="h-24 bg-white rounded-2xl border border-slate-200 p-4 shadow-xs" />
+    </div>
+    <div className="h-80 bg-white rounded-3xl border border-slate-200/90 p-6 shadow-xs" />
+  </div>
+);
 
 export const SuperadminDashboard: React.FC = () => {
   const { user, isSuperadmin, isAuthenticated, logout, isLoading } = useAuth();
@@ -106,7 +150,7 @@ export const SuperadminDashboard: React.FC = () => {
 
   useEffect(() => {
     fetchTelemetry();
-    const interval = setInterval(fetchTelemetry, 10000);
+    const interval = setInterval(fetchTelemetry, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -506,32 +550,38 @@ export const SuperadminDashboard: React.FC = () => {
         </aside>
 
         {/* Dynamic Main Content Workspace */}
-        <main className="flex-1 min-w-0 w-full">
-          {activeTab === 'products' && <SuperadminProductCatalog />}
-          {activeTab === 'merchandise' && <SuperadminMerchandiseCatalog />}
-          {activeTab === 'requisitions' && <SuperadminRequisitionsHub />}
-          {activeTab === 'suppliers' && <SuperadminSupplierManagement />}
-          {activeTab === 'sales-officers' && <SuperadminSalesOfficerManagement />}
-          {activeTab === 'psr-officers' && <SuperadminPsrManagement />}
-          {activeTab === 'deliveries' && <SuperadminDeliveryManagement />}
-          {activeTab === 'logs' && <SuperadminCommercialLogs />}
-          {activeTab === 'tables' && (
-            <DatabaseExplorer onOpenQueryWithTable={handleOpenQueryWithTable} />
-          )}
-          {activeTab === 'outlets' && <OutletManagement />}
-          {activeTab === 'inventory' && <StockDistributionView />}
-          {activeTab === 'query' && (
-            <SqlQueryConsole initialQuery={consoleInitialQuery} />
-          )}
+        <main className="flex-1 min-w-0 w-full" id="superadmin-main-content" aria-label="Main Operations Workspace">
+          <Suspense fallback={<TabLoadingSkeleton />}>
+            {activeTab === 'products' && <SuperadminProductCatalog />}
+            {activeTab === 'merchandise' && <SuperadminMerchandiseCatalog />}
+            {activeTab === 'requisitions' && <SuperadminRequisitionsHub />}
+            {activeTab === 'suppliers' && <SuperadminSupplierManagement />}
+            {activeTab === 'sales-officers' && <SuperadminSalesOfficerManagement />}
+            {activeTab === 'psr-officers' && <SuperadminPsrManagement />}
+            {activeTab === 'deliveries' && <SuperadminDeliveryManagement />}
+            {activeTab === 'logs' && <SuperadminCommercialLogs />}
+            {activeTab === 'tables' && (
+              <DatabaseExplorer onOpenQueryWithTable={handleOpenQueryWithTable} />
+            )}
+            {activeTab === 'outlets' && <OutletManagement />}
+            {activeTab === 'inventory' && <StockDistributionView />}
+            {activeTab === 'query' && (
+              <SqlQueryConsole initialQuery={consoleInitialQuery} />
+            )}
+          </Suspense>
         </main>
       </div>
 
       {/* Database Connection Config Modal */}
-      <DatabaseConfigModal
-        isOpen={isDbConfigOpen}
-        onClose={() => setIsDbConfigOpen(false)}
-        onConfigSaved={fetchTelemetry}
-      />
+      {isDbConfigOpen && (
+        <Suspense fallback={null}>
+          <DatabaseConfigModal
+            isOpen={isDbConfigOpen}
+            onClose={() => setIsDbConfigOpen(false)}
+            onConfigSaved={fetchTelemetry}
+          />
+        </Suspense>
+      )}
     </div>
   );
 };

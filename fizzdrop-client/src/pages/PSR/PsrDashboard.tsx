@@ -564,7 +564,7 @@ export default function PsrDashboard() {
             )}
 
             <button
-              onClick={loadDashboard}
+              onClick={() => { void loadDashboard(); }}
               className="p-2 rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-zinc-800 transition"
               title="Refresh Route Data"
             >
@@ -623,6 +623,10 @@ export default function PsrDashboard() {
                 <span className="flex items-center gap-1">
                   <Building2 className="h-3.5 w-3.5" /> Reporting to Sales Officer: <strong className="underline underline-offset-2">{data?.sales_officer?.name || data?.psr?.sales_officer_name || 'Assigned Officer'}</strong>
                 </span>
+                <span>•</span>
+                <span className="flex items-center gap-1">
+                  <Truck className="h-3.5 w-3.5" /> Supplier: <strong className="underline underline-offset-2">{data?.psr?.supplier_name || 'Dhaka Metropolitan & Central Beverage Logistics Hub'}</strong>
+                </span>
               </p>
             </div>
           </div>
@@ -637,6 +641,15 @@ export default function PsrDashboard() {
               <p className="text-orange-200 uppercase font-semibold text-[10px]">Designated Sub-Route</p>
               <p className="font-bold text-sm max-w-xs truncate" title={data?.sub_route}>
                 {data?.sub_route || 'Daily Outlets Route'}
+              </p>
+            </div>
+            <div className="hidden sm:block h-8 w-px bg-white/20" />
+            <div>
+              <p className="text-orange-200 uppercase font-semibold text-[10px] flex items-center gap-1">
+                <Truck className="h-3 w-3 text-orange-200" /> Dedicated Supplier Hub
+              </p>
+              <p className="font-bold text-sm max-w-[220px] truncate" title={data?.psr?.supplier_name || 'Dhaka Metropolitan & Central Beverage Logistics Hub'}>
+                {data?.psr?.supplier_name || 'Dhaka Metropolitan & Central Beverage Logistics Hub'}
               </p>
             </div>
           </div>
@@ -1056,6 +1069,10 @@ export default function PsrDashboard() {
                           </td>
                           <td className="p-3">
                             <span className="font-medium">{ord.product_name}</span>
+                            <div className="text-[10px] text-slate-400 dark:text-zinc-500 font-mono flex items-center gap-1 mt-0.5" title={`Fulfillment Supplier: ${ord.supplier_name || data?.psr?.supplier_name || 'Regional Logistics Hub'}`}>
+                              <Truck className="w-2.5 h-2.5 text-orange-500" />
+                              <span className="truncate max-w-[150px]">{ord.supplier_name || data?.psr?.supplier_name || 'Regional Logistics Hub'}</span>
+                            </div>
                           </td>
                           <td className="p-3 text-right font-bold">{ord.quantity}</td>
                           <td className="p-3 text-right text-slate-500">৳{Number(ord.unit_price).toFixed(2)}</td>
@@ -1294,6 +1311,12 @@ export default function PsrDashboard() {
                 <p className="text-xs text-slate-500 dark:text-zinc-400 flex items-center gap-1 mt-1">
                   <MapPin className="h-3 w-3" /> {orderModalOutlet.address}
                 </p>
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-orange-50 dark:bg-orange-950/60 text-orange-800 dark:text-orange-300 border border-orange-200 dark:border-orange-800">
+                    <Truck className="h-3.5 w-3.5 text-orange-600" />
+                    Fulfillment Supplier: {data?.psr?.supplier_name || 'Regional Logistics Hub'}
+                  </span>
+                </div>
               </div>
               <button
                 onClick={() => setOrderModalOutlet(null)}

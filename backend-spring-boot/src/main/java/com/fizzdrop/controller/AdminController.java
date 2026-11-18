@@ -27,6 +27,10 @@ public class AdminController {
     private final PreSalesOfficerRepository preSalesOfficerRepository;
     private final JdbcTemplate jdbcTemplate;
 
+    private static Map<String, Object> cachedCommercialLogs = null;
+    private static long lastCommercialLogsFetch = 0;
+    private static final long COMMERCIAL_CACHE_MS = 20000;
+
     public AdminController(ProductRepository productRepository,
                            OutletRepository outletRepository,
                            ShopInventoryRepository inventoryRepository,
@@ -92,6 +96,16 @@ public class AdminController {
             @RequestParam(required = false) String startDate,
             @RequestParam(required = false) String endDate
     ) {
+        boolean isUnfiltered = (supplierId == null && salesOfficerId == null && psrId == null &&
+                outletId == null && productId == null &&
+                (startDate == null || startDate.trim().isEmpty()) &&
+                (endDate == null || endDate.trim().isEmpty()));
+
+        long now = System.currentTimeMillis();
+        if (isUnfiltered && cachedCommercialLogs != null && (now - lastCommercialLogsFetch) < COMMERCIAL_CACHE_MS) {
+            return ResponseEntity.ok(cachedCommercialLogs);
+        }
+
         List<Product> allProducts = productRepository.findAll();
         List<Outlet> allOutlets = outletRepository.findAll();
         List<SupplierProfile> allSuppliers = supplierProfileRepository.findAll();
@@ -145,6 +159,46 @@ public class AdminController {
         int grandPsrCasesSold = 0;
         double grandPsrRevenue = 0.0;
 
+        // Pre-fetch PSR sales across all PSRs in a single grouped query
+        Map<Long, List<Map<String, Object>>> psrSalesByPsrId = new HashMap<>();
+        try {
+            StringBuilder allPsrSalesSql = new StringBuilder(
+                "SELECT po.psr_id, po.product_id, po.product_name, " +
+                "  COALESCE(SUM(po.quantity), 0) AS total_cases_sold, " +
+                "  COALESCE(SUM(po.total_amount), 0.0) AS total_amount, " +
+                "  COUNT(*) AS orders_count " +
+                "FROM psr_orders po " +
+                "WHERE po.status != 'CANCELLED'"
+            );
+            List<Object> pspAllParams = new ArrayList<>();
+            if (productId != null) {
+                allPsrSalesSql.append(" AND po.product_id = ?");
+                pspAllParams.add(productId);
+            }
+            if (outletId != null) {
+                allPsrSalesSql.append(" AND po.outlet_id = ?");
+                pspAllParams.add(outletId);
+            }
+            if (startDate != null && !startDate.trim().isEmpty()) {
+                allPsrSalesSql.append(" AND DATE(po.created_at) >= ?");
+                pspAllParams.add(startDate.trim());
+            }
+            if (endDate != null && !endDate.trim().isEmpty()) {
+                allPsrSalesSql.append(" AND DATE(po.created_at) <= ?");
+                pspAllParams.add(endDate.trim());
+            }
+            allPsrSalesSql.append(" GROUP BY po.psr_id, po.product_id, po.product_name ORDER BY total_cases_sold DESC");
+            List<Map<String, Object>> allPsrSalesRows = jdbcTemplate.queryForList(allPsrSalesSql.toString(), pspAllParams.toArray());
+            for (Map<String, Object> row : allPsrSalesRows) {
+                if (row.get("psr_id") != null) {
+                    Long pId = ((Number) row.get("psr_id")).longValue();
+                    psrSalesByPsrId.computeIfAbsent(pId, k -> new ArrayList<>()).add(row);
+                }
+            }
+        } catch (Exception ex) {
+            System.err.println("[Commercial Logs] Batch PSR sales query error: " + ex.getMessage());
+        }
+
         for (PreSalesOfficer psr : allPsrs) {
             Map<String, Object> psrMap = new HashMap<>();
             psrMap.put("id", psr.getId());
@@ -188,47 +242,16 @@ public class AdminController {
             psrMap.put("assigned_outlets", assignedShops);
             psrMap.put("assigned_outlets_count", assignedShops.size());
 
-            // Query product sales by this PSR from psr_orders
-            StringBuilder psrSalesSql = new StringBuilder(
-                "SELECT po.product_id, po.product_name, " +
-                "  COALESCE(SUM(po.quantity), 0) AS total_cases_sold, " +
-                "  COALESCE(SUM(po.total_amount), 0.0) AS total_amount, " +
-                "  COUNT(*) AS orders_count " +
-                "FROM psr_orders po " +
-                "WHERE po.psr_id = ? AND po.status != 'CANCELLED'"
-            );
-            List<Object> pspParams = new ArrayList<>();
-            pspParams.add(psr.getId());
-            if (productId != null) {
-                psrSalesSql.append(" AND po.product_id = ?");
-                pspParams.add(productId);
-            }
-            if (outletId != null) {
-                psrSalesSql.append(" AND po.outlet_id = ?");
-                pspParams.add(outletId);
-            }
-            if (startDate != null && !startDate.trim().isEmpty()) {
-                psrSalesSql.append(" AND DATE(po.created_at) >= ?");
-                pspParams.add(startDate.trim());
-            }
-            if (endDate != null && !endDate.trim().isEmpty()) {
-                psrSalesSql.append(" AND DATE(po.created_at) <= ?");
-                pspParams.add(endDate.trim());
-            }
-            psrSalesSql.append(" GROUP BY po.product_id, po.product_name ORDER BY total_cases_sold DESC");
-
-            List<Map<String, Object>> productSales = new ArrayList<>();
+            // Product sales by this PSR from pre-batched map
+            List<Map<String, Object>> productSales = psrSalesByPsrId.getOrDefault(psr.getId(), Collections.emptyList());
             int totalCases = 0;
             double totalRev = 0.0;
             int totalOrders = 0;
-            try {
-                productSales = jdbcTemplate.queryForList(psrSalesSql.toString(), pspParams.toArray());
-                for (Map<String, Object> psRow : productSales) {
-                    totalCases += ((Number) psRow.getOrDefault("total_cases_sold", 0)).intValue();
-                    totalRev += ((Number) psRow.getOrDefault("total_amount", 0.0)).doubleValue();
-                    totalOrders += ((Number) psRow.getOrDefault("orders_count", 0)).intValue();
-                }
-            } catch (Exception ignored) {}
+            for (Map<String, Object> psRow : productSales) {
+                totalCases += ((Number) psRow.getOrDefault("total_cases_sold", 0)).intValue();
+                totalRev += ((Number) psRow.getOrDefault("total_amount", 0.0)).doubleValue();
+                totalOrders += ((Number) psRow.getOrDefault("orders_count", 0)).intValue();
+            }
 
             psrMap.put("product_sales", productSales);
             psrMap.put("total_cases_sold", totalCases);
@@ -301,7 +324,87 @@ public class AdminController {
             enrichedSalesOfficers.add(soMap);
         }
 
-        // 1. Build Suppliers list with their designated Outlets, SOs and PSRs
+        // 1. Build Suppliers list with pre-batched queries
+        Map<Long, Double> procurementSpentBySupplier = new HashMap<>();
+        try {
+            List<Map<String, Object>> spentRows = jdbcTemplate.queryForList(
+                "SELECT supplier_id, COALESCE(SUM(total_amount - COALESCE(refund_amount, 0)), 0) AS total_spent " +
+                "FROM stock_requisitions WHERE status != 'REJECTED' GROUP BY supplier_id"
+            );
+            for (Map<String, Object> row : spentRows) {
+                if (row.get("supplier_id") != null) {
+                    procurementSpentBySupplier.put(((Number) row.get("supplier_id")).longValue(), ((Number) row.getOrDefault("total_spent", 0.0)).doubleValue());
+                }
+            }
+        } catch (Exception ignored) {}
+
+        Map<Long, Map<String, Object>> depotInvByDistrict = new HashMap<>();
+        try {
+            List<Map<String, Object>> invGroupRows = jdbcTemplate.queryForList(
+                "SELECT di.district_id, " +
+                "COALESCE(SUM(di.current_stock), 0) as total_units, " +
+                "COALESCE(SUM(di.current_stock * COALESCE(p.supplier_price, p.base_price, 0)), 0) as total_value " +
+                "FROM district_inventory di " +
+                "JOIN products p ON di.product_id = p.product_id " +
+                "GROUP BY di.district_id"
+            );
+            for (Map<String, Object> row : invGroupRows) {
+                if (row.get("district_id") != null) {
+                    depotInvByDistrict.put(((Number) row.get("district_id")).longValue(), row);
+                }
+            }
+        } catch (Exception ignored) {}
+
+        Map<Long, Map<String, Object>> outletPnlMap = new HashMap<>();
+        try {
+            List<Map<String, Object>> pnlGroupRows = jdbcTemplate.queryForList(
+                "SELECT r.outlet_id, " +
+                "COALESCE(SUM(COALESCE(r.total_amount, r.quantity * COALESCE(r.unit_price, p.outlet_price, 0))), 0) AS rev, " +
+                "COALESCE(SUM(r.quantity * COALESCE(p.supplier_price, p.base_price, 0)), 0) AS cogs, " +
+                "COALESCE(SUM(COALESCE(r.total_amount, r.quantity * COALESCE(r.unit_price, p.outlet_price, 0)) - (r.quantity * COALESCE(p.supplier_price, p.base_price, 0))), 0) AS profit " +
+                "FROM outlet_requisitions r " +
+                "JOIN products p ON r.product_id = p.product_id " +
+                "WHERE r.status = 'COMPLETED' GROUP BY r.outlet_id"
+            );
+            for (Map<String, Object> row : pnlGroupRows) {
+                if (row.get("outlet_id") != null) {
+                    outletPnlMap.put(((Number) row.get("outlet_id")).longValue(), row);
+                }
+            }
+        } catch (Exception ignored) {}
+
+        Map<Long, Double> txRevBySupplier = new HashMap<>();
+        try {
+            List<Map<String, Object>> txRows = jdbcTemplate.queryForList(
+                "SELECT supplier_id, COALESCE(SUM(amount), 0) AS total_tx_rev " +
+                "FROM supplier_transactions WHERE type = 'OUTLET_SALE' AND status = 'COMPLETED' GROUP BY supplier_id"
+            );
+            for (Map<String, Object> row : txRows) {
+                if (row.get("supplier_id") != null) {
+                    txRevBySupplier.put(((Number) row.get("supplier_id")).longValue(), ((Number) row.getOrDefault("total_tx_rev", 0.0)).doubleValue());
+                }
+            }
+        } catch (Exception ignored) {}
+
+        Map<Long, List<Map<String, Object>>> stocksByDistrict = new HashMap<>();
+        try {
+            List<Map<String, Object>> allDistrictStocks = jdbcTemplate.queryForList(
+                "SELECT di.district_id, di.product_id, p.brand, p.flavor_variant, p.size_volume, p.packaging, p.sku, " +
+                "di.current_stock, di.reserved_stock, " +
+                "COALESCE(p.supplier_price, p.base_price, 0) as unit_price, " +
+                "(di.current_stock * COALESCE(p.supplier_price, p.base_price, 0)) as total_value " +
+                "FROM district_inventory di " +
+                "JOIN products p ON di.product_id = p.product_id " +
+                "ORDER BY di.current_stock DESC, p.brand ASC"
+            );
+            for (Map<String, Object> row : allDistrictStocks) {
+                if (row.get("district_id") != null) {
+                    Long distId = ((Number) row.get("district_id")).longValue();
+                    stocksByDistrict.computeIfAbsent(distId, k -> new ArrayList<>()).add(row);
+                }
+            }
+        } catch (Exception ignored) {}
+
         List<Map<String, Object>> supplierList = new ArrayList<>();
         for (SupplierProfile sp : allSuppliers) {
             Map<String, Object> sMap = new HashMap<>();
@@ -335,69 +438,37 @@ public class AdminController {
             sMap.put("outlets_count", underOutlets.size());
             sMap.put("outlet_count", underOutlets.size());
 
-            // Calculate Supplier P&L (Profit and Loss)
-            double spProcurementSpent = 0.0;
-            try {
-                Double spSpent = jdbcTemplate.queryForObject(
-                    "SELECT COALESCE(SUM(total_amount - COALESCE(refund_amount, 0)), 0) FROM stock_requisitions WHERE supplier_id = ? AND status != 'REJECTED'",
-                    Double.class,
-                    sp.getId()
-                );
-                if (spSpent != null) spProcurementSpent = spSpent;
-            } catch (Exception ignored) {}
+            // Calculate Supplier P&L from pre-batched maps
+            double spProcurementSpent = procurementSpentBySupplier.getOrDefault(sp.getId(), 0.0);
 
             double spDepotInventoryValue = 0.0;
             int spDepotInventoryUnits = 0;
-            try {
-                List<Map<String, Object>> invRows = jdbcTemplate.queryForList(
-                    "SELECT COALESCE(SUM(di.current_stock), 0) as total_units, " +
-                    "COALESCE(SUM(di.current_stock * COALESCE(p.supplier_price, p.base_price, 0)), 0) as total_value " +
-                    "FROM district_inventory di " +
-                    "JOIN products p ON di.product_id = p.product_id " +
-                    "WHERE di.district_id = ?",
-                    sp.getPrimaryDistrictId()
-                );
-                if (!invRows.isEmpty()) {
-                    spDepotInventoryUnits = ((Number) invRows.get(0).getOrDefault("total_units", 0)).intValue();
-                    spDepotInventoryValue = ((Number) invRows.get(0).getOrDefault("total_value", 0.0)).doubleValue();
+            if (sp.getPrimaryDistrictId() != null) {
+                Map<String, Object> invRow = depotInvByDistrict.get(sp.getPrimaryDistrictId());
+                if (invRow != null) {
+                    spDepotInventoryUnits = ((Number) invRow.getOrDefault("total_units", 0)).intValue();
+                    spDepotInventoryValue = ((Number) invRow.getOrDefault("total_value", 0.0)).doubleValue();
                 }
-            } catch (Exception ignored) {}
+            }
 
             double spWholesaleRevenue = 0.0;
             double spWholesaleCogs = 0.0;
             double spWholesaleGrossProfit = 0.0;
 
-            if (!underOutlets.isEmpty()) {
-                List<Long> outIds = underOutlets.stream().map(m -> ((Number) m.get("outlet_id")).longValue()).toList();
-                String inSql = outIds.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(","));
-                try {
-                    List<Map<String, Object>> pnlRows = jdbcTemplate.queryForList(
-                        "SELECT " +
-                        "COALESCE(SUM(COALESCE(r.total_amount, r.quantity * COALESCE(r.unit_price, p.outlet_price, 0))), 0) AS rev, " +
-                        "COALESCE(SUM(r.quantity * COALESCE(p.supplier_price, p.base_price, 0)), 0) AS cogs, " +
-                        "COALESCE(SUM(COALESCE(r.total_amount, r.quantity * COALESCE(r.unit_price, p.outlet_price, 0)) - (r.quantity * COALESCE(p.supplier_price, p.base_price, 0))), 0) AS profit " +
-                        "FROM outlet_requisitions r " +
-                        "JOIN products p ON r.product_id = p.product_id " +
-                        "WHERE r.status = 'COMPLETED' AND r.outlet_id IN (" + inSql + ")"
-                    );
-                    if (!pnlRows.isEmpty()) {
-                        spWholesaleRevenue = ((Number) pnlRows.get(0).getOrDefault("rev", 0.0)).doubleValue();
-                        spWholesaleCogs = ((Number) pnlRows.get(0).getOrDefault("cogs", 0.0)).doubleValue();
-                        spWholesaleGrossProfit = ((Number) pnlRows.get(0).getOrDefault("profit", 0.0)).doubleValue();
-                    }
-                } catch (Exception ignored) {}
+            for (Map<String, Object> oItem : underOutlets) {
+                Long oId = ((Number) oItem.get("outlet_id")).longValue();
+                Map<String, Object> pnlRow = outletPnlMap.get(oId);
+                if (pnlRow != null) {
+                    spWholesaleRevenue += ((Number) pnlRow.getOrDefault("rev", 0.0)).doubleValue();
+                    spWholesaleCogs += ((Number) pnlRow.getOrDefault("cogs", 0.0)).doubleValue();
+                    spWholesaleGrossProfit += ((Number) pnlRow.getOrDefault("profit", 0.0)).doubleValue();
+                }
             }
 
-            try {
-                Double txRev = jdbcTemplate.queryForObject(
-                    "SELECT COALESCE(SUM(amount), 0) FROM supplier_transactions WHERE supplier_id = ? AND type = 'OUTLET_SALE' AND status = 'COMPLETED'",
-                    Double.class,
-                    sp.getId()
-                );
-                if (txRev != null && txRev > 0 && spWholesaleRevenue == 0) {
-                    spWholesaleRevenue = txRev;
-                }
-            } catch (Exception ignored) {}
+            Double txRev = txRevBySupplier.get(sp.getId());
+            if (txRev != null && txRev > 0 && spWholesaleRevenue == 0) {
+                spWholesaleRevenue = txRev;
+            }
 
             double spMarginPct = spWholesaleRevenue > 0 ? (spWholesaleGrossProfit / spWholesaleRevenue) * 100.0 : 0.0;
 
@@ -421,20 +492,9 @@ public class AdminController {
             sMap.put("total_available_stock", spDepotInventoryUnits);
 
             // Fetch available stock breakdown per product in supplier's regional depot
-            List<Map<String, Object>> supplierStocks = new ArrayList<>();
-            try {
-                supplierStocks = jdbcTemplate.queryForList(
-                    "SELECT di.product_id, p.brand, p.flavor_variant, p.size_volume, p.packaging, p.sku, " +
-                    "di.current_stock, di.reserved_stock, " +
-                    "COALESCE(p.supplier_price, p.base_price, 0) as unit_price, " +
-                    "(di.current_stock * COALESCE(p.supplier_price, p.base_price, 0)) as total_value " +
-                    "FROM district_inventory di " +
-                    "JOIN products p ON di.product_id = p.product_id " +
-                    "WHERE di.district_id = ? " +
-                    "ORDER BY di.current_stock DESC, p.brand ASC",
-                    sp.getPrimaryDistrictId()
-                );
-            } catch (Exception ignored) {}
+            List<Map<String, Object>> supplierStocks = sp.getPrimaryDistrictId() != null
+                    ? stocksByDistrict.getOrDefault(sp.getPrimaryDistrictId(), Collections.emptyList())
+                    : Collections.emptyList();
             sMap.put("available_stocks", supplierStocks);
 
             // Attach Sales Officers & PSRs to Supplier
@@ -880,6 +940,11 @@ public class AdminController {
         response.put("outlet_requisitions", outletRequisitionLogs);
         response.put("supplier_purchased_products", supplierPurchasedProducts);
         response.put("all_supplier_inventory", allSupplierStocks);
+
+        if (isUnfiltered) {
+            cachedCommercialLogs = response;
+            lastCommercialLogsFetch = System.currentTimeMillis();
+        }
 
         return ResponseEntity.ok(response);
     }

@@ -550,10 +550,27 @@ public class PsrController {
             int quantity = Integer.parseInt(ord.get("quantity").toString());
             Object totalAmount = ord.get("total_amount");
 
+            Long psrSupplierId = (psr != null && psr.getSupplierId() != null) ? psr.getSupplierId() : null;
+            String psrSupplierName = (psr != null && psr.getSupplierName() != null) ? psr.getSupplierName() : null;
+            if (psrSupplierId == null && ord.get("supplier_id") != null) {
+                try { psrSupplierId = Long.parseLong(ord.get("supplier_id").toString()); } catch (Exception ignored) {}
+            }
+            if (psrSupplierId == null) psrSupplierId = 1L;
+            if (psrSupplierName == null) psrSupplierName = "Dhaka Metropolitan & Central Beverage Logistics Hub";
+
             jdbcTemplate.update(
-                    "UPDATE psr_orders SET status = 'SUBMITTED_TO_SO', updated_at = NOW() WHERE id = ?",
-                    id
+                    "UPDATE psr_orders SET status = 'SUBMITTED_TO_SO', supplier_id = COALESCE(supplier_id, ?), supplier_name = COALESCE(supplier_name, ?), updated_at = NOW() WHERE id = ?",
+                    psrSupplierId, psrSupplierName, id
             );
+
+            // Keep outlet_requisitions in sync
+            try {
+                Long targetSoId = ord.get("sales_officer_id") != null ? Long.parseLong(ord.get("sales_officer_id").toString()) : (psr != null ? psr.getSalesOfficerId() : null);
+                jdbcTemplate.update(
+                    "UPDATE outlet_requisitions SET status = 'PENDING', sales_officer_id = COALESCE(sales_officer_id, ?), supplier_id = COALESCE(supplier_id, ?), updated_date = NOW() WHERE requisition_code = ?",
+                    targetSoId, psrSupplierId, orderCode
+                );
+            } catch (Exception ignored) {}
 
             // Notify Sales Officer
             Long soId = ord.get("sales_officer_id") != null ? Long.parseLong(ord.get("sales_officer_id").toString()) : (psr != null ? psr.getSalesOfficerId() : null);

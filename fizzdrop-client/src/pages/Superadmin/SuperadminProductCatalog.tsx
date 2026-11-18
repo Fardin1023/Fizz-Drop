@@ -205,7 +205,11 @@ export const SuperadminProductCatalog: React.FC = () => {
               Total Cataloged SKUs
             </span>
             <span className="text-2xl font-black font-oswald text-zinc-900 mt-1 block">
-              {products.length}
+              {loading && products.length === 0 ? (
+                <span className="inline-block w-8 h-7 bg-slate-200 rounded animate-pulse" />
+              ) : (
+                products.length
+              )}
             </span>
             <span className="text-[11px] text-slate-500">Live products in database</span>
           </div>
@@ -220,7 +224,11 @@ export const SuperadminProductCatalog: React.FC = () => {
               Central Stock Pool
             </span>
             <span className="text-2xl font-black font-oswald text-indigo-700 mt-1 block">
-              {totalCentralCases.toLocaleString()}
+              {loading && products.length === 0 ? (
+                <span className="inline-block w-16 h-7 bg-slate-200 rounded animate-pulse" />
+              ) : (
+                totalCentralCases.toLocaleString()
+              )}
             </span>
             <span className="text-[11px] text-slate-500">Cases available for supplier requisitions</span>
           </div>
@@ -235,7 +243,11 @@ export const SuperadminProductCatalog: React.FC = () => {
               Product Categories
             </span>
             <span className="text-2xl font-black font-oswald text-cyan-700 mt-1 block">
-              {categories.filter((c) => c !== 'ALL').length}
+              {loading && products.length === 0 ? (
+                <span className="inline-block w-8 h-7 bg-slate-200 rounded animate-pulse" />
+              ) : (
+                categories.filter((c) => c !== 'ALL').length
+              )}
             </span>
             <span className="text-[11px] text-slate-500">Active beverage segments</span>
           </div>
@@ -254,6 +266,7 @@ export const SuperadminProductCatalog: React.FC = () => {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by SKU, brand, flavor, or category..."
+            aria-label="Search master products by SKU, brand, flavor, or category"
             className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-zinc-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
           />
         </div>
@@ -263,6 +276,7 @@ export const SuperadminProductCatalog: React.FC = () => {
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
+            aria-label="Filter products by beverage category"
             className="px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-zinc-800 font-medium focus:outline-none cursor-pointer"
           >
             {categories.map((c) => (
@@ -277,6 +291,7 @@ export const SuperadminProductCatalog: React.FC = () => {
             type="button"
             onClick={fetchCatalogAndBranches}
             title="Refresh Central Products"
+            aria-label="Refresh master product catalog from database"
             className="p-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-500 transition-colors cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-blue-600' : ''}`} />
@@ -287,9 +302,41 @@ export const SuperadminProductCatalog: React.FC = () => {
       {/* Catalog Table */}
       <div className="rounded-3xl bg-white border border-slate-200/90 shadow-sm overflow-hidden">
         {loading && products.length === 0 ? (
-          <div className="py-20 text-center text-xs text-slate-500 space-y-2">
-            <div className="w-6 h-6 border-2 border-blue-600/30 border-t-blue-600 rounded-full animate-spin mx-auto" />
-            <span className="font-mono">Loading master product catalog from database...</span>
+          <div className="overflow-x-auto" role="status" aria-label="Loading master products from database">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 text-[10px] font-bold font-mono text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                <tr>
+                  <th className="py-3.5 px-4">Beverage Product</th>
+                  <th className="py-3.5 px-4">SKU Token</th>
+                  <th className="py-3.5 px-4">Packaging & Size</th>
+                  <th className="py-3.5 px-4">Category</th>
+                  <th className="py-3.5 px-4">3-Tier Commercial Pricing</th>
+                  <th className="py-3.5 px-4 text-center">Superadmin Central Stock</th>
+                  <th className="py-3.5 px-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {[1, 2, 3, 4, 5, 6].map((idx) => (
+                  <tr key={idx} className="animate-pulse">
+                    <td className="py-3.5 px-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-xl bg-slate-200/80 shrink-0" />
+                        <div className="space-y-1.5 flex-1">
+                          <div className="h-3.5 bg-slate-200 rounded w-28" />
+                          <div className="h-2.5 bg-slate-100 rounded w-16" />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-4"><div className="h-4 bg-slate-200/80 rounded w-20" /></td>
+                    <td className="py-3.5 px-4"><div className="h-3.5 bg-slate-200/80 rounded w-16" /></td>
+                    <td className="py-3.5 px-4"><div className="h-4 bg-slate-200/80 rounded w-14" /></td>
+                    <td className="py-3.5 px-4"><div className="h-7 bg-slate-100 rounded w-28" /></td>
+                    <td className="py-3.5 px-4 text-center"><div className="h-4 bg-slate-200/80 rounded w-12 mx-auto" /></td>
+                    <td className="py-3.5 px-4 text-right"><div className="h-6 bg-slate-200/80 rounded w-14 ml-auto" /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         ) : filteredProducts.length === 0 ? (
           <div className="py-16 px-4 text-center space-y-3">
@@ -348,7 +395,9 @@ export const SuperadminProductCatalog: React.FC = () => {
                             {p.image_url ? (
                               <img
                                 src={p.image_url}
-                                alt={p.brand}
+                                alt={`${p.brand} ${p.flavor_variant}`}
+                                loading="lazy"
+                                decoding="async"
                                 className="w-full h-full object-contain p-1"
                               />
                             ) : (
@@ -434,6 +483,7 @@ export const SuperadminProductCatalog: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => handleOpenEditModal(p)}
+                            aria-label={`Edit ${p.brand} ${p.flavor_variant}`}
                             className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 border border-transparent hover:border-blue-200 transition-colors cursor-pointer flex items-center gap-1 font-bold text-xs"
                             title="Edit product specifications, pricing, and central stock"
                           >
@@ -445,6 +495,7 @@ export const SuperadminProductCatalog: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => handleDelete(p.product_id, `${p.brand} ${p.flavor_variant}`)}
+                            aria-label={`Permanently delete ${p.brand} ${p.flavor_variant} from database`}
                             className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition-colors cursor-pointer"
                             title="Permanently remove product from master catalog"
                           >

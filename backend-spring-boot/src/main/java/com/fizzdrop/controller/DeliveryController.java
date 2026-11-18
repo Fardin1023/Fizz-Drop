@@ -408,6 +408,7 @@ public class DeliveryController {
 
         // Update assigned outlet requisitions to DISPATCHED
         for (Map<String, Object> it : items) {
+            String rCode = it.get("requisition_code") != null ? it.get("requisition_code").toString() : null;
             if (it.containsKey("requisition_id") && it.get("requisition_id") != null) {
                 try {
                     Long reqId = Long.parseLong(it.get("requisition_id").toString());
@@ -415,11 +416,18 @@ public class DeliveryController {
                         "UPDATE outlet_requisitions SET status = 'DISPATCHED', admin_supplier_notes = ?, updated_date = NOW() WHERE id = ?",
                         "Assigned to Delivery Fleet (" + dispatchCode + ")", reqId
                     );
+                    if (rCode == null) {
+                        try {
+                            List<Map<String, Object>> rRows = jdbcTemplate.queryForList("SELECT requisition_code FROM outlet_requisitions WHERE id = ?", reqId);
+                            if (!rRows.isEmpty() && rRows.get(0).get("requisition_code") != null) {
+                                rCode = rRows.get(0).get("requisition_code").toString();
+                            }
+                        } catch (Exception ignored) {}
+                    }
                 } catch (Exception ignored) {}
             }
-            if (it.containsKey("requisition_code") && it.get("requisition_code") != null) {
+            if (rCode != null && !rCode.trim().isEmpty()) {
                 try {
-                    String rCode = it.get("requisition_code").toString();
                     jdbcTemplate.update(
                         "UPDATE psr_orders SET status = 'DISPATCHED', updated_at = NOW() WHERE order_code = ?",
                         rCode
@@ -868,6 +876,26 @@ public class DeliveryController {
                         );
                     } catch (Exception ignored) {}
 
+                    // Mark psr_orders DELIVERED
+                    try {
+                        jdbcTemplate.update(
+                            "UPDATE psr_orders SET status = 'DELIVERED', updated_at = NOW() WHERE (outlet_id = ? AND product_id = ? AND status IN ('SUBMITTED_TO_PSR', 'SUBMITTED_TO_SO', 'REQUESTED_FROM_SUPPLIER', 'DISPATCHED'))",
+                            outletId, prodId
+                        );
+                    } catch (Exception ignored) {}
+
+                    // Deduct from supplier depot stock if supplied from depot
+                    try {
+                        Optional<SupplierProfile> spOpt = supplierProfileRepository.findById(supplierId);
+                        if (spOpt.isPresent() && spOpt.get().getPrimaryDistrictId() != null) {
+                            Long distId = spOpt.get().getPrimaryDistrictId();
+                            jdbcTemplate.update(
+                                "UPDATE district_inventory SET current_stock = GREATEST(0, current_stock - ?), updated_at = NOW() WHERE district_id = ? AND product_id = ?",
+                                qty, distId, prodId
+                            );
+                        }
+                    } catch (Exception ignored) {}
+
                     // Update stock count on the products purchased from supplier by the SO (deducted ONLY upon confirmed outlet delivery)
                     Long soId = null;
                     try {
@@ -1067,15 +1095,29 @@ public class DeliveryController {
 
         List<Map<String, Object>> teamRows;
         if (teamId != null && teamId > 0) {
-            teamRows = jdbcTemplate.queryForList("SELECT * FROM supplier_delivery_teams WHERE id = ?", teamId);
+            teamRows = jdbcTemplate.queryForList(
+                "SELECT t.*, s.business_name as supplier_name " +
+                "FROM supplier_delivery_teams t " +
+                "LEFT JOIN supplier_profiles s ON t.supplier_id = s.id " +
+                "WHERE t.id = ?",
+                teamId
+            );
         } else if (regNo != null && !regNo.trim().isEmpty()) {
             teamRows = jdbcTemplate.queryForList(
-                "SELECT * FROM supplier_delivery_teams WHERE LOWER(vehicle_registration_no) = LOWER(?)",
+                "SELECT t.*, s.business_name as supplier_name " +
+                "FROM supplier_delivery_teams t " +
+                "LEFT JOIN supplier_profiles s ON t.supplier_id = s.id " +
+                "WHERE LOWER(TRIM(t.vehicle_registration_no)) = LOWER(TRIM(?))",
                 regNo.trim()
             );
         } else {
             // Default to first active team
-            teamRows = jdbcTemplate.queryForList("SELECT * FROM supplier_delivery_teams ORDER BY id ASC LIMIT 1");
+            teamRows = jdbcTemplate.queryForList(
+                "SELECT t.*, s.business_name as supplier_name " +
+                "FROM supplier_delivery_teams t " +
+                "LEFT JOIN supplier_profiles s ON t.supplier_id = s.id " +
+                "ORDER BY t.id ASC LIMIT 1"
+            );
         }
 
         if (teamRows.isEmpty()) {
@@ -1116,7 +1158,10 @@ public class DeliveryController {
 
         // All teams for quick selector in UI
         List<Map<String, Object>> allTeams = jdbcTemplate.queryForList(
-            "SELECT id, team_name, vehicle_registration_no, driver_name, status FROM supplier_delivery_teams ORDER BY id ASC"
+            "SELECT t.id, t.team_name, t.vehicle_registration_no, t.driver_name, t.status, s.business_name as supplier_name " +
+            "FROM supplier_delivery_teams t " +
+            "LEFT JOIN supplier_profiles s ON t.supplier_id = s.id " +
+            "ORDER BY t.id ASC"
         );
 
         return ResponseEntity.ok(Map.of(
