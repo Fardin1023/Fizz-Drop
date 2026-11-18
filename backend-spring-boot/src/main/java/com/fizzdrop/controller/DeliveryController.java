@@ -319,9 +319,9 @@ public class DeliveryController {
                 "FROM supplier_delivery_dispatches d " +
                 "LEFT JOIN supplier_delivery_teams t ON d.delivery_team_id = t.id " +
                 "LEFT JOIN supplier_profiles s ON d.supplier_id = s.id " +
-                "WHERE d.supplier_id = ? " +
+                "WHERE d.supplier_id = ? AND (t.supplier_id = ? OR t.supplier_id IS NULL) " +
                 "ORDER BY d.dispatched_at DESC",
-                sId
+                sId, sId
             );
         }
 

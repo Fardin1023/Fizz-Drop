@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import DeliveryFleetMap from '../../components/Map/DeliveryFleetMap';
 import {
   Truck,
   Users,
@@ -550,6 +551,16 @@ export const SupplierDeliveryManagement: React.FC<SupplierDeliveryManagementProp
       {/* ======================================================== */}
       {activeSubTab === 'dispatches' && (
         <div className="space-y-4">
+          {/* Live OpenStreetMap Telemetry for Supplier's Delivery Fleet */}
+          {dispatches.length > 0 && (
+            <DeliveryFleetMap
+              dispatches={dispatches}
+              selectedDispatchId={expandedTripId}
+              onSelectDispatch={(disp) => setExpandedTripId(disp.id)}
+              height="520px"
+            />
+          )}
+
           {dispatches.length === 0 ? (
             <div className="p-12 text-center bg-white rounded-3xl border border-dashed border-slate-200">
               <Truck className="w-12 h-12 mx-auto text-slate-300 mb-2" />

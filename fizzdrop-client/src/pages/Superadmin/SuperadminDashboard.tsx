@@ -24,6 +24,7 @@ import {
   UserCheck,
   Store,
   Truck,
+  Navigation,
 } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { getNotificationDestination } from '../../utils/notificationRouter';
@@ -93,9 +94,9 @@ export const SuperadminDashboard: React.FC = () => {
   const { user, isSuperadmin, isAuthenticated, logout, isLoading } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const validTabs = ['products', 'merchandise', 'requisitions', 'suppliers', 'sales-officers', 'psr-officers', 'deliveries', 'logs', 'tables', 'outlets', 'inventory', 'query'];
+  const validTabs = ['products', 'merchandise', 'requisitions', 'suppliers', 'sales-officers', 'psr-officers', 'deliveries', 'fleet-tracker', 'logs', 'tables', 'outlets', 'inventory', 'query'];
   const initialTab = (searchParams.get('tab') as any) || 'products';
-  const [activeTab, setActiveTab] = useState<'products' | 'merchandise' | 'requisitions' | 'suppliers' | 'sales-officers' | 'psr-officers' | 'deliveries' | 'logs' | 'tables' | 'outlets' | 'inventory' | 'query'>(
+  const [activeTab, setActiveTab] = useState<'products' | 'merchandise' | 'requisitions' | 'suppliers' | 'sales-officers' | 'psr-officers' | 'deliveries' | 'fleet-tracker' | 'logs' | 'tables' | 'outlets' | 'inventory' | 'query'>(
     validTabs.includes(initialTab) ? initialTab : 'products'
   );
 
@@ -242,6 +243,15 @@ export const SuperadminDashboard: React.FC = () => {
       icon: Truck,
       gradient: 'from-purple-600 via-indigo-600 to-blue-600',
       badge: 'Fleets',
+    },
+    {
+      id: 'fleet-tracker' as const,
+      label: 'Live Fleet GPS Map Tracker',
+      shortLabel: 'Fleet Map Tracker',
+      desc: 'Real-time multi-vehicle OpenStreetMap tracking across all suppliers',
+      icon: Navigation,
+      gradient: 'from-blue-600 via-indigo-600 to-purple-600',
+      badge: 'Live GPS',
     },
     {
       id: 'logs' as const,
@@ -558,7 +568,8 @@ export const SuperadminDashboard: React.FC = () => {
             {activeTab === 'suppliers' && <SuperadminSupplierManagement />}
             {activeTab === 'sales-officers' && <SuperadminSalesOfficerManagement />}
             {activeTab === 'psr-officers' && <SuperadminPsrManagement />}
-            {activeTab === 'deliveries' && <SuperadminDeliveryManagement />}
+            {activeTab === 'deliveries' && <SuperadminDeliveryManagement initialSubTab="all" />}
+            {activeTab === 'fleet-tracker' && <SuperadminDeliveryManagement initialSubTab="map" />}
             {activeTab === 'logs' && <SuperadminCommercialLogs />}
             {activeTab === 'tables' && (
               <DatabaseExplorer onOpenQueryWithTable={handleOpenQueryWithTable} />

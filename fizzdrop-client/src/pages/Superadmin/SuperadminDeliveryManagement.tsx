@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import DeliveryFleetMap from '../../components/Map/DeliveryFleetMap';
 import {
   Truck,
   Users,
@@ -15,17 +16,33 @@ import {
   ChevronUp,
   Boxes,
   Building,
+  Navigation,
+  Layers,
+  MapPin,
 } from 'lucide-react';
 import type { VehicleDispatch, DeliveryTeam } from '../Admin/SupplierDeliveryManagement';
 
-export const SuperadminDeliveryManagement: React.FC = () => {
+export interface SuperadminDeliveryManagementProps {
+  initialSubTab?: 'all' | 'map' | 'trips';
+}
+
+export const SuperadminDeliveryManagement: React.FC<SuperadminDeliveryManagementProps> = ({
+  initialSubTab = 'all',
+}) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [dispatches, setDispatches] = useState<VehicleDispatch[]>([]);
   const [teams, setTeams] = useState<DeliveryTeam[]>([]);
+  const [activeSubTab, setActiveSubTab] = useState<'all' | 'map' | 'trips'>(initialSubTab);
   const [search, setSearch] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [subrouteFilter, setSubrouteFilter] = useState<string>('ALL');
   const [expandedTripId, setExpandedTripId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (initialSubTab) {
+      setActiveSubTab(initialSubTab);
+    }
+  }, [initialSubTab]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -148,44 +165,112 @@ export const SuperadminDeliveryManagement: React.FC = () => {
         </div>
       </div>
 
-      {/* Filters Strip */}
-      <div className="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3">
-        <div className="relative flex-1 max-w-md">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            placeholder="Search by Registration No, Trip Code, Driver, Team..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 rounded-2xl border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-purple-500/20"
-          />
-        </div>
+      {/* Section Switcher Tabs */}
+      <div className="flex items-center gap-2 border-b border-slate-200 pb-2 flex-wrap">
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('map')}
+          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+            activeSubTab === 'map'
+              ? 'bg-purple-600 text-white shadow-xs'
+              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <Navigation className="w-3.5 h-3.5" />
+          <span>Live Fleet GPS Map Tracker</span>
+          <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold ${
+            activeSubTab === 'map' ? 'bg-purple-800 text-white' : 'bg-purple-100 text-purple-700'
+          }`}>
+            Live GPS
+          </span>
+        </button>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 rounded-2xl border border-slate-200 text-xs text-slate-700 bg-white cursor-pointer"
-          >
-            <option value="ALL">All Delivery Statuses</option>
-            <option value="DISPATCHED">Dispatched</option>
-            <option value="IN_TRANSIT">In-Transit</option>
-            <option value="DELIVERED">Delivered</option>
-            <option value="COMPLETED">Completed</option>
-          </select>
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('all')}
+          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+            activeSubTab === 'all'
+              ? 'bg-purple-600 text-white shadow-xs'
+              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <Layers className="w-3.5 h-3.5" />
+          <span>Complete Operations (Map + Manifests)</span>
+        </button>
 
-          <select
-            value={subrouteFilter}
-            onChange={(e) => setSubrouteFilter(e.target.value)}
-            className="px-3 py-2 rounded-2xl border border-slate-200 text-xs text-slate-700 bg-white cursor-pointer"
-          >
-            <option value="ALL">All Sub-Routes</option>
-            {uniqueSubroutes.map((sr) => (
-              <option key={sr} value={sr}>{sr}</option>
-            ))}
-          </select>
-        </div>
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('trips')}
+          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+            activeSubTab === 'trips'
+              ? 'bg-purple-600 text-white shadow-xs'
+              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <Truck className="w-3.5 h-3.5" />
+          <span>Vehicle Trips & Manifests ({dispatches.length})</span>
+        </button>
       </div>
+
+      {/* Live OpenStreetMap National Fleet Telemetry Map */}
+      {(activeSubTab === 'map' || activeSubTab === 'all') && (
+        <div className="space-y-2">
+          {dispatches.length > 0 ? (
+            <DeliveryFleetMap
+              dispatches={dispatches}
+              selectedDispatchId={expandedTripId}
+              onSelectDispatch={(disp) => setExpandedTripId(disp.id)}
+              height={activeSubTab === 'map' ? '600px' : '520px'}
+            />
+          ) : (
+            <div className="p-10 text-center bg-white rounded-3xl border border-dashed border-slate-200 text-slate-400 text-xs">
+              No active vehicle telemetry data available.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Trips & Manifests Section */}
+      {(activeSubTab === 'trips' || activeSubTab === 'all') && (
+        <div className="space-y-4">
+          {/* Filters Strip */}
+          <div className="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="relative flex-1 max-w-md">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search by Registration No, Trip Code, Driver, Team..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 rounded-2xl border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-purple-500/20"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-3 py-2 rounded-2xl border border-slate-200 text-xs text-slate-700 bg-white cursor-pointer"
+              >
+                <option value="ALL">All Delivery Statuses</option>
+                <option value="DISPATCHED">Dispatched</option>
+                <option value="IN_TRANSIT">In-Transit</option>
+                <option value="DELIVERED">Delivered</option>
+                <option value="COMPLETED">Completed</option>
+              </select>
+
+              <select
+                value={subrouteFilter}
+                onChange={(e) => setSubrouteFilter(e.target.value)}
+                className="px-3 py-2 rounded-2xl border border-slate-200 text-xs text-slate-700 bg-white cursor-pointer"
+              >
+                <option value="ALL">All Sub-Routes</option>
+                {uniqueSubroutes.map((sr) => (
+                  <option key={sr} value={sr}>{sr}</option>
+                ))}
+              </select>
+            </div>
+          </div>
 
       {/* Trips List */}
       <div className="space-y-3">
@@ -343,6 +428,8 @@ export const SuperadminDeliveryManagement: React.FC = () => {
           })
         )}
       </div>
+        </div>
+      )}
     </div>
   );
 };
