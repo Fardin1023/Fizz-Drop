@@ -1,4 +1,7 @@
 @import "tailwindcss";
+@import "./styles/superadmin-theme.css";
+@import "./styles/supplier-theme.css";
+@import "./styles/sales-officer-theme.css";
 
 /* 1. Register Tailwind v4 Utility Classes (creates font-oswald and font-italia) */
 @theme {

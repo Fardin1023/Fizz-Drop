@@ -31,9 +31,11 @@ import {
   ExternalLink,
   BarChart2,
   PieChart,
+  Navigation,
 } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import rsmLogo from '../../assets/img/rsm-logo.jpg';
+import DeliveryFleetMap, { type VehicleDispatch } from '../../components/Map/DeliveryFleetMap';
 
 interface RegionalSalesManager {
   id: number;
@@ -123,6 +125,16 @@ export const RsmDashboard: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedReportModal, setSelectedReportModal] = useState<SalesManagerReport | null>(null);
 
+  // Regional Fleet Movements State (RSM -> ASMs -> SOs -> Suppliers -> Delivery Teams)
+  const [fleetDispatches, setFleetDispatches] = useState<VehicleDispatch[]>([]);
+  const [fleetTeams, setFleetTeams] = useState<any[]>([]);
+  const [selectedFleetDispatch, setSelectedFleetDispatch] = useState<VehicleDispatch | null>(null);
+  const [selectedAsmFilter, setSelectedAsmFilter] = useState<number | null>(null);
+  const [loadingFleet, setLoadingFleet] = useState(false);
+  const [divisionOutlets, setDivisionOutlets] = useState<any[]>([]);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [selectedDistrictId, setSelectedDistrictId] = useState<number | null>(null);
+
   const activeTab = searchParams.get('tab') || 'asms';
 
   const setActiveTab = (tab: string) => {
@@ -180,6 +192,101 @@ export const RsmDashboard: React.FC = () => {
       setSearchParams(params, { replace: true });
     }
   }, [selectedRsmId]);
+
+  // Fetch RSM Fleet Movements strictly under their ASMs -> SOs -> Suppliers -> Delivery Teams
+  const fetchRsmFleet = async (rsmId: number, asmId?: number | null) => {
+    try {
+      setLoadingFleet(true);
+      const url = asmId
+        ? `http://localhost:8080/api/v1/delivery/dispatches?rsmId=${rsmId}&asmId=${asmId}`
+        : `http://localhost:8080/api/v1/delivery/dispatches?rsmId=${rsmId}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        const list: VehicleDispatch[] = Array.isArray(data) ? data : [];
+        setFleetDispatches(list);
+        if (list.length > 0) {
+          setSelectedFleetDispatch((prev) => (prev && list.find((d) => d.id === prev.id) ? prev : list[0]));
+        }
+      } else {
+        setFleetDispatches([]);
+      }
+
+      // Fetch delivery teams for this RSM hierarchy
+      const teamsUrl = asmId
+        ? `http://localhost:8080/api/v1/delivery/teams?rsmId=${rsmId}&asmId=${asmId}`
+        : `http://localhost:8080/api/v1/delivery/teams?rsmId=${rsmId}`;
+      const teamsRes = await fetch(teamsUrl);
+      if (teamsRes.ok) {
+        const tData = await teamsRes.json();
+        setFleetTeams(Array.isArray(tData) ? tData : []);
+      } else {
+        setFleetTeams([]);
+      }
+    } catch (err) {
+      console.error('Failed to load RSM fleet data:', err);
+    } finally {
+      setLoadingFleet(false);
+    }
+  };
+
+  // Fetch division outlets
+  useEffect(() => {
+    fetch('http://localhost:8080/api/outlets')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        if (Array.isArray(data)) {
+          const div = selectedRsm?.division?.toLowerCase();
+          if (div) {
+            setDivisionOutlets(data.filter((o: any) => o.division_name?.toLowerCase() === div));
+          } else {
+            setDivisionOutlets(data);
+          }
+        }
+      })
+      .catch(() => {});
+  }, [selectedRsm?.division]);
+
+  // Fetch all suppliers for depot location resolution
+  useEffect(() => {
+    fetch('http://localhost:8080/api/v1/suppliers')
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setSuppliers(data);
+        }
+      })
+      .catch((err) => console.error('Failed to load suppliers:', err));
+  }, []);
+
+  // Map districts for this RSM's division from ASMs
+  const availableDistricts = useMemo(() => {
+    return asms.map((a) => ({
+      id: a.district_id,
+      name: a.district_name,
+      division: a.division,
+      asmName: a.name,
+      asmCode: a.code,
+      asmPhone: a.phone,
+    }));
+  }, [asms]);
+
+  // Load fleet data whenever selected RSM or ASM filter changes
+  useEffect(() => {
+    if (selectedRsmId) {
+      fetchRsmFleet(selectedRsmId, selectedAsmFilter);
+    }
+  }, [selectedRsmId, selectedAsmFilter]);
+
+  // Polling for live fleet movements when on fleet-map tab
+  useEffect(() => {
+    if (activeTab === 'fleet-map' && selectedRsmId) {
+      const interval = setInterval(() => {
+        fetchRsmFleet(selectedRsmId, selectedAsmFilter);
+      }, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [activeTab, selectedRsmId, selectedAsmFilter]);
 
   // Filter ASMs by search query
   const filteredAsms = useMemo(() => {
@@ -485,6 +592,20 @@ export const RsmDashboard: React.FC = () => {
             <FileText className="w-4 h-4" />
             <span>Combined ASM Reports Feed ({reports.length})</span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('fleet-map')}
+            className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+              activeTab === 'fleet-map'
+                ? 'bg-rose-600 text-white shadow-lg shadow-rose-900/30 ring-2 ring-rose-400'
+                : 'bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/70'
+            }`}
+          >
+            <Navigation className="w-4 h-4 text-cyan-400 animate-pulse" />
+            <span>Regional Fleet Movements Map</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+          </button>
         </div>
 
         {/* ========================================================================= */}
@@ -600,6 +721,18 @@ export const RsmDashboard: React.FC = () => {
                           <span>Report</span>
                         </button>
                       )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedAsmFilter(asm.id);
+                          setActiveTab('fleet-map');
+                        }}
+                        className="px-2.5 py-1 rounded-xl bg-blue-600/80 hover:bg-blue-600 text-white text-[11px] font-bold transition cursor-pointer flex items-center gap-1 shadow-xs"
+                        title={`Track live delivery movements for ${asm.name} (${asm.district_name})`}
+                      >
+                        <Navigation className="w-3 h-3 text-cyan-300" />
+                        <span>Fleet</span>
+                      </button>
                       <Link
                         to={`/asm?asmId=${asm.id}`}
                         className="px-2.5 py-1 rounded-xl bg-rose-600/80 hover:bg-rose-600 text-white text-[11px] font-bold transition cursor-pointer flex items-center gap-1"
@@ -789,6 +922,289 @@ export const RsmDashboard: React.FC = () => {
                   </Link>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB 4: REGIONAL FLEET MOVEMENTS MAP (RSM -> ASM -> SO -> SUPPLIER -> TEAM) */}
+        {/* ========================================================================= */}
+        {activeTab === 'fleet-map' && (
+          <div className="space-y-5">
+            {/* 1. Header & Hierarchy Pipeline Banner */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-slate-800/80 p-5 rounded-3xl border border-slate-700/80 shadow-lg">
+              <div className="space-y-1.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-mono font-black uppercase px-2.5 py-0.5 rounded-lg bg-rose-600 text-white shadow-xs">
+                    {selectedRsm?.code || 'RSM'} FLEET COMMAND
+                  </span>
+                  <span className="text-xs bg-slate-900 text-emerald-400 border border-emerald-500/40 px-2.5 py-0.5 rounded-lg font-bold flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                    <span>{selectedRsm?.division} Regional Movement</span>
+                  </span>
+                  <span className="text-xs bg-slate-900/90 text-cyan-300 border border-cyan-500/40 px-2.5 py-0.5 rounded-lg font-mono font-bold">
+                    🔒 STRICT REGION ISOLATION
+                  </span>
+                </div>
+                <h3 className="text-xl font-black text-white tracking-tight flex items-center gap-2">
+                  <span>Regional Delivery Fleet Telemetry & Route Movements</span>
+                </h3>
+                <p className="text-xs text-slate-400 max-w-3xl">
+                  Live tracking of vehicle movements and transit dispatches flowing through your division's hierarchy:
+                  <strong className="text-rose-300"> RSM ({selectedRsm?.division})</strong> ➔
+                  <strong className="text-amber-300"> ASMs ({asms.length} Districts)</strong> ➔
+                  <strong className="text-blue-300"> Sales Officers (SOs)</strong> ➔
+                  <strong className="text-indigo-300"> Regional Suppliers</strong> ➔
+                  <strong className="text-emerald-300"> Delivery Teams & Vehicles</strong>.
+                  Movement from other regional managers is strictly excluded.
+                </p>
+              </div>
+
+              {/* Hierarchy Quick Filter & Refresh Controls */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0">
+                {/* Filter by specific ASM */}
+                <div className="relative min-w-[220px]">
+                  <select
+                    value={selectedAsmFilter || ''}
+                    onChange={(e) => {
+                      const val = e.target.value ? Number(e.target.value) : null;
+                      setSelectedAsmFilter(val);
+                      if (val) {
+                        const match = asms.find((a) => a.id === val);
+                        if (match) setSelectedDistrictId(match.district_id);
+                      } else {
+                        setSelectedDistrictId(null);
+                      }
+                    }}
+                    className="w-full bg-slate-900 border border-slate-700 text-xs rounded-xl px-3 py-2.5 text-white pr-8 focus:ring-2 focus:ring-rose-500 focus:outline-none cursor-pointer appearance-none font-bold"
+                  >
+                    <option value="">All {asms.length} District ASMs</option>
+                    {asms.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.district_name} — {a.name} ({a.code})
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => selectedRsmId && fetchRsmFleet(selectedRsmId, selectedAsmFilter)}
+                  className="px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-700 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 border border-slate-700 cursor-pointer active:scale-95"
+                  title="Sync Live Fleet Dispatches"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loadingFleet ? 'animate-spin text-rose-400' : 'text-slate-400'}`} />
+                  <span>Sync Fleet</span>
+                </button>
+              </div>
+            </div>
+
+            {/* District Depot Switcher Bar */}
+            <div className="bg-slate-800/80 p-4 rounded-3xl border border-slate-700/80 shadow-md space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 text-base">
+                    🏭
+                  </span>
+                  <div>
+                    <h4 className="font-bold text-white text-sm flex items-center gap-2">
+                      <span>Switch District Supplier Depot Location</span>
+                      <span className="text-[10px] font-mono text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded-full border border-amber-500/30">
+                        {asms.length} Districts Available
+                      </span>
+                    </h4>
+                    <p className="text-[11px] text-slate-400">
+                      Select any district in {selectedRsm?.division} division to view its registered supplier depot address, contact info, and GPS coordinates on the map.
+                    </p>
+                  </div>
+                </div>
+
+                {/* District Dropdown Selector */}
+                <div className="relative min-w-[260px]">
+                  <select
+                    value={selectedDistrictId || ''}
+                    onChange={(e) => {
+                      const distId = e.target.value ? Number(e.target.value) : null;
+                      setSelectedDistrictId(distId);
+                      if (distId) {
+                        const matchAsm = asms.find((a) => a.district_id === distId);
+                        if (matchAsm) setSelectedAsmFilter(matchAsm.id);
+                      } else {
+                        setSelectedAsmFilter(null);
+                      }
+                    }}
+                    className="w-full bg-slate-900 border border-amber-500/50 text-xs rounded-xl px-3 py-2.5 text-amber-300 pr-8 focus:ring-2 focus:ring-amber-500 focus:outline-none cursor-pointer appearance-none font-bold font-mono shadow-xs"
+                  >
+                    <option value="">🗺️ All {asms.length} Districts (Division Depots Overview)</option>
+                    {asms.map((a) => (
+                      <option key={a.id} value={a.district_id}>
+                        📍 {a.district_name} District — ASM: {a.name}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-amber-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+              </div>
+
+              {/* Quick Select District Pills */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-1 border-t border-slate-700/60 scrollbar-thin">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedDistrictId(null);
+                    setSelectedAsmFilter(null);
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold font-mono transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer shrink-0 ${
+                    selectedDistrictId === null
+                      ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 font-black'
+                      : 'bg-slate-900/90 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                  }`}
+                >
+                  <span>🗺️ All Districts</span>
+                  <span className="text-[10px] bg-slate-950/40 px-1.5 py-0.2 rounded-full">
+                    {asms.length}
+                  </span>
+                </button>
+
+                {asms.map((a) => {
+                  const isSelected = selectedDistrictId === a.district_id;
+                  return (
+                    <button
+                      key={a.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedDistrictId(a.district_id);
+                        setSelectedAsmFilter(a.id);
+                      }}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold font-mono transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer shrink-0 ${
+                        isSelected
+                          ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 font-black'
+                          : 'bg-slate-900/90 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                      }`}
+                    >
+                      <span>📍 {a.district_name}</span>
+                      {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-slate-950 animate-ping" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 2. Interactive Delivery Fleet Map */}
+            <div className="space-y-4">
+              <DeliveryFleetMap
+                dispatches={fleetDispatches}
+                selectedDispatchId={selectedFleetDispatch?.id}
+                onSelectDispatch={(disp) => setSelectedFleetDispatch(disp)}
+                allowedOutlets={divisionOutlets}
+                selectedDistrictId={selectedDistrictId}
+                onSelectDistrict={(id) => {
+                  setSelectedDistrictId(id);
+                  if (id) {
+                    const matchAsm = asms.find((a) => a.district_id === id);
+                    if (matchAsm) setSelectedAsmFilter(matchAsm.id);
+                  } else {
+                    setSelectedAsmFilter(null);
+                  }
+                }}
+                availableDistricts={availableDistricts}
+                suppliers={suppliers}
+                divisionName={selectedRsm?.division}
+                height="600px"
+              />
+            </div>
+
+            {/* 3. Delivery Fleet Teams & Moving Vehicles Roster */}
+            <div className="bg-slate-800/80 rounded-3xl border border-slate-700/80 p-5 shadow-lg space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-700/60 pb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-rose-600 to-amber-600 text-white flex items-center justify-center font-bold text-lg shadow-md">
+                    🚚
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-white text-base">
+                      {selectedRsm?.division} Regional Delivery Teams & Vehicles
+                    </h4>
+                    <p className="text-xs text-slate-400">
+                      {fleetTeams.length} delivery teams assigned under your regional suppliers and Sales Officers.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 text-xs font-mono">
+                  <span className="text-slate-400">
+                    Active Trips: <strong className="text-white">{fleetDispatches.length} Dispatches</strong>
+                  </span>
+                  <span className="text-slate-400">
+                    Stores in Region: <strong className="text-emerald-400">{divisionOutlets.length} Outlets</strong>
+                  </span>
+                </div>
+              </div>
+
+              {/* Delivery Teams Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {fleetTeams.map((team) => {
+                  const activeDisp = fleetDispatches.find(
+                    (d) => d.delivery_team_id === team.id || d.vehicle_registration_no === team.vehicle_registration_no
+                  );
+                  const isMoving = activeDisp && (activeDisp.status === 'IN_TRANSIT' || activeDisp.status === 'BOARDED');
+                  return (
+                    <div
+                      key={team.id}
+                      onClick={() => activeDisp && setSelectedFleetDispatch(activeDisp)}
+                      className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+                        selectedFleetDispatch?.id === activeDisp?.id
+                          ? 'bg-slate-900 border-rose-500 shadow-md ring-1 ring-rose-500'
+                          : 'bg-slate-900/60 hover:bg-slate-900 border-slate-700/60 hover:border-slate-600'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+                          <span className="font-mono font-bold text-xs text-white">
+                            {team.vehicle_registration_no}
+                          </span>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-mono ${
+                          isMoving
+                            ? 'bg-blue-600/30 text-blue-300 border border-blue-500/40 animate-pulse'
+                            : 'bg-slate-800 text-slate-400 border border-slate-700'
+                        }`}>
+                          {isMoving ? 'ON ROUTE' : team.status || 'AVAILABLE'}
+                        </span>
+                      </div>
+
+                      <div className="mt-2 space-y-1">
+                        <p className="text-xs font-bold text-slate-200">{team.team_name}</p>
+                        <p className="text-[11px] text-slate-400">
+                          Supplier: <strong className="text-slate-300">{team.supplier_name || 'Regional Supplier'}</strong>
+                        </p>
+                        <p className="text-[11px] text-slate-400">
+                          Driver: <strong className="text-slate-300">{team.driver_name}</strong> ({team.driver_phone || 'N/A'})
+                        </p>
+                      </div>
+
+                      {activeDisp && (
+                        <div className="mt-3 pt-2 border-t border-slate-800 flex items-center justify-between text-[10px] font-mono">
+                          <span className="text-amber-400 font-bold">{activeDisp.sub_route}</span>
+                          <span className="text-slate-400">{activeDisp.dispatch_code}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {fleetTeams.length === 0 && (
+                  <div className="col-span-full p-8 text-center text-slate-500 rounded-2xl bg-slate-900/40 border border-slate-800">
+                    <Truck className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+                    <p className="font-bold text-xs text-slate-400">No Delivery Teams Configured in {selectedRsm?.division} Division</p>
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      Delivery teams will appear here once allocated to regional suppliers and Area Sales Managers in this territory.
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}

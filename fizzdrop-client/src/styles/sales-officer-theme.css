@@ -1,0 +1,804 @@
+/**
+ * Sales Officer Exclusive Palette Theme
+ * 5-Color Palette:
+ *  - Color 1: #FFFFFF (Pure Crisp White)
+ *  - Color 2: #F4F6F8 (Light Cool Gray / Canvas & Background)
+ *  - Color 3: #E6EBF1 (Soft Slate Gray / Surfaces, Headers & Neutral Boxes)
+ *  - Color 4: #D7DEE8 (Medium Slate / Borders, Dividers & Outlines)
+ *  - Color 5: #C7D0DB (Steel Slate Gray / Accent Tone & Active Highlights)
+ *
+ * Scoped EXCLUSIVELY to .sales-officer-theme and .so-theme so no other pages are affected.
+ */
+
+:root {
+  --sot-c1: #FFFFFF;
+  --sot-c2: #F4F6F8;
+  --sot-c3: #E6EBF1;
+  --sot-c4: #D7DEE8;
+  --sot-c5: #C7D0DB;
+  --sot-text-primary: #0F172A;
+  --sot-text-secondary: #334155;
+  --sot-text-muted: #64748B;
+  --sot-border: #D7DEE8;
+  --sot-border-accent: #C7D0DB;
+}
+
+/* =====================================================================
+   1. MAIN PAGE CONTAINER & CANVAS BACKGROUND
+   ===================================================================== */
+.sales-officer-theme,
+.so-theme {
+  background-color: #F4F6F8 !important;
+  color: #1E293B !important;
+  min-height: 100vh;
+}
+
+.sales-officer-theme ::selection,
+.so-theme ::selection {
+  background-color: #D7DEE8 !important;
+  color: #0F172A !important;
+}
+
+/* =====================================================================
+   2. TOP HEADER & NAVIGATION BAR
+   ===================================================================== */
+.sales-officer-theme header,
+.so-theme header,
+.sales-officer-theme .sticky.top-0,
+.so-theme .sticky.top-0 {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-bottom: 1px solid #D7DEE8 !important;
+  backdrop-filter: blur(12px) !important;
+}
+
+/* Header Storefront Button, Switchers, Badges, Profile Chip */
+.sales-officer-theme header a[href="/"],
+.so-theme header a[href="/"],
+.sales-officer-theme header .bg-slate-100,
+.so-theme header .bg-slate-100,
+.sales-officer-theme header .bg-slate-50,
+.so-theme header .bg-slate-50,
+.sales-officer-theme header select,
+.so-theme header select {
+  background-color: #E6EBF1 !important;
+  border: 1px solid #D7DEE8 !important;
+  color: #1E293B !important;
+}
+
+.sales-officer-theme header a[href="/"]:hover,
+.so-theme header a[href="/"]:hover,
+.sales-officer-theme header select:hover,
+.so-theme header select:hover {
+  background-color: #D7DEE8 !important;
+  color: #0F172A !important;
+  border-color: #C7D0DB !important;
+}
+
+.sales-officer-theme header .bg-blue-50,
+.so-theme header .bg-blue-50 {
+  background-color: #E6EBF1 !important;
+  color: #0F172A !important;
+  border: 1px solid #D7DEE8 !important;
+}
+
+/* =====================================================================
+   3. TERRITORY JURISDICTION BANNER & ACTIVE SUPPLIER HUB SELECTOR
+   ===================================================================== */
+.sales-officer-theme .rounded-3xl.bg-gradient-to-r.from-slate-900,
+.so-theme .rounded-3xl.bg-gradient-to-r.from-slate-900,
+.sales-officer-theme div[class*="from-slate-900"][class*="via-blue-950"],
+.so-theme div[class*="from-slate-900"][class*="via-blue-950"] {
+  background: linear-gradient(135deg, #FFFFFF 0%, #E6EBF1 100%) !important;
+  border: 1px solid #C7D0DB !important;
+  color: #0F172A !important;
+  box-shadow: 0 4px 15px rgba(199, 208, 219, 0.3) !important;
+}
+
+.sales-officer-theme div[class*="from-slate-900"][class*="via-blue-950"] h2,
+.so-theme div[class*="from-slate-900"][class*="via-blue-950"] h2,
+.sales-officer-theme div[class*="from-slate-900"][class*="via-blue-950"] .font-oswald,
+.so-theme div[class*="from-slate-900"][class*="via-blue-950"] .font-oswald {
+  background: none !important;
+  -webkit-text-fill-color: #0F172A !important;
+  color: #0F172A !important;
+}
+
+.sales-officer-theme div[class*="from-slate-900"][class*="via-blue-950"] .text-blue-200,
+.so-theme div[class*="from-slate-900"][class*="via-blue-950"] .text-blue-200,
+.sales-officer-theme div[class*="from-slate-900"][class*="via-blue-950"] .text-blue-200\/90,
+.so-theme div[class*="from-slate-900"][class*="via-blue-950"] .text-blue-200\/90 {
+  color: #334155 !important;
+}
+
+.sales-officer-theme div[class*="from-slate-900"][class*="via-blue-950"] .text-blue-400,
+.so-theme div[class*="from-slate-900"][class*="via-blue-950"] .text-blue-400 {
+  color: #475569 !important;
+}
+
+.sales-officer-theme div[class*="from-slate-900"][class*="via-blue-950"] .bg-blue-500\/20,
+.so-theme div[class*="from-slate-900"][class*="via-blue-950"] .bg-blue-500\/20 {
+  background-color: #D7DEE8 !important;
+  color: #0F172A !important;
+  border-color: #C7D0DB !important;
+}
+
+/* Active Supplier Hub Selector */
+.sales-officer-theme .bg-slate-900\/80,
+.so-theme .bg-slate-900\/80 {
+  background: #FFFFFF !important;
+  border: 1px solid #D7DEE8 !important;
+  color: #0F172A !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+}
+
+.sales-officer-theme .bg-slate-900\/80 select,
+.so-theme .bg-slate-900\/80 select,
+.sales-officer-theme .bg-slate-900\/80 .bg-slate-800,
+.so-theme .bg-slate-900\/80 .bg-slate-800 {
+  background-color: #F4F6F8 !important;
+  border: 1px solid #D7DEE8 !important;
+  color: #0F172A !important;
+}
+
+.sales-officer-theme .bg-slate-900\/80 select option,
+.so-theme .bg-slate-900\/80 select option {
+  background-color: #FFFFFF !important;
+  color: #0F172A !important;
+}
+
+.sales-officer-theme .bg-slate-900\/80 .text-cyan-300,
+.so-theme .bg-slate-900\/80 .text-cyan-300,
+.sales-officer-theme .bg-slate-900\/80 .text-cyan-400,
+.so-theme .bg-slate-900\/80 .text-cyan-400 {
+  color: #1E293B !important;
+}
+
+.sales-officer-theme .bg-slate-900\/80 .bg-indigo-500\/30,
+.so-theme .bg-slate-900\/80 .bg-indigo-500\/30 {
+  background-color: #E6EBF1 !important;
+  color: #0F172A !important;
+  border: 1px solid #D7DEE8 !important;
+}
+
+/* =====================================================================
+   4. MONTHLY TARGET QUOTA & RESTOCK HERO CARDS (TOP 3 CARDS)
+   ===================================================================== */
+.sales-officer-theme div[class*="from-indigo-900"][class*="via-slate-900"],
+.so-theme div[class*="from-indigo-900"][class*="via-slate-900"],
+.sales-officer-theme div[class*="from-teal-950"][class*="via-slate-900"],
+.so-theme div[class*="from-teal-950"][class*="via-slate-900"] {
+  background: #FFFFFF !important;
+  border: 1px solid #D7DEE8 !important;
+  color: #1E293B !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04), 0 2px 4px -2px rgba(0, 0, 0, 0.03) !important;
+}
+
+/* Card 1 & Card 2 Text & Badges */
+.sales-officer-theme div[class*="from-indigo-900"][class*="via-slate-900"] *,
+.so-theme div[class*="from-indigo-900"][class*="via-slate-900"] *,
+.sales-officer-theme div[class*="from-teal-950"][class*="via-slate-900"] *,
+.so-theme div[class*="from-teal-950"][class*="via-slate-900"] * {
+  color: #1E293B;
+}
+
+.sales-officer-theme div[class*="from-indigo-900"][class*="via-slate-900"] .text-3xl,
+.so-theme div[class*="from-indigo-900"][class*="via-slate-900"] .text-3xl,
+.sales-officer-theme div[class*="from-indigo-900"][class*="via-slate-900"] .text-4xl,
+.so-theme div[class*="from-indigo-900"][class*="via-slate-900"] .text-4xl,
+.sales-officer-theme div[class*="from-teal-950"][class*="via-slate-900"] .text-3xl,
+.so-theme div[class*="from-teal-950"][class*="via-slate-900"] .text-3xl,
+.sales-officer-theme div[class*="from-teal-950"][class*="via-slate-900"] .text-4xl,
+.so-theme div[class*="from-teal-950"][class*="via-slate-900"] .text-4xl {
+  color: #0F172A !important;
+}
+
+.sales-officer-theme div[class*="from-indigo-900"] .bg-indigo-500\/20,
+.so-theme div[class*="from-indigo-900"] .bg-indigo-500\/20,
+.sales-officer-theme div[class*="from-teal-950"] .bg-teal-500\/20,
+.so-theme div[class*="from-teal-950"] .bg-teal-500\/20,
+.sales-officer-theme div[class*="from-teal-950"] .bg-teal-500\/30,
+.so-theme div[class*="from-teal-950"] .bg-teal-500\/30 {
+  background-color: #E6EBF1 !important;
+  color: #0F172A !important;
+  border: 1px solid #D7DEE8 !important;
+}
+
+.sales-officer-theme div[class*="from-indigo-900"] .text-indigo-200,
+.so-theme div[class*="from-indigo-900"] .text-indigo-200,
+.sales-officer-theme div[class*="from-teal-950"] .text-teal-200,
+.so-theme div[class*="from-teal-950"] .text-teal-200,
+.sales-officer-theme div[class*="from-teal-950"] .text-teal-300,
+.so-theme div[class*="from-teal-950"] .text-teal-300 {
+  color: #334155 !important;
+}
+
+.sales-officer-theme div[class*="from-indigo-900"] .text-cyan-300,
+.so-theme div[class*="from-indigo-900"] .text-cyan-300 {
+  color: #0F172A !important;
+}
+
+/* Inner breakdown sub-boxes in Card 2 */
+.sales-officer-theme div[class*="from-teal-950"] .bg-white\/5,
+.so-theme div[class*="from-teal-950"] .bg-white\/5 {
+  background-color: #F4F6F8 !important;
+  border: 1px solid #D7DEE8 !important;
+}
+
+.sales-officer-theme div[class*="from-teal-950"] .bg-white\/5 *,
+.so-theme div[class*="from-teal-950"] .bg-white\/5 * {
+  color: #0F172A !important;
+}
+
+/* Progress bar container and track */
+.sales-officer-theme .bg-white\/10,
+.so-theme .bg-white\/10 {
+  background-color: #E6EBF1 !important;
+  border-color: #D7DEE8 !important;
+}
+
+/* Sub-boxes in Card 3 */
+.sales-officer-theme .bg-blue-50\/70,
+.so-theme .bg-blue-50\/70,
+.sales-officer-theme .bg-amber-50\/70,
+.so-theme .bg-amber-50\/70 {
+  background-color: #E6EBF1 !important;
+  border: 1px solid #D7DEE8 !important;
+}
+
+.sales-officer-theme .bg-blue-50\/70 span,
+.so-theme .bg-blue-50\/70 span,
+.sales-officer-theme .bg-amber-50\/70 span,
+.so-theme .bg-amber-50\/70 span {
+  color: #0F172A !important;
+}
+
+/* =====================================================================
+   5. SECONDARY METRIC STRIP (4 STAT BOXES)
+   ===================================================================== */
+.sales-officer-theme .grid.grid-cols-2.sm\:grid-cols-4 > div:nth-child(1),
+.so-theme .grid.grid-cols-2.sm\:grid-cols-4 > div:nth-child(1) {
+  background-color: #FFFFFF !important;
+  border: 1px solid #D7DEE8 !important;
+}
+
+.sales-officer-theme .grid.grid-cols-2.sm\:grid-cols-4 > div:nth-child(2),
+.so-theme .grid.grid-cols-2.sm\:grid-cols-4 > div:nth-child(2) {
+  background-color: #E6EBF1 !important;
+  border: 1px solid #D7DEE8 !important;
+}
+
+.sales-officer-theme .grid.grid-cols-2.sm\:grid-cols-4 > div:nth-child(3),
+.so-theme .grid.grid-cols-2.sm\:grid-cols-4 > div:nth-child(3) {
+  background-color: #FFFFFF !important;
+  border: 1px solid #D7DEE8 !important;
+}
+
+.sales-officer-theme .grid.grid-cols-2.sm\:grid-cols-4 > div:nth-child(4),
+.so-theme .grid.grid-cols-2.sm\:grid-cols-4 > div:nth-child(4) {
+  background-color: #E6EBF1 !important;
+  border: 1px solid #D7DEE8 !important;
+}
+
+.sales-officer-theme .grid.grid-cols-2.sm\:grid-cols-4 > div p,
+.so-theme .grid.grid-cols-2.sm\:grid-cols-4 > div p {
+  color: #64748B !important;
+}
+
+.sales-officer-theme .grid.grid-cols-2.sm\:grid-cols-4 > div .text-2xl,
+.so-theme .grid.grid-cols-2.sm\:grid-cols-4 > div .text-2xl {
+  color: #0F172A !important;
+  font-weight: 900 !important;
+}
+
+/* =====================================================================
+   6. TAB NAVIGATION STRIP
+   ===================================================================== */
+.sales-officer-theme .border-b.border-slate-200,
+.so-theme .border-b.border-slate-200 {
+  border-bottom: 1px solid #D7DEE8 !important;
+}
+
+/* Active tab */
+.sales-officer-theme button.bg-blue-600.text-white,
+.so-theme button.bg-blue-600.text-white {
+  background-color: #1E293B !important;
+  color: #FFFFFF !important;
+  border: 1px solid #0F172A !important;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.2) !important;
+}
+
+.sales-officer-theme button.bg-blue-600.text-white *,
+.so-theme button.bg-blue-600.text-white * {
+  color: #FFFFFF !important;
+  stroke: #FFFFFF !important;
+}
+
+/* Inactive tabs */
+.sales-officer-theme button.bg-white.text-slate-600,
+.so-theme button.bg-white.text-slate-600,
+.sales-officer-theme button.border-slate-200\/80,
+.so-theme button.border-slate-200\/80 {
+  background-color: #FFFFFF !important;
+  color: #334155 !important;
+  border: 1px solid #D7DEE8 !important;
+}
+
+.sales-officer-theme button.bg-white.text-slate-600:hover,
+.so-theme button.bg-white.text-slate-600:hover {
+  background-color: #E6EBF1 !important;
+  color: #0F172A !important;
+  border-color: #C7D0DB !important;
+}
+
+.sales-officer-theme button.bg-white.text-slate-600 * {
+  color: #475569 !important;
+}
+
+.sales-officer-theme button.bg-white.text-slate-600:hover * {
+  color: #0F172A !important;
+}
+
+/* =====================================================================
+   7. ALL SECTIONS, BOXES, CARDS & CONTAINERS ("dont skip any section")
+   ===================================================================== */
+.sales-officer-theme .bg-white,
+.so-theme .bg-white,
+.sales-officer-theme .bg-slate-50,
+.so-theme .bg-slate-50,
+.sales-officer-theme .bg-slate-100,
+.so-theme .bg-slate-100,
+.sales-officer-theme .bg-gray-50,
+.so-theme .bg-gray-50,
+.sales-officer-theme .bg-zinc-50,
+.so-theme .bg-zinc-50 {
+  background-color: #FFFFFF !important;
+  border-color: #D7DEE8 !important;
+}
+
+/* Secondary Boxes, Panels, Chips & Subtle Sub-cards */
+.sales-officer-theme .bg-slate-50\/80,
+.so-theme .bg-slate-50\/80,
+.sales-officer-theme .bg-slate-100\/80,
+.so-theme .bg-slate-100\/80,
+.sales-officer-theme .bg-slate-100\/90,
+.so-theme .bg-slate-100\/90,
+.sales-officer-theme .bg-slate-200\/60,
+.so-theme .bg-slate-200\/60,
+.sales-officer-theme .bg-slate-200\/70,
+.so-theme .bg-slate-200\/70,
+.sales-officer-theme .bg-slate-200\/80,
+.so-theme .bg-slate-200\/80,
+.sales-officer-theme .bg-slate-200\/90,
+.so-theme .bg-slate-200\/90 {
+  background-color: #E6EBF1 !important;
+  border-color: #D7DEE8 !important;
+}
+
+/* Dark gradient sections inside Sales Officer tabs (Wholesale Buffer, etc.) */
+.sales-officer-theme div[class*="from-blue-900"][class*="via-indigo-950"],
+.so-theme div[class*="from-blue-900"][class*="via-indigo-950"],
+.sales-officer-theme div[class*="from-indigo-950"],
+.so-theme div[class*="from-indigo-950"],
+.sales-officer-theme div[class*="from-slate-900"]:not(.map-district-depot-hud-card):not(.map-district-depot-hud-minimized):not([class*="leaflet"]),
+.so-theme div[class*="from-slate-900"]:not(.map-district-depot-hud-card):not(.map-district-depot-hud-minimized):not([class*="leaflet"]) {
+  background: linear-gradient(135deg, #FFFFFF 0%, #E6EBF1 100%) !important;
+  border: 1px solid #C7D0DB !important;
+  color: #1E293B !important;
+}
+
+.sales-officer-theme div[class*="from-blue-900"][class*="via-indigo-950"] *,
+.so-theme div[class*="from-blue-900"][class*="via-indigo-950"] * {
+  color: #1E293B;
+}
+
+.sales-officer-theme div[class*="from-blue-900"][class*="via-indigo-950"] h3,
+.so-theme div[class*="from-blue-900"][class*="via-indigo-950"] h3,
+.sales-officer-theme div[class*="from-blue-900"][class*="via-indigo-950"] .text-2xl,
+.so-theme div[class*="from-blue-900"][class*="via-indigo-950"] .text-2xl {
+  color: #0F172A !important;
+}
+
+.sales-officer-theme div[class*="from-blue-900"] .bg-cyan-400\/20,
+.so-theme div[class*="from-blue-900"] .bg-cyan-400\/20,
+.sales-officer-theme div[class*="from-blue-900"] .bg-cyan-500\/20,
+.so-theme div[class*="from-blue-900"] .bg-cyan-500\/20 {
+  background-color: #E6EBF1 !important;
+  color: #0F172A !important;
+  border: 1px solid #D7DEE8 !important;
+}
+
+.sales-officer-theme div[class*="from-blue-900"] .bg-white\/5,
+.so-theme div[class*="from-blue-900"] .bg-white\/5 {
+  background-color: #FFFFFF !important;
+  border: 1px solid #D7DEE8 !important;
+}
+
+.sales-officer-theme div[class*="from-blue-900"] .bg-white\/5 *,
+.so-theme div[class*="from-blue-900"] .bg-white\/5 * {
+  color: #0F172A !important;
+}
+
+/* All Borders and Dividers */
+.sales-officer-theme .border,
+.so-theme .border,
+.sales-officer-theme .border-b,
+.so-theme .border-b,
+.sales-officer-theme .border-t,
+.so-theme .border-t,
+.sales-officer-theme .border-l,
+.so-theme .border-l,
+.sales-officer-theme .border-r,
+.so-theme .border-r,
+.sales-officer-theme .border-slate-100,
+.so-theme .border-slate-100,
+.sales-officer-theme .border-slate-200,
+.so-theme .border-slate-200,
+.sales-officer-theme .border-slate-200\/80,
+.so-theme .border-slate-200\/80,
+.sales-officer-theme .border-slate-200\/90,
+.so-theme .border-slate-200\/90,
+.sales-officer-theme .border-slate-300,
+.so-theme .border-slate-300,
+.sales-officer-theme .border-blue-100,
+.so-theme .border-blue-100,
+.sales-officer-theme .border-blue-200,
+.so-theme .border-blue-200,
+.sales-officer-theme .border-indigo-100,
+.so-theme .border-indigo-100,
+.sales-officer-theme .border-indigo-200,
+.so-theme .border-indigo-200,
+.sales-officer-theme .border-teal-400\/30,
+.so-theme .border-teal-400\/30,
+.sales-officer-theme .border-teal-500\/30,
+.so-theme .border-teal-500\/30 {
+  border-color: #D7DEE8 !important;
+}
+
+.sales-officer-theme .divide-slate-200 > :not([hidden]) ~ :not([hidden]),
+.so-theme .divide-slate-200 > :not([hidden]) ~ :not([hidden]),
+.sales-officer-theme .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+.so-theme .divide-slate-100 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #D7DEE8 !important;
+}
+
+/* =====================================================================
+   8. ALL BUTTONS & ACTIONS ("dont skip any button")
+   ===================================================================== */
+/* Primary Action Buttons (Gradients: blue-600, cyan-600, orange-600, etc.) */
+.sales-officer-theme button.bg-gradient-to-r,
+.so-theme button.bg-gradient-to-r,
+.sales-officer-theme button[class*="from-blue-600"],
+.so-theme button[class*="from-blue-600"],
+.sales-officer-theme button[class*="from-cyan-600"],
+.so-theme button[class*="from-cyan-600"],
+.sales-officer-theme button[class*="from-cyan-500"],
+.so-theme button[class*="from-cyan-500"],
+.sales-officer-theme button[class*="from-indigo-600"],
+.so-theme button[class*="from-indigo-600"],
+.sales-officer-theme button[class*="from-orange-600"],
+.so-theme button[class*="from-orange-600"],
+.sales-officer-theme button[class*="from-amber-500"],
+.so-theme button[class*="from-amber-500"] {
+  background: linear-gradient(135deg, #1E293B 0%, #334155 100%) !important;
+  color: #FFFFFF !important;
+  border: 1px solid #0F172A !important;
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.15) !important;
+}
+
+.sales-officer-theme button.bg-gradient-to-r *,
+.so-theme button.bg-gradient-to-r *,
+.sales-officer-theme button[class*="from-blue-600"] *,
+.so-theme button[class*="from-blue-600"] * {
+  color: #FFFFFF !important;
+  stroke: #FFFFFF !important;
+}
+
+.sales-officer-theme button.bg-gradient-to-r:hover,
+.so-theme button.bg-gradient-to-r:hover,
+.sales-officer-theme button[class*="from-blue-600"]:hover,
+.so-theme button[class*="from-blue-600"]:hover {
+  background: #0F172A !important;
+  color: #FFFFFF !important;
+  border-color: #0F172A !important;
+}
+
+/* Secondary & Neutral Buttons */
+.sales-officer-theme button.bg-slate-100,
+.so-theme button.bg-slate-100,
+.sales-officer-theme button.bg-slate-200,
+.so-theme button.bg-slate-200,
+.sales-officer-theme button.bg-blue-50,
+.so-theme button.bg-blue-50 {
+  background-color: #E6EBF1 !important;
+  color: #1E293B !important;
+  border: 1px solid #D7DEE8 !important;
+}
+
+.sales-officer-theme button.bg-slate-100:hover,
+.so-theme button.bg-slate-100:hover,
+.sales-officer-theme button.bg-slate-200:hover,
+.so-theme button.bg-slate-200:hover,
+.sales-officer-theme button.bg-blue-50:hover,
+.so-theme button.bg-blue-50:hover {
+  background-color: #D7DEE8 !important;
+  color: #0F172A !important;
+  border-color: #C7D0DB !important;
+}
+
+.sales-officer-theme button.bg-slate-100 *,
+.so-theme button.bg-slate-100 *,
+.sales-officer-theme button.bg-blue-50 *,
+.so-theme button.bg-blue-50 * {
+  color: #1E293B !important;
+  stroke: #1E293B !important;
+}
+
+/* White / Card Outline Buttons */
+.sales-officer-theme button.bg-white,
+.so-theme button.bg-white,
+.sales-officer-theme button.border-slate-200,
+.so-theme button.border-slate-200 {
+  background-color: #FFFFFF !important;
+  color: #334155 !important;
+  border: 1px solid #D7DEE8 !important;
+}
+
+.sales-officer-theme button.bg-white:hover,
+.so-theme button.bg-white:hover {
+  background-color: #E6EBF1 !important;
+  color: #0F172A !important;
+  border-color: #C7D0DB !important;
+}
+
+/* Danger / Cancel / Close Buttons */
+.sales-officer-theme button.hover\:bg-rose-50:hover,
+.so-theme button.hover\:bg-rose-50:hover,
+.sales-officer-theme button.text-rose-600,
+.so-theme button.text-rose-600 {
+  background-color: #FEE2E2 !important;
+  color: #991B1B !important;
+  border: 1px solid #FCA5A5 !important;
+}
+
+/* =====================================================================
+   9. BADGES, CHIPS & STATUS PILLS
+   ===================================================================== */
+.sales-officer-theme .bg-blue-50,
+.so-theme .bg-blue-50,
+.sales-officer-theme .bg-indigo-50,
+.so-theme .bg-indigo-50,
+.sales-officer-theme .bg-slate-100,
+.so-theme .bg-slate-100,
+.sales-officer-theme .bg-cyan-50,
+.so-theme .bg-cyan-50 {
+  background-color: #E6EBF1 !important;
+  color: #0F172A !important;
+  border-color: #D7DEE8 !important;
+}
+
+.sales-officer-theme .bg-blue-50 *,
+.so-theme .bg-blue-50 *,
+.sales-officer-theme .bg-indigo-50 *,
+.so-theme .bg-indigo-50 * {
+  color: #0F172A !important;
+  stroke: #0F172A !important;
+}
+
+/* Success status (Completed, Active) */
+.sales-officer-theme .bg-emerald-500\/20,
+.so-theme .bg-emerald-500\/20,
+.sales-officer-theme .bg-emerald-50,
+.so-theme .bg-emerald-50 {
+  background-color: rgba(16, 185, 129, 0.12) !important;
+  color: #047857 !important;
+  border: 1px solid rgba(16, 185, 129, 0.3) !important;
+}
+
+/* Amber status (Pending, Due) */
+.sales-officer-theme .bg-amber-500\/20,
+.so-theme .bg-amber-500\/20,
+.sales-officer-theme .bg-amber-50,
+.so-theme .bg-amber-50 {
+  background-color: rgba(245, 158, 11, 0.12) !important;
+  color: #B45309 !important;
+  border: 1px solid rgba(245, 158, 11, 0.3) !important;
+}
+
+/* =====================================================================
+   10. ALL FONT COLORS ("dont skip any font")
+   ===================================================================== */
+/* Primary Headings & Bold Text */
+.sales-officer-theme h1,
+.so-theme h1,
+.sales-officer-theme h2,
+.so-theme h2,
+.sales-officer-theme h3,
+.so-theme h3,
+.sales-officer-theme h4,
+.so-theme h4,
+.sales-officer-theme h5,
+.so-theme h5,
+.sales-officer-theme h6,
+.so-theme h6,
+.sales-officer-theme .font-black,
+.so-theme .font-black,
+.sales-officer-theme .font-extrabold,
+.so-theme .font-extrabold,
+.sales-officer-theme .text-slate-900,
+.so-theme .text-slate-900,
+.sales-officer-theme .text-zinc-900,
+.so-theme .text-zinc-900,
+.sales-officer-theme .text-gray-900,
+.so-theme .text-gray-900,
+.sales-officer-theme .text-slate-950,
+.so-theme .text-slate-950,
+.sales-officer-theme .font-oswald,
+.so-theme .font-oswald {
+  color: #0F172A !important;
+}
+
+/* Secondary Body, Descriptions, Labels */
+.sales-officer-theme .text-slate-600,
+.so-theme .text-slate-600,
+.sales-officer-theme .text-slate-700,
+.so-theme .text-slate-700,
+.sales-officer-theme .text-zinc-600,
+.so-theme .text-zinc-600,
+.sales-officer-theme .text-zinc-700,
+.so-theme .text-zinc-700 {
+  color: #334155 !important;
+}
+
+/* Muted Footnotes, Subtitles, Placeholders */
+.sales-officer-theme .text-slate-400,
+.so-theme .text-slate-400,
+.sales-officer-theme .text-slate-500,
+.so-theme .text-slate-500,
+.sales-officer-theme .text-zinc-400,
+.so-theme .text-zinc-400,
+.sales-officer-theme .text-zinc-500,
+.so-theme .text-zinc-500 {
+  color: #64748B !important;
+}
+
+/* Prevent white text from being invisible on light containers */
+.sales-officer-theme .bg-white .text-white,
+.so-theme .bg-white .text-white,
+.sales-officer-theme .bg-\[\#F4F6F8\] .text-white,
+.so-theme .bg-\[\#F4F6F8\] .text-white,
+.sales-officer-theme .bg-\[\#E6EBF1\] .text-white,
+.so-theme .bg-\[\#E6EBF1\] .text-white {
+  color: #0F172A !important;
+}
+
+/* =====================================================================
+   11. DATA TABLES, ROWS & DATA GRIDS
+   ===================================================================== */
+.sales-officer-theme table thead,
+.so-theme table thead,
+.sales-officer-theme table thead th,
+.so-theme table thead th,
+.sales-officer-theme table th,
+.so-theme table th {
+  background-color: #E6EBF1 !important;
+  color: #0F172A !important;
+  border-bottom: 1px solid #D7DEE8 !important;
+  font-weight: 700 !important;
+}
+
+.sales-officer-theme table tbody tr,
+.so-theme table tbody tr {
+  background-color: #FFFFFF !important;
+  border-bottom: 1px solid #E6EBF1 !important;
+}
+
+.sales-officer-theme table tbody tr:nth-child(even),
+.so-theme table tbody tr:nth-child(even) {
+  background-color: rgba(244, 246, 248, 0.75) !important;
+}
+
+.sales-officer-theme table tbody tr:hover,
+.so-theme table tbody tr:hover {
+  background-color: #E6EBF1 !important;
+}
+
+.sales-officer-theme table td,
+.so-theme table td {
+  border-color: #E6EBF1 !important;
+  color: #1E293B !important;
+}
+
+/* =====================================================================
+   12. FORM INPUTS & SEARCH BARS
+   ===================================================================== */
+.sales-officer-theme input[type="text"],
+.so-theme input[type="text"],
+.sales-officer-theme input[type="number"],
+.so-theme input[type="number"],
+.sales-officer-theme input[type="search"],
+.so-theme input[type="search"],
+.sales-officer-theme input[type="email"],
+.so-theme input[type="email"],
+.sales-officer-theme select,
+.so-theme select,
+.sales-officer-theme textarea,
+.so-theme textarea {
+  background-color: #FFFFFF !important;
+  border: 1px solid #D7DEE8 !important;
+  color: #0F172A !important;
+}
+
+.sales-officer-theme input:focus,
+.so-theme input:focus,
+.sales-officer-theme select:focus,
+.so-theme select:focus,
+.sales-officer-theme textarea:focus,
+.so-theme textarea:focus {
+  border-color: #C7D0DB !important;
+  outline: 2px solid #D7DEE8 !important;
+  box-shadow: 0 0 0 3px rgba(199, 208, 219, 0.4) !important;
+}
+
+/* =====================================================================
+   13. MODALS & POPUPS IN SALES OFFICER PORTAL
+   ===================================================================== */
+.sales-officer-theme .fixed.inset-0 .bg-white,
+.so-theme .fixed.inset-0 .bg-white,
+.sales-officer-theme .fixed.inset-0 .rounded-3xl,
+.so-theme .fixed.inset-0 .rounded-3xl {
+  background-color: #FFFFFF !important;
+  border: 1px solid #C7D0DB !important;
+  color: #1E293B !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15) !important;
+}
+
+.sales-officer-theme .fixed.inset-0 .px-6.py-5,
+.so-theme .fixed.inset-0 .px-6.py-5,
+.sales-officer-theme .fixed.inset-0 .px-6.py-4,
+.so-theme .fixed.inset-0 .px-6.py-4 {
+  background: linear-gradient(135deg, #FFFFFF 0%, #E6EBF1 100%) !important;
+  border-bottom: 1px solid #D7DEE8 !important;
+  color: #0F172A !important;
+}
+
+.sales-officer-theme .fixed.inset-0 .px-6.py-5 *,
+.so-theme .fixed.inset-0 .px-6.py-5 *,
+.sales-officer-theme .fixed.inset-0 .px-6.py-4 *,
+.so-theme .fixed.inset-0 .px-6.py-4 * {
+  color: #0F172A !important;
+  stroke: #0F172A !important;
+}
+
+.sales-officer-theme .fixed.inset-0 .p-3\.5.rounded-2xl.bg-slate-50,
+.so-theme .fixed.inset-0 .p-3\.5.rounded-2xl.bg-slate-50 {
+  background-color: #F4F6F8 !important;
+  border: 1px solid #D7DEE8 !important;
+}
+
+/* =====================================================================
+   14. DELIVERY FLEET MAP IN SALES OFFICER PORTAL
+   ===================================================================== */
+/* Standby / Telemetry HUD cards on the map */
+.sales-officer-theme .fizz-fleet-map-container .map-telemetry-hud-card,
+.so-theme .fizz-fleet-map-container .map-telemetry-hud-card {
+  background-color: rgba(255, 255, 255, 0.96) !important;
+  border-color: #D7DEE8 !important;
+  color: #0F172A !important;
+}
+
+.sales-officer-theme .fizz-fleet-map-container .map-telemetry-hud-card h4,
+.so-theme .fizz-fleet-map-container .map-telemetry-hud-card h4 {
+  color: #0F172A !important;
+}
+
+.sales-officer-theme .fizz-fleet-map-container .map-telemetry-hud-card p,
+.so-theme .fizz-fleet-map-container .map-telemetry-hud-card p {
+  color: #334155 !important;
+}
+
+/* Telemetry filter pills on the map */
+.sales-officer-theme .fizz-fleet-map-container .bg-white\/90,
+.so-theme .fizz-fleet-map-container .bg-white\/90 {
+  background-color: #FFFFFF !important;
+  border-color: #D7DEE8 !important;
+}

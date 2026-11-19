@@ -1,0 +1,698 @@
+/**
+ * Supplier Exclusive Palette Theme
+ * 6-Color Palette:
+ *  - Color 1: #FFE8BD (Soft Warm Butter Cream / Pastel Gold)
+ *  - Color 2: #EEF9FA (Pale Ice Mint / Mint White Canvas)
+ *  - Color 3: #C8F1E8 (Soft Pastel Aquamarine / Seafoam Mint)
+ *  - Color 4: #DEFDEF (Pale Fresh Mint / Light Pastel Green)
+ *  - Color 5: #BFC8C5 (Muted Pewter Sage / Slate Taupe Border)
+ *  - Color 6: #FADECF (Soft Pastel Peach / Blush Melon Accent)
+ *
+ * Scoped EXCLUSIVELY to .supplier-theme so no other pages are affected.
+ */
+
+:root {
+  --spt-c1: #FFE8BD;
+  --spt-c2: #EEF9FA;
+  --spt-c3: #C8F1E8;
+  --spt-c4: #DEFDEF;
+  --spt-c5: #BFC8C5;
+  --spt-c6: #FADECF;
+  --spt-text: #15221C;
+  --spt-text-muted: #4A5852;
+  --spt-text-tertiary: #697872;
+}
+
+/* =====================================================================
+   1. MAIN PAGE CONTAINER & CANVAS BACKGROUND
+   ===================================================================== */
+.supplier-theme {
+  background-color: #EEF9FA !important;
+  color: #15221C !important;
+  min-height: 100vh;
+}
+
+.supplier-theme ::selection {
+  background-color: #C8F1E8 !important;
+  color: #111D17 !important;
+}
+
+/* =====================================================================
+   2. TOP HEADER & NAVIGATION BAR
+   ===================================================================== */
+.supplier-theme .sticky.top-0,
+.supplier-theme header {
+  background-color: rgba(222, 253, 239, 0.95) !important;
+  border-bottom: 1px solid #BFC8C5 !important;
+  backdrop-filter: blur(12px) !important;
+}
+
+/* =====================================================================
+   3. SIDEBAR NAVIGATION
+   ===================================================================== */
+.supplier-theme aside > div {
+  background-color: rgba(222, 253, 239, 0.95) !important;
+  border: 1px solid #BFC8C5 !important;
+}
+
+.supplier-theme aside .border-b {
+  border-bottom: 1px solid #BFC8C5 !important;
+}
+
+/* Active navigation item */
+.supplier-theme aside button.bg-gradient-to-r,
+.supplier-theme aside button[class*="from-"],
+.supplier-theme aside button.spt-nav-active {
+  background: #FFE8BD !important;
+  color: #15221C !important;
+  border: 1px solid #BFC8C5 !important;
+  font-weight: 700 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+.supplier-theme aside button.bg-gradient-to-r *,
+.supplier-theme aside button[class*="from-"] * {
+  color: #15221C !important;
+  stroke: #15221C !important;
+}
+
+/* Inactive navigation item */
+.supplier-theme aside button:not([class*="from-"]):not(.spt-nav-active) {
+  background-color: #EEF9FA !important;
+  color: #384640 !important;
+  border: 1px solid #BFC8C5 !important;
+}
+
+.supplier-theme aside button:not([class*="from-"]):not(.spt-nav-active):hover {
+  background-color: #C8F1E8 !important;
+  color: #121E18 !important;
+  border-color: #BFC8C5 !important;
+}
+
+.supplier-theme aside button:not([class*="from-"]):not(.spt-nav-active):hover * {
+  color: #121E18 !important;
+  stroke: #121E18 !important;
+}
+
+/* Sidebar item icon container */
+.supplier-theme aside .p-1\.5.rounded-lg {
+  background-color: #C8F1E8 !important;
+  color: #15221C !important;
+  border: 1px solid #BFC8C5 !important;
+}
+
+.supplier-theme aside .p-1\.5.rounded-lg * {
+  color: #15221C !important;
+  stroke: #15221C !important;
+}
+
+/* Sidebar Footer card */
+.supplier-theme aside .p-2\.5.rounded-xl {
+  background-color: #EEF9FA !important;
+  border: 1px solid #BFC8C5 !important;
+}
+
+/* =====================================================================
+   4. ALL SECTIONS, BOXES, CARDS & CONTAINERS
+   ===================================================================== */
+.supplier-theme .bg-white,
+.supplier-theme .bg-slate-50,
+.supplier-theme .bg-slate-100,
+.supplier-theme .bg-zinc-50,
+.supplier-theme .bg-gray-50,
+.supplier-theme .bg-gray-100 {
+  background-color: #EEF9FA !important;
+  border-color: #BFC8C5 !important;
+}
+
+/* Secondary boxes, panels & containers */
+.supplier-theme .bg-slate-50\/70,
+.supplier-theme .bg-slate-50\/80,
+.supplier-theme .bg-slate-100\/70,
+.supplier-theme .bg-slate-100\/80,
+.supplier-theme .bg-slate-100\/90,
+.supplier-theme .bg-slate-200\/60,
+.supplier-theme .bg-slate-200\/70,
+.supplier-theme .bg-blue-50\/70,
+.supplier-theme .bg-indigo-50\/70,
+.supplier-theme .bg-emerald-50\/70,
+.supplier-theme .bg-teal-50\/70 {
+  background-color: #DEFDEF !important;
+  border-color: #BFC8C5 !important;
+}
+
+/* All dark and colored gradient banners and headers inside supplier */
+.supplier-theme div[class*="from-blue-700"],
+.supplier-theme div[class*="from-blue-800"],
+.supplier-theme div[class*="from-blue-900"],
+.supplier-theme div[class*="from-indigo-700"],
+.supplier-theme div[class*="from-indigo-800"],
+.supplier-theme div[class*="from-indigo-900"],
+.supplier-theme div[class*="from-indigo-950"]:not([class*="leaflet"]),
+.supplier-theme div[class*="from-slate-900"]:not(.map-district-depot-hud-card):not(.map-district-depot-hud-minimized):not([class*="leaflet"]),
+.supplier-theme div[class*="from-slate-950"],
+.supplier-theme div[class*="bg-slate-900"]:not(.map-district-depot-hud-card):not(.map-district-depot-hud-minimized):not([class*="leaflet"]),
+.supplier-theme div[class*="bg-slate-950"],
+.supplier-theme header[class*="bg-slate-900"] {
+  background: #DEFDEF !important;
+  color: #15221C !important;
+  border-color: #BFC8C5 !important;
+}
+
+.supplier-theme div[class*="from-blue-700"] *,
+.supplier-theme div[class*="from-indigo-900"] *,
+.supplier-theme div[class*="from-slate-900"] * {
+  color: #15221C !important;
+}
+
+.supplier-theme div[class*="from-blue-700"] p,
+.supplier-theme div[class*="from-indigo-900"] p,
+.supplier-theme div[class*="from-slate-900"] p {
+  color: #4A5852 !important;
+}
+
+/* All borders & dividers */
+.supplier-theme .border,
+.supplier-theme .border-b,
+.supplier-theme .border-t,
+.supplier-theme .border-l,
+.supplier-theme .border-r,
+.supplier-theme .border-slate-100,
+.supplier-theme .border-slate-200,
+.supplier-theme .border-slate-200\/80,
+.supplier-theme .border-slate-200\/90,
+.supplier-theme .border-slate-300,
+.supplier-theme .border-gray-200,
+.supplier-theme .border-zinc-200,
+.supplier-theme .border-blue-100,
+.supplier-theme .border-blue-200,
+.supplier-theme .border-indigo-100,
+.supplier-theme .border-indigo-200,
+.supplier-theme .border-emerald-100,
+.supplier-theme .border-emerald-200,
+.supplier-theme .border-amber-200,
+.supplier-theme .border-purple-200,
+.supplier-theme .border-rose-200 {
+  border-color: #BFC8C5 !important;
+}
+
+.supplier-theme .divide-slate-200 > :not([hidden]) ~ :not([hidden]),
+.supplier-theme .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+.supplier-theme .divide-gray-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #BFC8C5 !important;
+}
+
+/* =====================================================================
+   5. OVERVIEW KPI BOXES (CYCLED ACCROSS THE 6-COLOR PALETTE)
+   ===================================================================== */
+.supplier-theme .grid.grid-cols-2.sm\:grid-cols-4 > div:nth-child(1),
+.supplier-theme .grid.grid-cols-4 > div:nth-child(1),
+.supplier-theme .grid.grid-cols-1.sm\:grid-cols-2.lg\:grid-cols-4 > div:nth-child(1),
+.supplier-theme .spt-box-butter {
+  background: #FFE8BD !important;
+  border: 1px solid #BFC8C5 !important;
+}
+
+.supplier-theme .grid.grid-cols-2.sm\:grid-cols-4 > div:nth-child(2),
+.supplier-theme .grid.grid-cols-4 > div:nth-child(2),
+.supplier-theme .grid.grid-cols-1.sm\:grid-cols-2.lg\:grid-cols-4 > div:nth-child(2),
+.supplier-theme .spt-box-aqua {
+  background: #C8F1E8 !important;
+  border: 1px solid #BFC8C5 !important;
+}
+
+.supplier-theme .grid.grid-cols-2.sm\:grid-cols-4 > div:nth-child(3),
+.supplier-theme .grid.grid-cols-4 > div:nth-child(3),
+.supplier-theme .grid.grid-cols-1.sm\:grid-cols-2.lg\:grid-cols-4 > div:nth-child(3),
+.supplier-theme .spt-box-mint {
+  background: #DEFDEF !important;
+  border: 1px solid #BFC8C5 !important;
+}
+
+.supplier-theme .grid.grid-cols-2.sm\:grid-cols-4 > div:nth-child(4),
+.supplier-theme .grid.grid-cols-4 > div:nth-child(4),
+.supplier-theme .grid.grid-cols-1.sm\:grid-cols-2.lg\:grid-cols-4 > div:nth-child(4),
+.supplier-theme .spt-box-peach {
+  background: #FADECF !important;
+  border: 1px solid #BFC8C5 !important;
+}
+
+/* Ensure font colors in KPI boxes are high contrast */
+.supplier-theme .grid.grid-cols-2.sm\:grid-cols-4 > div *,
+.supplier-theme .grid.grid-cols-4 > div *,
+.supplier-theme .grid.grid-cols-1.sm\:grid-cols-2.lg\:grid-cols-4 > div * {
+  color: #15221C !important;
+}
+
+.supplier-theme .grid.grid-cols-2.sm\:grid-cols-4 > div p,
+.supplier-theme .grid.grid-cols-4 > div p,
+.supplier-theme .grid.grid-cols-1.sm\:grid-cols-2.lg\:grid-cols-4 > div p {
+  color: #4A5852 !important;
+}
+
+/* =====================================================================
+   6. ALL BUTTONS IN SUPPLIER PORTAL
+   ===================================================================== */
+/* Primary Action Buttons (Gradients, solid buttons, submit, dispatch, top-up) */
+.supplier-theme button.bg-blue-600,
+.supplier-theme button.bg-indigo-600,
+.supplier-theme button.bg-emerald-600,
+.supplier-theme button.bg-teal-600,
+.supplier-theme button.bg-purple-600,
+.supplier-theme button.bg-amber-600,
+.supplier-theme button.bg-zinc-900,
+.supplier-theme button.bg-slate-900,
+.supplier-theme button[class*="from-blue-600"],
+.supplier-theme button[class*="from-indigo-600"],
+.supplier-theme button[class*="from-emerald-600"],
+.supplier-theme button[class*="from-teal-600"],
+.supplier-theme button[class*="from-purple-600"],
+.supplier-theme button[class*="from-amber-600"],
+.supplier-theme button[class*="from-amber-500"],
+.supplier-theme button[class*="from-emerald-500"],
+.supplier-theme button.spt-btn-primary {
+  background: #FFE8BD !important;
+  color: #15221C !important;
+  border: 1px solid #BFC8C5 !important;
+  font-weight: 700 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+.supplier-theme button.bg-blue-600 *,
+.supplier-theme button.bg-indigo-600 *,
+.supplier-theme button.bg-emerald-600 *,
+.supplier-theme button[class*="from-blue-600"] *,
+.supplier-theme button[class*="from-indigo-600"] *,
+.supplier-theme button[class*="from-emerald-600"] *,
+.supplier-theme button[class*="from-amber-600"] *,
+.supplier-theme button.spt-btn-primary * {
+  color: #15221C !important;
+  stroke: #15221C !important;
+}
+
+.supplier-theme button.bg-blue-600:hover,
+.supplier-theme button.bg-indigo-600:hover,
+.supplier-theme button.bg-emerald-600:hover,
+.supplier-theme button.bg-slate-900:hover,
+.supplier-theme button[class*="from-blue-600"]:hover,
+.supplier-theme button[class*="from-indigo-600"]:hover,
+.supplier-theme button[class*="from-emerald-600"]:hover,
+.supplier-theme button[class*="from-amber-600"]:hover,
+.supplier-theme button.spt-btn-primary:hover {
+  background: #C8F1E8 !important;
+  color: #0F1A15 !important;
+  border-color: #BFC8C5 !important;
+}
+
+/* Secondary, White, Slate, Outline & Neutral Buttons */
+.supplier-theme button.bg-white,
+.supplier-theme button.bg-slate-50,
+.supplier-theme button.bg-slate-100,
+.supplier-theme button.bg-slate-200,
+.supplier-theme button.bg-gray-100,
+.supplier-theme button.border-slate-200,
+.supplier-theme button.border-slate-300,
+.supplier-theme button.spt-btn-secondary {
+  background-color: #DEFDEF !important;
+  color: #15221C !important;
+  border: 1px solid #BFC8C5 !important;
+}
+
+.supplier-theme button.bg-white *,
+.supplier-theme button.bg-slate-50 *,
+.supplier-theme button.bg-slate-100 *,
+.supplier-theme button.spt-btn-secondary * {
+  color: #15221C !important;
+  stroke: #15221C !important;
+}
+
+.supplier-theme button.bg-white:hover,
+.supplier-theme button.bg-slate-50:hover,
+.supplier-theme button.bg-slate-100:hover,
+.supplier-theme button.bg-slate-200:hover,
+.supplier-theme button.spt-btn-secondary:hover {
+  background-color: #C8F1E8 !important;
+  color: #0F1A15 !important;
+  border-color: #BFC8C5 !important;
+}
+
+.supplier-theme button.bg-white:hover *,
+.supplier-theme button.bg-slate-50:hover *,
+.supplier-theme button.bg-slate-100:hover * {
+  color: #0F1A15 !important;
+  stroke: #0F1A15 !important;
+}
+
+/* Active Filter Chips & Tabs */
+.supplier-theme button.active,
+.supplier-theme button[aria-selected="true"],
+.supplier-theme .spt-chip-active {
+  background-color: #C8F1E8 !important;
+  color: #15221C !important;
+  border: 1px solid #BFC8C5 !important;
+  font-weight: 700 !important;
+}
+
+/* Inactive Filter Chips & Tabs */
+.supplier-theme .spt-chip-inactive {
+  background-color: #EEF9FA !important;
+  color: #384640 !important;
+  border: 1px solid #BFC8C5 !important;
+}
+
+.supplier-theme .spt-chip-inactive:hover {
+  background-color: #DEFDEF !important;
+  color: #15221C !important;
+}
+
+/* Danger / Delete / Reject Buttons */
+.supplier-theme button.bg-rose-50,
+.supplier-theme button.hover\:bg-rose-50:hover,
+.supplier-theme button.text-rose-600 {
+  background-color: #FADECF !important;
+  color: #7D2828 !important;
+  border: 1px solid #BFC8C5 !important;
+}
+
+/* =====================================================================
+   7. BADGES, PILLS, CHIPS & METRIC ICONS
+   ===================================================================== */
+.supplier-theme .bg-blue-50,
+.supplier-theme .bg-indigo-50,
+.supplier-theme .bg-purple-50,
+.supplier-theme .bg-emerald-50,
+.supplier-theme .bg-teal-50,
+.supplier-theme .bg-cyan-50,
+.supplier-theme .bg-amber-50,
+.supplier-theme .bg-emerald-100,
+.supplier-theme .bg-blue-100,
+.supplier-theme .bg-indigo-100 {
+  background-color: #C8F1E8 !important;
+  color: #15221C !important;
+  border-color: #BFC8C5 !important;
+}
+
+.supplier-theme .bg-blue-50 *,
+.supplier-theme .bg-indigo-50 *,
+.supplier-theme .bg-purple-50 *,
+.supplier-theme .bg-emerald-50 * {
+  color: #15221C !important;
+  stroke: #15221C !important;
+}
+
+/* Metric / Icon Containers */
+.supplier-theme .w-8.h-8.rounded-xl,
+.supplier-theme .w-9.h-9.rounded-xl,
+.supplier-theme .w-10.h-10.rounded-xl,
+.supplier-theme .w-11.h-11.rounded-2xl,
+.supplier-theme .w-12.h-12.rounded-2xl {
+  background-color: #C8F1E8 !important;
+  color: #15221C !important;
+  border: 1px solid #BFC8C5 !important;
+}
+
+.supplier-theme .w-8.h-8.rounded-xl *,
+.supplier-theme .w-9.h-9.rounded-xl *,
+.supplier-theme .w-10.h-10.rounded-xl *,
+.supplier-theme .w-11.h-11.rounded-2xl *,
+.supplier-theme .w-12.h-12.rounded-2xl * {
+  color: #15221C !important;
+  stroke: #15221C !important;
+}
+
+/* Urgent / Critical Badges */
+.supplier-theme .bg-rose-50,
+.supplier-theme .bg-rose-500\/20,
+.supplier-theme .bg-rose-100 {
+  background-color: #FADECF !important;
+  color: #7D2828 !important;
+  border-color: #BFC8C5 !important;
+}
+
+.supplier-theme .bg-rose-50 *,
+.supplier-theme .bg-rose-100 * {
+  color: #7D2828 !important;
+}
+
+/* =====================================================================
+   8. ALL FONT COLORS ("dont skip any font")
+   ===================================================================== */
+/* Primary Headings, Titles, Big Numbers, Brand Text */
+.supplier-theme h1,
+.supplier-theme h2,
+.supplier-theme h3,
+.supplier-theme h4,
+.supplier-theme h5,
+.supplier-theme h6,
+.supplier-theme .font-black,
+.supplier-theme .font-extrabold,
+.supplier-theme .text-slate-900,
+.supplier-theme .text-zinc-900,
+.supplier-theme .text-gray-900,
+.supplier-theme .text-slate-950,
+.supplier-theme .text-zinc-950,
+.supplier-theme .font-oswald {
+  color: #15221C !important;
+}
+
+/* Numbers & Highlights */
+.supplier-theme .text-emerald-600,
+.supplier-theme .text-emerald-700,
+.supplier-theme .text-blue-600,
+.supplier-theme .text-blue-700,
+.supplier-theme .text-indigo-600,
+.supplier-theme .text-indigo-700,
+.supplier-theme .text-cyan-600,
+.supplier-theme .text-purple-600,
+.supplier-theme .text-amber-600 {
+  color: #15221C !important;
+}
+
+/* Secondary Subtitles, Descriptions, Meta Information, Field Labels */
+.supplier-theme .text-slate-500,
+.supplier-theme .text-slate-600,
+.supplier-theme .text-slate-700,
+.supplier-theme .text-zinc-600,
+.supplier-theme .text-gray-600,
+.supplier-theme .text-gray-500,
+.supplier-theme .text-blue-100,
+.supplier-theme .text-blue-100\/90,
+.supplier-theme .text-blue-200 {
+  color: #4A5852 !important;
+}
+
+/* Muted / Tertiary / Placeholder / Tokens */
+.supplier-theme .text-slate-400,
+.supplier-theme .text-zinc-400,
+.supplier-theme .text-gray-400,
+.supplier-theme .text-slate-300 {
+  color: #697872 !important;
+}
+
+/* Ensure no text-white leaks on light cards in supplier */
+.supplier-theme .bg-white .text-white,
+.supplier-theme .bg-\[\#EEF9FA\] .text-white,
+.supplier-theme .bg-\[\#DEFDEF\] .text-white {
+  color: #15221C !important;
+}
+
+/* =====================================================================
+   9. TABLES, LISTS & DATA GRIDS
+   ===================================================================== */
+.supplier-theme table thead,
+.supplier-theme table thead th,
+.supplier-theme table th {
+  background-color: #DEFDEF !important;
+  color: #15221C !important;
+  border-bottom: 1px solid #BFC8C5 !important;
+  font-weight: 700 !important;
+}
+
+.supplier-theme table tbody tr {
+  background-color: #EEF9FA !important;
+  border-bottom: 1px solid #BFC8C5 !important;
+}
+
+.supplier-theme table tbody tr:nth-child(even) {
+  background-color: rgba(222, 253, 239, 0.45) !important;
+}
+
+.supplier-theme table tbody tr:hover {
+  background-color: rgba(200, 241, 232, 0.45) !important;
+}
+
+.supplier-theme table td {
+  border-color: #BFC8C5 !important;
+  color: #15221C !important;
+}
+
+/* =====================================================================
+   10. FORM INPUTS & SEARCH BARS
+   ===================================================================== */
+.supplier-theme input[type="text"],
+.supplier-theme input[type="number"],
+.supplier-theme input[type="search"],
+.supplier-theme input[type="email"],
+.supplier-theme input[type="password"],
+.supplier-theme select,
+.supplier-theme textarea {
+  background-color: #EEF9FA !important;
+  border: 1px solid #BFC8C5 !important;
+  color: #15221C !important;
+}
+
+.supplier-theme input:focus,
+.supplier-theme select:focus,
+.supplier-theme textarea:focus {
+  border-color: #C8F1E8 !important;
+  outline: 2px solid #DEFDEF !important;
+  box-shadow: 0 0 0 3px rgba(200, 241, 232, 0.45) !important;
+}
+
+/* =====================================================================
+   11. MODALS & POPUPS IN SUPPLIER PORTAL
+   ===================================================================== */
+.supplier-theme .fixed.inset-0 .bg-white,
+.supplier-theme .fixed.inset-0 .rounded-3xl,
+.supplier-theme .fixed.inset-0 .rounded-2xl {
+  background-color: #EEF9FA !important;
+  border: 1px solid #BFC8C5 !important;
+  color: #15221C !important;
+}
+
+.supplier-theme .fixed.inset-0 .px-6.py-5,
+.supplier-theme .fixed.inset-0 .px-6.py-4,
+.supplier-theme .fixed.inset-0 .p-6.relative {
+  background-color: #DEFDEF !important;
+  border-bottom: 1px solid #BFC8C5 !important;
+  color: #15221C !important;
+}
+
+.supplier-theme .fixed.inset-0 .px-6.py-5 *,
+.supplier-theme .fixed.inset-0 .px-6.py-4 *,
+.supplier-theme .fixed.inset-0 .p-6.relative * {
+  color: #15221C !important;
+  stroke: #15221C !important;
+}
+
+/* =====================================================================
+   12. MAP OVERLAYS, HUD CARDS & POPUPS IN SUPPLIER PORTAL
+   ===================================================================== */
+/* District Depot HUD floating card (Dark HUD as designed in Image 2) */
+.supplier-theme .map-district-depot-hud-card,
+.supplier-theme .map-district-depot-hud-minimized,
+.supplier-theme .fizz-fleet-map-container .map-district-depot-hud-card,
+.supplier-theme .fizz-fleet-map-container .map-district-depot-hud-minimized {
+  background-color: rgba(15, 23, 42, 0.96) !important;
+  border-color: rgba(245, 158, 11, 0.7) !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
+}
+
+.supplier-theme .map-district-depot-hud-card h4,
+.supplier-theme .map-district-depot-hud-card strong,
+.supplier-theme .map-district-depot-hud-card .text-white {
+  color: #FFFFFF !important;
+}
+
+.supplier-theme .map-district-depot-hud-card .text-amber-300,
+.supplier-theme .map-district-depot-hud-minimized .text-amber-300 {
+  color: #FCD34D !important;
+}
+
+.supplier-theme .map-district-depot-hud-card .text-amber-400,
+.supplier-theme .map-district-depot-hud-minimized .text-amber-400 {
+  color: #FBBF24 !important;
+}
+
+.supplier-theme .map-district-depot-hud-card .text-slate-400,
+.supplier-theme .map-district-depot-hud-minimized .text-slate-400 {
+  color: #94A3B8 !important;
+}
+
+.supplier-theme .map-district-depot-hud-card .text-slate-300 {
+  color: #CBD5E1 !important;
+}
+
+.supplier-theme .map-district-depot-hud-card .text-cyan-400 {
+  color: #22D3EE !important;
+}
+
+.supplier-theme .map-district-depot-hud-card .text-emerald-400 {
+  color: #34D399 !important;
+}
+
+.supplier-theme .map-district-depot-hud-card button.bg-amber-500,
+.supplier-theme .fizz-fleet-map-container button.bg-amber-500 {
+  background-color: #F59E0B !important;
+  color: #020617 !important;
+}
+
+.supplier-theme .map-district-depot-hud-card button.bg-amber-500 * {
+  color: #020617 !important;
+}
+
+.supplier-theme .map-district-depot-hud-card button.bg-slate-800 {
+  background-color: #1E293B !important;
+  color: #CBD5E1 !important;
+}
+
+/* Light HUD cards on the map: Standby card & Telemetry */
+.supplier-theme .fizz-fleet-map-container .map-telemetry-hud-card {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-color: #BFC8C5 !important;
+}
+
+.supplier-theme .fizz-fleet-map-container .map-telemetry-hud-card h4 {
+  color: #0F172A !important;
+}
+
+.supplier-theme .fizz-fleet-map-container .map-telemetry-hud-card p,
+.supplier-theme .fizz-fleet-map-container .map-telemetry-hud-card .text-slate-600 {
+  color: #475569 !important;
+}
+
+.supplier-theme .fizz-fleet-map-container .map-telemetry-hud-card .text-slate-500 {
+  color: #64748B !important;
+}
+
+.supplier-theme .fizz-fleet-map-container .map-telemetry-hud-card strong {
+  color: #0F172A !important;
+}
+
+/* Leaflet Markers, Pins and Pills */
+.supplier-theme .leaflet-container div[class*="bg-slate-900"],
+.supplier-theme .leaflet-container div[class*="bg-indigo-950"],
+.supplier-theme .leaflet-container div[class*="bg-amber-950"],
+.supplier-theme .leaflet-container div[class*="bg-rose-950"],
+.supplier-theme .leaflet-container div[class*="bg-emerald-950"] {
+  background-color: rgba(15, 23, 42, 0.95) !important;
+  color: #FFFFFF !important;
+}
+
+.supplier-theme .leaflet-container div[class*="bg-amber-500"] {
+  background-color: #F59E0B !important;
+  color: #FFFFFF !important;
+}
+
+.supplier-theme .leaflet-container .text-white {
+  color: #FFFFFF !important;
+}
+
+/* Popups */
+.supplier-theme .leaflet-popup-content-wrapper,
+.supplier-theme .leaflet-popup-tip {
+  background-color: #EEF9FA !important;
+  color: #15221C !important;
+  border: 1px solid #BFC8C5 !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15) !important;
+}
+
+.supplier-theme .leaflet-popup-content h4,
+.supplier-theme .leaflet-popup-content strong {
+  color: #15221C !important;
+}
+
+.supplier-theme .leaflet-popup-content p {
+  color: #334155 !important;
+}

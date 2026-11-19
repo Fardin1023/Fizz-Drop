@@ -1,0 +1,643 @@
+/**
+ * Superadmin Exclusive Palette Theme
+ * Palette:
+ *  - Color 1: #FFF9F0 (Alabaster Ivory / Warm Canvas)
+ *  - Color 2: #F2E6D5 (Warm Linen / Cream Sand)
+ *  - Color 3: #D9CBB8 (Warm Taupe / Biscuit Border)
+ *  - Color 4: #CFE0D2 (Soft Pale Sage / Mint Celadon)
+ *  - Color 5: #B8CBBE (Dusty Laurel / Medium Sage Green)
+ *
+ * Scoped EXCLUSIVELY to .superadmin-theme so no other pages are affected.
+ */
+
+:root {
+  --sat-c1: #FFF9F0;
+  --sat-c2: #F2E6D5;
+  --sat-c3: #D9CBB8;
+  --sat-c4: #CFE0D2;
+  --sat-c5: #B8CBBE;
+  --sat-text: #19241D;
+  --sat-text-muted: #535E56;
+  --sat-heading: #101B14;
+}
+
+/* =====================================================================
+   1. MAIN PAGE CONTAINER & AMBIENT ELEMENTS
+   ===================================================================== */
+.superadmin-theme {
+  background-color: #FFF9F0 !important;
+  color: #19241D !important;
+  min-height: 100vh;
+}
+
+.superadmin-theme ::selection {
+  background-color: #B8CBBE !important;
+  color: #101B14 !important;
+}
+
+/* Dot matrix grid & ambient glows */
+.superadmin-theme .sat-grid-bg {
+  background-image: radial-gradient(#D9CBB8 1.2px, transparent 1.2px) !important;
+  opacity: 0.55 !important;
+}
+
+.superadmin-theme .sat-glow-1 {
+  background-color: rgba(207, 224, 210, 0.4) !important;
+}
+
+.superadmin-theme .sat-glow-2 {
+  background-color: rgba(184, 203, 190, 0.3) !important;
+}
+
+.superadmin-theme .sat-glow-3 {
+  background-color: rgba(242, 230, 213, 0.5) !important;
+}
+
+/* =====================================================================
+   2. TOP EXECUTIVE BANNER & HEADER
+   ===================================================================== */
+.superadmin-theme .sat-executive-banner {
+  background: linear-gradient(90deg, #B8CBBE 0%, #CFE0D2 50%, #B8CBBE 100%) !important;
+  color: #122018 !important;
+  border-bottom: 1px solid #D9CBB8 !important;
+}
+
+.superadmin-theme .sat-top-header {
+  background-color: rgba(242, 230, 213, 0.95) !important;
+  border-bottom: 1px solid #D9CBB8 !important;
+  backdrop-filter: blur(12px) !important;
+}
+
+/* =====================================================================
+   3. SIDEBAR NAVIGATION
+   ===================================================================== */
+.superadmin-theme aside .sat-sidebar-container {
+  background-color: rgba(242, 230, 213, 0.95) !important;
+  border: 1px solid #D9CBB8 !important;
+}
+
+.superadmin-theme .sat-nav-item-inactive {
+  background-color: #FFF9F0 !important;
+  color: #2E2720 !important;
+  border: 1px solid #D9CBB8 !important;
+}
+
+.superadmin-theme .sat-nav-item-inactive:hover {
+  background-color: #CFE0D2 !important;
+  color: #122018 !important;
+  border-color: #B8CBBE !important;
+}
+
+.superadmin-theme .sat-nav-item-active {
+  background-color: #B8CBBE !important;
+  color: #101B14 !important;
+  border: 1px solid #9EB4A4 !important;
+  font-weight: 700 !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06) !important;
+}
+
+/* =====================================================================
+   4. ALL SECTIONS, PANELS, CARDS & CONTAINERS
+   ===================================================================== */
+.superadmin-theme .bg-white,
+.superadmin-theme .bg-slate-50,
+.superadmin-theme .bg-slate-100,
+.superadmin-theme .bg-zinc-50,
+.superadmin-theme .bg-gray-50,
+.superadmin-theme .bg-gray-100 {
+  background-color: #FFF9F0 !important;
+}
+
+/* Secondary containers, metric cards, sub-panels */
+.superadmin-theme .bg-slate-50\/70,
+.superadmin-theme .bg-slate-50\/80,
+.superadmin-theme .bg-slate-100\/70,
+.superadmin-theme .bg-slate-100\/80,
+.superadmin-theme .bg-slate-100\/90,
+.superadmin-theme .bg-slate-200\/60,
+.superadmin-theme .bg-slate-200\/70,
+.superadmin-theme .bg-blue-50\/70,
+.superadmin-theme .bg-indigo-50\/70,
+.superadmin-theme .bg-purple-50\/70,
+.superadmin-theme .bg-emerald-50\/70,
+.superadmin-theme .bg-teal-50\/70 {
+  background-color: #F2E6D5 !important;
+}
+
+/* Section borders & dividers */
+.superadmin-theme .border,
+.superadmin-theme .border-b,
+.superadmin-theme .border-t,
+.superadmin-theme .border-l,
+.superadmin-theme .border-r,
+.superadmin-theme .border-slate-100,
+.superadmin-theme .border-slate-200,
+.superadmin-theme .border-slate-200\/80,
+.superadmin-theme .border-slate-200\/90,
+.superadmin-theme .border-slate-300,
+.superadmin-theme .border-gray-200,
+.superadmin-theme .border-zinc-200,
+.superadmin-theme .border-blue-100,
+.superadmin-theme .border-blue-200,
+.superadmin-theme .border-indigo-100,
+.superadmin-theme .border-indigo-200,
+.superadmin-theme .border-purple-100,
+.superadmin-theme .border-purple-200,
+.superadmin-theme .border-emerald-100,
+.superadmin-theme .border-emerald-200 {
+  border-color: #D9CBB8 !important;
+}
+
+.superadmin-theme .divide-slate-200 > :not([hidden]) ~ :not([hidden]),
+.superadmin-theme .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+.superadmin-theme .divide-gray-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #D9CBB8 !important;
+}
+
+/* =====================================================================
+   5. ALL BUTTONS IN SUPERADMIN PAGE
+   ===================================================================== */
+/* Primary Action Buttons (Gradients, solid blues, indigos, purples, emeralds, blacks) */
+.superadmin-theme button.bg-blue-600,
+.superadmin-theme button.bg-indigo-600,
+.superadmin-theme button.bg-purple-600,
+.superadmin-theme button.bg-emerald-600,
+.superadmin-theme button.bg-teal-600,
+.superadmin-theme button.bg-zinc-900,
+.superadmin-theme button.bg-slate-900,
+.superadmin-theme button.bg-black,
+.superadmin-theme button[class*="from-blue-600"],
+.superadmin-theme button[class*="from-indigo-600"],
+.superadmin-theme button[class*="from-purple-600"],
+.superadmin-theme button[class*="from-emerald-600"],
+.superadmin-theme button[class*="from-teal-600"],
+.superadmin-theme button[class*="from-amber-500"],
+.superadmin-theme button[class*="from-orange-500"],
+.superadmin-theme button[class*="bg-amber-600"],
+.superadmin-theme button.sat-btn-primary {
+  background: #B8CBBE !important;
+  color: #122018 !important;
+  border: 1px solid #A2B8AA !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.07) !important;
+  font-weight: 700 !important;
+}
+
+.superadmin-theme button.bg-blue-600 *,
+.superadmin-theme button.bg-indigo-600 *,
+.superadmin-theme button.bg-purple-600 *,
+.superadmin-theme button.bg-emerald-600 *,
+.superadmin-theme button[class*="from-blue-600"] *,
+.superadmin-theme button[class*="from-indigo-600"] *,
+.superadmin-theme button[class*="from-purple-600"] *,
+.superadmin-theme button[class*="from-emerald-600"] *,
+.superadmin-theme button.sat-btn-primary * {
+  color: #122018 !important;
+  stroke: #122018 !important;
+}
+
+.superadmin-theme button.bg-blue-600:hover,
+.superadmin-theme button.bg-indigo-600:hover,
+.superadmin-theme button.bg-purple-600:hover,
+.superadmin-theme button.bg-emerald-600:hover,
+.superadmin-theme button.bg-zinc-900:hover,
+.superadmin-theme button.bg-slate-900:hover,
+.superadmin-theme button[class*="from-blue-600"]:hover,
+.superadmin-theme button[class*="from-indigo-600"]:hover,
+.superadmin-theme button[class*="from-purple-600"]:hover,
+.superadmin-theme button[class*="from-emerald-600"]:hover,
+.superadmin-theme button.sat-btn-primary:hover {
+  background: #CFE0D2 !important;
+  color: #0B1610 !important;
+  border-color: #B8CBBE !important;
+}
+
+/* Secondary, White, Slate, Outline & Neutral Buttons */
+.superadmin-theme button.bg-white,
+.superadmin-theme button.bg-slate-50,
+.superadmin-theme button.bg-slate-100,
+.superadmin-theme button.bg-slate-200,
+.superadmin-theme button.bg-gray-100,
+.superadmin-theme button.border-slate-200,
+.superadmin-theme button.border-slate-300,
+.superadmin-theme button.sat-btn-secondary {
+  background-color: #F2E6D5 !important;
+  color: #2D251D !important;
+  border: 1px solid #D9CBB8 !important;
+}
+
+.superadmin-theme button.bg-white *,
+.superadmin-theme button.bg-slate-50 *,
+.superadmin-theme button.bg-slate-100 *,
+.superadmin-theme button.sat-btn-secondary * {
+  color: #2D251D !important;
+  stroke: #2D251D !important;
+}
+
+.superadmin-theme button.bg-white:hover,
+.superadmin-theme button.bg-slate-50:hover,
+.superadmin-theme button.bg-slate-100:hover,
+.superadmin-theme button.bg-slate-200:hover,
+.superadmin-theme button.sat-btn-secondary:hover {
+  background-color: #CFE0D2 !important;
+  color: #122018 !important;
+  border-color: #B8CBBE !important;
+}
+
+.superadmin-theme button.bg-white:hover *,
+.superadmin-theme button.bg-slate-50:hover *,
+.superadmin-theme button.bg-slate-100:hover *,
+.superadmin-theme button.sat-btn-secondary:hover * {
+  color: #122018 !important;
+  stroke: #122018 !important;
+}
+
+/* Active Filter Chips & Tabs */
+.superadmin-theme button.active,
+.superadmin-theme button[aria-selected="true"],
+.superadmin-theme .sat-chip-active {
+  background-color: #B8CBBE !important;
+  color: #122018 !important;
+  border: 1px solid #9EB4A4 !important;
+  font-weight: 700 !important;
+}
+
+/* Inactive Filter Chips & Tabs */
+.superadmin-theme .sat-chip-inactive {
+  background-color: #F2E6D5 !important;
+  color: #383028 !important;
+  border: 1px solid #D9CBB8 !important;
+}
+
+.superadmin-theme .sat-chip-inactive:hover {
+  background-color: #CFE0D2 !important;
+  color: #122018 !important;
+}
+
+/* Icon Buttons (Refresh, Edit, Delete, Close, Settings, Collapse) */
+.superadmin-theme button.p-1,
+.superadmin-theme button.p-1\.5,
+.superadmin-theme button.p-2,
+.superadmin-theme button.p-2\.5 {
+  border-color: #D9CBB8 !important;
+}
+
+/* Action Danger Buttons (Delete) */
+.superadmin-theme button.text-rose-600,
+.superadmin-theme button.hover\:bg-rose-50:hover,
+.superadmin-theme button.hover\:text-rose-600:hover {
+  border-color: #D9CBB8 !important;
+}
+
+/* =====================================================================
+   6. BADGES, PILLS, CHIPS & METRIC ICONS
+   ===================================================================== */
+.superadmin-theme .bg-blue-50,
+.superadmin-theme .bg-indigo-50,
+.superadmin-theme .bg-purple-50,
+.superadmin-theme .bg-emerald-50,
+.superadmin-theme .bg-teal-50,
+.superadmin-theme .bg-cyan-50,
+.superadmin-theme .bg-amber-50,
+.superadmin-theme .bg-emerald-100,
+.superadmin-theme .bg-blue-100,
+.superadmin-theme .bg-indigo-100 {
+  background-color: #CFE0D2 !important;
+  color: #16241C !important;
+  border-color: #B8CBBE !important;
+}
+
+.superadmin-theme .bg-blue-50 *,
+.superadmin-theme .bg-indigo-50 *,
+.superadmin-theme .bg-purple-50 *,
+.superadmin-theme .bg-emerald-50 * {
+  color: #16241C !important;
+  stroke: #16241C !important;
+}
+
+/* Metric / Icon containers */
+.superadmin-theme .w-8.h-8.rounded-lg,
+.superadmin-theme .w-8.h-8.rounded-xl,
+.superadmin-theme .w-9.h-9.rounded-xl,
+.superadmin-theme .w-10.h-10.rounded-xl,
+.superadmin-theme .w-12.h-12.rounded-2xl {
+  background-color: #CFE0D2 !important;
+  color: #16241C !important;
+  border-color: #D9CBB8 !important;
+}
+
+.superadmin-theme .w-8.h-8.rounded-lg *,
+.superadmin-theme .w-8.h-8.rounded-xl *,
+.superadmin-theme .w-9.h-9.rounded-xl *,
+.superadmin-theme .w-10.h-10.rounded-xl *,
+.superadmin-theme .w-12.h-12.rounded-2xl * {
+  color: #16241C !important;
+  stroke: #16241C !important;
+}
+
+/* =====================================================================
+   7. TABLES, LISTS & DATA GRIDS
+   ===================================================================== */
+.superadmin-theme table thead,
+.superadmin-theme table thead th,
+.superadmin-theme table th {
+  background-color: #F2E6D5 !important;
+  color: #16241C !important;
+  border-bottom: 1px solid #D9CBB8 !important;
+  font-weight: 700 !important;
+}
+
+.superadmin-theme table tbody tr {
+  background-color: #FFF9F0 !important;
+  border-bottom: 1px solid #D9CBB8 !important;
+}
+
+.superadmin-theme table tbody tr:nth-child(even) {
+  background-color: rgba(242, 230, 213, 0.45) !important;
+}
+
+.superadmin-theme table tbody tr:hover {
+  background-color: rgba(207, 224, 210, 0.45) !important;
+}
+
+.superadmin-theme table td {
+  border-color: #D9CBB8 !important;
+  color: #1E2721 !important;
+}
+
+/* =====================================================================
+   8. FORM INPUTS & SEARCH BARS
+   ===================================================================== */
+.superadmin-theme input[type="text"],
+.superadmin-theme input[type="number"],
+.superadmin-theme input[type="search"],
+.superadmin-theme input[type="email"],
+.superadmin-theme input[type="password"],
+.superadmin-theme select,
+.superadmin-theme textarea {
+  background-color: #FFF9F0 !important;
+  border: 1px solid #D9CBB8 !important;
+  color: #19241D !important;
+}
+
+.superadmin-theme input:focus,
+.superadmin-theme select:focus,
+.superadmin-theme textarea:focus {
+  border-color: #B8CBBE !important;
+  outline: 2px solid #CFE0D2 !important;
+  box-shadow: 0 0 0 3px rgba(184, 203, 190, 0.35) !important;
+}
+
+/* =====================================================================
+   9. MAP OVERLAYS, HUD CARDS & POPUPS ON SUPERADMIN PAGE
+   ===================================================================== */
+/* District Depot HUD floating card (Dark HUD as designed in Image 2) */
+.superadmin-theme .map-district-depot-hud-card,
+.superadmin-theme .map-district-depot-hud-minimized,
+.superadmin-theme .fizz-fleet-map-container .map-district-depot-hud-card,
+.superadmin-theme .fizz-fleet-map-container .map-district-depot-hud-minimized {
+  background-color: rgba(15, 23, 42, 0.96) !important;
+  border-color: rgba(245, 158, 11, 0.7) !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
+}
+
+.superadmin-theme .map-district-depot-hud-card h4,
+.superadmin-theme .map-district-depot-hud-card strong,
+.superadmin-theme .map-district-depot-hud-card .text-white {
+  color: #FFFFFF !important;
+}
+
+.superadmin-theme .map-district-depot-hud-card .text-amber-300,
+.superadmin-theme .map-district-depot-hud-minimized .text-amber-300 {
+  color: #FCD34D !important;
+}
+
+.superadmin-theme .map-district-depot-hud-card .text-amber-400,
+.superadmin-theme .map-district-depot-hud-minimized .text-amber-400 {
+  color: #FBBF24 !important;
+}
+
+.superadmin-theme .map-district-depot-hud-card .text-slate-400,
+.superadmin-theme .map-district-depot-hud-minimized .text-slate-400 {
+  color: #94A3B8 !important;
+}
+
+.superadmin-theme .map-district-depot-hud-card .text-slate-300 {
+  color: #CBD5E1 !important;
+}
+
+.superadmin-theme .map-district-depot-hud-card .text-cyan-400 {
+  color: #22D3EE !important;
+}
+
+.superadmin-theme .map-district-depot-hud-card .text-emerald-400 {
+  color: #34D399 !important;
+}
+
+.superadmin-theme .map-district-depot-hud-card button.bg-amber-500,
+.superadmin-theme .fizz-fleet-map-container button.bg-amber-500 {
+  background-color: #F59E0B !important;
+  color: #020617 !important;
+}
+
+.superadmin-theme .map-district-depot-hud-card button.bg-amber-500 * {
+  color: #020617 !important;
+}
+
+.superadmin-theme .map-district-depot-hud-card button.bg-slate-800 {
+  background-color: #1E293B !important;
+  color: #CBD5E1 !important;
+}
+
+/* Light HUD cards on the map: Standby card & Telemetry */
+.superadmin-theme .fizz-fleet-map-container .map-telemetry-hud-card {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-color: #D9CBB8 !important;
+}
+
+.superadmin-theme .fizz-fleet-map-container .map-telemetry-hud-card h4 {
+  color: #0F172A !important;
+}
+
+.superadmin-theme .fizz-fleet-map-container .map-telemetry-hud-card p,
+.superadmin-theme .fizz-fleet-map-container .map-telemetry-hud-card .text-slate-600 {
+  color: #475569 !important;
+}
+
+.superadmin-theme .fizz-fleet-map-container .map-telemetry-hud-card .text-slate-500 {
+  color: #64748B !important;
+}
+
+.superadmin-theme .fizz-fleet-map-container .map-telemetry-hud-card strong,
+.superadmin-theme .fizz-fleet-map-container .map-telemetry-hud-card .text-slate-900 {
+  color: #0F172A !important;
+}
+
+/* Leaflet Markers, Pins and Pills */
+.superadmin-theme .leaflet-container div[class*="bg-slate-900"],
+.superadmin-theme .leaflet-container div[class*="bg-indigo-950"],
+.superadmin-theme .leaflet-container div[class*="bg-amber-950"],
+.superadmin-theme .leaflet-container div[class*="bg-rose-950"],
+.superadmin-theme .leaflet-container div[class*="bg-emerald-950"] {
+  background-color: rgba(15, 23, 42, 0.95) !important;
+  color: #FFFFFF !important;
+}
+
+.superadmin-theme .leaflet-container div[class*="bg-amber-500"] {
+  background-color: #F59E0B !important;
+  color: #FFFFFF !important;
+}
+
+.superadmin-theme .leaflet-container .text-white {
+  color: #FFFFFF !important;
+}
+
+/* Popups */
+.superadmin-theme .leaflet-popup-content-wrapper,
+.superadmin-theme .leaflet-popup-tip {
+  background-color: #FFF9F0 !important;
+  color: #101B14 !important;
+  border: 1px solid #D9CBB8 !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15) !important;
+}
+
+.superadmin-theme .leaflet-popup-content h4,
+.superadmin-theme .leaflet-popup-content strong {
+  color: #101B14 !important;
+}
+
+.superadmin-theme .leaflet-popup-content p {
+  color: #334155 !important;
+}
+
+/* =====================================================================
+   10. TYPOGRAPHY & FONT COLORS (SUPERADMIN PALETTE SYSTEM)
+   ===================================================================== */
+/* Primary Headings, Titles, Big Numbers, Brand Text */
+.superadmin-theme h1,
+.superadmin-theme h2,
+.superadmin-theme h3,
+.superadmin-theme h4,
+.superadmin-theme h5,
+.superadmin-theme h6,
+.superadmin-theme .font-black,
+.superadmin-theme .text-slate-900,
+.superadmin-theme .text-zinc-900,
+.superadmin-theme .text-gray-900,
+.superadmin-theme .text-slate-950,
+.superadmin-theme .text-zinc-950 {
+  color: #101B14 !important;
+}
+
+/* Secondary Subtitles, Metric Labels, Card Descriptions */
+.superadmin-theme .text-slate-500,
+.superadmin-theme .text-slate-600,
+.superadmin-theme .text-slate-700,
+.superadmin-theme .text-zinc-600,
+.superadmin-theme .text-gray-600,
+.superadmin-theme .text-gray-500,
+.superadmin-theme .text-indigo-200,
+.superadmin-theme .text-indigo-200\/80,
+.superadmin-theme .text-blue-200 {
+  color: #535E56 !important;
+}
+
+/* Muted / Tertiary / Placeholder / SKU text */
+.superadmin-theme .text-slate-400,
+.superadmin-theme .text-zinc-400,
+.superadmin-theme .text-gray-400,
+.superadmin-theme .text-slate-300 {
+  color: #6C776F !important;
+}
+
+/* Specific Accent Text Overrides */
+.superadmin-theme .text-indigo-600,
+.superadmin-theme .text-blue-600,
+.superadmin-theme .text-cyan-600,
+.superadmin-theme .text-emerald-600,
+.superadmin-theme .text-purple-600,
+.superadmin-theme .text-indigo-700,
+.superadmin-theme .text-blue-700,
+.superadmin-theme .text-cyan-700,
+.superadmin-theme .text-emerald-700 {
+  color: #122018 !important;
+}
+
+/* Ensure no text-white leaks on light cards in superadmin */
+.superadmin-theme .bg-white .text-white,
+.superadmin-theme .bg-\[\#FFF9F0\] .text-white,
+.superadmin-theme .bg-\[\#F2E6D5\] .text-white {
+  color: #101B14 !important;
+}
+
+/* =====================================================================
+   11. CONTAINER GRADIENT OVERRIDES (DARK BANNERS & MODAL HEADERS)
+   ===================================================================== */
+.superadmin-theme div[class*="from-slate-900"]:not(.map-district-depot-hud-card):not(.map-district-depot-hud-minimized):not([class*="leaflet"]),
+.superadmin-theme div[class*="from-blue-900"],
+.superadmin-theme div[class*="from-indigo-950"]:not([class*="leaflet"]),
+.superadmin-theme div[class*="from-blue-950"],
+.superadmin-theme div[class*="bg-slate-900"]:not(.map-district-depot-hud-card):not(.map-district-depot-hud-minimized):not([class*="leaflet"]),
+.superadmin-theme div[class*="bg-slate-950"],
+.superadmin-theme header[class*="bg-slate-900"] {
+  background: #F2E6D5 !important;
+  color: #101B14 !important;
+  border-color: #D9CBB8 !important;
+}
+
+.superadmin-theme div[class*="from-slate-900"] h1,
+.superadmin-theme div[class*="from-slate-900"] h2,
+.superadmin-theme div[class*="from-slate-900"] h3,
+.superadmin-theme div[class*="from-blue-900"] h1,
+.superadmin-theme div[class*="from-blue-900"] h2,
+.superadmin-theme div[class*="from-blue-900"] h3 {
+  color: #101B14 !important;
+}
+
+.superadmin-theme div[class*="from-slate-900"] p,
+.superadmin-theme div[class*="from-blue-900"] p {
+  color: #535E56 !important;
+}
+
+/* Badges inside headers */
+.superadmin-theme div[class*="from-slate-900"] .rounded-full,
+.superadmin-theme div[class*="from-blue-900"] .rounded-full,
+.superadmin-theme .inline-flex.rounded-full {
+  background-color: #CFE0D2 !important;
+  color: #122018 !important;
+  border: 1px solid #B8CBBE !important;
+}
+
+.superadmin-theme div[class*="from-slate-900"] .rounded-full *,
+.superadmin-theme div[class*="from-blue-900"] .rounded-full *,
+.superadmin-theme .inline-flex.rounded-full * {
+  color: #122018 !important;
+  stroke: #122018 !important;
+}
+
+/* Button Gradients (e.g. from-indigo-500 to-cyan-500) */
+.superadmin-theme button[class*="from-indigo-500"],
+.superadmin-theme button[class*="from-blue-500"],
+.superadmin-theme button[class*="from-cyan-500"],
+.superadmin-theme button[class*="to-cyan-500"],
+.superadmin-theme button[class*="to-cyan-400"] {
+  background: #B8CBBE !important;
+  color: #122018 !important;
+  border: 1px solid #A2B8AA !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.07) !important;
+  font-weight: 700 !important;
+}
+
+.superadmin-theme button[class*="from-indigo-500"]:hover,
+.superadmin-theme button[class*="from-blue-500"]:hover,
+.superadmin-theme button[class*="from-cyan-500"]:hover {
+  background: #CFE0D2 !important;
+  color: #0B1610 !important;
+}
+
+.superadmin-theme button[class*="from-indigo-500"] *,
+.superadmin-theme button[class*="from-blue-500"] * {
+  color: #122018 !important;
+  stroke: #122018 !important;
+}
+

@@ -32,6 +32,7 @@ public class RequisitionProcessingService {
     private final StockReturnRequestRepository stockReturnRequestRepository;
     private final StockReturnItemRepository stockReturnItemRepository;
     private final SupplierTransactionRepository supplierTransactionRepository;
+    private final DistrictProductPricingRepository districtProductPricingRepository;
     private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     @org.springframework.beans.factory.annotation.Value("${stripe.publishable.key:}")
@@ -50,6 +51,7 @@ public class RequisitionProcessingService {
                                         StockReturnRequestRepository stockReturnRequestRepository,
                                         StockReturnItemRepository stockReturnItemRepository,
                                         SupplierTransactionRepository supplierTransactionRepository,
+                                        DistrictProductPricingRepository districtProductPricingRepository,
                                         org.springframework.jdbc.core.JdbcTemplate jdbcTemplate) {
         this.districtRepository = districtRepository;
         this.supplierProfileRepository = supplierProfileRepository;
@@ -64,6 +66,7 @@ public class RequisitionProcessingService {
         this.stockReturnRequestRepository = stockReturnRequestRepository;
         this.stockReturnItemRepository = stockReturnItemRepository;
         this.supplierTransactionRepository = supplierTransactionRepository;
+        this.districtProductPricingRepository = districtProductPricingRepository;
         this.jdbcTemplate = jdbcTemplate;
     }
 
@@ -683,7 +686,10 @@ public class RequisitionProcessingService {
 
                 Product p = productRepository.findById(ir.getProductId()).orElse(null);
                 if (p != null) {
-                    java.math.BigDecimal rate = p.getSupplierPrice() != null ? p.getSupplierPrice() : p.getBasePrice();
+                    Long distId = profile.getPrimaryDistrictId() != null ? profile.getPrimaryDistrictId() : 1L;
+                    Optional<DistrictProductPricing> dpp = districtProductPricingRepository.findByDistrictIdAndProductId(distId, p.getProductId());
+                    java.math.BigDecimal rate = dpp.map(DistrictProductPricing::getSupplierPrice)
+                            .orElse(p.getSupplierPrice() != null ? p.getSupplierPrice() : p.getBasePrice());
                     if (rate != null) {
                         totalAmount = totalAmount.add(rate.multiply(java.math.BigDecimal.valueOf(ir.getRequestedQuantity())));
                     }
@@ -896,11 +902,16 @@ public class RequisitionProcessingService {
         java.math.BigDecimal originalSubtotal = java.math.BigDecimal.ZERO;
         java.math.BigDecimal fulfilledSubtotal = java.math.BigDecimal.ZERO;
 
+        SupplierProfile reqSupplier = supplierProfileRepository.findById(req.getSupplierId()).orElse(null);
+        Long reqDistId = (reqSupplier != null && reqSupplier.getPrimaryDistrictId() != null) ? reqSupplier.getPrimaryDistrictId() : 1L;
+
         for (StockRequisitionItem item : items) {
             Product p = productRepository.findById(item.getProductId()).orElse(null);
-            java.math.BigDecimal price = (p != null && p.getSupplierPrice() != null)
-                    ? p.getSupplierPrice()
-                    : (p != null && p.getBasePrice() != null ? p.getBasePrice() : java.math.BigDecimal.valueOf(48.0));
+            Optional<DistrictProductPricing> dpp = districtProductPricingRepository.findByDistrictIdAndProductId(reqDistId, item.getProductId());
+            java.math.BigDecimal price = dpp.map(DistrictProductPricing::getSupplierPrice)
+                    .orElse(p != null && p.getSupplierPrice() != null
+                            ? p.getSupplierPrice()
+                            : (p != null && p.getBasePrice() != null ? p.getBasePrice() : java.math.BigDecimal.valueOf(48.0)));
             int reqQty = item.getRequestedQuantity() != null ? item.getRequestedQuantity() : 0;
             int appQty = item.getApprovedQuantity() != null ? item.getApprovedQuantity() : 0;
 
@@ -1205,7 +1216,10 @@ public class RequisitionProcessingService {
                     i.setSizeVolume(p.getSizeVolume());
                     i.setSku(p.getSku());
                     i.setCategory(p.getCategory() != null ? p.getCategory() : "Beverages");
-                    java.math.BigDecimal supplierRate = p.getSupplierPrice() != null ? p.getSupplierPrice() : p.getBasePrice();
+                    Long distId = (sp != null && sp.getPrimaryDistrictId() != null) ? sp.getPrimaryDistrictId() : (req.getDistrictId() != null ? req.getDistrictId() : 1L);
+                    Optional<DistrictProductPricing> dpp = districtProductPricingRepository.findByDistrictIdAndProductId(distId, p.getProductId());
+                    java.math.BigDecimal supplierRate = dpp.map(DistrictProductPricing::getSupplierPrice)
+                            .orElse(p.getSupplierPrice() != null ? p.getSupplierPrice() : p.getBasePrice());
                     i.setBasePrice(supplierRate);
 
                     java.math.BigDecimal price = supplierRate != null ? supplierRate : java.math.BigDecimal.valueOf(48.0);
@@ -1326,7 +1340,10 @@ public class RequisitionProcessingService {
                 i.setSizeVolume(p.getSizeVolume());
                 i.setSku(p.getSku());
                 i.setCategory(p.getCategory() != null ? p.getCategory() : "Beverages");
-                java.math.BigDecimal supplierRate = p.getSupplierPrice() != null ? p.getSupplierPrice() : p.getBasePrice();
+                Long distId = (sp != null && sp.getPrimaryDistrictId() != null) ? sp.getPrimaryDistrictId() : (req.getDistrictId() != null ? req.getDistrictId() : 1L);
+                Optional<DistrictProductPricing> dpp = districtProductPricingRepository.findByDistrictIdAndProductId(distId, p.getProductId());
+                java.math.BigDecimal supplierRate = dpp.map(DistrictProductPricing::getSupplierPrice)
+                        .orElse(p.getSupplierPrice() != null ? p.getSupplierPrice() : p.getBasePrice());
                 i.setBasePrice(supplierRate);
 
                 java.math.BigDecimal price = supplierRate != null ? supplierRate : java.math.BigDecimal.valueOf(48.0);

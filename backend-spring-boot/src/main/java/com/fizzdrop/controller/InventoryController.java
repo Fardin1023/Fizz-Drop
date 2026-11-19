@@ -3,11 +3,13 @@ package com.fizzdrop.controller;
 import com.fizzdrop.dto.ApiResponse;
 import com.fizzdrop.dto.SupplyRequest;
 import com.fizzdrop.entity.DistrictInventory;
+import com.fizzdrop.entity.DistrictProductPricing;
 import com.fizzdrop.entity.Outlet;
 import com.fizzdrop.entity.Product;
 import com.fizzdrop.entity.ShopInventory;
 import com.fizzdrop.entity.SupplierProfile;
 import com.fizzdrop.repository.DistrictInventoryRepository;
+import com.fizzdrop.repository.DistrictProductPricingRepository;
 import com.fizzdrop.repository.OutletRepository;
 import com.fizzdrop.repository.ProductRepository;
 import com.fizzdrop.repository.ShopInventoryRepository;
@@ -44,6 +46,7 @@ public class InventoryController {
     private final SupplierTransactionRepository supplierTransactionRepository;
     private final SalesOfficerRepository salesOfficerRepository;
     private final PreSalesOfficerRepository psrRepository;
+    private final DistrictProductPricingRepository districtProductPricingRepository;
 
     public InventoryController(ShopInventoryRepository inventoryRepository,
                                ProductRepository productRepository,
@@ -54,7 +57,8 @@ public class InventoryController {
                                AppNotificationRepository notificationRepository,
                                SupplierTransactionRepository supplierTransactionRepository,
                                SalesOfficerRepository salesOfficerRepository,
-                               PreSalesOfficerRepository psrRepository) {
+                               PreSalesOfficerRepository psrRepository,
+                               DistrictProductPricingRepository districtProductPricingRepository) {
         this.inventoryRepository = inventoryRepository;
         this.productRepository = productRepository;
         this.outletRepository = outletRepository;
@@ -65,6 +69,7 @@ public class InventoryController {
         this.supplierTransactionRepository = supplierTransactionRepository;
         this.salesOfficerRepository = salesOfficerRepository;
         this.psrRepository = psrRepository;
+        this.districtProductPricingRepository = districtProductPricingRepository;
     }
 
     /**
@@ -587,6 +592,11 @@ public class InventoryController {
             invMap.put(si.getProductId(), si);
         }
 
+        Long distId = outlet.getDistrictId() != null ? outlet.getDistrictId() : 1L;
+        List<DistrictProductPricing> distPricing = districtProductPricingRepository.findByDistrictId(distId);
+        Map<Long, DistrictProductPricing> pricingMap = distPricing.stream()
+                .collect(Collectors.toMap(DistrictProductPricing::getProductId, dp -> dp, (a, b) -> a));
+
         List<Map<String, Object>> productList = new ArrayList<>();
         int totalUnits = 0;
         int lowStockCount = 0;
@@ -599,6 +609,11 @@ public class InventoryController {
             if (stock == 0) outOfStockCount++;
             else if (stock <= 15) lowStockCount++;
 
+            DistrictProductPricing dpp = pricingMap.get(p.getProductId());
+            BigDecimal supPrice = (dpp != null && dpp.getSupplierPrice() != null) ? dpp.getSupplierPrice() : (p.getSupplierPrice() != null ? p.getSupplierPrice() : p.getBasePrice());
+            BigDecimal outPrice = (dpp != null && dpp.getOutletPrice() != null) ? dpp.getOutletPrice() : (p.getOutletPrice() != null ? p.getOutletPrice() : (p.getBasePrice() != null ? p.getBasePrice().multiply(BigDecimal.valueOf(1.15)).setScale(2, java.math.RoundingMode.HALF_UP) : BigDecimal.valueOf(30)));
+            BigDecimal retPrice = (dpp != null && dpp.getRetailPrice() != null) ? dpp.getRetailPrice() : (p.getRetailPrice() != null ? p.getRetailPrice() : (p.getBasePrice() != null ? p.getBasePrice().multiply(BigDecimal.valueOf(1.32)).setScale(2, java.math.RoundingMode.HALF_UP) : BigDecimal.valueOf(35)));
+
             Map<String, Object> pMap = new HashMap<>();
             pMap.put("product_id", p.getProductId());
             pMap.put("brand", p.getBrand());
@@ -606,10 +621,10 @@ public class InventoryController {
             pMap.put("packaging", p.getPackaging());
             pMap.put("size_volume", p.getSizeVolume());
             pMap.put("sku", p.getSku());
-            pMap.put("base_price", p.getBasePrice());
-            pMap.put("supplier_price", p.getSupplierPrice() != null ? p.getSupplierPrice() : p.getBasePrice());
-            pMap.put("outlet_price", p.getOutletPrice() != null ? p.getOutletPrice() : (p.getBasePrice() != null ? p.getBasePrice().multiply(BigDecimal.valueOf(1.15)).setScale(2, java.math.RoundingMode.HALF_UP) : BigDecimal.valueOf(30)));
-            pMap.put("retail_price", p.getRetailPrice() != null ? p.getRetailPrice() : (p.getBasePrice() != null ? p.getBasePrice().multiply(BigDecimal.valueOf(1.32)).setScale(2, java.math.RoundingMode.HALF_UP) : BigDecimal.valueOf(35)));
+            pMap.put("base_price", supPrice);
+            pMap.put("supplier_price", supPrice);
+            pMap.put("outlet_price", outPrice);
+            pMap.put("retail_price", retPrice);
             pMap.put("category", p.getCategory());
             pMap.put("image_url", p.getImageUrl());
             pMap.put("stock_quantity", stock);
@@ -739,8 +754,11 @@ public class InventoryController {
         }
         inventoryRepository.save(inv);
 
-        // Calculate pricing - Tier 3: Outlet sells to customer at retail_price (MRP)
-        BigDecimal unitPrice = product.getRetailPrice() != null ? product.getRetailPrice() : (product.getBasePrice() != null ? product.getBasePrice() : BigDecimal.valueOf(25.0));
+        // Calculate pricing - Tier 3: Outlet sells to customer at retail_price (MRP for this outlet's district)
+        Long distId = outlet.getDistrictId() != null ? outlet.getDistrictId() : 1L;
+        Optional<DistrictProductPricing> dpp = districtProductPricingRepository.findByDistrictIdAndProductId(distId, productId);
+        BigDecimal unitPrice = dpp.map(DistrictProductPricing::getRetailPrice)
+                .orElse(product.getRetailPrice() != null ? product.getRetailPrice() : (product.getBasePrice() != null ? product.getBasePrice() : BigDecimal.valueOf(25.0)));
         BigDecimal totalAmount = unitPrice.multiply(BigDecimal.valueOf(qty));
         String paymentMethod = req.getOrDefault("payment_method", "Cash").toString();
         String customerNotes = req.getOrDefault("customer_notes", "").toString();
@@ -859,7 +877,10 @@ public class InventoryController {
         String reqCode = "OUT-REQ-" + (System.currentTimeMillis() % 1000000);
         String prodName = product.getBrand() + " " + product.getFlavorVariant();
 
-        BigDecimal unitPrice = product.getOutletPrice() != null ? product.getOutletPrice() : product.getBasePrice();
+        Long distId = outlet.getDistrictId() != null ? outlet.getDistrictId() : 1L;
+        Optional<DistrictProductPricing> dpp = districtProductPricingRepository.findByDistrictIdAndProductId(distId, productId);
+        BigDecimal unitPrice = dpp.map(DistrictProductPricing::getOutletPrice)
+                .orElse(product.getOutletPrice() != null ? product.getOutletPrice() : product.getBasePrice());
         BigDecimal totalAmount = unitPrice != null ? unitPrice.multiply(BigDecimal.valueOf(qty)) : BigDecimal.ZERO;
 
         // Resolve assigned Pre-Sales Officer
@@ -1466,13 +1487,13 @@ public class InventoryController {
         try {
             // 1. Resolve Supplier & District
             SupplierProfile supplier = null;
-            if (userId != null && userId > 0) {
-                supplier = supplierProfileRepository.findByUserId(userId).orElse(null);
-            }
-            if (supplier == null && supplierId != null && supplierId > 0) {
+            if (supplierId != null && supplierId > 0) {
                 supplier = supplierProfileRepository.findById(supplierId).orElse(null);
             }
-            if (supplier == null && userId == null && supplierId == null) {
+            if (supplier == null && userId != null && userId > 0) {
+                supplier = supplierProfileRepository.findByUserId(userId).orElse(null);
+            }
+            if (supplier == null) {
                 supplier = supplierProfileRepository.findAll().stream().findFirst().orElse(null);
             }
             Long districtId = (supplier != null && supplier.getPrimaryDistrictId() != null) ? supplier.getPrimaryDistrictId() : 1L;
@@ -1803,6 +1824,27 @@ public class InventoryController {
             summary.put("categories_count", activeCategoriesCount);
 
             Map<String, Object> response = new HashMap<>();
+            if (supplier != null) {
+                Map<String, Object> supInfo = new HashMap<>();
+                supInfo.put("id", supplier.getId());
+                supInfo.put("business_name", supplier.getBusinessName());
+                supInfo.put("depot_address", supplier.getDepotAddress());
+                supInfo.put("division_name", supplier.getDivisionName());
+                supInfo.put("primary_district_id", supplier.getPrimaryDistrictId());
+                response.put("supplier_info", supInfo);
+            }
+            List<Map<String, Object>> allSuppliers = supplierProfileRepository.findAll().stream()
+                .map(sp -> {
+                    Map<String, Object> sm = new HashMap<>();
+                    sm.put("id", sp.getId());
+                    sm.put("business_name", sp.getBusinessName());
+                    sm.put("division_name", sp.getDivisionName());
+                    sm.put("depot_address", sp.getDepotAddress());
+                    return sm;
+                })
+                .collect(Collectors.toList());
+            response.put("all_suppliers", allSuppliers);
+
             response.put("summary", summary);
             response.put("product_breakdown", productBreakdown);
             response.put("superadmin_purchased_inventory", superadminPurchasedInventory);

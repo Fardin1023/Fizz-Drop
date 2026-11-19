@@ -128,16 +128,16 @@ export const SuperadminMerchandiseCatalog: React.FC = () => {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* 1. Header Section */}
-      <div className="p-6 rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white shadow-xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="p-6 rounded-3xl bg-[#F2E6D5] text-[#101B14] shadow-xs border border-[#D9CBB8] flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 text-xs font-bold uppercase tracking-wider mb-2">
-            <Sparkles className="w-3.5 h-3.5" />
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#CFE0D2] border border-[#B8CBBE] text-[#122018] text-xs font-bold uppercase tracking-wider mb-2">
+            <Sparkles className="w-3.5 h-3.5 text-[#122018]" />
             Superadmin Merchandise Control Center
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-[#101B14]">
             Official Merchandise & Lifestyle Products
           </h1>
-          <p className="text-sm text-indigo-200/80 mt-1 max-w-2xl">
+          <p className="text-sm text-[#535E56] mt-1 max-w-2xl">
             Manage co-branded apparel, biker jackets, aerodynamic helmets, racing sport bikes, and collectibles with dedicated stock & spec tables.
           </p>
         </div>
@@ -146,19 +146,19 @@ export const SuperadminMerchandiseCatalog: React.FC = () => {
           <button
             onClick={fetchMerchandise}
             disabled={loading}
-            className="p-3 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/10 text-white transition-all cursor-pointer"
+            className="p-3 rounded-2xl bg-[#FFF9F0] hover:bg-[#CFE0D2] border border-[#D9CBB8] text-[#19241D] transition-all cursor-pointer"
             title="Refresh Catalog"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 text-[#19241D] ${loading ? 'animate-spin' : ''}`} />
           </button>
           <button
             onClick={() => {
               setEditingItem(null);
               setIsModalOpen(true);
             }}
-            className="px-5 py-3 rounded-2xl bg-gradient-to-r from-indigo-500 to-cyan-500 hover:from-indigo-400 hover:to-cyan-400 text-slate-950 font-bold text-xs shadow-lg shadow-indigo-500/25 transition-all flex items-center gap-2 cursor-pointer shrink-0"
+            className="px-5 py-3 rounded-2xl bg-[#B8CBBE] hover:bg-[#CFE0D2] text-[#122018] font-bold text-xs shadow-xs border border-[#A2B8AA] transition-all flex items-center gap-2 cursor-pointer shrink-0"
           >
-            <Plus className="w-4 h-4 stroke-[3]" />
+            <Plus className="w-4 h-4 stroke-[3] text-[#122018]" />
             Add Merchandise Product
           </button>
         </div>
@@ -166,76 +166,76 @@ export const SuperadminMerchandiseCatalog: React.FC = () => {
 
       {/* 2. Analytical Metric Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex items-center gap-3.5">
-          <div className="p-3 rounded-xl bg-indigo-50 text-indigo-600">
-            <Package className="w-5 h-5" />
+        <div className="p-4 rounded-2xl bg-[#FFF9F0] border border-[#D9CBB8] shadow-xs flex items-center gap-3.5">
+          <div className="p-3 rounded-xl bg-[#CFE0D2] text-[#16241C] border border-[#B8CBBE]">
+            <Package className="w-5 h-5 text-[#16241C]" />
           </div>
           <div>
-            <span className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+            <span className="block text-[11px] font-bold text-[#535E56] uppercase tracking-wider">
               Total Merchandise
             </span>
-            <span className="text-xl font-black text-slate-900">{totalItems} Models</span>
+            <span className="text-xl font-black text-[#101B14]">{totalItems} Models</span>
           </div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex items-center gap-3.5">
-          <div className="p-3 rounded-xl bg-cyan-50 text-cyan-600">
-            <Boxes className="w-5 h-5" />
+        <div className="p-4 rounded-2xl bg-[#FFF9F0] border border-[#D9CBB8] shadow-xs flex items-center gap-3.5">
+          <div className="p-3 rounded-xl bg-[#CFE0D2] text-[#16241C] border border-[#B8CBBE]">
+            <Boxes className="w-5 h-5 text-[#16241C]" />
           </div>
           <div>
-            <span className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+            <span className="block text-[11px] font-bold text-[#535E56] uppercase tracking-wider">
               Stock In Hand
             </span>
-            <span className="text-xl font-black text-slate-900">{totalStock.toLocaleString()} Units</span>
+            <span className="text-xl font-black text-[#101B14]">{totalStock.toLocaleString()} Units</span>
           </div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex items-center gap-3.5">
-          <div className="p-3 rounded-xl bg-emerald-50 text-emerald-600">
-            <DollarSign className="w-5 h-5" />
+        <div className="p-4 rounded-2xl bg-[#FFF9F0] border border-[#D9CBB8] shadow-xs flex items-center gap-3.5">
+          <div className="p-3 rounded-xl bg-[#CFE0D2] text-[#16241C] border border-[#B8CBBE]">
+            <DollarSign className="w-5 h-5 text-[#16241C]" />
           </div>
           <div>
-            <span className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+            <span className="block text-[11px] font-bold text-[#535E56] uppercase tracking-wider">
               Inventory Valuation
             </span>
-            <span className="text-xl font-black text-slate-900">৳{totalValuation.toLocaleString()}</span>
+            <span className="text-xl font-black text-[#101B14]">৳{totalValuation.toLocaleString()}</span>
           </div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex items-center gap-3.5">
-          <div className="p-3 rounded-xl bg-purple-50 text-purple-600">
-            <Layers className="w-5 h-5" />
+        <div className="p-4 rounded-2xl bg-[#FFF9F0] border border-[#D9CBB8] shadow-xs flex items-center gap-3.5">
+          <div className="p-3 rounded-xl bg-[#CFE0D2] text-[#16241C] border border-[#B8CBBE]">
+            <Layers className="w-5 h-5 text-[#16241C]" />
           </div>
           <div>
-            <span className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+            <span className="block text-[11px] font-bold text-[#535E56] uppercase tracking-wider">
               Active Brands
             </span>
-            <span className="text-xl font-black text-slate-900">{activeBrandCount} Brands</span>
+            <span className="text-xl font-black text-[#101B14]">{activeBrandCount} Brands</span>
           </div>
         </div>
       </div>
 
       {/* 3. Search & Filters Bar */}
-      <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+      <div className="p-4 rounded-2xl bg-[#FFF9F0] border border-[#D9CBB8] shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
         {/* Search */}
         <div className="relative flex-1">
-          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#535E56]" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search merchandise by title, brand, or SKU..."
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#D9CBB8] bg-[#FFF9F0] text-xs text-[#19241D] placeholder-[#6E7870] focus:outline-none focus:ring-2 focus:ring-[#CFE0D2]"
           />
         </div>
 
         {/* Brand Dropdown */}
         <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-slate-400 shrink-0" />
+          <Filter className="w-4 h-4 text-[#535E56] shrink-0" />
           <select
             value={selectedBrand}
             onChange={(e) => setSelectedBrand(e.target.value)}
-            className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+            className="px-3 py-2 rounded-xl border border-[#D9CBB8] text-xs font-semibold text-[#19241D] bg-[#FFF9F0] focus:outline-none focus:ring-2 focus:ring-[#CFE0D2] cursor-pointer"
           >
             {distinctBrands.map((b) => (
               <option key={b} value={b}>
@@ -245,11 +245,11 @@ export const SuperadminMerchandiseCatalog: React.FC = () => {
           </select>
 
           {/* Grid / Table Mode */}
-          <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+          <div className="flex items-center bg-[#F2E6D5] p-1 rounded-xl border border-[#D9CBB8]">
             <button
               onClick={() => setViewMode('grid')}
               className={`p-1.5 rounded-lg transition-all cursor-pointer ${
-                viewMode === 'grid' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                viewMode === 'grid' ? 'bg-[#B8CBBE] text-[#122018] shadow-xs font-bold' : 'text-[#535E56] hover:text-[#122018] hover:bg-[#CFE0D2]/50'
               }`}
               title="Grid View"
             >
@@ -258,7 +258,7 @@ export const SuperadminMerchandiseCatalog: React.FC = () => {
             <button
               onClick={() => setViewMode('table')}
               className={`p-1.5 rounded-lg transition-all cursor-pointer ${
-                viewMode === 'table' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                viewMode === 'table' ? 'bg-[#B8CBBE] text-[#122018] shadow-xs font-bold' : 'text-[#535E56] hover:text-[#122018] hover:bg-[#CFE0D2]/50'
               }`}
               title="Table View"
             >
@@ -278,8 +278,8 @@ export const SuperadminMerchandiseCatalog: React.FC = () => {
               onClick={() => setSelectedType(type)}
               className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
                 isSelected
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
-                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                  ? 'bg-[#B8CBBE] text-[#122018] border border-[#9EB4A4] shadow-xs'
+                  : 'bg-[#FFF9F0] border border-[#D9CBB8] text-[#3E352C] hover:bg-[#CFE0D2] hover:text-[#122018]'
               }`}
             >
               {type}

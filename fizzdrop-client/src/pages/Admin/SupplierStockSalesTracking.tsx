@@ -148,13 +148,23 @@ export const SupplierStockSalesTracking: React.FC<SupplierStockSalesTrackingProp
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('ALL');
   const [viewTab, setViewTab] = useState<'superadmin-purchases' | 'products' | 'officers' | 'ledger'>('superadmin-purchases');
 
-  const fetchData = async () => {
+  const [currentSupplier, setCurrentSupplier] = useState<any>(null);
+  const [allSuppliers, setAllSuppliers] = useState<any[]>([]);
+  const [selectedSupplierId, setSelectedSupplierId] = useState<number | undefined>(undefined);
+
+  const fetchData = async (overrideSupId?: number) => {
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:8080/api/inventory/supplier/sold-vs-dispatched?userId=${userId}`);
+      const targetSupId = overrideSupId !== undefined ? overrideSupId : selectedSupplierId;
+      const url = targetSupId
+        ? `http://localhost:8080/api/inventory/supplier/sold-vs-dispatched?userId=${userId}&supplierId=${targetSupId}`
+        : `http://localhost:8080/api/inventory/supplier/sold-vs-dispatched?userId=${userId}`;
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
         if (data.summary) setSummary(data.summary);
+        if (data.supplier_info) setCurrentSupplier(data.supplier_info);
+        if (Array.isArray(data.all_suppliers)) setAllSuppliers(data.all_suppliers);
         if (Array.isArray(data.superadmin_purchased_inventory)) setSuperadminPurchased(data.superadmin_purchased_inventory);
         if (Array.isArray(data.category_breakdown)) setCategoryBreakdown(data.category_breakdown);
         if (Array.isArray(data.product_breakdown)) setProducts(data.product_breakdown);
@@ -246,9 +256,17 @@ export const SupplierStockSalesTracking: React.FC<SupplierStockSalesTrackingProp
         <div className="absolute top-0 right-0 -mt-6 -mr-6 w-52 h-52 bg-white/10 rounded-full blur-2xl pointer-events-none" />
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md text-blue-100 text-xs font-semibold mb-2.5 border border-white/20">
-              <Boxes className="w-3.5 h-3.5 text-blue-300" />
-              <span>Superadmin Purchases & Field Fulfillment Ledger</span>
+            <div className="flex items-center gap-2 flex-wrap mb-2.5">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md text-blue-100 text-xs font-semibold border border-white/20">
+                <Boxes className="w-3.5 h-3.5 text-blue-300" />
+                <span>Superadmin Purchases & Field Fulfillment Ledger</span>
+              </div>
+              {currentSupplier?.business_name && (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/25 backdrop-blur-md text-emerald-100 text-xs font-bold border border-emerald-400/30">
+                  <Warehouse className="w-3.5 h-3.5 text-emerald-300" />
+                  <span>Depot: {currentSupplier.business_name}</span>
+                </div>
+              )}
             </div>
             <h1 className="text-2xl sm:text-3xl font-black font-oswald tracking-tight uppercase">
               Superadmin Purchased Stock & Sales Tracking
@@ -258,9 +276,30 @@ export const SupplierStockSalesTracking: React.FC<SupplierStockSalesTrackingProp
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+            {allSuppliers && allSuppliers.length > 1 && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/20 hover:bg-white/25 border border-white/25 shadow-sm text-xs font-bold transition-all">
+                <Warehouse className="w-3.5 h-3.5 text-blue-200" />
+                <select
+                  value={selectedSupplierId || (currentSupplier?.id ?? '')}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setSelectedSupplierId(val);
+                    fetchData(val);
+                  }}
+                  className="bg-transparent text-white font-bold text-xs outline-none cursor-pointer pr-1 [&>option]:text-gray-900"
+                  title="Switch Supplier Hub / Depot"
+                >
+                  {allSuppliers.map((sup: any) => (
+                    <option key={sup.id} value={sup.id}>
+                      {sup.business_name || `Supplier #${sup.id}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <button
-              onClick={fetchData}
+              onClick={() => fetchData()}
               disabled={loading}
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 text-white text-xs font-bold transition-all border border-white/25 shadow-sm cursor-pointer"
               title="Refresh tracking data"

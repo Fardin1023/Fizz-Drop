@@ -27,6 +27,7 @@ public class SalesOfficerController {
     private final ProductRepository productRepository;
     private final ShopInventoryRepository shopInventoryRepository;
     private final DistrictInventoryRepository districtInventoryRepository;
+    private final DistrictProductPricingRepository districtProductPricingRepository;
     private final JdbcTemplate jdbcTemplate;
     private final AppNotificationRepository notificationRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -39,6 +40,7 @@ public class SalesOfficerController {
                                   ProductRepository productRepository,
                                   ShopInventoryRepository shopInventoryRepository,
                                   DistrictInventoryRepository districtInventoryRepository,
+                                  DistrictProductPricingRepository districtProductPricingRepository,
                                   JdbcTemplate jdbcTemplate,
                                   AppNotificationRepository notificationRepository) {
         this.notificationRepository = notificationRepository;
@@ -50,6 +52,7 @@ public class SalesOfficerController {
         this.productRepository = productRepository;
         this.shopInventoryRepository = shopInventoryRepository;
         this.districtInventoryRepository = districtInventoryRepository;
+        this.districtProductPricingRepository = districtProductPricingRepository;
         this.jdbcTemplate = jdbcTemplate;
     }
 
@@ -501,10 +504,11 @@ public class SalesOfficerController {
             pm.put("flavor_variant", p.getFlavorVariant());
             pm.put("category", p.getCategory());
             pm.put("sku", p.getSku());
-            pm.put("base_price", p.getBasePrice());
-            pm.put("supplier_price", p.getSupplierPrice());
-            pm.put("outlet_price", p.getOutletPrice());
-            pm.put("retail_price", p.getRetailPrice());
+            Optional<DistrictProductPricing> dpp = districtProductPricingRepository.findByDistrictIdAndProductId(districtId, p.getProductId());
+            pm.put("base_price", dpp.map(DistrictProductPricing::getSupplierPrice).orElse(p.getBasePrice()));
+            pm.put("supplier_price", dpp.map(DistrictProductPricing::getSupplierPrice).orElse(p.getSupplierPrice()));
+            pm.put("outlet_price", dpp.map(DistrictProductPricing::getOutletPrice).orElse(p.getOutletPrice()));
+            pm.put("retail_price", dpp.map(DistrictProductPricing::getRetailPrice).orElse(p.getRetailPrice()));
             pm.put("image_url", p.getImageUrl());
 
             // District buffer stock
@@ -868,7 +872,10 @@ public class SalesOfficerController {
                     .orElseThrow(() -> new IllegalArgumentException("Target Supplier not found with ID: " + finalSupplierId));
 
             String reqCode = "SO-REQ-" + (100000 + new Random().nextInt(900000));
-            BigDecimal unitPrice = product.getOutletPrice() != null ? product.getOutletPrice() : (product.getBasePrice() != null ? product.getBasePrice() : BigDecimal.ZERO);
+            Long targetDistrictId = supplier.getPrimaryDistrictId() != null ? supplier.getPrimaryDistrictId() : 1L;
+            BigDecimal unitPrice = districtProductPricingRepository.findByDistrictIdAndProductId(targetDistrictId, productId)
+                    .map(DistrictProductPricing::getOutletPrice)
+                    .orElse(product.getOutletPrice() != null ? product.getOutletPrice() : (product.getBasePrice() != null ? product.getBasePrice() : BigDecimal.ZERO));
             BigDecimal totalAmount = unitPrice.multiply(BigDecimal.valueOf(quantity));
 
             // Sales Officer buffer stock purchase is separate and not assigned to any outlet yet

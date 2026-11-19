@@ -78,6 +78,96 @@ public class DeliveryController {
         }
     }
 
+    // Helper method to resolve Supplier IDs for a given RSM hierarchy: RSM -> ASMs -> SOs -> Suppliers
+    private Set<Long> getSupplierIdsForRsm(Long rsmId, Long asmId) {
+        Set<Long> supplierIds = new HashSet<>();
+        if (rsmId == null || rsmId <= 0) return supplierIds;
+        try {
+            List<Map<String, Object>> rsmRows = jdbcTemplate.queryForList(
+                "SELECT id, code, name, division FROM regional_sales_managers WHERE id = ?",
+                rsmId
+            );
+            if (rsmRows.isEmpty()) {
+                return supplierIds;
+            }
+            String division = (String) rsmRows.get(0).get("division");
+
+            Set<Long> districtIds = new HashSet<>();
+            if (asmId != null && asmId > 0) {
+                List<Map<String, Object>> asmRows = jdbcTemplate.queryForList(
+                    "SELECT district_id FROM area_sales_managers WHERE id = ? AND (rsm_id = ? OR LOWER(TRIM(division)) = LOWER(TRIM(?)))",
+                    asmId, rsmId, division
+                );
+                for (Map<String, Object> asm : asmRows) {
+                    if (asm.get("district_id") != null) {
+                        districtIds.add(((Number) asm.get("district_id")).longValue());
+                    }
+                }
+            } else {
+                List<Map<String, Object>> asmRows = jdbcTemplate.queryForList(
+                    "SELECT district_id FROM area_sales_managers WHERE rsm_id = ? OR LOWER(TRIM(division)) = LOWER(TRIM(?))",
+                    rsmId, division
+                );
+                for (Map<String, Object> asm : asmRows) {
+                    if (asm.get("district_id") != null) {
+                        districtIds.add(((Number) asm.get("district_id")).longValue());
+                    }
+                }
+            }
+
+            // SOs in these districts
+            if (!districtIds.isEmpty()) {
+                String placeholders = String.join(",", Collections.nCopies(districtIds.size(), "?"));
+                List<Map<String, Object>> soRows = jdbcTemplate.queryForList(
+                    "SELECT id, supplier_id, allocated_supplier_ids FROM sales_officers WHERE district_id IN (" + placeholders + ")",
+                    districtIds.toArray()
+                );
+                for (Map<String, Object> so : soRows) {
+                    if (so.get("supplier_id") != null) {
+                        supplierIds.add(((Number) so.get("supplier_id")).longValue());
+                    }
+                    Object alloc = so.get("allocated_supplier_ids");
+                    if (alloc != null) {
+                        String[] parts = alloc.toString().split(",");
+                        for (String p : parts) {
+                            try {
+                                long sid = Long.parseLong(p.trim());
+                                if (sid > 0) supplierIds.add(sid);
+                            } catch (Exception ignored) {}
+                        }
+                    }
+                }
+            }
+
+            // Also suppliers whose division matches RSM division (or primary_district_id in districtIds)
+            if (asmId == null || asmId <= 0) {
+                List<Map<String, Object>> supRows = jdbcTemplate.queryForList(
+                    "SELECT id FROM supplier_profiles WHERE LOWER(TRIM(division_name)) = LOWER(TRIM(?))",
+                    division
+                );
+                for (Map<String, Object> sp : supRows) {
+                    if (sp.get("id") != null) {
+                        supplierIds.add(((Number) sp.get("id")).longValue());
+                    }
+                }
+            } else if (!districtIds.isEmpty()) {
+                String placeholders = String.join(",", Collections.nCopies(districtIds.size(), "?"));
+                List<Map<String, Object>> supRows = jdbcTemplate.queryForList(
+                    "SELECT id FROM supplier_profiles WHERE primary_district_id IN (" + placeholders + ")",
+                    districtIds.toArray()
+                );
+                for (Map<String, Object> sp : supRows) {
+                    if (sp.get("id") != null) {
+                        supplierIds.add(((Number) sp.get("id")).longValue());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[DeliveryController] Failed to resolve suppliers for RSM: " + e.getMessage());
+        }
+        return supplierIds;
+    }
+
     // ==========================================
     // 1. DELIVERY TEAMS & FLEET MANAGEMENT
     // ==========================================
@@ -86,10 +176,27 @@ public class DeliveryController {
     public ResponseEntity<?> getDeliveryTeams(
             @RequestParam(required = false) Long supplierId,
             @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) Long rsmId,
+            @RequestParam(required = false) Long asmId,
             @RequestParam(required = false, defaultValue = "false") boolean all) {
 
         List<Map<String, Object>> teams;
-        if (all) {
+        if (rsmId != null) {
+            Set<Long> supplierIds = getSupplierIdsForRsm(rsmId, asmId);
+            if (supplierIds.isEmpty()) {
+                teams = Collections.emptyList();
+            } else {
+                String placeholders = String.join(",", Collections.nCopies(supplierIds.size(), "?"));
+                teams = jdbcTemplate.queryForList(
+                    "SELECT t.*, s.business_name as supplier_name " +
+                    "FROM supplier_delivery_teams t " +
+                    "LEFT JOIN supplier_profiles s ON t.supplier_id = s.id " +
+                    "WHERE t.supplier_id IN (" + placeholders + ") " +
+                    "ORDER BY t.created_at DESC",
+                    supplierIds.toArray()
+                );
+            }
+        } else if (all) {
             teams = jdbcTemplate.queryForList(
                 "SELECT t.*, s.business_name as supplier_name " +
                 "FROM supplier_delivery_teams t " +
@@ -212,14 +319,20 @@ public class DeliveryController {
             "r.status, r.created_date, p.brand, p.flavor_variant, p.category, p.sku " +
             "FROM outlet_requisitions r " +
             "JOIN products p ON r.product_id = p.product_id " +
-            "WHERE r.status IN ('PENDING', 'APPROVED', 'DISPATCHED') " +
+            "WHERE r.status IN ('PENDING', 'APPROVED', 'DISPATCHED') AND r.outlet_id IS NOT NULL " +
             "ORDER BY r.created_date DESC"
         );
 
         Map<Long, List<Map<String, Object>>> demandsByOutlet = new HashMap<>();
         for (Map<String, Object> d : openDemands) {
-            Long outId = ((Number) d.get("outlet_id")).longValue();
-            demandsByOutlet.computeIfAbsent(outId, k -> new ArrayList<>()).add(d);
+            Object outIdObj = d.get("outlet_id");
+            if (outIdObj == null) {
+                outIdObj = d.get("OUTLET_ID");
+            }
+            if (outIdObj instanceof Number) {
+                Long outId = ((Number) outIdObj).longValue();
+                demandsByOutlet.computeIfAbsent(outId, k -> new ArrayList<>()).add(d);
+            }
         }
 
         // Group outlets by sub_route (fallback to area if sub_route is blank)
@@ -278,17 +391,37 @@ public class DeliveryController {
             @RequestParam(required = false) Long userId,
             @RequestParam(required = false) Long soId,
             @RequestParam(required = false) Long salesOfficerId,
+            @RequestParam(required = false) Long rsmId,
+            @RequestParam(required = false) Long asmId,
             @RequestParam(required = false, defaultValue = "false") boolean all) {
 
         List<Map<String, Object>> list;
         Long targetSoId = soId != null ? soId : salesOfficerId;
-        if (targetSoId != null) {
+        if (rsmId != null) {
+            Set<Long> supplierIds = getSupplierIdsForRsm(rsmId, asmId);
+            if (supplierIds.isEmpty()) {
+                list = Collections.emptyList();
+            } else {
+                String placeholders = String.join(",", Collections.nCopies(supplierIds.size(), "?"));
+                list = jdbcTemplate.queryForList(
+                    "SELECT d.*, t.team_name, t.vehicle_registration_no, t.vehicle_type, t.driver_name, t.driver_phone, t.team_members, " +
+                    "s.business_name as supplier_name " +
+                    "FROM supplier_delivery_dispatches d " +
+                    "LEFT JOIN supplier_delivery_teams t ON d.delivery_team_id = t.id " +
+                    "LEFT JOIN supplier_profiles s ON d.supplier_id = s.id " +
+                    "WHERE d.supplier_id IN (" + placeholders + ") " +
+                    "ORDER BY d.dispatched_at DESC",
+                    supplierIds.toArray()
+                );
+            }
+        } else if (targetSoId != null) {
             List<Map<String, Object>> soRows = jdbcTemplate.queryForList(
                 "SELECT id, supplier_id, assigned_area, city FROM sales_officers WHERE id = ? OR user_id = ?",
                 targetSoId, targetSoId
             );
             if (!soRows.isEmpty()) {
-                Long sId = ((Number) soRows.get(0).get("supplier_id")).longValue();
+                Object supIdVal = soRows.get(0).get("supplier_id");
+                Long sId = (supIdVal instanceof Number) ? ((Number) supIdVal).longValue() : 1L;
                 list = jdbcTemplate.queryForList(
                     "SELECT d.*, t.team_name, t.vehicle_registration_no, t.vehicle_type, t.driver_name, t.driver_phone, t.team_members, " +
                     "s.business_name as supplier_name " +
@@ -502,7 +635,8 @@ public class DeliveryController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail("Dispatch not found."));
         }
         Map<String, Object> trip = rows.get(0);
-        Long teamId = ((Number) trip.get("delivery_team_id")).longValue();
+        Object dtIdObj = trip.get("delivery_team_id");
+        Long teamId = (dtIdObj instanceof Number) ? ((Number) dtIdObj).longValue() : null;
 
         if ("DELIVERED".equalsIgnoreCase(newStatus) || "COMPLETED".equalsIgnoreCase(newStatus)) {
             jdbcTemplate.update(
@@ -510,7 +644,9 @@ public class DeliveryController {
                 newStatus.toUpperCase(), id
             );
             // Free the delivery team back to AVAILABLE
-            jdbcTemplate.update("UPDATE supplier_delivery_teams SET status = 'AVAILABLE', updated_at = NOW() WHERE id = ?", teamId);
+            if (teamId != null) {
+                jdbcTemplate.update("UPDATE supplier_delivery_teams SET status = 'AVAILABLE', updated_at = NOW() WHERE id = ?", teamId);
+            }
         } else {
             jdbcTemplate.update(
                 "UPDATE supplier_delivery_dispatches SET status = ?, updated_at = NOW() WHERE id = ?",
@@ -1351,7 +1487,7 @@ public class DeliveryController {
         }
         Map<String, Object> trip = dispRows.get(0);
         Long teamId = trip.get("team_id") != null ? ((Number) trip.get("team_id")).longValue() : null;
-        Long supplierId = ((Number) trip.get("supplier_id")).longValue();
+        Long supplierId = trip.get("supplier_id") != null ? ((Number) trip.get("supplier_id")).longValue() : 1L;
         String regNo = (String) trip.getOrDefault("vehicle_registration_no", "FLEET");
         String driver = (String) trip.getOrDefault("driver_name", "Driver");
         String driverPhone = (String) trip.getOrDefault("driver_phone", "");
@@ -1625,7 +1761,9 @@ public class DeliveryController {
         Long matchedDispatchId = null;
 
         for (Map<String, Object> disp : dispatches) {
-            Long dId = ((Number) disp.get("id")).longValue();
+            Object dispIdVal = disp.get("id");
+            if (dispIdVal == null) continue;
+            Long dId = ((Number) dispIdVal).longValue();
             matchedDispatchId = dId;
             matchedTeamId = disp.get("delivery_team_id") != null ? ((Number) disp.get("delivery_team_id")).longValue() : matchedTeamId;
             matchedRegNo = disp.get("vehicle_registration_no") != null ? disp.get("vehicle_registration_no").toString() : matchedRegNo;
@@ -1816,7 +1954,8 @@ public class DeliveryController {
         }
 
         Map<String, Object> team = teamRows.get(0);
-        Long resolvedTeamId = ((Number) team.get("id")).longValue();
+        Object teamIdVal = team.get("id");
+        Long resolvedTeamId = (teamIdVal instanceof Number) ? ((Number) teamIdVal).longValue() : 1L;
 
         // Get trips assigned to this team
         List<Map<String, Object>> trips = jdbcTemplate.queryForList(

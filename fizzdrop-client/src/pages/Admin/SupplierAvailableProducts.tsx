@@ -61,57 +61,6 @@ export const SupplierAvailableProducts: React.FC<SupplierAvailableProductsProps>
   // Animated Zero-Stock Alert Modal state
   const [isZeroStockAlertOpen, setIsZeroStockAlertOpen] = useState<boolean>(false);
   const [zeroStockAlertData, setZeroStockAlertData] = useState<ZeroStockAlertData | null>(null);
-  const [priceModalProduct, setPriceModalProduct] = useState<AvailableProduct | null>(null);
-  const [newPriceValue, setNewPriceValue] = useState<number>(0);
-  const [priceSubmitting, setPriceSubmitting] = useState<boolean>(false);
-  const [priceSuccessMsg, setPriceSuccessMsg] = useState<string | null>(null);
-
-  const handleSavePrice = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!priceModalProduct || newPriceValue <= 0) return;
-
-    setPriceSubmitting(true);
-    try {
-      const res = await fetch(`http://localhost:8080/api/products/${priceModalProduct.product_id}/price`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ outlet_price: newPriceValue }),
-      });
-
-      if (!res.ok) throw new Error('Failed to update product pricing');
-
-      // Update local product list
-      setProducts((prev) =>
-        prev.map((item) =>
-          item.product_id === priceModalProduct.product_id
-            ? { ...item, outlet_price: newPriceValue }
-            : item
-        )
-      );
-
-      // Real-time broadcast to Superadmin tabs
-      try {
-        const channel = new BroadcastChannel('fizzdrop_realtime_events');
-        channel.postMessage({
-          type: 'PRICE_UPDATED',
-          product_id: priceModalProduct.product_id,
-          outlet_price: newPriceValue,
-          product_name: `${priceModalProduct.brand} ${priceModalProduct.flavor_variant}`,
-        });
-        setTimeout(() => channel.close(), 100);
-      } catch (e) {}
-
-      setPriceSuccessMsg(
-        `Price for ${priceModalProduct.brand} ${priceModalProduct.flavor_variant} updated to ৳${newPriceValue.toFixed(2)}. Superadmin dashboard has been updated.`
-      );
-      setTimeout(() => setPriceSuccessMsg(null), 4000);
-      setPriceModalProduct(null);
-    } catch (err: any) {
-      alert(err.message || 'Error updating price');
-    } finally {
-      setPriceSubmitting(false);
-    }
-  };
 
   const fetchAvailableProducts = async () => {
     setLoading(true);
@@ -394,7 +343,7 @@ export const SupplierAvailableProducts: React.FC<SupplierAvailableProductsProps>
                   <th className="py-3.5 px-4">Category</th>
                   <th className="py-3.5 px-4">SKU</th>
                   <th className="py-3.5 px-4">Packaging & Size</th>
-                  <th className="py-3.5 px-4">Wholesale Price</th>
+                  <th className="py-3.5 px-4">District Fixed Rates</th>
                   <th className="py-3.5 px-4 text-center bg-emerald-50/70 border-x border-emerald-100 text-emerald-950 font-black">
                     Your Depot Stock (Holding)
                   </th>
@@ -472,9 +421,20 @@ export const SupplierAvailableProducts: React.FC<SupplierAvailableProductsProps>
                               ৳{Number((p as any).outlet_price || (Number(p.base_price) * 1.15)).toFixed(2)}
                             </span>
                           </div>
-                          <span className="text-[9px] font-mono font-bold text-emerald-600 block">
-                            +৳{(Number((p as any).outlet_price || (Number(p.base_price) * 1.15)) - Number((p as any).supplier_price || p.base_price)).toFixed(2)} margin
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] uppercase font-bold text-slate-400">Retail:</span>
+                            <span className="font-mono font-bold text-slate-600 text-xs">
+                              ৳{Number((p as any).retail_price || (Number(p.base_price) * 1.30)).toFixed(2)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between pt-0.5">
+                            <span className="text-[9px] font-mono font-bold text-emerald-600 block">
+                              +৳{(Number((p as any).outlet_price || (Number(p.base_price) * 1.15)) - Number((p as any).supplier_price || p.base_price)).toFixed(2)} margin
+                            </span>
+                            <span className="text-[8px] font-mono px-1 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                              🔒 Superadmin Rate
+                            </span>
+                          </div>
                         </div>
                       </td>
 

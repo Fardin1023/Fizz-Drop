@@ -20,6 +20,9 @@ import {
   RefreshCw,
   Sparkles,
   Eye,
+  ChevronDown,
+  ChevronUp,
+  Minus,
 } from 'lucide-react';
 
 export interface DispatchItem {
@@ -39,6 +42,7 @@ export interface DispatchItem {
   delivered_at?: string;
   outlet_confirmed_at?: string;
   wholesale_profit?: number;
+  reallocated_to_outlet_id?: number;
 }
 
 export interface VehicleDispatch {
@@ -67,12 +71,124 @@ export interface VehicleDispatch {
   items: DispatchItem[];
 }
 
+export interface DistrictOption {
+  id: number;
+  name: string;
+  division: string;
+  asmName?: string;
+  asmCode?: string;
+  asmPhone?: string;
+}
+
+export interface SupplierDepotInfo {
+  districtId: number;
+  districtName: string;
+  division: string;
+  supplierId?: number;
+  supplierName: string;
+  tradeLicense?: string;
+  depotAddress: string;
+  phone: string;
+  coords: [number, number];
+  isPrimaryHub: boolean;
+  isRegisteredSupplier: boolean;
+  coveredDistricts?: string[];
+  asmName?: string;
+  asmCode?: string;
+  asmPhone?: string;
+}
+
 interface DeliveryFleetMapProps {
   dispatches: VehicleDispatch[];
   selectedDispatchId?: number | null;
   onSelectDispatch?: (dispatch: VehicleDispatch) => void;
   height?: string;
+  allowedOutlets?: any[];
+  selectedDistrictId?: number | null;
+  onSelectDistrict?: (districtId: number | null) => void;
+  availableDistricts?: DistrictOption[];
+  suppliers?: any[];
+  divisionName?: string;
 }
+
+// 64 Bangladesh Districts Geo-Centroids & Depot Terminals
+export const BANGLADESH_DISTRICT_DEPOTS: Record<string, { lat: number; lng: number; defaultAddress: string }> = {
+  // Dhaka Division
+  'Dhaka': { lat: 23.7925, lng: 90.4125, defaultAddress: 'Road 11, Plot 42, Gulshan-1 Logistics Depot, Dhaka' },
+  'Gazipur': { lat: 23.9999, lng: 90.4203, defaultAddress: 'Joydebpur Commercial Logistics Terminal, Gazipur' },
+  'Narayanganj': { lat: 23.6238, lng: 90.5000, defaultAddress: 'Chashara Station Road, Narayanganj Central Logistics Depot' },
+  'Tangail': { lat: 24.2513, lng: 89.9167, defaultAddress: 'Victoria Road Commercial Hub, Tangail Sadar Depot' },
+  'Kishoreganj': { lat: 24.4449, lng: 90.7766, defaultAddress: 'Station Road Beverage Logistics Yard, Kishoreganj' },
+  'Manikganj': { lat: 23.8644, lng: 90.0047, defaultAddress: 'Dhaka-Aricha Highway Distribution Hub, Manikganj' },
+  'Munshiganj': { lat: 23.5422, lng: 90.5305, defaultAddress: 'Mirkadim Port Area Supply Hub, Munshiganj' },
+  'Narsingdi': { lat: 23.9193, lng: 90.7202, defaultAddress: 'Velanagar Logistics Terminal, Narsingdi' },
+  'Faridpur': { lat: 23.6071, lng: 89.8429, defaultAddress: 'Goalchamot Central Beverage Depot, Faridpur' },
+  'Gopalganj': { lat: 23.0051, lng: 89.8266, defaultAddress: 'Post Office Road Distribution Center, Gopalganj' },
+  'Madaripur': { lat: 23.1641, lng: 90.1897, defaultAddress: 'Main Road Sadar Logistics Yard, Madaripur' },
+  'Rajbari': { lat: 23.7574, lng: 89.6445, defaultAddress: 'Panbazar Regional Beverage Depot, Rajbari' },
+  'Shariatpur': { lat: 23.2423, lng: 90.4348, defaultAddress: 'Palong Model Town Supply Hub, Shariatpur' },
+  'Mymensingh': { lat: 24.7471, lng: 90.4203, defaultAddress: 'Maskanda Bus Stand Logistics Hub, Mymensingh' },
+  'Jamalpur': { lat: 24.9375, lng: 89.9378, defaultAddress: 'Station Road Regional Beverage Depot, Jamalpur' },
+  'Netrokona': { lat: 24.8709, lng: 90.7279, defaultAddress: 'Choto Bazar Beverage Distribution Yard, Netrokona' },
+  'Sherpur': { lat: 25.0205, lng: 90.0153, defaultAddress: 'Noyaanikbazar Logistics Hub, Sherpur' },
+
+  // Chittagong Division
+  'Chittagong': { lat: 22.3850, lng: 91.8750, defaultAddress: 'Plot B-12, Kalurghat Heavy Industrial Area, Mohara, Chandgaon, Chattogram' },
+  "Cox's Bazar": { lat: 21.4272, lng: 92.0058, defaultAddress: 'Kolatoli Road Distribution Depot, Cox\'s Bazar' },
+  'Comilla': { lat: 23.4607, lng: 91.1809, defaultAddress: 'Paduar Bazar Bishwa Road Supply Hub, Comilla' },
+  'Feni': { lat: 23.0186, lng: 91.3966, defaultAddress: 'Trunk Road Central Logistics Depot, Feni' },
+  'Brahmanbaria': { lat: 23.9571, lng: 91.1119, defaultAddress: 'Kowtoli Road Supply Terminal, Brahmanbaria' },
+  'Rangamati': { lat: 22.6533, lng: 92.1753, defaultAddress: 'Reserve Bazar Logistics Hub, Rangamati' },
+  'Khagrachhari': { lat: 23.1192, lng: 91.9847, defaultAddress: 'Chengi Square Regional Depot, Khagrachhari' },
+  'Bandarban': { lat: 22.1953, lng: 92.2184, defaultAddress: 'Balaghata Logistics Yard, Bandarban' },
+  'Noakhali': { lat: 22.8696, lng: 91.0993, defaultAddress: 'Maijdee Court Distribution Hub, Noakhali' },
+  'Chandpur': { lat: 23.2333, lng: 90.6667, defaultAddress: 'Natun Bazar Riverport Logistics Hub, Chandpur' },
+  'Lakshmipur': { lat: 22.9425, lng: 90.8412, defaultAddress: 'Uttar Bazar Supply Terminal, Lakshmipur' },
+
+  // Rajshahi Division
+  'Rajshahi': { lat: 24.3745, lng: 88.6042, defaultAddress: 'Shiroil Bus Terminal Road, Rajshahi Central Hub' },
+  'Bogra': { lat: 24.8465, lng: 89.3777, defaultAddress: 'Charmatha Central Bus Terminal, Bogra Hub' },
+  'Pabna': { lat: 24.0064, lng: 89.2372, defaultAddress: 'Abdul Hamid Road, Pabna Logistics Yard' },
+  'Sirajganj': { lat: 24.4534, lng: 89.7008, defaultAddress: 'Mujib Sarak, Sirajganj Distribution Hub' },
+  'Naogaon': { lat: 24.7936, lng: 88.9318, defaultAddress: 'Baludanga Bus Stand, Naogaon Depot' },
+  'Natore': { lat: 24.4206, lng: 88.9324, defaultAddress: 'Kanaikhali, Natore Regional Hub' },
+  'Joypurhat': { lat: 25.0968, lng: 89.0227, defaultAddress: 'Railgate Area, Joypurhat Logistics Depot' },
+  'Chapainawabganj': { lat: 24.5965, lng: 88.2775, defaultAddress: 'Shibtala, Chapainawabganj Depot' },
+  'Rangpur': { lat: 25.7439, lng: 89.2752, defaultAddress: 'Modern Mor, Rangpur Central Hub' },
+  'Dinajpur': { lat: 25.6217, lng: 88.6355, defaultAddress: 'Ghashipara, Dinajpur Supply Hub' },
+  'Gaibandha': { lat: 25.3288, lng: 89.5430, defaultAddress: 'Circular Road, Gaibandha Depot' },
+  'Kurigram': { lat: 25.8054, lng: 89.6362, defaultAddress: 'Ghoshpara, Kurigram Regional Depot' },
+  'Lalmonirhat': { lat: 25.9923, lng: 89.2847, defaultAddress: 'Mission Mor, Lalmonirhat Supply Center' },
+  'Nilphamari': { lat: 25.9318, lng: 88.8560, defaultAddress: 'Babri Jhar, Nilphamari Depot' },
+  'Panchagarh': { lat: 26.3411, lng: 88.5542, defaultAddress: 'Dhaka-Banglabandha Hwy, Panchagarh Terminal' },
+  'Thakurgaon': { lat: 26.0337, lng: 88.4617, defaultAddress: 'Old Bus Stand, Thakurgaon Depot' },
+
+  // Khulna Division
+  'Khulna': { lat: 22.8456, lng: 89.5403, defaultAddress: 'Sonadanga Central Bus Terminal, Khulna Logistics Hub' },
+  'Jessore': { lat: 23.1664, lng: 89.2081, defaultAddress: 'Monihar Cinema Mor, Jessore Central Depot' },
+  'Satkhira': { lat: 22.7185, lng: 89.0705, defaultAddress: 'Kalaroa Road, Satkhira Distribution Depot' },
+  'Bagerhat': { lat: 22.6516, lng: 89.7859, defaultAddress: 'Shat Gombuj Road, Bagerhat Supply Hub' },
+  'Kushtia': { lat: 23.9013, lng: 89.1205, defaultAddress: 'Mazampur Gate, Kushtia Regional Depot' },
+  'Jhenaidah': { lat: 23.5450, lng: 89.1726, defaultAddress: 'Payra Chattar, Jhenaidah Logistics Hub' },
+  'Chuadanga': { lat: 23.6402, lng: 88.8418, defaultAddress: 'Court Road, Chuadanga Supply Center' },
+  'Meherpur': { lat: 23.7622, lng: 88.6318, defaultAddress: 'Hospital Road, Meherpur Depot' },
+  'Magura': { lat: 23.4873, lng: 89.4199, defaultAddress: 'Vaina Mor, Magura Distribution Depot' },
+  'Narail': { lat: 23.1725, lng: 89.5127, defaultAddress: 'Rupganj Bazar, Narail Logistics Yard' },
+
+  // Barishal Division
+  'Barisal': { lat: 22.7010, lng: 90.3535, defaultAddress: 'Nathullabad Bus Terminal, Barisal Central Depot' },
+  'Bhola': { lat: 22.6859, lng: 90.6481, defaultAddress: 'Ukhas Road, Bhola Island Supply Hub' },
+  'Jhalokathi': { lat: 22.6406, lng: 90.1987, defaultAddress: 'Palbari, Jhalokathi Logistics Yard' },
+  'Pirojpur': { lat: 22.5841, lng: 89.9720, defaultAddress: 'Baleshwar Riverport Road, Pirojpur Hub' },
+  'Barguna': { lat: 22.0953, lng: 90.1121, defaultAddress: 'Sadar Hospital Road, Barguna Depot' },
+  'Patuakhali': { lat: 22.3596, lng: 90.3298, defaultAddress: 'Chowrasta, Patuakhali Regional Depot' },
+
+  // Sylhet Division
+  'Sylhet': { lat: 24.8949, lng: 91.8687, defaultAddress: 'Kadamtali Bus Terminal Road, Sylhet Logistics Hub' },
+  'Moulvibazar': { lat: 24.4829, lng: 91.7774, defaultAddress: 'Kusumbagh, Moulvibazar Distribution Center' },
+  'Habiganj': { lat: 24.3749, lng: 91.4155, defaultAddress: 'Shayestanagar, Habiganj Regional Depot' },
+  'Sunamganj': { lat: 25.0658, lng: 91.3950, defaultAddress: 'Traffic Point, Sunamganj Beverage Logistics Depot' },
+};
 
 // Sub-route geographic anchor centroids in Bangladesh
 const SUBROUTE_COORDINATES: Record<string, [number, number]> = {
@@ -248,11 +364,105 @@ function buildSegmentPath(p1: [number, number], p2: [number, number], steps = 14
   return segment;
 }
 
+// Render prominent Supplier Depot marker for a district
+function renderSupplierDepotMarker(
+  depot: SupplierDepotInfo,
+  isSelected: boolean,
+  markersGroup: L.LayerGroup,
+  onSelect: (id: number) => void
+) {
+  const depotIcon = L.divIcon({
+    className: 'custom-district-depot-icon',
+    html: `
+      <div class="relative flex flex-col items-center transform -translate-x-1/2 -translate-y-1/2 cursor-pointer group z-40">
+        <!-- Depot Vessel Pin -->
+        <div class="relative flex items-center justify-center w-11 h-11 rounded-2xl ${
+          isSelected
+            ? 'bg-amber-500 border-2 border-white ring-4 ring-amber-400 shadow-2xl scale-110'
+            : depot.isPrimaryHub
+            ? 'bg-indigo-950 border-2 border-indigo-400 shadow-xl'
+            : 'bg-slate-900 border-2 border-cyan-400 shadow-lg'
+        } text-white transition-all group-hover:scale-120" style="background-color: ${
+          isSelected ? '#f59e0b' : depot.isPrimaryHub ? '#1e1b4b' : '#0f172a'
+        } !important; color: #ffffff !important;">
+          <span class="text-lg">🏭</span>
+          ${isSelected ? '<span class="absolute -inset-1.5 rounded-2xl border-2 border-amber-300 animate-ping"></span>' : ''}
+        </div>
+
+        <!-- Depot District Label Pill -->
+        <div class="mt-1 flex flex-col items-center pointer-events-none">
+          <div class="px-2.5 py-0.5 rounded-lg ${
+            isSelected
+              ? 'bg-amber-950/95 border-2 border-amber-400 text-amber-200'
+              : 'bg-slate-900/95 border border-slate-700/80 text-white'
+          } shadow-lg whitespace-nowrap flex items-center gap-1.5" style="background-color: ${
+            isSelected ? 'rgba(69, 26, 3, 0.95)' : 'rgba(15, 23, 42, 0.95)'
+          } !important; color: ${isSelected ? '#fde68a' : '#ffffff'} !important;">
+            <span class="w-2 h-2 rounded-full ${isSelected ? 'bg-amber-400 animate-ping' : 'bg-emerald-400'}"></span>
+            <span class="text-[9px] font-mono font-bold tracking-tight" style="color: ${isSelected ? '#fde68a' : '#ffffff'} !important;">
+              ${depot.districtName} Depot Hub
+            </span>
+          </div>
+          <span class="text-[8px] font-sans px-1.5 py-0.2 rounded mt-0.5 border border-slate-700 shadow-2xs max-w-[170px] truncate" style="color: #f1f5f9 !important; background-color: rgba(15, 23, 42, 0.92) !important;">
+            ${depot.supplierName}
+          </span>
+        </div>
+      </div>
+    `,
+    iconSize: [180, 60],
+    iconAnchor: [90, 22],
+  });
+
+  const marker = L.marker(depot.coords, { icon: depotIcon }).addTo(markersGroup);
+
+  marker.on('click', () => {
+    onSelect(depot.districtId);
+  });
+
+  marker.bindPopup(`
+    <div class="p-3 text-xs font-sans min-w-[240px] max-w-xs" style="color: #0f172a !important;">
+      <div class="flex items-center gap-2 border-b border-slate-200 pb-2 mb-2">
+        <span class="p-2 rounded-xl bg-indigo-100 text-indigo-700 text-lg">🏭</span>
+        <div>
+          <h4 class="font-bold text-slate-900 text-sm" style="color: #0f172a !important;">${depot.districtName} Supplier Depot</h4>
+          <span class="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
+            ${depot.isPrimaryHub ? '★ PRIMARY LOGISTICS DEPOT' : 'REGIONAL DISTRIBUTION DEPOT'}
+          </span>
+        </div>
+      </div>
+      <div class="space-y-1.5 text-slate-600 text-[11px]" style="color: #334155 !important;">
+        <p><strong style="color: #0f172a !important;">Supplier:</strong> <span class="text-slate-900 font-semibold" style="color: #0f172a !important;">${depot.supplierName}</span></p>
+        <p><strong style="color: #0f172a !important;">Depot Address:</strong> <span class="text-slate-700" style="color: #334155 !important;">${depot.depotAddress}</span></p>
+        <p><strong style="color: #0f172a !important;">Contact Phone:</strong> <span class="font-mono text-blue-600 font-bold" style="color: #0284c7 !important;">${depot.phone}</span></p>
+        ${depot.asmName ? `<p><strong style="color: #0f172a !important;">District ASM:</strong> <span class="text-emerald-700 font-bold" style="color: #047857 !important;">${depot.asmName} (${depot.asmCode || ''})</span></p>` : ''}
+        <p><strong style="color: #0f172a !important;">Covered Districts:</strong> <span class="text-slate-500" style="color: #64748b !important;">${depot.coveredDistricts ? depot.coveredDistricts.join(', ') : depot.districtName}</span></p>
+        <p><strong style="color: #0f172a !important;">GPS Location:</strong> <span class="font-mono text-slate-500" style="color: #64748b !important;">${depot.coords[0].toFixed(4)}° N, ${depot.coords[1].toFixed(4)}° E</span></p>
+      </div>
+    </div>
+  `);
+
+  if (isSelected) {
+    setTimeout(() => {
+      try {
+        marker.openPopup();
+      } catch (e) {}
+    }, 350);
+  }
+
+  return marker;
+}
+
 export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
   dispatches,
   selectedDispatchId,
   onSelectDispatch,
   height = '560px',
+  allowedOutlets,
+  selectedDistrictId,
+  onSelectDistrict,
+  availableDistricts,
+  suppliers,
+  divisionName,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -269,6 +479,125 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
 
   // Active focused vehicle reg (null means "All Vehicles (Merged Fleet)")
   const [focusedVehicleReg, setFocusedVehicleReg] = useState<string | null>(null);
+
+  // District Switcher State (switch between districts to view supplier depot location)
+  const [internalDistrictId, setInternalDistrictId] = useState<number | null>(selectedDistrictId ?? null);
+
+  // Minimize states for in-map HUD overlay sections
+  const [isTopLeftMinimized, setIsTopLeftMinimized] = useState<boolean>(false);
+  const [isDepotCardMinimized, setIsDepotCardMinimized] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (selectedDistrictId !== undefined) {
+      setInternalDistrictId(selectedDistrictId);
+    }
+  }, [selectedDistrictId]);
+
+  const handleDistrictChange = (distId: number | null) => {
+    setInternalDistrictId(distId);
+    if (distId !== null) {
+      setIsDepotCardMinimized(false);
+    }
+    if (onSelectDistrict) {
+      onSelectDistrict(distId);
+    }
+  };
+
+  // 64-District Depot Hubs resolution matching suppliers and ASMs
+  const districtDepots: SupplierDepotInfo[] = useMemo(() => {
+    const list: SupplierDepotInfo[] = [];
+
+    // If districts list is provided (e.g. from RSM's ASMs)
+    if (availableDistricts && availableDistricts.length > 0) {
+      availableDistricts.forEach((dist) => {
+        // 1. Direct primary supplier for this district
+        const primarySup = (suppliers || []).find(
+          (s) => s.primary_district_id === dist.id || (s.district_name && s.district_name.toLowerCase() === dist.name.toLowerCase())
+        );
+        // 2. Covering supplier for this district
+        const coveringSup = !primarySup
+          ? (suppliers || []).find((s) => {
+              const cList = s.covered_district_ids_list || [];
+              return cList.includes(dist.id);
+            })
+          : null;
+
+        const matchedSup = primarySup || coveringSup;
+        const baseGeo = BANGLADESH_DISTRICT_DEPOTS[dist.name] || {
+          lat: 23.7925,
+          lng: 90.4078,
+          defaultAddress: `${dist.name} District Beverage Logistics Yard, Bangladesh`,
+        };
+
+        let depotCoords: [number, number] = [baseGeo.lat, baseGeo.lng];
+        let depotAddress = baseGeo.defaultAddress;
+
+        if (matchedSup) {
+          depotAddress = matchedSup.depot_address || baseGeo.defaultAddress;
+          if (primarySup) {
+            if (dist.name === 'Dhaka') {
+              depotCoords = [23.7925, 90.4125];
+            } else if (dist.name === 'Chittagong') {
+              depotCoords = [22.3850, 91.8750];
+            }
+          }
+        }
+
+        list.push({
+          districtId: dist.id,
+          districtName: dist.name,
+          division: dist.division,
+          supplierId: matchedSup?.id,
+          supplierName: matchedSup ? matchedSup.business_name : `${dist.name} Regional Beverage Logistics Hub`,
+          tradeLicense: matchedSup?.trade_license_number || `REG-${dist.name.toUpperCase().slice(0, 3)}-2026`,
+          depotAddress,
+          phone: matchedSup?.phone_number || dist.asmPhone || '+8801700000000',
+          coords: depotCoords,
+          isPrimaryHub: !!primarySup,
+          isRegisteredSupplier: !!matchedSup,
+          coveredDistricts: matchedSup?.assigned_districts
+            ? matchedSup.assigned_districts.map((d: any) => d.name || d)
+            : [dist.name],
+          asmName: dist.asmName,
+          asmCode: dist.asmCode,
+          asmPhone: dist.asmPhone,
+        });
+      });
+      return list;
+    }
+
+    // Fallback if only suppliers are passed
+    if (suppliers && suppliers.length > 0) {
+      suppliers.forEach((s) => {
+        const geo = BANGLADESH_DISTRICT_DEPOTS[s.district_name] || {
+          lat: 23.7925,
+          lng: 90.4125,
+          defaultAddress: s.depot_address || 'Central Logistics Depot Hub',
+        };
+        list.push({
+          districtId: s.primary_district_id || 1,
+          districtName: s.district_name || 'Central District',
+          division: s.division_name || 'Dhaka',
+          supplierId: s.id,
+          supplierName: s.business_name,
+          tradeLicense: s.trade_license_number,
+          depotAddress: s.depot_address || geo.defaultAddress,
+          phone: s.phone_number || 'N/A',
+          coords: [geo.lat, geo.lng],
+          isPrimaryHub: true,
+          isRegisteredSupplier: true,
+          coveredDistricts: (s.assigned_districts || []).map((d: any) => d.name || d),
+        });
+      });
+    }
+
+    return list;
+  }, [availableDistricts, suppliers]);
+
+  const selectedDepot = useMemo(() => {
+    if (!internalDistrictId) return null;
+    return districtDepots.find((d) => d.districtId === internalDistrictId) || null;
+  }, [internalDistrictId, districtDepots]);
 
   // Live metrics of focused vehicle for HUD
   const [focusedTelemetry, setFocusedTelemetry] = useState<{
@@ -306,6 +635,9 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
 
   // Outlets to display when orders are completed or in standby
   const outletsToDisplay = useMemo(() => {
+    if (allowedOutlets && allowedOutlets.length > 0) {
+      return allowedOutlets;
+    }
     if (registeredOutlets.length > 0) {
       return registeredOutlets;
     }
@@ -555,36 +887,50 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
     // WHEN ORDERS ARE COMPLETED: Clear map routes, display ONLY Depot & Outlets
     // =========================================================================
     if (!hasActiveOrders) {
-      // 1. Draw Central Depot Hub Marker
-      const depotCoord = resolveDepotCoordinates('Central Sub-Route', 0);
-      const depotIcon = L.divIcon({
-        className: 'custom-map-icon',
-        html: `
-          <div class="relative flex items-center justify-center w-10 h-10 rounded-2xl bg-indigo-950 border-2 border-indigo-400 shadow-xl text-white transform -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-transform hover:scale-110">
-            <svg class="w-5 h-5 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-            <span class="absolute -bottom-5 font-mono text-[9px] font-black uppercase px-2 py-0.5 rounded bg-indigo-950 text-indigo-200 border border-indigo-700 whitespace-nowrap shadow-xs">
-              Central Depot Hub
+      const allCoords: [number, number][] = [];
+
+      // 1. Draw District Supplier Depots (every district in the region has its depot hub)
+      if (districtDepots.length > 0) {
+        districtDepots.forEach((depot) => {
+          allCoords.push(depot.coords);
+          renderSupplierDepotMarker(
+            depot,
+            internalDistrictId === depot.districtId,
+            markersGroup,
+            handleDistrictChange
+          );
+        });
+      } else {
+        // Fallback default Central Depot Hub Marker
+        const depotCoord = resolveDepotCoordinates('Central Sub-Route', 0);
+        allCoords.push(depotCoord);
+        const depotIcon = L.divIcon({
+          className: 'custom-map-icon',
+          html: `
+            <div class="relative flex items-center justify-center w-10 h-10 rounded-2xl bg-indigo-950 border-2 border-indigo-400 shadow-xl text-white transform -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-transform hover:scale-110" style="background-color: #1e1b4b !important; color: #ffffff !important;">
+              <svg class="w-5 h-5 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+              <span class="absolute -bottom-5 font-mono text-[9px] font-black uppercase px-2 py-0.5 rounded bg-indigo-950 text-indigo-200 border border-indigo-700 whitespace-nowrap shadow-xs" style="background-color: #1e1b4b !important; color: #c7d2fe !important;">
+                Central Depot Hub
+              </span>
+            </div>
+          `,
+          iconSize: [40, 40],
+          iconAnchor: [20, 20],
+        });
+
+        const depotMarker = L.marker(depotCoord, { icon: depotIcon }).addTo(markersGroup);
+        depotMarker.bindPopup(`
+          <div class="p-2.5 text-xs font-sans">
+            <h4 class="font-bold text-indigo-900 text-sm">🏭 Central Logistics Depot Hub</h4>
+            <p class="text-slate-600 mt-1">Fleet base and central beverage supply terminal.</p>
+            <span class="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+              ✓ All Orders Completed • Fleet at Depot
             </span>
           </div>
-        `,
-        iconSize: [40, 40],
-        iconAnchor: [20, 20],
-      });
-
-      const depotMarker = L.marker(depotCoord, { icon: depotIcon }).addTo(markersGroup);
-      depotMarker.bindPopup(`
-        <div class="p-2.5 text-xs font-sans">
-          <h4 class="font-bold text-indigo-900 text-sm">🏭 Central Logistics Depot Hub</h4>
-          <p class="text-slate-600 mt-1">Fleet base and central beverage supply terminal.</p>
-          <span class="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-            ✓ All Orders Completed • Fleet at Depot
-          </span>
-        </div>
-      `);
+        `);
+      }
 
       // 2. Draw Registered Outlets
-      const allCoords: [number, number][] = [depotCoord];
-
       outletsToDisplay.forEach((outlet, idx) => {
         const outletId = outlet.id || outlet.outlet_id || (idx + 1);
         const subRoute = outlet.sub_route || 'Gulshan Sub-Route';
@@ -601,20 +947,20 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
           html: `
             <div class="relative flex flex-col items-center transform -translate-x-1/2 -translate-y-[14px] cursor-pointer group">
               <!-- Outlet Circle Pin -->
-              <div class="relative z-10 flex items-center justify-center w-7 h-7 rounded-full bg-slate-900 border-2 border-cyan-400 shadow-lg text-xs text-white transition-transform group-hover:scale-115">
+              <div class="relative z-10 flex items-center justify-center w-7 h-7 rounded-full bg-slate-900 border-2 border-cyan-400 shadow-lg text-xs text-white transition-transform group-hover:scale-115" style="background-color: #0f172a !important; color: #ffffff !important;">
                 🏪
               </div>
 
               <!-- Outlet Name Pill -->
               <div class="mt-1 flex flex-col items-center z-20 pointer-events-none">
-                <div class="px-2 py-0.5 rounded-lg bg-slate-900/95 text-white shadow-md border border-slate-700/80 whitespace-nowrap flex items-center gap-1 max-w-[210px]">
-                  <span class="text-[9px] font-bold tracking-tight text-white truncate max-w-[170px]" title="${cleanName}">
+                <div class="px-2 py-0.5 rounded-lg bg-slate-900/95 text-white shadow-md border border-slate-700/80 whitespace-nowrap flex items-center gap-1 max-w-[210px]" style="background-color: rgba(15, 23, 42, 0.95) !important; color: #ffffff !important;">
+                  <span class="text-[9px] font-bold tracking-tight text-white truncate max-w-[170px]" style="color: #ffffff !important;" title="${cleanName}">
                     ${cleanName}
                   </span>
                 </div>
                 ${
                   outlet.branch_name
-                    ? `<span class="text-[8px] font-mono font-medium text-slate-300 bg-slate-800/90 px-1.5 py-0.2 rounded mt-0.5 border border-slate-700 shadow-2xs">
+                    ? `<span class="text-[8px] font-mono font-medium px-1.5 py-0.2 rounded mt-0.5 border border-slate-700 shadow-2xs" style="color: #f1f5f9 !important; background-color: rgba(15, 23, 42, 0.90) !important;">
                         ${outlet.branch_name}
                       </span>`
                     : ''
@@ -639,8 +985,15 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
         `);
       });
 
-      // Auto-fit map to show depot and all outlets
+      // Auto-fit map to show selected depot or all depots & outlets
       try {
+        if (internalDistrictId) {
+          const matchDepot = districtDepots.find((d) => d.districtId === internalDistrictId);
+          if (matchDepot) {
+            map.flyTo(matchDepot.coords, 14, { animate: true, duration: 1.0 });
+            return;
+          }
+        }
         if (allCoords.length > 0) {
           map.fitBounds(L.latLngBounds(allCoords), { padding: [50, 50], maxZoom: 15 });
         }
@@ -652,6 +1005,19 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
     if (mergedVehiclesData.length === 0) return;
 
     const allRouteCoordinates: [number, number][] = [];
+
+    // Draw district supplier depots if available
+    if (districtDepots.length > 0) {
+      districtDepots.forEach((depot) => {
+        allRouteCoordinates.push(depot.coords);
+        renderSupplierDepotMarker(
+          depot,
+          internalDistrictId === depot.districtId,
+          markersGroup,
+          handleDistrictChange
+        );
+      });
+    }
 
     mergedVehiclesData.forEach((v) => {
       const isFocused = focusedVehicleReg === v.regNo;
@@ -773,9 +1139,9 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
       const depotIcon = L.divIcon({
         className: 'custom-map-icon',
         html: `
-          <div class="relative flex items-center justify-center w-9 h-9 rounded-2xl bg-indigo-950 border-2 ${v.color.border} shadow-xl text-white transform -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-transform hover:scale-115">
+          <div class="relative flex items-center justify-center w-9 h-9 rounded-2xl bg-indigo-950 border-2 ${v.color.border} shadow-xl text-white transform -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-transform hover:scale-115" style="background-color: #1e1b4b !important; color: #ffffff !important;">
             <svg class="w-4 h-4 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-            <span class="absolute -bottom-5 font-mono text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-indigo-950 text-indigo-200 border border-indigo-700 whitespace-nowrap shadow-xs">
+            <span class="absolute -bottom-5 font-mono text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-indigo-950 text-indigo-200 border border-indigo-700 whitespace-nowrap shadow-xs" style="background-color: #1e1b4b !important; color: #c7d2fe !important;">
               ${v.regNo} Hub
             </span>
           </div>
@@ -786,10 +1152,10 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
 
       const depotMarker = L.marker(depot.coords, { icon: depotIcon }).addTo(markersGroup);
       depotMarker.bindPopup(`
-        <div class="p-2.5 text-xs font-sans">
-          <h4 class="font-bold text-indigo-900 text-sm">🏭 Depot Hub (${v.teamName})</h4>
-          <p class="text-slate-600 mt-1">Departure depot for subroute: <strong>${v.subRoute}</strong></p>
-          <p class="text-slate-500 font-mono text-[11px] mt-0.5">Assigned Vehicle: <strong>${v.regNo}</strong> (${v.driver})</p>
+        <div class="p-2.5 text-xs font-sans" style="color: #0f172a !important;">
+          <h4 class="font-bold text-indigo-900 text-sm" style="color: #1e1b4b !important;">🏭 Depot Hub (${v.teamName})</h4>
+          <p class="text-slate-600 mt-1" style="color: #334155 !important;">Departure depot for subroute: <strong>${v.subRoute}</strong></p>
+          <p class="text-slate-500 font-mono text-[11px] mt-0.5" style="color: #64748b !important;">Assigned Vehicle: <strong style="color: #0f172a !important;">${v.regNo}</strong> (${v.driver})</p>
         </div>
       `);
 
@@ -817,7 +1183,7 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
           html: `
             <div class="relative flex flex-col items-center transform -translate-x-1/2 -translate-y-[14px] cursor-pointer group">
               <!-- Stop Circle Pin -->
-              <div class="relative z-10 flex items-center justify-center w-7 h-7 rounded-full ${pinBg} border-2 border-white shadow-lg font-black text-xs text-white transition-transform group-hover:scale-115">
+              <div class="relative z-10 flex items-center justify-center w-7 h-7 rounded-full ${pinBg} border-2 border-white shadow-lg font-black text-xs text-white transition-transform group-hover:scale-115" style="color: #ffffff !important;">
                 ${pinText}
               </div>
 
@@ -829,19 +1195,17 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
                     : isRedirected
                     ? 'bg-emerald-950/95 border-emerald-500'
                     : 'bg-slate-900/95 border-slate-700/80'
-                } text-white shadow-md border whitespace-nowrap flex items-center gap-1 max-w-[210px]">
+                } text-white shadow-md border whitespace-nowrap flex items-center gap-1 max-w-[210px]" style="background-color: ${
+                  isCancelled ? 'rgba(76, 5, 25, 0.95)' : isRedirected ? 'rgba(6, 78, 59, 0.95)' : 'rgba(15, 23, 42, 0.95)'
+                } !important; color: #ffffff !important;">
                   <span class="text-[10px]">${isCancelled ? '❌' : isRedirected ? '⚡' : '🏪'}</span>
-                  <span class="text-[9px] font-bold tracking-tight text-white truncate max-w-[170px]" title="${stop.name}">
+                  <span class="text-[9px] font-bold tracking-tight text-white truncate max-w-[170px]" style="color: #ffffff !important;" title="${stop.name}">
                     ${stop.name}
                   </span>
                 </div>
-                <span class="text-[8px] font-mono font-semibold ${
-                  isCancelled
-                    ? 'text-rose-300 bg-rose-950/90 border-rose-700'
-                    : isRedirected
-                    ? 'text-emerald-300 bg-emerald-950/90 border-emerald-600'
-                    : 'text-slate-300 bg-slate-800/90 border-slate-700'
-                } px-1.5 py-0.2 rounded mt-0.5 border shadow-2xs">
+                <span class="text-[8px] font-mono font-semibold px-1.5 py-0.2 rounded mt-0.5 border shadow-2xs" style="color: ${
+                  isCancelled ? '#fecdd3' : isRedirected ? '#a7f3d0' : '#f1f5f9'
+                } !important; background-color: rgba(15, 23, 42, 0.92) !important;">
                   ${
                     isCancelled
                       ? `⛔ Cancelled • Stop #${stop.stopNumber} (Skipped)`
@@ -966,14 +1330,21 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
       }
     });
 
-    // Auto-fit all routes onto single unified map view
+    // Auto-fit all routes onto single unified map view or fly to selected district depot
+    if (internalDistrictId) {
+      const matchDepot = districtDepots.find((d) => d.districtId === internalDistrictId);
+      if (matchDepot) {
+        map.flyTo(matchDepot.coords, 14, { animate: true, duration: 1.0 });
+        return;
+      }
+    }
     if (allRouteCoordinates.length > 0) {
       try {
         const bounds = L.latLngBounds(allRouteCoordinates);
         map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
       } catch (e) {}
     }
-  }, [mergedVehiclesData, focusedVehicleReg, isTestingMotion]);
+  }, [mergedVehiclesData, focusedVehicleReg, isTestingMotion, internalDistrictId, districtDepots]);
 
   // 3. Live Fluid Movement Engine Along Real Street Waypoints
   useEffect(() => {
@@ -1105,8 +1476,30 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
           </div>
         </div>
 
-        {/* Multi-Vehicle Merged Fleet Selector Tabs */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0">
+        {/* Multi-Vehicle Merged Fleet Selector Tabs & District Depot Switcher */}
+        <div className="flex flex-wrap items-center gap-2 overflow-x-auto pb-1 lg:pb-0">
+          {/* District Depot Switcher Dropdown */}
+          {availableDistricts && availableDistricts.length > 0 && (
+            <div className="relative">
+              <select
+                value={internalDistrictId ?? ''}
+                onChange={(e) => handleDistrictChange(e.target.value ? Number(e.target.value) : null)}
+                className="bg-slate-900 border border-slate-700 text-amber-300 font-mono text-xs font-bold rounded-xl px-3 py-1.5 pr-7 focus:ring-2 focus:ring-amber-500 focus:outline-none cursor-pointer appearance-none shadow-xs"
+              >
+                <option value="">🏢 Switch District Depot: All ({availableDistricts.length} Districts)</option>
+                {availableDistricts.map((d) => {
+                  const match = districtDepots.find((dp) => dp.districtId === d.id);
+                  return (
+                    <option key={d.id} value={d.id}>
+                      📍 {d.name} — {match ? match.supplierName.slice(0, 24) : `${d.name} Depot`}
+                    </option>
+                  );
+                })}
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+          )}
+
           {!hasActiveOrders ? (
             <button
               type="button"
@@ -1114,7 +1507,7 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
               className="px-3 py-1.5 rounded-xl text-xs font-bold font-mono transition-all flex items-center gap-1.5 whitespace-nowrap bg-slate-900 text-white shadow-sm ring-2 ring-slate-700 cursor-pointer"
             >
               <Building2 className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Depot Hub & Outlets ({outletsToDisplay.length})</span>
+              <span>Depot Hubs & Outlets ({outletsToDisplay.length})</span>
               <span className="w-2 h-2 rounded-full bg-emerald-400" />
             </button>
           ) : (
@@ -1173,131 +1566,296 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
       </div>
 
       {/* 2. SINGLE UNIFIED MAP CONTAINER WRAPPER WITH HUD OVERLAYS */}
-      <div className="relative rounded-3xl overflow-hidden border border-slate-200 shadow-xl bg-slate-100" style={{ height }}>
+      <div className="fizz-fleet-map-container relative rounded-3xl overflow-hidden border border-slate-200 shadow-xl bg-slate-100" style={{ height }}>
         {/* Leaflet Map DOM Root */}
         <div ref={mapContainerRef} className="w-full h-full z-0" />
 
         {/* HUD Top Left: Active Vehicle or Merged Fleet Telemetry Card */}
-        <div className="absolute top-4 left-4 z-10 max-w-xs sm:max-w-sm p-3.5 rounded-2xl bg-white/95 backdrop-blur-md border border-slate-200/90 shadow-xl space-y-2 pointer-events-auto">
-          {!hasActiveOrders ? (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
-                <div className="flex items-center gap-2">
-                  <span className="p-1.5 rounded-xl bg-indigo-900 text-white font-black text-sm">🏭</span>
-                  <div>
-                    <h4 className="font-black text-sm text-slate-900 tracking-tight leading-none">
-                      Depot & Outlets Standby
-                    </h4>
-                    <span className="text-[10px] text-slate-500 font-semibold">Central Logistics Depot</span>
+        {isTopLeftMinimized ? (
+          <button
+            type="button"
+            onClick={() => setIsTopLeftMinimized(false)}
+            className="map-telemetry-hud-minimized absolute top-4 left-4 z-10 px-3 py-2 rounded-2xl bg-white/95 backdrop-blur-md border border-slate-200/90 shadow-xl flex items-center gap-2 text-xs font-bold text-slate-800 hover:bg-slate-50 transition-all cursor-pointer pointer-events-auto active:scale-95 group"
+            title="Expand Section"
+          >
+            <span className="p-1 rounded-lg bg-indigo-50 text-indigo-700 text-xs">
+              {!hasActiveOrders ? '🏭' : activeFocusedData ? '🚚' : '🌐'}
+            </span>
+            <span className="font-bold text-slate-900 text-[11px]">
+              {!hasActiveOrders
+                ? `Depot & Outlets Standby (${outletsToDisplay.length})`
+                : activeFocusedData
+                ? `${activeFocusedData.regNo} (${activeFocusedData.status === 'IN_TRANSIT' || isTestingMotion ? 'IN_TRANSIT' : activeFocusedData.status})`
+                : `Merged Fleet (${mergedVehiclesData.length})`}
+            </span>
+            <span className="text-[10px] font-mono text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 flex items-center gap-1 group-hover:bg-blue-100">
+              <ChevronDown className="w-3 h-3" />
+              <span>Expand</span>
+            </span>
+          </button>
+        ) : (
+          <div className="map-telemetry-hud-card absolute top-4 left-4 z-10 max-w-xs sm:max-w-sm p-3.5 rounded-2xl bg-white/95 backdrop-blur-md border border-slate-200/90 shadow-xl space-y-2 pointer-events-auto">
+            {!hasActiveOrders ? (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 rounded-xl bg-indigo-900 text-white font-black text-sm" style={{ backgroundColor: '#1e1b4b', color: '#ffffff' }}>🏭</span>
+                    <div>
+                      <h4 className="font-black text-sm text-slate-900 tracking-tight leading-none" style={{ color: '#0f172a' }}>
+                        Depot & Outlets Standby
+                      </h4>
+                      <span className="text-[10px] font-semibold" style={{ color: '#64748b' }}>Central Logistics Depot</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase font-mono border" style={{ backgroundColor: '#d1fae5', color: '#065f46', borderColor: '#6ee7b7' }}>
+                      Orders Completed
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsTopLeftMinimized(true)}
+                      className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+                      title="Minimize section"
+                    >
+                      <Minus className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 </div>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase font-mono bg-emerald-100 text-emerald-800 border border-emerald-300">
-                  Orders Completed
-                </span>
-              </div>
 
-              <div className="space-y-1 text-xs">
-                <p className="text-slate-600 text-[11px]">
-                  All beverage delivery orders are currently completed. Vehicles are resting at the central depot.
-                </p>
-                <div className="flex justify-between items-center text-[11px] pt-1 border-t border-slate-100 text-slate-600">
-                  <span className="font-medium text-slate-500">Retail Outlets:</span>
-                  <strong className="text-slate-900 font-bold">{outletsToDisplay.length} Registered Outlets</strong>
-                </div>
-              </div>
-            </div>
-          ) : activeFocusedData ? (
-            <>
-              <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
-                <div className="flex items-center gap-2">
-                  <span className="p-1.5 rounded-xl bg-blue-100 text-blue-700 font-black text-sm">🚚</span>
-                  <div>
-                    <h4 className="font-black font-mono text-sm text-slate-900 tracking-tight leading-none">
-                      {activeFocusedData.regNo}
-                    </h4>
-                    <span className="text-[10px] text-slate-500 font-semibold">{activeFocusedData.subRoute}</span>
+                <div className="space-y-1 text-xs">
+                  <p className="text-[11px]" style={{ color: '#475569' }}>
+                    All beverage delivery orders are currently completed. Vehicles are resting at the central depot.
+                  </p>
+                  <div className="flex justify-between items-center text-[11px] pt-1 border-t border-slate-100">
+                    <span className="font-medium" style={{ color: '#64748b' }}>Retail Outlets:</span>
+                    <strong className="font-bold" style={{ color: '#0f172a' }}>{outletsToDisplay.length} Registered Outlets</strong>
                   </div>
                 </div>
-                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider font-mono ${
-                  activeFocusedData.status === 'IN_TRANSIT' || isTestingMotion
-                    ? 'bg-blue-600 text-white animate-pulse'
-                    : 'bg-amber-500 text-white'
-                }`}>
-                  {activeFocusedData.status === 'IN_TRANSIT' || isTestingMotion ? 'IN_TRANSIT' : activeFocusedData.status}
-                </span>
               </div>
-
-              {/* Metrics Grid */}
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="p-2 rounded-xl bg-slate-50 border border-slate-100">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Cruising Speed</span>
-                  <span className="font-mono font-black text-blue-700 text-sm">
-                    {focusedTelemetry?.speed || 36} km/h
-                  </span>
+            ) : activeFocusedData ? (
+              <>
+                <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 rounded-xl bg-blue-100 text-blue-700 font-black text-sm">🚚</span>
+                    <div>
+                      <h4 className="font-black font-mono text-sm text-slate-900 tracking-tight leading-none">
+                        {activeFocusedData.regNo}
+                      </h4>
+                      <span className="text-[10px] text-slate-500 font-semibold">{activeFocusedData.subRoute}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider font-mono ${
+                      activeFocusedData.status === 'IN_TRANSIT' || isTestingMotion
+                        ? 'bg-blue-600 text-white animate-pulse'
+                        : 'bg-amber-500 text-white'
+                    }`}>
+                      {activeFocusedData.status === 'IN_TRANSIT' || isTestingMotion ? 'IN_TRANSIT' : activeFocusedData.status}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsTopLeftMinimized(true)}
+                      className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+                      title="Minimize section"
+                    >
+                      <Minus className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
-                <div className="p-2 rounded-xl bg-slate-50 border border-slate-100">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Next Destination</span>
-                  <span className="font-bold text-slate-800 text-xs truncate block" title={focusedTelemetry?.nextStopName || 'Outlet Stop'}>
-                    {focusedTelemetry?.nextStopName || 'Outlet Stop'}
-                  </span>
-                </div>
-              </div>
 
-              <div className="flex items-center justify-between text-[11px] pt-1 text-slate-600">
-                <span className="flex items-center gap-1 font-medium">
-                  <Phone className="w-3.5 h-3.5 text-blue-500" />
-                  {activeFocusedData.driver} ({activeFocusedData.phone})
-                </span>
-                <span className="font-mono font-bold text-indigo-700">
-                  {activeFocusedData.totalCases} Cases
-                </span>
-              </div>
-            </>
-          ) : (
-            /* Merged Fleet Overview Header Card */
-            <>
-              <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
-                <div className="flex items-center gap-2">
-                  <span className="p-1.5 rounded-xl bg-slate-900 text-white font-black text-sm">🌐</span>
-                  <div>
-                    <h4 className="font-black font-mono text-sm text-slate-900 tracking-tight leading-none">
-                      Merged Fleet Tracking
-                    </h4>
-                    <span className="text-[10px] text-slate-500 font-semibold">
-                      {mergedVehiclesData.length} Vehicles Tracked Simultaneously
+                {/* Metrics Grid */}
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="p-2 rounded-xl bg-slate-50 border border-slate-100">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Cruising Speed</span>
+                    <span className="font-mono font-black text-blue-700 text-sm">
+                      {focusedTelemetry?.speed || 36} km/h
+                    </span>
+                  </div>
+                  <div className="p-2 rounded-xl bg-slate-50 border border-slate-100">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Next Destination</span>
+                    <span className="font-bold text-slate-800 text-xs truncate block" title={focusedTelemetry?.nextStopName || 'Outlet Stop'}>
+                      {focusedTelemetry?.nextStopName || 'Outlet Stop'}
                     </span>
                   </div>
                 </div>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider font-mono bg-emerald-600 text-white">
-                  ALL ONLINE
+
+                <div className="flex items-center justify-between text-[11px] pt-1 text-slate-600">
+                  <span className="flex items-center gap-1 font-medium">
+                    <Phone className="w-3.5 h-3.5 text-blue-500" />
+                    {activeFocusedData.driver} ({activeFocusedData.phone})
+                  </span>
+                  <span className="font-mono font-bold text-indigo-700">
+                    {activeFocusedData.totalCases} Cases
+                  </span>
+                </div>
+              </>
+            ) : (
+              /* Merged Fleet Overview Header Card */
+              <>
+                <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 rounded-xl bg-slate-900 text-white font-black text-sm">🌐</span>
+                    <div>
+                      <h4 className="font-black font-mono text-sm text-slate-900 tracking-tight leading-none">
+                        Merged Fleet Tracking
+                      </h4>
+                      <span className="text-[10px] text-slate-500 font-semibold">
+                        {mergedVehiclesData.length} Vehicles Tracked Simultaneously
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider font-mono bg-emerald-600 text-white">
+                      ALL ONLINE
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsTopLeftMinimized(true)}
+                      className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+                      title="Minimize section"
+                    >
+                      <Minus className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-1 text-xs">
+                  {mergedVehiclesData.map((v) => (
+                    <div
+                      key={v.regNo}
+                      onClick={() => {
+                        setFocusedVehicleReg(v.regNo);
+                        const marker = truckMarkersMapRef.current.get(v.regNo);
+                        if (marker && mapInstanceRef.current) {
+                          mapInstanceRef.current.flyTo(marker.getLatLng(), 15, { animate: true, duration: 1.0 });
+                        }
+                      }}
+                      className="flex items-center justify-between p-1.5 rounded-xl hover:bg-slate-50 cursor-pointer border border-transparent hover:border-slate-100 transition"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className={`w-2.5 h-2.5 rounded-full ${v.color.bg}`} />
+                        <span className="font-mono font-bold text-slate-800 text-[11px]">{v.regNo}</span>
+                        <span className="text-[10px] text-slate-400">({v.driver})</span>
+                      </div>
+                      <span className="text-[10px] font-mono font-bold text-blue-600">{v.totalCases} Cases</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* HUD Top Right Overlay: Selected District Supplier Depot Card */}
+        {selectedDepot && (
+          isDepotCardMinimized ? (
+            <div className="map-district-depot-hud-minimized absolute top-4 right-16 z-20 flex items-center gap-1.5 p-1.5 rounded-2xl backdrop-blur-md border border-amber-500/70 shadow-2xl pointer-events-auto" style={{ backgroundColor: 'rgba(15, 23, 42, 0.96)', borderColor: 'rgba(245, 158, 11, 0.7)', color: '#ffffff' }}>
+              <button
+                type="button"
+                onClick={() => setIsDepotCardMinimized(false)}
+                className="flex items-center gap-2 px-2.5 py-1 text-xs font-bold hover:text-amber-300 transition cursor-pointer group"
+                style={{ color: '#ffffff' }}
+                title="Expand District Depot Details"
+              >
+                <span className="text-amber-400 text-sm" style={{ color: '#fbbf24' }}>🏭</span>
+                <span className="font-mono text-xs font-bold" style={{ color: '#fcd34d' }}>
+                  {selectedDepot.districtName} Depot
                 </span>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-amber-500/40 flex items-center gap-1 group-hover:bg-amber-500/30" style={{ color: '#fcd34d', backgroundColor: 'rgba(245, 158, 11, 0.2)' }}>
+                  <ChevronDown className="w-3 h-3" />
+                  <span>Expand</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDistrictChange(null)}
+                className="text-[10px] font-bold px-2 py-1 rounded-lg transition cursor-pointer"
+                style={{ backgroundColor: '#1e293b', color: '#cbd5e1' }}
+                title="Reset to All Districts"
+              >
+                ✕
+              </button>
+            </div>
+          ) : (
+            <div className="map-district-depot-hud-card absolute top-4 right-16 z-20 max-w-xs sm:max-w-sm p-3.5 rounded-2xl backdrop-blur-md border border-amber-500/70 shadow-2xl space-y-2 pointer-events-auto" style={{ backgroundColor: 'rgba(15, 23, 42, 0.96)', borderColor: 'rgba(245, 158, 11, 0.7)', color: '#ffffff' }}>
+              <div className="flex items-center justify-between gap-2 border-b border-slate-800 pb-2">
+                <div className="flex items-center gap-2">
+                  <span className="p-1.5 rounded-xl bg-amber-500 text-slate-950 font-black text-sm" style={{ backgroundColor: '#f59e0b', color: '#020617' }}>🏭</span>
+                  <div>
+                    <h4 className="font-black text-sm tracking-tight leading-none flex items-center gap-1.5" style={{ color: '#ffffff' }}>
+                      <span>{selectedDepot.districtName} District Depot</span>
+                    </h4>
+                    <span className="text-[10px] font-mono font-bold" style={{ color: '#fcd34d' }}>
+                      {selectedDepot.isPrimaryHub ? '★ PRIMARY LOGISTICS HUB' : 'REGIONAL TRANSIT HUB'}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setIsDepotCardMinimized(true)}
+                    className="p-1 rounded-lg transition cursor-pointer"
+                    style={{ color: '#94a3b8' }}
+                    title="Minimize section"
+                  >
+                    <Minus className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDistrictChange(null)}
+                    className="text-[10px] font-bold px-2 py-0.5 rounded-lg transition cursor-pointer"
+                    style={{ backgroundColor: '#1e293b', color: '#cbd5e1' }}
+                    title="Reset to All Districts"
+                  >
+                    ✕ Reset
+                  </button>
+                </div>
               </div>
 
-              <div className="space-y-1 text-xs">
-                {mergedVehiclesData.map((v) => (
-                  <div
-                    key={v.regNo}
-                    onClick={() => {
-                      setFocusedVehicleReg(v.regNo);
-                      const marker = truckMarkersMapRef.current.get(v.regNo);
-                      if (marker && mapInstanceRef.current) {
-                        mapInstanceRef.current.flyTo(marker.getLatLng(), 15, { animate: true, duration: 1.0 });
-                      }
-                    }}
-                    className="flex items-center justify-between p-1.5 rounded-xl hover:bg-slate-50 cursor-pointer border border-transparent hover:border-slate-100 transition"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className={`w-2.5 h-2.5 rounded-full ${v.color.bg}`} />
-                      <span className="font-mono font-bold text-slate-800 text-[11px]">{v.regNo}</span>
-                      <span className="text-[10px] text-slate-400">({v.driver})</span>
-                    </div>
-                    <span className="text-[10px] font-mono font-bold text-blue-600">{v.totalCases} Cases</span>
+              <div className="space-y-1.5 text-xs">
+                <div>
+                  <span className="text-[10px] block uppercase font-bold" style={{ color: '#94a3b8' }}>Operating Supplier</span>
+                  <strong className="text-xs font-bold" style={{ color: '#ffffff' }}>{selectedDepot.supplierName}</strong>
+                </div>
+                <div>
+                  <span className="text-[10px] block uppercase font-bold" style={{ color: '#94a3b8' }}>Physical Depot Address</span>
+                  <span className="text-[11px] leading-tight block" style={{ color: '#cbd5e1' }}>{selectedDepot.depotAddress}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800 text-[11px]">
+                  <div>
+                    <span className="text-[9px] uppercase block font-bold" style={{ color: '#94a3b8' }}>Contact Phone</span>
+                    <span className="font-mono font-bold" style={{ color: '#22d3ee' }}>{selectedDepot.phone}</span>
                   </div>
-                ))}
+                  <div>
+                    <span className="text-[9px] uppercase block font-bold" style={{ color: '#94a3b8' }}>District ASM</span>
+                    <span className="truncate block font-bold" style={{ color: '#34d399' }} title={selectedDepot.asmName || 'N/A'}>
+                      {selectedDepot.asmName || 'Assigned ASM'}
+                    </span>
+                  </div>
+                </div>
               </div>
-            </>
-          )}
-        </div>
+
+              <div className="flex items-center justify-between pt-1 border-t border-slate-800">
+                <span className="text-[9px] font-mono" style={{ color: '#94a3b8' }}>
+                  GPS: {selectedDepot.coords[0].toFixed(3)}° N, {selectedDepot.coords[1].toFixed(3)}° E
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (mapInstanceRef.current) {
+                      mapInstanceRef.current.flyTo(selectedDepot.coords, 15, { animate: true, duration: 1.0 });
+                    }
+                  }}
+                  className="px-2.5 py-1 rounded-xl font-black text-[10px] transition cursor-pointer flex items-center gap-1 shadow-xs"
+                  style={{ backgroundColor: '#f59e0b', color: '#020617' }}
+                >
+                  <Navigation className="w-3 h-3" />
+                  <span>Focus Depot</span>
+                </button>
+              </div>
+            </div>
+          )
+        )}
 
         {/* HUD Top Right: Action Buttons & Testing Motion Controls */}
         <div className="absolute top-4 right-4 z-10 flex flex-col gap-2 pointer-events-auto">

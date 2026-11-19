@@ -20,11 +20,12 @@ public class Product {
 
     @Column(name = "brand", nullable = false, length = 50)
     @JsonProperty("brand")
+    @JsonAlias({"brand", "brand_name", "brandName"})
     private String brand;
 
     @Column(name = "flavor_variant", nullable = false, length = 50)
     @JsonProperty("flavor_variant")
-    @JsonAlias({"flavor_variant", "flavorVariant"})
+    @JsonAlias({"flavor_variant", "flavorVariant", "product_name", "productName", "name"})
     private String flavorVariant;
 
     @Column(name = "packaging", nullable = false, length = 30)

@@ -7,7 +7,6 @@ import {
   ImageIcon,
   Calendar,
   Layers,
-  Coins,
   Edit3,
   CheckCircle2,
   RefreshCw,
@@ -85,11 +84,12 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [flavorVariant, setFlavorVariant] = useState('');
   const [packaging, setPackaging] = useState('Can');
   const [sizeVolume, setSizeVolume] = useState('250ml');
-  const [basePrice, setBasePrice] = useState<string>('');
-  const [supplierPrice, setSupplierPrice] = useState<string>('');
-  const [outletPrice, setOutletPrice] = useState<string>('');
-  const [retailPrice, setRetailPrice] = useState<string>('');
+  const [basePrice, setBasePrice] = useState<string>('30');
+  const [supplierPrice, setSupplierPrice] = useState<string>('30');
+  const [outletPrice, setOutletPrice] = useState<string>('34.50');
+  const [retailPrice, setRetailPrice] = useState<string>('39.68');
   const [sku, setSku] = useState('');
+  const [skuManuallyEdited, setSkuManuallyEdited] = useState(false);
   const [centralStock, setCentralStock] = useState<string>('1500');
   const [expiryDate, setExpiryDate] = useState<string>(defaultExpiry());
   const [imageUrl, setImageUrl] = useState<string>('');
@@ -104,25 +104,27 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     if (!isOpen) return;
 
     if (productToEdit) {
-      const cat = productToEdit.category || 'Pepsi';
+      const b = productToEdit.brand || '';
+      const cat = productToEdit.category || b || 'Pepsi';
       setCategory(cat);
-      setBrand(productToEdit.brand || cat);
-      setCustomBrand(productToEdit.brand || '');
-      setFlavorVariant(productToEdit.flavor_variant || productToEdit.flavorVariant || '');
+      setBrand(b || cat);
+      setCustomBrand(b || '');
+      setFlavorVariant(productToEdit.flavor_variant || productToEdit.flavorVariant || productToEdit.product_name || productToEdit.name || '');
       setPackaging(productToEdit.packaging || 'Can');
       setSizeVolume(productToEdit.size_volume || productToEdit.sizeVolume || '250ml');
       setSku(productToEdit.sku || '');
+      setSkuManuallyEdited(true);
 
-      const base = productToEdit.base_price ?? productToEdit.basePrice ?? '';
+      const base = productToEdit.base_price ?? productToEdit.basePrice ?? 30;
       setBasePrice(String(base));
 
       const supp = productToEdit.supplier_price ?? productToEdit.supplierPrice ?? base;
       setSupplierPrice(String(supp));
 
-      const out = productToEdit.outlet_price ?? productToEdit.outletPrice ?? (base ? (Number(base) * 1.15).toFixed(2) : '');
+      const out = productToEdit.outlet_price ?? productToEdit.outletPrice ?? (base ? (Number(base) * 1.15).toFixed(2) : '34.50');
       setOutletPrice(String(out));
 
-      const ret = productToEdit.retail_price ?? productToEdit.retailPrice ?? (out ? (Number(out) * 1.15).toFixed(2) : '');
+      const ret = productToEdit.retail_price ?? productToEdit.retailPrice ?? (out ? (Number(out) * 1.15).toFixed(2) : '39.68');
       setRetailPrice(String(ret));
 
       setCentralStock(String(productToEdit.central_stock ?? productToEdit.centralStock ?? 1500));
@@ -143,6 +145,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setSupplierPrice('30');
       setOutletPrice('34.50');
       setRetailPrice('39.68');
+      setSkuManuallyEdited(false);
       setCentralStock('1500');
       setExpiryDate(defaultExpiry());
       setImageUrl(pepsiImg);
@@ -152,7 +155,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     }
   }, [isOpen, productToEdit]);
 
-  const effectiveBrand = brand === 'Custom' ? customBrand || 'Brand' : brand;
+  const effectiveBrand = (brand.trim() || customBrand.trim() || 'Beverage');
 
   // When base price changes, auto-calculate initial rates if not in edit mode
   const handleBasePriceChange = (val: string) => {
@@ -184,6 +187,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     setCategory(newCat);
     if (newCat !== 'Custom') {
       setBrand(newCat);
+      setCustomBrand(newCat);
       if (!isEditing) {
         setPackaging('Can');
         setSizeVolume('250ml');
@@ -193,24 +197,29 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         if (match) setImageUrl(match.src);
         setExpiryDate(defaultExpiry());
       }
+    } else {
+      setBrand('');
+      setCustomBrand('');
     }
   };
 
   // Helper to re-generate standard SKU token
   const handleGenerateSku = () => {
-    const brandCode = effectiveBrand.substring(0, 3).toUpperCase().replace(/\s+/g, '');
-    const flavorCode = flavorVariant.substring(0, 3).toUpperCase().replace(/\s+/g, '');
+    const bRaw = (effectiveBrand || 'BEV').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const fRaw = (flavorVariant || 'VAR').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const brandCode = bRaw.substring(0, Math.min(3, bRaw.length)) || 'BEV';
+    const flavorCode = fRaw.substring(0, Math.min(3, fRaw.length)) || 'VAR';
     const pkgCode = packaging.substring(0, 3).toUpperCase();
-    const volCode = sizeVolume.replace(/[^0-9]/g, '');
-    setSku(`${brandCode || 'BEV'}-${flavorCode || 'VAR'}-${pkgCode}-${volCode || '500'}`);
+    const volCode = sizeVolume.replace(/[^0-9]/g, '') || '500';
+    setSku(`${brandCode}-${flavorCode}-${pkgCode}-${volCode}`);
   };
 
-  // Auto-generate SKU only for new products (avoid overwriting custom SKU in edit mode)
+  // Auto-generate SKU only for new products unless manually edited
   useEffect(() => {
-    if (isEditing) return;
+    if (isEditing || skuManuallyEdited) return;
     if (!effectiveBrand || !flavorVariant) return;
     handleGenerateSku();
-  }, [category, effectiveBrand, flavorVariant, packaging, sizeVolume, isEditing]);
+  }, [category, effectiveBrand, flavorVariant, packaging, sizeVolume, isEditing, skuManuallyEdited]);
 
   if (!isOpen) return null;
 
@@ -238,13 +247,17 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setError('Please provide a valid brand name.');
       return;
     }
+    if (!flavorVariant.trim()) {
+      setError('Please provide a product name / flavor variant.');
+      return;
+    }
     if (!sku.trim()) {
       setError('SKU is required.');
       return;
     }
-    const priceNum = parseFloat(basePrice);
+    const priceNum = parseFloat(basePrice) || (productToEdit?.base_price ?? productToEdit?.basePrice ?? 30);
     if (isNaN(priceNum) || priceNum <= 0) {
-      setError('Base price (Supplier Buy Rate) must be a valid positive number.');
+      setError('Product price must be a valid positive number.');
       return;
     }
 
@@ -257,14 +270,20 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         : 'http://localhost:8080/api/products';
       const method = isEditing ? 'PUT' : 'POST';
 
+      const catToSave = effectiveBrand || 'Beverage';
+      const fullName = `${effectiveBrand} ${flavorVariant.trim()}`.trim();
+
       const payload = {
+        name: fullName,
+        product_name: fullName,
+        productName: fullName,
         brand: effectiveBrand,
-        flavor_variant: flavorVariant,
-        flavorVariant,
+        flavor_variant: flavorVariant.trim(),
+        flavorVariant: flavorVariant.trim(),
         packaging,
         size_volume: sizeVolume,
         sizeVolume,
-        sku,
+        sku: sku.trim(),
         base_price: priceNum,
         basePrice: priceNum,
         supplier_price: parseFloat(supplierPrice) || priceNum,
@@ -273,7 +292,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         outletPrice: parseFloat(outletPrice) || Number((priceNum * 1.15).toFixed(2)),
         retail_price: parseFloat(retailPrice) || Number((priceNum * 1.32).toFixed(2)),
         retailPrice: parseFloat(retailPrice) || Number((priceNum * 1.32).toFixed(2)),
-        category,
+        category: catToSave,
         expiry_date: expiryDate,
         expiryDate: expiryDate,
         image_url: imageUrl || null,
@@ -376,56 +395,79 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
                 <Layers className="w-4 h-4 text-indigo-600" />
-                Category & Brand
+                Brand & Category *
               </label>
               <span className="text-[10px] text-zinc-400">Select standard brand or define custom</span>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {CATEGORIES.map((cat) => (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => handleCategoryChange(cat)}
-                  className={`py-2 px-3 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
-                    category === cat
-                      ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                      : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-zinc-700'
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
+              {CATEGORIES.map((cat) => {
+                const isSelected = category === cat || (cat !== 'Custom' && brand.toLowerCase() === cat.toLowerCase());
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => handleCategoryChange(cat)}
+                    className={`py-2 px-3 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+                      isSelected
+                        ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 shadow-xs ring-1 ring-indigo-500/30'
+                        : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-zinc-700'
+                    }`}
+                  >
+                    {cat === 'Custom' ? '➕ Other / Custom Brand' : cat}
+                  </button>
+                );
+              })}
             </div>
 
-            {category === 'Custom' && (
-              <div className="mt-2">
-                <input
-                  type="text"
-                  placeholder="Enter custom brand name..."
-                  value={customBrand}
-                  onChange={(e) => setCustomBrand(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
-                  required
-                />
+            {/* Direct Brand Name Input - Always editable so user can freely enter or fine-tune any brand */}
+            <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+                  Brand Name *
+                </label>
+                {category === 'Custom' && (
+                  <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">Custom Brand Active</span>
+                )}
               </div>
-            )}
+              <input
+                type="text"
+                placeholder="Enter brand name (e.g. Pepsi, Coca-Cola, Mojo, Speed, Pran, Red Bull)..."
+                value={brand}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setBrand(val);
+                  setCustomBrand(val);
+                  const matched = DRINK_CATEGORIES.find((c) => c.toLowerCase() === val.trim().toLowerCase());
+                  if (matched) {
+                    setCategory(matched);
+                  } else {
+                    setCategory('Custom');
+                  }
+                }}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-sm font-bold text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                required
+              />
+            </div>
           </div>
 
-          {/* 2. Flavor Variant, Packaging, Size */}
+          {/* 2. Product Name / Flavor Variant, Packaging, Size */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1.5">
-                Flavor / Variant *
+                Product Name / Variant *
               </label>
               <input
                 type="text"
                 value={flavorVariant}
                 onChange={(e) => setFlavorVariant(e.target.value)}
-                placeholder="e.g. Regular, Zero, Diet, Black"
+                placeholder="e.g. Regular, Zero Sugar, Classic, Orange, Mango..."
                 required
                 className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
               />
+              <span className="text-[10px] text-zinc-400 mt-1 block">
+                Catalog Display: <strong className="text-indigo-600 dark:text-indigo-400 font-bold">{effectiveBrand} {flavorVariant || '(Product Name)'}</strong>
+              </span>
             </div>
 
             <div>
@@ -459,103 +501,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             </div>
           </div>
 
-          {/* 3. 3-Tier Multi-Echelon Transaction Pricing */}
-          <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-50/70 via-indigo-50/50 to-purple-50/50 dark:bg-zinc-800/40 border border-blue-200 dark:border-zinc-700 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-indigo-950 dark:text-indigo-300 flex items-center gap-1.5">
-                <Coins className="w-4 h-4 text-indigo-600" />
-                3-Tier Multi-Level Pricing Structure (Superadmin ➔ Supplier ➔ Outlet ➔ Customer)
-              </span>
-              <button
-                type="button"
-                onClick={handleRecalculateMargins}
-                className="text-[10px] font-mono font-bold text-indigo-600 bg-white dark:bg-zinc-900 px-2 py-0.5 rounded-full border border-indigo-200 shadow-xs flex items-center gap-1 hover:bg-indigo-50 cursor-pointer"
-                title="Auto-calculate 15% wholesale margin and 15% retail margin based on Buy Rate"
-              >
-                <RefreshCw className="w-2.5 h-2.5" />
-                <span>Auto-Calculate Margins</span>
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {/* Tier 1: Superadmin -> Supplier */}
-              <div className="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-blue-100 dark:border-zinc-800 shadow-xs">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 block mb-1">
-                  Tier 1: Supplier Buy Rate
-                </span>
-                <span className="text-[9px] text-zinc-400 block mb-1.5">Rate charged to Regional Suppliers</span>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-xs">৳</span>
-                  <input
-                    type="number"
-                    step="0.25"
-                    min="1"
-                    value={basePrice}
-                    onChange={(e) => handleBasePriceChange(e.target.value)}
-                    required
-                    placeholder="30.00"
-                    className="w-full pl-7 pr-3 py-2 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-bold font-mono text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-                  />
-                </div>
-              </div>
-
-              {/* Tier 2: Supplier -> Outlet */}
-              <div className="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-indigo-100 dark:border-zinc-800 shadow-xs">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 block">
-                    Tier 2: Outlet Rate
-                  </span>
-                  {parseFloat(outletPrice) > parseFloat(basePrice) && (
-                    <span className="text-[9px] font-mono font-bold text-emerald-600">
-                      +৳{(parseFloat(outletPrice) - parseFloat(basePrice)).toFixed(2)} / unit
-                    </span>
-                  )}
-                </div>
-                <span className="text-[9px] text-zinc-400 block mb-1.5">Wholesale sell rate to franchise outlets</span>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-xs">৳</span>
-                  <input
-                    type="number"
-                    step="0.25"
-                    min="1"
-                    value={outletPrice}
-                    onChange={(e) => setOutletPrice(e.target.value)}
-                    placeholder="35.00"
-                    className="w-full pl-7 pr-3 py-2 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-bold font-mono text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
-                  />
-                </div>
-              </div>
-
-              {/* Tier 3: Outlet -> Retail Customer */}
-              <div className="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-purple-100 dark:border-zinc-800 shadow-xs">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700 block">
-                    Tier 3: Retail MRP
-                  </span>
-                  {parseFloat(retailPrice) > parseFloat(outletPrice) && (
-                    <span className="text-[9px] font-mono font-bold text-emerald-600">
-                      +৳{(parseFloat(retailPrice) - parseFloat(outletPrice)).toFixed(2)} / unit
-                    </span>
-                  )}
-                </div>
-                <span className="text-[9px] text-zinc-400 block mb-1.5">End-customer counter price</span>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-xs">৳</span>
-                  <input
-                    type="number"
-                    step="0.25"
-                    min="1"
-                    value={retailPrice}
-                    onChange={(e) => setRetailPrice(e.target.value)}
-                    placeholder="40.00"
-                    className="w-full pl-7 pr-3 py-2 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-bold font-mono text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-purple-500/40"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 4. SKU & Central Stock Pool */}
+          {/* 3. SKU & Central Stock Pool */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <div className="flex items-center justify-between mb-1.5">
@@ -564,7 +510,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 </label>
                 <button
                   type="button"
-                  onClick={handleGenerateSku}
+                  onClick={() => {
+                    setSkuManuallyEdited(false);
+                    handleGenerateSku();
+                  }}
                   className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer flex items-center gap-1"
                 >
                   <RefreshCw className="w-2.5 h-2.5" />
@@ -574,7 +523,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               <input
                 type="text"
                 value={sku}
-                onChange={(e) => setSku(e.target.value)}
+                onChange={(e) => {
+                  setSku(e.target.value);
+                  setSkuManuallyEdited(true);
+                }}
                 placeholder="e.g. PEP-REG-CAN-250"
                 required
                 className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm font-mono font-bold text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"

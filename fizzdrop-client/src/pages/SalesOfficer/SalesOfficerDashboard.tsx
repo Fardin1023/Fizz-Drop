@@ -928,7 +928,7 @@ export const SalesOfficerDashboard: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50/80 text-zinc-900 flex flex-col pb-16 selection:bg-blue-500/20 selection:text-blue-900">
+    <div className="sales-officer-theme so-theme min-h-screen bg-[#F4F6F8] text-[#1E293B] flex flex-col pb-16 selection:bg-[#D7DEE8] selection:text-[#0F172A]">
       {/* Real-time Animated Notification Pop-up Window */}
       <NotificationPopup
         notification={popupNotification}

@@ -76,17 +76,17 @@ const DatabaseConfigModal = lazy(() =>
 
 const TabLoadingSkeleton: React.FC = () => (
   <div className="space-y-4 animate-pulse" role="status" aria-label="Loading module content">
-    <div className="h-28 bg-white rounded-3xl border border-slate-200/90 p-5 flex flex-col justify-center space-y-2.5 shadow-xs">
-      <div className="h-3.5 bg-slate-200 rounded-md w-1/4" />
-      <div className="h-6 bg-slate-200 rounded-lg w-1/2" />
-      <div className="h-3 bg-slate-100 rounded-md w-2/3" />
+    <div className="h-28 bg-[#FFF9F0] rounded-3xl border border-[#D9CBB8] p-5 flex flex-col justify-center space-y-2.5 shadow-xs">
+      <div className="h-3.5 bg-[#D9CBB8] rounded-md w-1/4" />
+      <div className="h-6 bg-[#D9CBB8] rounded-lg w-1/2" />
+      <div className="h-3 bg-[#F2E6D5] rounded-md w-2/3" />
     </div>
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-      <div className="h-24 bg-white rounded-2xl border border-slate-200 p-4 shadow-xs" />
-      <div className="h-24 bg-white rounded-2xl border border-slate-200 p-4 shadow-xs" />
-      <div className="h-24 bg-white rounded-2xl border border-slate-200 p-4 shadow-xs" />
+      <div className="h-24 bg-[#FFF9F0] rounded-2xl border border-[#D9CBB8] p-4 shadow-xs" />
+      <div className="h-24 bg-[#FFF9F0] rounded-2xl border border-[#D9CBB8] p-4 shadow-xs" />
+      <div className="h-24 bg-[#FFF9F0] rounded-2xl border border-[#D9CBB8] p-4 shadow-xs" />
     </div>
-    <div className="h-80 bg-white rounded-3xl border border-slate-200/90 p-6 shadow-xs" />
+    <div className="h-80 bg-[#FFF9F0] rounded-3xl border border-[#D9CBB8] p-6 shadow-xs" />
   </div>
 );
 
@@ -301,7 +301,7 @@ export const SuperadminDashboard: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50/70 text-slate-900 flex flex-col pb-16 selection:bg-blue-500/20 selection:text-blue-900 relative">
+    <div className="superadmin-theme min-h-screen bg-[#FFF9F0] text-[#19241D] flex flex-col pb-16 selection:bg-[#B8CBBE] selection:text-[#101B14] relative">
       
       {/* Real-time Animated Notification Pop-up Window */}
       <NotificationPopup
@@ -310,45 +310,45 @@ export const SuperadminDashboard: React.FC = () => {
         onAction={handleNotificationClick}
       />
 
-      {/* Security-Developer Dot-Matrix Subtle Technical Grid Background */}
-      <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:20px_20px] opacity-60" />
+      {/* Warm Biscuit Dot-Matrix Subtle Technical Grid Background */}
+      <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(#D9CBB8_1.2px,transparent_1.2px)] [background-size:20px_20px] opacity-60" />
 
-      {/* Soft Homepage-Style Cyan & Blue Ambient Glow Orbs */}
-      <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden opacity-50">
-        <div className="absolute -top-[10%] left-1/4 w-[550px] h-[450px] bg-blue-400/10 rounded-full blur-[140px]" />
-        <div className="absolute top-[20%] -right-[5%] w-[450px] h-[350px] bg-cyan-400/15 rounded-full blur-[120px]" />
-        <div className="absolute bottom-[5%] left-1/3 w-[500px] h-[400px] bg-indigo-400/10 rounded-full blur-[150px]" />
+      {/* Soft Sage & Sand Ambient Glow Orbs */}
+      <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden opacity-60">
+        <div className="absolute -top-[10%] left-1/4 w-[550px] h-[450px] bg-[#CFE0D2]/35 rounded-full blur-[140px]" />
+        <div className="absolute top-[20%] -right-[5%] w-[450px] h-[350px] bg-[#B8CBBE]/25 rounded-full blur-[120px]" />
+        <div className="absolute bottom-[5%] left-1/3 w-[500px] h-[400px] bg-[#F2E6D5]/60 rounded-full blur-[150px]" />
       </div>
 
-      {/* Superadmin Executive Master Banner (Catchy Purple & Indigo Authority Bar) */}
-      <div className="bg-gradient-to-r from-purple-950 via-indigo-900 to-purple-950 text-white px-4 py-2.5 text-xs border-b border-indigo-800/40 shadow-sm relative z-50">
+      {/* Superadmin Executive Master Banner (Sage & Cream Theme Bar) */}
+      <div className="bg-gradient-to-r from-[#B8CBBE] via-[#CFE0D2] to-[#B8CBBE] text-[#122018] px-4 py-2.5 text-xs border-b border-[#D9CBB8] shadow-xs relative z-50">
         <div className="max-w-7xl mx-auto w-full flex flex-col sm:flex-row items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
-            <Crown className="w-4 h-4 text-amber-300 shrink-0 animate-pulse" />
-            <span className="font-semibold text-slate-100 truncate">
-              You are logged in as <strong className="text-amber-200">Superadmin</strong>. Master authority over catalog, Aiven Cloud database, and regional supplier allotments.
+            <Crown className="w-4 h-4 text-[#122018] shrink-0 animate-pulse" />
+            <span className="font-semibold text-[#122018] truncate">
+              You are logged in as <strong className="text-[#0A140F] underline decoration-[#122018]/40">Superadmin</strong>. Master authority over catalog, Aiven Cloud database, and regional supplier allotments.
             </span>
           </div>
           <Link
             to="/admin"
-            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white/15 hover:bg-white/25 text-white font-bold text-xs transition-all shadow-xs shrink-0 border border-white/20 hover:border-white/30 cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#FFF9F0] hover:bg-[#F2E6D5] text-[#122018] font-bold text-xs transition-all shadow-xs shrink-0 border border-[#D9CBB8] hover:border-[#B8CBBE] cursor-pointer"
             title="Open Regional Supplier Portal"
           >
             <span>Open Supplier Portal</span>
-            <ArrowRight className="w-3.5 h-3.5 text-amber-300" />
+            <ArrowRight className="w-3.5 h-3.5 text-[#122018]" />
           </Link>
         </div>
       </div>
 
       {/* Clean Top Header (Upper navigation tabs removed) */}
-      <header className="sticky top-0 z-40 w-full bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-2xs">
+      <header className="sticky top-0 z-40 w-full bg-[#F2E6D5]/95 backdrop-blur-md border-b border-[#D9CBB8] shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
           <div className="flex items-center justify-between gap-2.5">
             {/* Identity & Superadmin Brand with Sidebar Toggle */}
             <div className="flex items-center gap-2 min-w-0">
               <button
                 onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 hover:text-indigo-600 transition-colors cursor-pointer shrink-0"
+                className="p-1.5 rounded-lg border border-[#D9CBB8] bg-[#FFF9F0] hover:bg-[#CFE0D2] text-[#19241D] hover:text-[#0C1710] transition-colors cursor-pointer shrink-0"
                 title={isSidebarCollapsed ? "Expand Navigation Sidebar" : "Collapse Navigation Sidebar"}
               >
                 {isSidebarCollapsed ? <Menu className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
@@ -356,32 +356,32 @@ export const SuperadminDashboard: React.FC = () => {
 
               <Link
                 to="/"
-                className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-semibold text-slate-700 hover:text-indigo-600 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-colors shadow-2xs shrink-0"
+                className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-semibold text-[#19241D] hover:text-[#0C1710] bg-[#FFF9F0] hover:bg-[#CFE0D2] border border-[#D9CBB8] transition-colors shadow-2xs shrink-0"
                 title="Return to Customer Storefront / Home"
               >
-                <Home className="w-3.5 h-3.5 text-indigo-600" />
+                <Home className="w-3.5 h-3.5 text-[#19241D]" />
                 <span className="hidden sm:inline">Storefront</span>
               </Link>
 
               <img
                 src={superadminLogo}
                 alt="Superadmin Logo"
-                className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl object-cover shadow-md shadow-indigo-500/25 border border-indigo-400/40 shrink-0 transform hover:scale-105 transition-transform"
+                className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl object-cover shadow-xs border border-[#B8CBBE] shrink-0 transform hover:scale-105 transition-transform"
               />
 
-              <span className="font-oswald font-bold tracking-tight uppercase text-zinc-900 text-xs sm:text-sm truncate">
+              <span className="font-oswald font-bold tracking-tight uppercase text-[#101B14] text-xs sm:text-sm truncate">
                 Superadmin Operations Hub
               </span>
 
-              <span className="rounded-full font-mono font-bold text-[9px] px-1.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 uppercase tracking-wider flex items-center gap-1 shrink-0">
-                <Radio className="w-2 h-2 animate-pulse text-emerald-600" />
+              <span className="rounded-full font-mono font-bold text-[9px] px-2 py-0.5 bg-[#CFE0D2] text-[#122018] border border-[#B8CBBE] uppercase tracking-wider flex items-center gap-1 shrink-0">
+                <Radio className="w-2 h-2 animate-pulse text-[#122018]" />
                 ROOT: SECURE
               </span>
             </div>
 
             {/* Quick Live Telemetry Badges & User Controls */}
             <div className="flex items-center gap-1.5 shrink-0">
-              <span className="text-[11px] text-slate-400 font-mono hidden md:inline truncate">
+              <span className="text-[11px] text-[#5A645D] font-mono hidden md:inline truncate">
                 ({user?.email})
               </span>
 
@@ -389,14 +389,14 @@ export const SuperadminDashboard: React.FC = () => {
                 onClick={() => setIsDbConfigOpen(true)}
                 className={`border font-bold font-mono px-2 py-0.5 text-[11px] rounded-md flex items-center gap-1 cursor-pointer transition-colors shadow-2xs ${
                   dbStatus?.connected
-                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
-                    : 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100'
+                    ? 'bg-[#B8CBBE] border-[#A2B8AA] text-[#122018] hover:bg-[#CFE0D2]'
+                    : 'bg-[#CFE0D2] border-[#B8CBBE] text-[#122018] hover:bg-[#B8CBBE]'
                 }`}
                 title="Configure Database Connection"
               >
-                <span className={`w-1.5 h-1.5 rounded-full ${dbStatus?.connected ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                <span className={`w-1.5 h-1.5 rounded-full ${dbStatus?.connected ? 'bg-[#122018]' : 'bg-[#7A634B]'}`} />
                 <span>{dbStatus?.connected ? 'AIVEN: CONNECTED' : 'CONFIG DB'}</span>
-                <Settings className="w-3 h-3 opacity-70" />
+                <Settings className="w-3 h-3 opacity-80" />
               </button>
 
               <NotificationDropdown
@@ -412,7 +412,7 @@ export const SuperadminDashboard: React.FC = () => {
 
               <button
                 onClick={logout}
-                className="p-1 rounded-md text-slate-500 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 transition-colors cursor-pointer"
+                className="p-1 rounded-md text-[#5A645D] hover:text-[#912828] bg-[#FFF9F0] hover:bg-[#F2E6D5] border border-[#D9CBB8] transition-colors cursor-pointer"
                 title="Sign out of Superadmin"
               >
                 <LogOut className="w-3.5 h-3.5" />
@@ -431,17 +431,17 @@ export const SuperadminDashboard: React.FC = () => {
             isSidebarCollapsed ? 'md:w-20' : 'md:w-64 lg:w-72'
           }`}
         >
-          <div className="bg-white/95 backdrop-blur-xl rounded-2xl border border-slate-200/90 shadow-sm p-2 sm:p-2.5 space-y-1.5">
+          <div className="bg-[#F2E6D5]/95 backdrop-blur-xl rounded-2xl border border-[#D9CBB8] shadow-sm p-2 sm:p-2.5 space-y-1.5">
             {/* Sidebar Section Title */}
-            <div className="px-2 py-1.5 flex items-center justify-between border-b border-slate-100 mb-1">
+            <div className="px-2 py-1.5 flex items-center justify-between border-b border-[#D9CBB8] mb-1">
               {!isSidebarCollapsed ? (
                 <div className="flex items-center gap-2 min-w-0">
                   <img
                     src={superadminLogo}
                     alt="Superadmin Emblem"
-                    className="w-5 h-5 rounded-md object-cover shadow-2xs border border-indigo-300/40 shrink-0"
+                    className="w-5 h-5 rounded-md object-cover shadow-2xs border border-[#B8CBBE] shrink-0"
                   />
-                  <span className="text-[10px] font-bold font-mono tracking-wider text-slate-500 uppercase truncate">
+                  <span className="text-[10px] font-bold font-mono tracking-wider text-[#4E463E] uppercase truncate">
                     Central Operations Matrix
                   </span>
                 </div>
@@ -449,13 +449,13 @@ export const SuperadminDashboard: React.FC = () => {
                 <img
                   src={superadminLogo}
                   alt="Superadmin"
-                  className="w-7 h-7 rounded-lg object-cover shadow-2xs mx-auto border border-indigo-300/40"
+                  className="w-7 h-7 rounded-lg object-cover shadow-2xs mx-auto border border-[#B8CBBE]"
                 />
               )}
               
               <button
                 onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                className="hidden md:flex p-1 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors cursor-pointer"
+                className="hidden md:flex p-1 rounded-md text-[#5A645D] hover:text-[#122018] bg-[#FFF9F0] hover:bg-[#CFE0D2] border border-[#D9CBB8] transition-colors cursor-pointer"
                 title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
               >
                 {isSidebarCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
@@ -475,22 +475,22 @@ export const SuperadminDashboard: React.FC = () => {
                       isSidebarCollapsed ? 'justify-center p-2.5' : 'p-2.5 gap-3'
                     } ${
                       isActive
-                        ? `bg-gradient-to-r ${item.gradient} text-white shadow-md shadow-indigo-500/20 font-bold scale-[1.01]`
-                        : 'bg-white hover:bg-slate-50 hover:translate-x-0.5 text-slate-700 border border-transparent hover:border-slate-200'
+                        ? 'bg-[#B8CBBE] text-[#101B14] shadow-sm border border-[#9EB4A4] font-bold scale-[1.01]'
+                        : 'bg-[#FFF9F0] hover:bg-[#CFE0D2] hover:translate-x-0.5 text-[#2C251F] hover:text-[#101B14] border border-[#D9CBB8]'
                     }`}
                     title={item.label}
                   >
                     {/* Active Glowing Left Pill Bar */}
                     {isActive && (
-                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-white rounded-r-full shadow-xs" />
+                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-[#101B14] rounded-r-full shadow-xs" />
                     )}
 
                     {/* Icon Container with subtle animation */}
                     <div
                       className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-110 ${
                         isActive
-                          ? 'bg-white/20 text-white shadow-xs'
-                          : 'bg-slate-100 text-slate-600 group-hover:bg-indigo-50 group-hover:text-indigo-600'
+                          ? 'bg-[#FFF9F0] text-[#101B14] shadow-xs'
+                          : 'bg-[#F2E6D5] text-[#3D352D] group-hover:bg-[#FFF9F0] group-hover:text-[#101B14] border border-[#D9CBB8]'
                       }`}
                     >
                       <Icon className="w-4 h-4" />
@@ -500,17 +500,17 @@ export const SuperadminDashboard: React.FC = () => {
                     {!isSidebarCollapsed && (
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-1">
-                          <span className={`text-xs font-semibold truncate ${isActive ? 'text-white' : 'text-slate-800'}`}>
+                          <span className={`text-xs font-semibold truncate ${isActive ? 'text-[#101B14] font-bold' : 'text-[#2C251F]'}`}>
                             {item.shortLabel}
                           </span>
                           {item.badge && (
                             <span
                               className={`text-[9px] font-mono px-1.5 py-0.2 rounded-md uppercase font-bold shrink-0 ${
                                 isActive
-                                  ? 'bg-white/25 text-white'
+                                  ? 'bg-[#FFF9F0] text-[#101B14] border border-[#A5BAAC]'
                                   : item.badgeHighlight
-                                  ? 'bg-rose-50 text-rose-700 border border-rose-200 animate-pulse'
-                                  : 'bg-slate-100 text-slate-500'
+                                  ? 'bg-[#CFE0D2] text-[#122018] border border-[#B8CBBE] animate-pulse font-extrabold'
+                                  : 'bg-[#F2E6D5] text-[#4E463E] border border-[#D9CBB8]'
                               }`}
                             >
                               {item.badge}
@@ -519,7 +519,7 @@ export const SuperadminDashboard: React.FC = () => {
                         </div>
                         <span
                           className={`block text-[10px] truncate leading-tight mt-0.5 ${
-                            isActive ? 'text-white/80 font-normal' : 'text-slate-400 font-normal'
+                            isActive ? 'text-[#27382E] font-medium' : 'text-[#645C54] font-normal'
                           }`}
                         >
                           {item.desc}
@@ -533,22 +533,22 @@ export const SuperadminDashboard: React.FC = () => {
 
             {/* Sidebar Footer: Aiven Cloud Live Telemetry */}
             {!isSidebarCollapsed && (
-              <div className="pt-2 mt-2 border-t border-slate-100 px-1">
-                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between gap-2">
+              <div className="pt-2 mt-2 border-t border-[#D9CBB8] px-1">
+                <div className="p-2.5 rounded-xl bg-[#FFF9F0] border border-[#D9CBB8] flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping shrink-0" />
+                    <span className="w-2 h-2 rounded-full bg-[#122018] animate-ping shrink-0" />
                     <div className="min-w-0">
-                      <span className="block text-[10px] font-bold text-slate-800 uppercase tracking-wider truncate">
+                      <span className="block text-[10px] font-bold text-[#19241D] uppercase tracking-wider truncate">
                         Aiven Cloud MySQL
                       </span>
-                      <span className="block text-[9px] font-mono text-emerald-600 truncate">
+                      <span className="block text-[9px] font-mono text-[#2B3F34] font-semibold truncate">
                         MySQL 8.4.11 Active
                       </span>
                     </div>
                   </div>
                   <button
                     onClick={() => setIsDbConfigOpen(true)}
-                    className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 transition-colors cursor-pointer"
+                    className="p-1 rounded-md text-[#5A645D] hover:text-[#122018] bg-[#F2E6D5] hover:bg-[#CFE0D2] border border-[#D9CBB8] transition-colors cursor-pointer"
                     title="View Connection Details"
                   >
                     <Settings className="w-3 h-3" />

@@ -629,16 +629,16 @@ export const SuperadminRequisitionsHub: React.FC = () => {
       </div>
 
       {/* Central Warehouse Fixed Category Stock Pool Banner */}
-      <div className="rounded-3xl bg-gradient-to-r from-blue-900 via-indigo-950 to-slate-900 text-white p-5 shadow-xl border border-blue-800/50 animate-fade-in">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
+      <div className="rounded-3xl bg-[#F2E6D5] text-[#101B14] p-5 shadow-xs border border-[#D9CBB8] animate-fade-in">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#D9CBB8] pb-3">
           <div>
             <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 text-[9px] font-mono font-bold uppercase tracking-wider">
+              <span className="px-2 py-0.5 rounded-full bg-[#CFE0D2] text-[#122018] border border-[#B8CBBE] text-[9px] font-mono font-bold uppercase tracking-wider">
                 CENTRAL INVENTORY ALLOCATION POOL
               </span>
-              <span className="text-xs text-blue-200 font-mono">Role 4: Superadmin Reserve</span>
+              <span className="text-xs text-[#535E56] font-mono">Role 4: Superadmin Reserve</span>
             </div>
-            <h3 className="font-oswald text-base font-bold uppercase text-white mt-0.5">
+            <h3 className="font-oswald text-base font-bold uppercase text-[#101B14] mt-0.5">
               Fixed Category Stock For Supplier Dispatches
             </h3>
           </div>
@@ -646,7 +646,7 @@ export const SuperadminRequisitionsHub: React.FC = () => {
           <button
             type="button"
             onClick={() => setShowCentralPool((prev) => !prev)}
-            className="text-xs font-semibold text-cyan-300 hover:text-cyan-200 flex items-center gap-1 transition-colors cursor-pointer self-start sm:self-auto"
+            className="text-xs font-semibold text-[#122018] hover:text-[#2C3E32] flex items-center gap-1 transition-colors cursor-pointer self-start sm:self-auto"
           >
             <span>{showCentralPool ? 'Collapse Category Reserves' : 'Expand Category Reserves'}</span>
           </button>
@@ -657,23 +657,23 @@ export const SuperadminRequisitionsHub: React.FC = () => {
             {Object.entries(categoryStockSummary).map(([catName, data]) => (
               <div
                 key={catName}
-                className="p-3 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md flex flex-col justify-between"
+                className="p-3 rounded-2xl bg-[#FFF9F0] border border-[#D9CBB8] shadow-2xs flex flex-col justify-between"
               >
                 <div>
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-cyan-300 block truncate font-bold">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-[#535E56] block truncate font-bold">
                     {catName}
                   </span>
                   <div className="mt-1 flex items-baseline gap-1">
-                    <span className="font-oswald text-xl font-black text-white">
+                    <span className="font-oswald text-xl font-black text-[#101B14]">
                       {data.totalCases.toLocaleString()}
                     </span>
-                    <span className="text-[10px] text-blue-200 font-sans">cases</span>
+                    <span className="text-[10px] text-[#535E56] font-sans">cases</span>
                   </div>
                 </div>
 
-                <div className="mt-2 pt-2 border-t border-white/10 flex items-center justify-between text-[10px] font-mono text-slate-300">
+                <div className="mt-2 pt-2 border-t border-[#D9CBB8] flex items-center justify-between text-[10px] font-mono text-[#535E56]">
                   <span>{data.skuCount} SKUs</span>
-                  <span className="text-emerald-400 font-bold">{data.fixedPerSku}/SKU</span>
+                  <span className="text-[#122018] font-bold">{data.fixedPerSku}/SKU</span>
                 </div>
               </div>
             ))}
@@ -688,14 +688,14 @@ export const SuperadminRequisitionsHub: React.FC = () => {
           onClick={() => setActiveHubTab('requisitions')}
           className={`px-5 py-2.5 rounded-2xl font-bold text-xs flex items-center gap-2 transition-all cursor-pointer ${
             activeHubTab === 'requisitions'
-              ? 'bg-slate-900 text-white shadow-md'
-              : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+              ? 'bg-[#B8CBBE] text-[#122018] shadow-xs border border-[#9EB4A4]'
+              : 'bg-[#FFF9F0] hover:bg-[#CFE0D2] text-[#3E352C] hover:text-[#122018] border border-[#D9CBB8]'
           }`}
         >
-          <ClipboardList className="w-4 h-4 text-cyan-400" />
+          <ClipboardList className="w-4 h-4 text-[#122018]" />
           <span>Stock Requisitions Hub ({requisitions.length})</span>
           {requisitions.filter((r) => r.status === 'PENDING').length > 0 && (
-            <span className="px-2 py-0.5 rounded-full text-[10px] bg-amber-500 text-slate-950 font-black animate-pulse">
+            <span className="px-2 py-0.5 rounded-full text-[10px] bg-[#CFE0D2] text-[#122018] border border-[#B8CBBE] font-black animate-pulse">
               {requisitions.filter((r) => r.status === 'PENDING').length} PENDING
             </span>
           )}
@@ -706,14 +706,14 @@ export const SuperadminRequisitionsHub: React.FC = () => {
           onClick={() => setActiveHubTab('returns')}
           className={`px-5 py-2.5 rounded-2xl font-bold text-xs flex items-center gap-2 transition-all cursor-pointer ${
             activeHubTab === 'returns'
-              ? 'bg-slate-900 text-white shadow-md'
-              : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+              ? 'bg-[#B8CBBE] text-[#122018] shadow-xs border border-[#9EB4A4]'
+              : 'bg-[#FFF9F0] hover:bg-[#CFE0D2] text-[#3E352C] hover:text-[#122018] border border-[#D9CBB8]'
           }`}
         >
-          <RotateCcw className="w-4 h-4 text-amber-400" />
+          <RotateCcw className="w-4 h-4 text-[#122018]" />
           <span>Stock Returns & Exchange Claims ({returnRequests.length})</span>
           {returnRequests.filter((r) => r.status === 'PENDING_REVIEW').length > 0 && (
-            <span className="px-2 py-0.5 rounded-full text-[10px] bg-rose-500 text-white font-black animate-bounce">
+            <span className="px-2 py-0.5 rounded-full text-[10px] bg-[#CFE0D2] text-[#122018] border border-[#B8CBBE] font-black animate-bounce">
               {returnRequests.filter((r) => r.status === 'PENDING_REVIEW').length} TO REVIEW
             </span>
           )}

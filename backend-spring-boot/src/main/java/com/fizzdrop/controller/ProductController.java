@@ -4,24 +4,32 @@ import com.fizzdrop.dto.ApiResponse;
 import com.fizzdrop.entity.CentralInventory;
 import com.fizzdrop.entity.District;
 import com.fizzdrop.entity.DistrictInventory;
+import com.fizzdrop.entity.DistrictProductPricing;
 import com.fizzdrop.entity.Outlet;
 import com.fizzdrop.entity.Product;
+import com.fizzdrop.entity.SalesOfficer;
 import com.fizzdrop.entity.ShopInventory;
 import com.fizzdrop.entity.SupplierProfile;
+import com.fizzdrop.entity.User;
 import com.fizzdrop.repository.CentralInventoryRepository;
 import com.fizzdrop.repository.DistrictInventoryRepository;
+import com.fizzdrop.repository.DistrictProductPricingRepository;
 import com.fizzdrop.repository.DistrictRepository;
 import com.fizzdrop.repository.OutletRepository;
 import com.fizzdrop.repository.ProductRepository;
+import com.fizzdrop.repository.SalesOfficerRepository;
 import com.fizzdrop.repository.ShopInventoryRepository;
 import com.fizzdrop.repository.SupplierProfileRepository;
+import com.fizzdrop.repository.UserRepository;
 import com.fizzdrop.service.RequisitionProcessingService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/products")
@@ -34,6 +42,9 @@ public class ProductController {
     private final DistrictInventoryRepository districtInventoryRepository;
     private final SupplierProfileRepository supplierProfileRepository;
     private final DistrictRepository districtRepository;
+    private final DistrictProductPricingRepository districtProductPricingRepository;
+    private final SalesOfficerRepository salesOfficerRepository;
+    private final UserRepository userRepository;
 
     public ProductController(ProductRepository productRepository, 
                              ShopInventoryRepository inventoryRepository,
@@ -41,7 +52,10 @@ public class ProductController {
                              CentralInventoryRepository centralInventoryRepository,
                              DistrictInventoryRepository districtInventoryRepository,
                              SupplierProfileRepository supplierProfileRepository,
-                             DistrictRepository districtRepository) {
+                             DistrictRepository districtRepository,
+                             DistrictProductPricingRepository districtProductPricingRepository,
+                             SalesOfficerRepository salesOfficerRepository,
+                             UserRepository userRepository) {
         this.productRepository = productRepository;
         this.inventoryRepository = inventoryRepository;
         this.outletRepository = outletRepository;
@@ -49,6 +63,9 @@ public class ProductController {
         this.districtInventoryRepository = districtInventoryRepository;
         this.supplierProfileRepository = supplierProfileRepository;
         this.districtRepository = districtRepository;
+        this.districtProductPricingRepository = districtProductPricingRepository;
+        this.salesOfficerRepository = salesOfficerRepository;
+        this.userRepository = userRepository;
     }
 
     private static List<Product> cachedCatalog = null;
@@ -204,16 +221,85 @@ public class ProductController {
         }
     }
 
+    private Long resolveDistrictId(Long districtId, Long branchId, Long supplierId, Long userId) {
+        if (districtId != null && districtId > 0) {
+            return districtId;
+        }
+        if (branchId != null && branchId > 0) {
+            Outlet o = outletRepository.findById(branchId).orElse(null);
+            if (o != null && o.getDistrictId() != null) {
+                return o.getDistrictId();
+            }
+        }
+        if (supplierId != null && supplierId > 0) {
+            SupplierProfile sp = supplierProfileRepository.findById(supplierId).orElse(null);
+            if (sp != null && sp.getPrimaryDistrictId() != null) {
+                return sp.getPrimaryDistrictId();
+            }
+        }
+        if (userId != null && userId > 0) {
+            SupplierProfile sp = supplierProfileRepository.findByUserId(userId).orElse(null);
+            if (sp != null && sp.getPrimaryDistrictId() != null) {
+                return sp.getPrimaryDistrictId();
+            }
+            SalesOfficer so = salesOfficerRepository.findByUserId(userId).orElse(null);
+            if (so != null && so.getDistrictId() != null) {
+                return so.getDistrictId();
+            }
+            User u = userRepository.findById(userId).orElse(null);
+            if (u != null && u.getBranchId() != null) {
+                Outlet o = outletRepository.findById(u.getBranchId()).orElse(null);
+                if (o != null && o.getDistrictId() != null) {
+                    return o.getDistrictId();
+                }
+            }
+            // For superadmin (userId = 4) or fallback
+            SupplierProfile defaultSp = supplierProfileRepository.findAll().stream().findFirst().orElse(null);
+            if (defaultSp != null && defaultSp.getPrimaryDistrictId() != null) {
+                return defaultSp.getPrimaryDistrictId();
+            }
+        }
+        return 1L; // Dhaka District HQ Central Logistics default
+    }
+
+    private void applyDistrictPricing(List<Product> products, Long districtId) {
+        if (products == null || products.isEmpty() || districtId == null) return;
+        List<DistrictProductPricing> distPricings = districtProductPricingRepository.findByDistrictId(districtId);
+        if (distPricings.isEmpty()) return;
+
+        Map<Long, DistrictProductPricing> pricingMap = distPricings.stream()
+                .collect(Collectors.toMap(DistrictProductPricing::getProductId, dp -> dp, (a, b) -> a));
+
+        for (Product p : products) {
+            DistrictProductPricing dpp = pricingMap.get(p.getProductId());
+            if (dpp != null) {
+                if (dpp.getSupplierPrice() != null) {
+                    p.setSupplierPrice(dpp.getSupplierPrice());
+                    p.setBasePrice(dpp.getSupplierPrice());
+                }
+                if (dpp.getOutletPrice() != null) {
+                    p.setOutletPrice(dpp.getOutletPrice());
+                }
+                if (dpp.getRetailPrice() != null) {
+                    p.setRetailPrice(dpp.getRetailPrice());
+                }
+            }
+        }
+    }
+
     @GetMapping
     public ResponseEntity<List<Product>> getAllProducts(
             @RequestParam(required = false) Long branchId,
             @RequestParam(required = false) Long userId,
             @RequestParam(required = false) Long supplierId,
+            @RequestParam(required = false) Long districtId,
             @RequestParam(required = false) String brand,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String search) {
 
-        boolean isDefaultCatalogQuery = branchId == null && userId == null && supplierId == null &&
+        Long resolvedDistrictId = resolveDistrictId(districtId, branchId, supplierId, userId);
+
+        boolean isDefaultCatalogQuery = branchId == null && userId == null && supplierId == null && districtId == null &&
                 (brand == null || brand.equalsIgnoreCase("All Brands") || brand.trim().isEmpty()) &&
                 (category == null || category.equalsIgnoreCase("All Categories") || category.trim().isEmpty()) &&
                 (search == null || search.trim().isEmpty());
@@ -238,6 +324,9 @@ public class ProductController {
 
         batchPopulateProductMetadata(products, branchId, userId, supplierId);
 
+        // Apply District Pricing allotted by Superadmin
+        applyDistrictPricing(products, resolvedDistrictId);
+
         if (isDefaultCatalogQuery) {
             cachedCatalog = products;
             lastCatalogFetch = System.currentTimeMillis();
@@ -256,6 +345,8 @@ public class ProductController {
             list = list.subList(0, 8);
         }
         batchPopulateProductMetadata(list, branchId, userId, supplierId);
+        Long resolvedDistrictId = resolveDistrictId(null, branchId, supplierId, userId);
+        applyDistrictPricing(list, resolvedDistrictId);
         return ResponseEntity.ok(list);
     }
 
@@ -272,12 +363,27 @@ public class ProductController {
         Product p = product.get();
         List<Outlet> outlets = outletRepository.findAll();
         populateProductMetadata(p, null, userId, supplierId, outlets);
+        Long resolvedDistrictId = resolveDistrictId(null, null, supplierId, userId);
+        applyDistrictPricing(Collections.singletonList(p), resolvedDistrictId);
         return ResponseEntity.ok(p);
     }
 
     @PostMapping
     public ResponseEntity<?> createProduct(@RequestBody Product product) {
         try {
+            if (product.getCategory() == null || product.getCategory().trim().isEmpty() || "Custom".equalsIgnoreCase(product.getCategory())) {
+                if (product.getBrand() != null && !product.getBrand().trim().isEmpty() && !"Custom".equalsIgnoreCase(product.getBrand())) {
+                    product.setCategory(product.getBrand().trim());
+                } else {
+                    product.setCategory("Beverage");
+                }
+            }
+            if (product.getBrand() == null || product.getBrand().trim().isEmpty()) {
+                product.setBrand("Beverage");
+            }
+            if (product.getFlavorVariant() == null || product.getFlavorVariant().trim().isEmpty()) {
+                product.setFlavorVariant("Regular");
+            }
             if (product.getBasePrice() == null && product.getSupplierPrice() != null) {
                 product.setBasePrice(product.getSupplierPrice());
             }
@@ -341,6 +447,35 @@ public class ProductController {
     public ResponseEntity<?> updateProductPrice(
             @PathVariable Long id,
             @RequestBody Map<String, Object> body) {
+        // District-level pricing is now allotted by Superadmin
+        Object distObj = body.get("district_id") != null ? body.get("district_id") : body.get("districtId");
+        if (distObj != null) {
+            Long distId = Long.parseLong(distObj.toString());
+            DistrictProductPricing dpp = districtProductPricingRepository.findByDistrictIdAndProductId(distId, id).orElseGet(() -> {
+                DistrictProductPricing np = new DistrictProductPricing();
+                np.setDistrictId(distId);
+                np.setProductId(id);
+                return np;
+            });
+            if (body.containsKey("supplier_price") && body.get("supplier_price") != null) {
+                dpp.setSupplierPrice(new BigDecimal(body.get("supplier_price").toString()));
+            }
+            if (body.containsKey("outlet_price") && body.get("outlet_price") != null) {
+                dpp.setOutletPrice(new BigDecimal(body.get("outlet_price").toString()));
+            }
+            if (body.containsKey("retail_price") && body.get("retail_price") != null) {
+                dpp.setRetailPrice(new BigDecimal(body.get("retail_price").toString()));
+            }
+            dpp.setUpdatedAt(LocalDateTime.now());
+            districtProductPricingRepository.save(dpp);
+            invalidateCatalogCache();
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "District product pricing allotted successfully by Superadmin!",
+                "pricing", dpp
+            ));
+        }
+
         return productRepository.findById(id).map(product -> {
             if (body.containsKey("outlet_price") && body.get("outlet_price") != null) {
                 product.setOutletPrice(new BigDecimal(body.get("outlet_price").toString()));
@@ -355,7 +490,7 @@ public class ProductController {
             invalidateCatalogCache();
             return ResponseEntity.ok(Map.of(
                 "success", true,
-                "message", "Product pricing updated successfully by supplier!",
+                "message", "Product base pricing updated.",
                 "product", saved
             ));
         }).orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("success", false, "message", "Product not found")));
@@ -364,8 +499,15 @@ public class ProductController {
     @PutMapping("/{id}")
     public ResponseEntity<?> updateProduct(@PathVariable Long id, @RequestBody Product productUpdates) {
         return productRepository.findById(id).map(existing -> {
-            if (productUpdates.getBrand() != null) existing.setBrand(productUpdates.getBrand());
-            if (productUpdates.getFlavorVariant() != null) existing.setFlavorVariant(productUpdates.getFlavorVariant());
+            if (productUpdates.getBrand() != null && !productUpdates.getBrand().trim().isEmpty()) {
+                existing.setBrand(productUpdates.getBrand().trim());
+                if (existing.getCategory() == null || "Custom".equalsIgnoreCase(existing.getCategory())) {
+                    existing.setCategory(productUpdates.getBrand().trim());
+                }
+            }
+            if (productUpdates.getFlavorVariant() != null && !productUpdates.getFlavorVariant().trim().isEmpty()) {
+                existing.setFlavorVariant(productUpdates.getFlavorVariant().trim());
+            }
             if (productUpdates.getPackaging() != null) existing.setPackaging(productUpdates.getPackaging());
             if (productUpdates.getSizeVolume() != null) existing.setSizeVolume(productUpdates.getSizeVolume());
             if (productUpdates.getSku() != null) existing.setSku(productUpdates.getSku());
