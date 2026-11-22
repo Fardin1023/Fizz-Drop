@@ -12,10 +12,12 @@ import {
   Edit3,
   Coins,
   MapPin,
+  TableProperties,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { ProductFormModal } from '../Admin/ProductFormModal';
 import { DistrictPricingStudio } from './DistrictPricingStudio';
+import { SuperadminPriceBoard } from './SuperadminPriceBoard';
 
 interface ProductRecord {
   product_id: number;
@@ -44,7 +46,7 @@ export const SuperadminProductCatalog: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [editingProduct, setEditingProduct] = useState<ProductRecord | null>(null);
   const [actionMsg, setActionMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
-  const [viewMode, setViewMode] = useState<'catalog' | 'district-pricing'>('catalog');
+  const [viewMode, setViewMode] = useState<'catalog' | 'district-pricing' | 'price-board'>('catalog');
   const [studioDistrictId, setStudioDistrictId] = useState<number>(1);
 
   const fetchCatalogAndBranches = async () => {
@@ -143,19 +145,19 @@ export const SuperadminProductCatalog: React.FC = () => {
   const totalCentralCases = products.reduce((sum, p) => sum + (p.central_stock || p.total_stock || 0), 0);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2.5">
       {/* Action Notification Alert */}
       {actionMsg && (
         <div
-          className={`p-3.5 rounded-2xl border text-xs font-semibold flex items-center justify-between ${
+          className={`p-3 rounded-xl border text-xs font-semibold flex items-center justify-between ${
             actionMsg.type === 'success'
-              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+              ? 'bg-[#DEFDEF] text-[#101B14] border-[#B8CBBE]'
               : 'bg-rose-50 text-rose-800 border-rose-200'
           }`}
         >
           <div className="flex items-center gap-2">
             {actionMsg.type === 'success' ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
             ) : (
               <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
             )}
@@ -170,179 +172,204 @@ export const SuperadminProductCatalog: React.FC = () => {
         </div>
       )}
 
-      {/* View Mode Toggle: Master Catalog vs District Pricing Studio */}
-      <div className="flex items-center gap-2 p-1.5 bg-slate-100 rounded-2xl w-fit border border-slate-200">
+      {/* View Mode Toggle: Master Catalog vs District Pricing Studio vs Price Board */}
+      <div className="flex flex-wrap items-center gap-1.5 p-1 bg-[#F2E6D5]/80 rounded-xl w-fit border border-[#D9CBB8]">
         <button
           type="button"
           onClick={() => setViewMode('catalog')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
             viewMode === 'catalog'
-              ? 'bg-white text-blue-700 shadow-sm border border-slate-200/80'
-              : 'text-slate-600 hover:text-slate-900'
+              ? 'bg-[#B8CBBE] text-[#101B14] shadow-xs border border-[#9EB4A4]'
+              : 'text-[#535E56] hover:text-[#101B14]'
           }`}
         >
-          <Package className="w-4 h-4" />
+          <Package className="w-3.5 h-3.5" />
           <span>Master Beverage Catalog ({products.length} SKUs)</span>
         </button>
 
         <button
           type="button"
-          onClick={() => setViewMode('district-pricing')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            viewMode === 'district-pricing'
-              ? 'bg-emerald-600 text-white shadow-sm'
-              : 'text-slate-600 hover:text-slate-900'
+          onClick={() => setViewMode('price-board')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            viewMode === 'price-board'
+              ? 'bg-[#B8CBBE] text-[#101B14] shadow-xs border border-[#9EB4A4]'
+              : 'text-[#535E56] hover:text-[#101B14]'
           }`}
         >
-          <Coins className="w-4 h-4" />
+          <TableProperties className="w-3.5 h-3.5" />
+          <span>Price Board (All 64 Districts)</span>
+          <span className={`text-[9px] px-1.5 py-0.2 rounded-md font-mono ${
+            viewMode === 'price-board' ? 'bg-[#FFF9F0] text-[#101B14]' : 'bg-[#CFE0D2] text-[#122018]'
+          }`}>
+            Live Board
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setViewMode('district-pricing')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            viewMode === 'district-pricing'
+              ? 'bg-[#B8CBBE] text-[#101B14] shadow-xs border border-[#9EB4A4]'
+              : 'text-[#535E56] hover:text-[#101B14]'
+          }`}
+        >
+          <Coins className="w-3.5 h-3.5" />
           <span>District Pricing Allotment Studio (64 Districts)</span>
-          <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
-            viewMode === 'district-pricing' ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-800'
+          <span className={`text-[9px] px-1.5 py-0.2 rounded-md font-mono ${
+            viewMode === 'district-pricing' ? 'bg-[#FFF9F0] text-[#101B14]' : 'bg-[#CFE0D2] text-[#122018]'
           }`}>
             64 Districts
           </span>
         </button>
       </div>
 
-      {viewMode === 'district-pricing' ? (
+      {viewMode === 'price-board' ? (
+        <SuperadminPriceBoard
+          onOpenPricingStudio={(distId) => {
+            setStudioDistrictId(distId);
+            setViewMode('district-pricing');
+          }}
+        />
+      ) : viewMode === 'district-pricing' ? (
         <DistrictPricingStudio initialDistrictId={studioDistrictId} />
       ) : (
         <>
-          {/* Top Header & Telemetry Card */}
-          <div className="p-4 sm:p-5 rounded-3xl bg-white border border-slate-200/90 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-mono uppercase tracking-wider font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
-              CENTRAL PRODUCT MASTER
-            </span>
-            <span className="text-xs text-slate-400">•</span>
-            <span className="text-xs font-mono font-semibold text-slate-600">
-              Superadmin Product & Pricing Control
-            </span>
+          {/* Top Header Card */}
+          <div className="px-4 py-3 rounded-2xl bg-[#FFF9F0] border border-[#D9CBB8] shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[9px] font-mono uppercase tracking-wider font-bold text-[#101B14] bg-[#CFE0D2] px-2 py-0.5 rounded border border-[#B8CBBE]">
+                  CENTRAL PRODUCT MASTER
+                </span>
+                <span className="text-xs text-[#8C988F]">•</span>
+                <span className="text-xs font-mono font-semibold text-[#535E56]">
+                  Superadmin Product & Pricing Control
+                </span>
+              </div>
+              <h2 className="font-oswald text-lg sm:text-xl font-black text-[#101B14] uppercase tracking-tight mt-0.5">
+                Master Products & Multi-Tier Pricing
+              </h2>
+              <p className="text-xs text-[#535E56] max-w-2xl leading-relaxed">
+                Input, edit, and fine-tune beverage specifications, SKUs, 3-tier multi-echelon pricing, and central depot stock.
+              </p>
+            </div>
+
+            {/* Primary CTA: Input Product Details */}
+            <button
+              type="button"
+              onClick={handleOpenCreateModal}
+              className="py-1.5 px-3.5 rounded-xl bg-[#B8CBBE] hover:bg-[#CFE0D2] text-[#101B14] font-bold text-xs shadow-xs border border-[#9EB4A4] flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap active:scale-95 shrink-0"
+            >
+              <Plus className="w-3.5 h-3.5 text-[#101B14]" />
+              <span>Input Product Details</span>
+            </button>
           </div>
-          <h2 className="font-oswald text-xl sm:text-2xl font-black text-zinc-900 uppercase tracking-tight mt-1">
-            Master Products & Multi-Tier Pricing
-          </h2>
-          <p className="text-xs text-slate-500 mt-0.5 max-w-2xl">
-            Input, edit, and fine-tune beverage specifications, SKUs, 3-tier multi-echelon pricing (Supplier Buy Rate, Outlet Rate, Retail MRP), and central depot stock.
-          </p>
-        </div>
 
-        {/* Primary CTA: Input Product Details */}
-        <button
-          type="button"
-          onClick={handleOpenCreateModal}
-          className="py-2.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold text-xs shadow-md shadow-blue-500/20 flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap active:scale-95 shrink-0"
-        >
-          <Plus className="w-4 h-4 text-white" />
-          <span>Input Product Details</span>
-        </button>
-      </div>
+          {/* Telemetry Metric Badges */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <div className="px-3.5 py-2.5 rounded-xl bg-[#FFF9F0] border border-[#D9CBB8] shadow-2xs flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#535E56] block font-mono">
+                  Total Cataloged SKUs
+                </span>
+                <span className="text-xl font-black font-oswald text-[#101B14] mt-0.5 block">
+                  {loading && products.length === 0 ? (
+                    <span className="inline-block w-8 h-6 bg-slate-200 rounded animate-pulse" />
+                  ) : (
+                    products.length
+                  )}
+                </span>
+                <span className="text-[10px] text-[#717E75]">Live products in database</span>
+              </div>
+              <div className="w-8 h-8 rounded-lg bg-[#CFE0D2] text-[#101B14] flex items-center justify-center border border-[#B8CBBE] shrink-0">
+                <Package className="w-4 h-4" />
+              </div>
+            </div>
 
-      {/* Telemetry Metric Badges */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-between">
-          <div>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block font-mono">
-              Total Cataloged SKUs
-            </span>
-            <span className="text-2xl font-black font-oswald text-zinc-900 mt-1 block">
-              {loading && products.length === 0 ? (
-                <span className="inline-block w-8 h-7 bg-slate-200 rounded animate-pulse" />
-              ) : (
-                products.length
-              )}
-            </span>
-            <span className="text-[11px] text-slate-500">Live products in database</span>
+            <div className="px-3.5 py-2.5 rounded-xl bg-[#FFF9F0] border border-[#D9CBB8] shadow-2xs flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#535E56] block font-mono">
+                  Central Stock Pool
+                </span>
+                <span className="text-xl font-black font-oswald text-[#101B14] mt-0.5 block">
+                  {loading && products.length === 0 ? (
+                    <span className="inline-block w-16 h-6 bg-slate-200 rounded animate-pulse" />
+                  ) : (
+                    totalCentralCases.toLocaleString()
+                  )}
+                </span>
+                <span className="text-[10px] text-[#717E75]">Cases available for supplier requisitions</span>
+              </div>
+              <div className="w-8 h-8 rounded-lg bg-[#CFE0D2] text-[#101B14] flex items-center justify-center border border-[#B8CBBE] shrink-0">
+                <Boxes className="w-4 h-4" />
+              </div>
+            </div>
+
+            <div className="px-3.5 py-2.5 rounded-xl bg-[#FFF9F0] border border-[#D9CBB8] shadow-2xs flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#535E56] block font-mono">
+                  Product Categories
+                </span>
+                <span className="text-xl font-black font-oswald text-[#101B14] mt-0.5 block">
+                  {loading && products.length === 0 ? (
+                    <span className="inline-block w-8 h-6 bg-slate-200 rounded animate-pulse" />
+                  ) : (
+                    categories.filter((c) => c !== 'ALL').length
+                  )}
+                </span>
+                <span className="text-[10px] text-[#717E75]">Active beverage segments</span>
+              </div>
+              <div className="w-8 h-8 rounded-lg bg-[#CFE0D2] text-[#101B14] flex items-center justify-center border border-[#B8CBBE] shrink-0">
+                <Layers className="w-4 h-4" />
+              </div>
+            </div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
-            <Package className="w-5 h-5" />
+
+          {/* Search & Filter Toolbar */}
+          <div className="px-3 py-2 rounded-xl bg-[#FFF9F0] border border-[#D9CBB8] shadow-2xs flex flex-wrap items-center justify-between gap-2">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#535E56]" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by SKU, brand, flavor, or category..."
+                aria-label="Search master products by SKU, brand, flavor, or category"
+                className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-white border border-[#D9CBB8] text-xs text-[#101B14] placeholder-[#8C988F] focus:outline-none focus:ring-2 focus:ring-[#B8CBBE]"
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              {/* Category Filter */}
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                aria-label="Filter products by beverage category"
+                className="px-2.5 py-1.5 rounded-lg bg-white border border-[#D9CBB8] text-xs text-[#101B14] font-medium focus:outline-none cursor-pointer"
+              >
+                {categories.map((c) => (
+                  <option key={c} value={c}>
+                    Category: {c}
+                  </option>
+                ))}
+              </select>
+
+              {/* Refresh Button */}
+              <button
+                type="button"
+                onClick={fetchCatalogAndBranches}
+                title="Refresh Central Products"
+                aria-label="Refresh master product catalog from database"
+                className="p-1.5 rounded-lg border border-[#D9CBB8] bg-white hover:bg-[#CFE0D2] text-[#535E56] hover:text-[#101B14] transition-colors cursor-pointer"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-emerald-700' : ''}`} />
+              </button>
+            </div>
           </div>
-        </div>
 
-        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-between">
-          <div>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block font-mono">
-              Central Stock Pool
-            </span>
-            <span className="text-2xl font-black font-oswald text-indigo-700 mt-1 block">
-              {loading && products.length === 0 ? (
-                <span className="inline-block w-16 h-7 bg-slate-200 rounded animate-pulse" />
-              ) : (
-                totalCentralCases.toLocaleString()
-              )}
-            </span>
-            <span className="text-[11px] text-slate-500">Cases available for supplier requisitions</span>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100">
-            <Boxes className="w-5 h-5" />
-          </div>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-center justify-between">
-          <div>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block font-mono">
-              Product Categories
-            </span>
-            <span className="text-2xl font-black font-oswald text-cyan-700 mt-1 block">
-              {loading && products.length === 0 ? (
-                <span className="inline-block w-8 h-7 bg-slate-200 rounded animate-pulse" />
-              ) : (
-                categories.filter((c) => c !== 'ALL').length
-              )}
-            </span>
-            <span className="text-[11px] text-slate-500">Active beverage segments</span>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center border border-cyan-100">
-            <Layers className="w-5 h-5" />
-          </div>
-        </div>
-      </div>
-
-      {/* Search & Filter Toolbar */}
-      <div className="p-3 rounded-2xl bg-white border border-slate-200/90 shadow-2xs flex flex-wrap items-center justify-between gap-2.5">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by SKU, brand, flavor, or category..."
-            aria-label="Search master products by SKU, brand, flavor, or category"
-            className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-zinc-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-          />
-        </div>
-
-        <div className="flex items-center gap-2">
-          {/* Category Filter */}
-          <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            aria-label="Filter products by beverage category"
-            className="px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-zinc-800 font-medium focus:outline-none cursor-pointer"
-          >
-            {categories.map((c) => (
-              <option key={c} value={c}>
-                Category: {c}
-              </option>
-            ))}
-          </select>
-
-          {/* Refresh Button */}
-          <button
-            type="button"
-            onClick={fetchCatalogAndBranches}
-            title="Refresh Central Products"
-            aria-label="Refresh master product catalog from database"
-            className="p-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-500 transition-colors cursor-pointer"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-blue-600' : ''}`} />
-          </button>
-        </div>
-      </div>
-
-      {/* Catalog Table */}
-      <div className="rounded-3xl bg-white border border-slate-200/90 shadow-sm overflow-hidden">
+          {/* Catalog Table */}
+          <div className="rounded-2xl bg-[#FFF9F0] border border-[#D9CBB8] shadow-xs overflow-hidden">
         {loading && products.length === 0 ? (
           <div className="overflow-x-auto" role="status" aria-label="Loading master products from database">
             <table className="w-full text-left text-xs">
@@ -411,18 +438,18 @@ export const SuperadminProductCatalog: React.FC = () => {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 text-[10px] font-bold font-mono text-slate-500 uppercase tracking-wider border-b border-slate-200">
+              <thead className="bg-[#F2E6D5]/80 text-[10px] font-bold font-mono text-[#101B14] uppercase tracking-wider border-b border-[#D9CBB8]">
                 <tr>
-                  <th className="py-3.5 px-4">Beverage Product</th>
-                  <th className="py-3.5 px-4">SKU Token</th>
-                  <th className="py-3.5 px-4">Packaging & Size</th>
-                  <th className="py-3.5 px-4">Category</th>
-                  <th className="py-3.5 px-4">3-Tier Commercial Pricing</th>
-                  <th className="py-3.5 px-4 text-center">Superadmin Central Stock</th>
-                  <th className="py-3.5 px-4 text-right">Actions</th>
+                  <th className="py-2.5 px-3.5">Beverage Product</th>
+                  <th className="py-2.5 px-3.5">SKU Token</th>
+                  <th className="py-2.5 px-3.5">Packaging & Size</th>
+                  <th className="py-2.5 px-3.5">Category</th>
+                  <th className="py-2.5 px-3.5">3-Tier Commercial Pricing</th>
+                  <th className="py-2.5 px-3.5 text-center">Superadmin Central Stock</th>
+                  <th className="py-2.5 px-3.5 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-[#D9CBB8]/40">
                 {filteredProducts.map((p) => {
                   const centralStock = p.central_stock || p.total_stock || 0;
                   const buyRate = Number(p.supplier_price ?? p.base_price ?? 0);
@@ -430,8 +457,8 @@ export const SuperadminProductCatalog: React.FC = () => {
                   const retailMRP = Number(p.retail_price ?? (outletRate * 1.15));
 
                   return (
-                    <tr key={p.product_id} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="py-3 px-4">
+                    <tr key={p.product_id} className="hover:bg-[#F2E6D5]/30 transition-colors">
+                      <td className="py-2.5 px-3.5">
                         <div className="flex items-center gap-3">
                           <div className="w-11 h-11 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
                             {p.image_url ? (

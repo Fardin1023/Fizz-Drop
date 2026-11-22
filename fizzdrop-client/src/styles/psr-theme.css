@@ -1,0 +1,683 @@
+/**
+ * Pre-Sales Representative (PSR) Exclusive Palette Theme
+ * 5-Color Palette:
+ *  - Color 1: #f7fbff (Pure Ice White / Card Background & Input Fill)
+ *  - Color 2: #e8f4ff (Soft Baby Sky Blue / Main Canvas Background)
+ *  - Color 3: #d6ecff (Soft Sky Blue / Headers, Sub-Cards & Pill Badges)
+ *  - Color 4: #c4dde9 (Slate Sky Blue / Borders, Outlines & Dividers)
+ *  - Color 5: #b7c4cd (Cool Grey Slate / Accent Borders & Active Controls)
+ *
+ * Scoped EXCLUSIVELY to .psr-theme and .psr-portal-page so no other pages are affected.
+ */
+
+:root {
+  --psr-c1: #f7fbff;
+  --psr-c2: #e8f4ff;
+  --psr-c3: #d6ecff;
+  --psr-c4: #c4dde9;
+  --psr-c5: #b7c4cd;
+  --psr-text-primary: #0F172A;
+  --psr-text-secondary: #334155;
+  --psr-text-muted: #64748B;
+  --psr-border: #c4dde9;
+  --psr-border-accent: #b7c4cd;
+  --psr-accent-btn: #0F172A;
+  --psr-accent-blue: #0284C7;
+}
+
+/* =====================================================================
+   1. MAIN PAGE CONTAINER & CANVAS BACKGROUND
+   ===================================================================== */
+.psr-theme,
+.psr-portal-page {
+  background-color: #e8f4ff !important;
+  color: #0F172A !important;
+  min-height: 100vh;
+}
+
+.psr-theme ::selection,
+.psr-portal-page ::selection {
+  background-color: #d6ecff !important;
+  color: #0F172A !important;
+}
+
+/* =====================================================================
+   2. TOP HEADER & NAVIGATION BAR
+   ===================================================================== */
+.psr-theme header,
+.psr-portal-page header,
+.psr-theme .sticky.top-0,
+.psr-portal-page .sticky.top-0 {
+  background-color: rgba(247, 251, 255, 0.96) !important;
+  border-bottom: 1px solid #c4dde9 !important;
+  backdrop-filter: blur(12px) !important;
+  box-shadow: 0 2px 10px rgba(196, 221, 233, 0.35) !important;
+}
+
+.psr-theme header h1,
+.psr-portal-page header h1 {
+  color: #0F172A !important;
+}
+
+/* Logo Border */
+.psr-theme header img,
+.psr-portal-page header img {
+  border-color: #c4dde9 !important;
+  box-shadow: 0 4px 10px rgba(183, 196, 205, 0.3) !important;
+}
+
+/* PSR Code Chip */
+.psr-theme header span.bg-amber-100,
+.psr-portal-page header span.bg-amber-100 {
+  background-color: #d6ecff !important;
+  color: #0F172A !important;
+  border: 1px solid #c4dde9 !important;
+}
+
+/* Sub-Route and Area Subtitle */
+.psr-theme header p,
+.psr-portal-page header p {
+  color: #475569 !important;
+}
+
+.psr-theme header p strong,
+.psr-portal-page header p strong {
+  color: #0F172A !important;
+}
+
+/* Quick Switch PSR Dropdown */
+.psr-theme header .bg-slate-100,
+.psr-portal-page header .bg-slate-100,
+.psr-theme header select,
+.psr-portal-page header select {
+  background-color: #f7fbff !important;
+  border: 1px solid #c4dde9 !important;
+  color: #0F172A !important;
+}
+
+.psr-theme header select option,
+.psr-portal-page header select option {
+  background-color: #ffffff !important;
+  color: #0F172A !important;
+}
+
+/* Refresh & Header Action Buttons */
+.psr-theme header button,
+.psr-portal-page header button {
+  color: #334155 !important;
+}
+
+.psr-theme header button:hover,
+.psr-portal-page header button:hover {
+  background-color: #d6ecff !important;
+  color: #0F172A !important;
+}
+
+/* =====================================================================
+   3. TERRITORY JURISDICTION / ASSIGNED HIERARCHY BANNER
+   ===================================================================== */
+.psr-theme div[class*="from-orange-600"][class*="via-amber-600"],
+.psr-portal-page div[class*="from-orange-600"][class*="via-amber-600"],
+.psr-theme .bg-gradient-to-r.from-orange-600,
+.psr-portal-page .bg-gradient-to-r.from-orange-600 {
+  background: linear-gradient(135deg, #d6ecff 0%, #e8f4ff 50%, #f7fbff 100%) !important;
+  border: 1px solid #c4dde9 !important;
+  color: #0F172A !important;
+  box-shadow: 0 4px 18px rgba(196, 221, 233, 0.45) !important;
+}
+
+.psr-theme div[class*="from-orange-600"] h2,
+.psr-portal-page div[class*="from-orange-600"] h2 {
+  color: #0F172A !important;
+}
+
+.psr-theme div[class*="from-orange-600"] p,
+.psr-portal-page div[class*="from-orange-600"] p,
+.psr-theme div[class*="from-orange-600"] span,
+.psr-portal-page div[class*="from-orange-600"] span {
+  color: #334155 !important;
+}
+
+.psr-theme div[class*="from-orange-600"] strong,
+.psr-portal-page div[class*="from-orange-600"] strong {
+  color: #0F172A !important;
+}
+
+/* Representative Emblem */
+.psr-theme div[class*="from-orange-600"] img,
+.psr-portal-page div[class*="from-orange-600"] img {
+  border-color: #c4dde9 !important;
+  box-shadow: 0 4px 12px rgba(183, 196, 205, 0.4) !important;
+  background-color: #ffffff !important;
+}
+
+/* Top Role Badge */
+.psr-theme div[class*="from-orange-600"] span.bg-white\/20,
+.psr-portal-page div[class*="from-orange-600"] span.bg-white\/20 {
+  background-color: #f7fbff !important;
+  color: #0F172A !important;
+  border: 1px solid #c4dde9 !important;
+}
+
+/* Live Field Duty Badge */
+.psr-theme div[class*="from-orange-600"] span.bg-emerald-500\/90,
+.psr-portal-page div[class*="from-orange-600"] span.bg-emerald-500\/90 {
+  background-color: #e8f4ff !important;
+  color: #0F172A !important;
+  border: 1px solid #c4dde9 !important;
+}
+
+.psr-theme div[class*="from-orange-600"] span.bg-emerald-500\/90 span,
+.psr-portal-page div[class*="from-orange-600"] span.bg-emerald-500\/90 span {
+  background-color: #0F172A !important;
+}
+
+/* Right-side Sub-Card Pills */
+.psr-theme div[class*="from-orange-600"] .bg-white\/10,
+.psr-portal-page div[class*="from-orange-600"] .bg-white\/10 {
+  background-color: #f7fbff !important;
+  border: 1px solid #c4dde9 !important;
+  box-shadow: 0 2px 8px rgba(196, 221, 233, 0.3) !important;
+}
+
+.psr-theme div[class*="from-orange-600"] .bg-white\/10 p.text-orange-200,
+.psr-portal-page div[class*="from-orange-600"] .bg-white\/10 p.text-orange-200 {
+  color: #64748B !important;
+}
+
+.psr-theme div[class*="from-orange-600"] .bg-white\/10 p.font-bold,
+.psr-portal-page div[class*="from-orange-600"] .bg-white\/10 p.font-bold {
+  color: #0F172A !important;
+}
+
+.psr-theme div[class*="from-orange-600"] .bg-white\/10 .bg-white\/20,
+.psr-portal-page div[class*="from-orange-600"] .bg-white\/10 .bg-white\/20 {
+  background-color: #c4dde9 !important;
+}
+
+/* =====================================================================
+   4. STATS TELEMETRY CARDS (4-GRID)
+   ===================================================================== */
+.psr-theme .grid-cols-2.lg\:grid-cols-4 > div,
+.psr-portal-page .grid-cols-2.lg\:grid-cols-4 > div {
+  background-color: #f7fbff !important;
+  border: 1px solid #c4dde9 !important;
+  box-shadow: 0 2px 8px rgba(196, 221, 233, 0.25) !important;
+}
+
+.psr-theme .grid-cols-2.lg\:grid-cols-4 > div:hover,
+.psr-portal-page .grid-cols-2.lg\:grid-cols-4 > div:hover {
+  border-color: #b7c4cd !important;
+  box-shadow: 0 4px 14px rgba(183, 196, 205, 0.35) !important;
+}
+
+.psr-theme .grid-cols-2.lg\:grid-cols-4 p,
+.psr-portal-page .grid-cols-2.lg\:grid-cols-4 p {
+  color: #475569 !important;
+}
+
+.psr-theme .grid-cols-2.lg\:grid-cols-4 h3,
+.psr-portal-page .grid-cols-2.lg\:grid-cols-4 h3 {
+  color: #0F172A !important;
+}
+
+/* Stat Icon Containers */
+.psr-theme .grid-cols-2.lg\:grid-cols-4 .rounded-lg,
+.psr-portal-page .grid-cols-2.lg\:grid-cols-4 .rounded-lg {
+  background-color: #d6ecff !important;
+  border: 1px solid #c4dde9 !important;
+  color: #0F172A !important;
+}
+
+.psr-theme .grid-cols-2.lg\:grid-cols-4 .rounded-lg svg,
+.psr-portal-page .grid-cols-2.lg\:grid-cols-4 .rounded-lg svg {
+  color: #0F172A !important;
+}
+
+/* =====================================================================
+   5. TAB NAVIGATION & CONTROLS STRIP
+   ===================================================================== */
+.psr-theme .border-b.border-slate-200,
+.psr-portal-page .border-b.border-slate-200 {
+  border-color: #c4dde9 !important;
+}
+
+/* Tab Inactive Buttons */
+.psr-theme button.text-slate-600,
+.psr-portal-page button.text-slate-600,
+.psr-theme button[class*="text-slate-600"],
+.psr-portal-page button[class*="text-slate-600"] {
+  background-color: #f7fbff !important;
+  border: 1px solid #c4dde9 !important;
+  color: #334155 !important;
+}
+
+.psr-theme button.text-slate-600:hover,
+.psr-portal-page button.text-slate-600:hover {
+  background-color: #d6ecff !important;
+  color: #0F172A !important;
+  border-color: #b7c4cd !important;
+}
+
+/* Tab Active Button (Replaces bg-orange-500) */
+.psr-theme button.bg-orange-500,
+.psr-portal-page button.bg-orange-500,
+.psr-theme button[class*="bg-orange-500"],
+.psr-portal-page button[class*="bg-orange-500"] {
+  background-color: #0F172A !important;
+  color: #ffffff !important;
+  border: 1px solid #0F172A !important;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.25) !important;
+}
+
+/* Search Input */
+.psr-theme input[type="text"],
+.psr-portal-page input[type="text"],
+.psr-theme input[type="search"],
+.psr-portal-page input[type="search"] {
+  background-color: #f7fbff !important;
+  border: 1px solid #c4dde9 !important;
+  color: #0F172A !important;
+}
+
+.psr-theme input[type="text"]:focus,
+.psr-portal-page input[type="text"]:focus {
+  border-color: #b7c4cd !important;
+  outline: 2px solid #d6ecff !important;
+}
+
+/* Submit Drafts Button */
+.psr-theme button.bg-emerald-600,
+.psr-portal-page button.bg-emerald-600 {
+  background-color: #0F172A !important;
+  color: #ffffff !important;
+  border: 1px solid #b7c4cd !important;
+}
+
+.psr-theme button.bg-emerald-600:hover,
+.psr-portal-page button.bg-emerald-600:hover {
+  background-color: #1E293B !important;
+}
+
+/* =====================================================================
+   6. TARGET ALLOTMENT BANNER & PROGRESS BARS
+   ===================================================================== */
+.psr-theme div[class*="from-amber-500"][class*="via-orange-600"],
+.psr-portal-page div[class*="from-amber-500"][class*="via-orange-600"] {
+  background: linear-gradient(135deg, #d6ecff 0%, #e8f4ff 60%, #f7fbff 100%) !important;
+  border: 1px solid #c4dde9 !important;
+  color: #0F172A !important;
+  box-shadow: 0 4px 15px rgba(196, 221, 233, 0.4) !important;
+}
+
+.psr-theme div[class*="from-amber-500"] h4,
+.psr-portal-page div[class*="from-amber-500"] h4,
+.psr-theme div[class*="from-amber-500"] h2,
+.psr-portal-page div[class*="from-amber-500"] h2 {
+  color: #0F172A !important;
+}
+
+.psr-theme div[class*="from-amber-500"] p,
+.psr-portal-page div[class*="from-amber-500"] p,
+.psr-theme div[class*="from-amber-500"] span,
+.psr-portal-page div[class*="from-amber-500"] span {
+  color: #334155 !important;
+}
+
+.psr-theme div[class*="from-amber-500"] .bg-white\/20,
+.psr-portal-page div[class*="from-amber-500"] .bg-white\/20,
+.psr-theme div[class*="from-amber-500"] .bg-white\/25,
+.psr-portal-page div[class*="from-amber-500"] .bg-white\/25 {
+  background-color: #f7fbff !important;
+  border: 1px solid #c4dde9 !important;
+  color: #0F172A !important;
+}
+
+.psr-theme div[class*="from-amber-500"] .bg-black\/20,
+.psr-portal-page div[class*="from-amber-500"] .bg-black\/20 {
+  background-color: #f7fbff !important;
+  border: 1px solid #c4dde9 !important;
+  color: #0F172A !important;
+}
+
+/* Progress bar in Target Banner */
+.psr-theme div[class*="from-amber-500"] .bg-black\/25,
+.psr-portal-page div[class*="from-amber-500"] .bg-black\/25 {
+  background-color: #c4dde9 !important;
+}
+
+.psr-theme div[class*="from-amber-500"] .bg-black\/25 > div,
+.psr-portal-page div[class*="from-amber-500"] .bg-black\/25 > div {
+  background-color: #0F172A !important;
+}
+
+/* Target Line Breakdown Cards */
+.psr-theme div[class*="from-amber-500"] .grid > div,
+.psr-portal-page div[class*="from-amber-500"] .grid > div {
+  background-color: #f7fbff !important;
+  border: 1px solid #c4dde9 !important;
+}
+
+.psr-theme div[class*="from-amber-500"] .grid > div span,
+.psr-portal-page div[class*="from-amber-500"] .grid > div span {
+  color: #0F172A !important;
+}
+
+/* Operating Rule Banner */
+.psr-theme .bg-amber-50,
+.psr-portal-page .bg-amber-50 {
+  background-color: #e8f4ff !important;
+  border: 1px solid #c4dde9 !important;
+  color: #0F172A !important;
+}
+
+.psr-theme .bg-amber-50 strong,
+.psr-portal-page .bg-amber-50 strong {
+  color: #0F172A !important;
+}
+
+.psr-theme .bg-amber-50 svg,
+.psr-portal-page .bg-amber-50 svg {
+  color: #334155 !important;
+}
+
+/* =====================================================================
+   7. OUTLET CARDS GRID (TAB 1)
+   ===================================================================== */
+.psr-theme .grid.grid-cols-1.md\:grid-cols-2.lg\:grid-cols-3 > div,
+.psr-portal-page .grid.grid-cols-1.md\:grid-cols-2.lg\:grid-cols-3 > div {
+  background-color: #f7fbff !important;
+  border: 1px solid #c4dde9 !important;
+  box-shadow: 0 2px 8px rgba(196, 221, 233, 0.25) !important;
+}
+
+.psr-theme .grid.grid-cols-1.md\:grid-cols-2.lg\:grid-cols-3 > div:hover,
+.psr-portal-page .grid.grid-cols-1.md\:grid-cols-2.lg\:grid-cols-3 > div:hover {
+  border-color: #b7c4cd !important;
+  box-shadow: 0 6px 18px rgba(183, 196, 205, 0.35) !important;
+}
+
+/* Outlet Card Title */
+.psr-theme .grid.grid-cols-1.md\:grid-cols-2.lg\:grid-cols-3 h3,
+.psr-portal-page .grid.grid-cols-1.md\:grid-cols-2.lg\:grid-cols-3 h3 {
+  color: #0F172A !important;
+}
+
+/* Outlet Card Tag */
+.psr-theme .grid.grid-cols-1.md\:grid-cols-2.lg\:grid-cols-3 span.text-orange-600,
+.psr-portal-page .grid.grid-cols-1.md\:grid-cols-2.lg\:grid-cols-3 span.text-orange-600 {
+  color: #334155 !important;
+}
+
+/* Active Badge */
+.psr-theme .grid.grid-cols-1.md\:grid-cols-2.lg\:grid-cols-3 span.bg-emerald-100,
+.psr-portal-page .grid.grid-cols-1.md\:grid-cols-2.lg\:grid-cols-3 span.bg-emerald-100 {
+  background-color: #d6ecff !important;
+  color: #0F172A !important;
+  border: 1px solid #c4dde9 !important;
+}
+
+/* Sub-Route Pill inside Card */
+.psr-theme .grid.grid-cols-1.md\:grid-cols-2.lg\:grid-cols-3 span.bg-slate-100,
+.psr-portal-page .grid.grid-cols-1.md\:grid-cols-2.lg\:grid-cols-3 span.bg-slate-100 {
+  background-color: #d6ecff !important;
+  border: 1px solid #c4dde9 !important;
+  color: #0F172A !important;
+}
+
+/* Shelf Stock Count */
+.psr-theme .grid.grid-cols-1.md\:grid-cols-2.lg\:grid-cols-3 strong.text-slate-900,
+.psr-portal-page .grid.grid-cols-1.md\:grid-cols-2.lg\:grid-cols-3 strong.text-slate-900 {
+  color: #0F172A !important;
+}
+
+/* Card Action: Visit & Check Inventory */
+.psr-theme .grid.grid-cols-1.md\:grid-cols-2.lg\:grid-cols-3 button.bg-blue-50,
+.psr-portal-page .grid.grid-cols-1.md\:grid-cols-2.lg\:grid-cols-3 button.bg-blue-50 {
+  background-color: #e8f4ff !important;
+  border: 1px solid #c4dde9 !important;
+  color: #0F172A !important;
+}
+
+.psr-theme .grid.grid-cols-1.md\:grid-cols-2.lg\:grid-cols-3 button.bg-blue-50:hover,
+.psr-portal-page .grid.grid-cols-1.md\:grid-cols-2.lg\:grid-cols-3 button.bg-blue-50:hover {
+  background-color: #d6ecff !important;
+  border-color: #b7c4cd !important;
+}
+
+/* Card Action: Take Order */
+.psr-theme .grid.grid-cols-1.md\:grid-cols-2.lg\:grid-cols-3 button.bg-orange-600,
+.psr-portal-page .grid.grid-cols-1.md\:grid-cols-2.lg\:grid-cols-3 button.bg-orange-600 {
+  background-color: #0F172A !important;
+  color: #ffffff !important;
+  border: 1px solid #b7c4cd !important;
+}
+
+.psr-theme .grid.grid-cols-1.md\:grid-cols-2.lg\:grid-cols-3 button.bg-orange-600:hover,
+.psr-portal-page .grid.grid-cols-1.md\:grid-cols-2.lg\:grid-cols-3 button.bg-orange-600:hover {
+  background-color: #1E293B !important;
+}
+
+/* Card Action: Refund */
+.psr-theme .grid.grid-cols-1.md\:grid-cols-2.lg\:grid-cols-3 button.bg-red-50,
+.psr-portal-page .grid.grid-cols-1.md\:grid-cols-2.lg\:grid-cols-3 button.bg-red-50 {
+  background-color: #f7fbff !important;
+  border: 1px solid #c4dde9 !important;
+  color: #991B1B !important;
+}
+
+.psr-theme .grid.grid-cols-1.md\:grid-cols-2.lg\:grid-cols-3 button.bg-red-50:hover,
+.psr-portal-page .grid.grid-cols-1.md\:grid-cols-2.lg\:grid-cols-3 button.bg-red-50:hover {
+  background-color: #fee2e2 !important;
+  border-color: #fca5a5 !important;
+}
+
+/* =====================================================================
+   8. DATA TABLES (FIELD ORDERS, REFUND CLAIMS)
+   ===================================================================== */
+.psr-theme .overflow-hidden.rounded-xl,
+.psr-portal-page .overflow-hidden.rounded-xl {
+  background-color: #f7fbff !important;
+  border: 1px solid #c4dde9 !important;
+}
+
+/* Table Card Header */
+.psr-theme .overflow-hidden.rounded-xl > div:first-child,
+.psr-portal-page .overflow-hidden.rounded-xl > div:first-child {
+  background-color: #d6ecff !important;
+  border-bottom: 1px solid #c4dde9 !important;
+}
+
+.psr-theme .overflow-hidden.rounded-xl > div:first-child h3,
+.psr-portal-page .overflow-hidden.rounded-xl > div:first-child h3 {
+  color: #0F172A !important;
+}
+
+.psr-theme .overflow-hidden.rounded-xl > div:first-child p,
+.psr-portal-page .overflow-hidden.rounded-xl > div:first-child p {
+  color: #334155 !important;
+}
+
+.psr-theme .overflow-hidden.rounded-xl > div:first-child span,
+.psr-portal-page .overflow-hidden.rounded-xl > div:first-child span {
+  background-color: #f7fbff !important;
+  border: 1px solid #c4dde9 !important;
+  color: #0F172A !important;
+}
+
+/* Thead */
+.psr-theme table thead,
+.psr-portal-page table thead,
+.psr-theme table thead th,
+.psr-portal-page table thead th {
+  background-color: #e8f4ff !important;
+  color: #0F172A !important;
+  border-bottom: 1px solid #c4dde9 !important;
+  font-weight: 700 !important;
+}
+
+/* Tbody */
+.psr-theme table tbody tr,
+.psr-portal-page table tbody tr {
+  background-color: #f7fbff !important;
+  border-bottom: 1px solid #e8f4ff !important;
+}
+
+.psr-theme table tbody tr:nth-child(even),
+.psr-portal-page table tbody tr:nth-child(even) {
+  background-color: #ffffff !important;
+}
+
+.psr-theme table tbody tr:hover,
+.psr-portal-page table tbody tr:hover {
+  background-color: #d6ecff !important;
+}
+
+.psr-theme table td,
+.psr-portal-page table td {
+  color: #0F172A !important;
+}
+
+.psr-theme table td.text-orange-600,
+.psr-portal-page table td.text-orange-600 {
+  color: #0F172A !important;
+}
+
+/* Request to SO button in Table */
+.psr-theme table button.bg-blue-600,
+.psr-portal-page table button.bg-blue-600 {
+  background-color: #0F172A !important;
+  color: #ffffff !important;
+  border: 1px solid #b7c4cd !important;
+}
+
+.psr-theme table button.bg-blue-600:hover,
+.psr-portal-page table button.bg-blue-600:hover {
+  background-color: #1E293B !important;
+}
+
+/* =====================================================================
+   9. ROUTE VISIT LOGS (TAB 4)
+   ===================================================================== */
+.psr-theme .space-y-4 > h3,
+.psr-portal-page .space-y-4 > h3 {
+  color: #0F172A !important;
+}
+
+.psr-theme .space-y-3 > div.rounded-lg,
+.psr-portal-page .space-y-3 > div.rounded-lg {
+  background-color: #f7fbff !important;
+  border: 1px solid #c4dde9 !important;
+}
+
+.psr-theme .space-y-3 > div.rounded-lg:hover,
+.psr-portal-page .space-y-3 > div.rounded-lg:hover {
+  background-color: #ffffff !important;
+  border-color: #b7c4cd !important;
+}
+
+.psr-theme .space-y-3 > div.rounded-lg span.bg-orange-100,
+.psr-portal-page .space-y-3 > div.rounded-lg span.bg-orange-100 {
+  background-color: #d6ecff !important;
+  color: #0F172A !important;
+  border: 1px solid #c4dde9 !important;
+}
+
+/* =====================================================================
+   10. MODALS & POPUP FORMS
+   ===================================================================== */
+.psr-theme .fixed.inset-0 .bg-white,
+.psr-portal-page .fixed.inset-0 .bg-white {
+  background-color: #f7fbff !important;
+  border: 1px solid #c4dde9 !important;
+  box-shadow: 0 25px 50px -12px rgba(183, 196, 205, 0.45) !important;
+  color: #0F172A !important;
+}
+
+/* Modal Headers */
+.psr-theme .fixed.inset-0 .bg-gradient-to-r.from-blue-700,
+.psr-portal-page .fixed.inset-0 .bg-gradient-to-r.from-blue-700 {
+  background: linear-gradient(135deg, #d6ecff 0%, #e8f4ff 100%) !important;
+  border-bottom: 1px solid #c4dde9 !important;
+  color: #0F172A !important;
+}
+
+.psr-theme .fixed.inset-0 .bg-gradient-to-r.from-blue-700 h3,
+.psr-portal-page .fixed.inset-0 .bg-gradient-to-r.from-blue-700 h3 {
+  color: #0F172A !important;
+}
+
+.psr-theme .fixed.inset-0 .bg-gradient-to-r.from-blue-700 p,
+.psr-portal-page .fixed.inset-0 .bg-gradient-to-r.from-blue-700 p {
+  color: #334155 !important;
+}
+
+.psr-theme .fixed.inset-0 .bg-gradient-to-r.from-blue-700 button,
+.psr-portal-page .fixed.inset-0 .bg-gradient-to-r.from-blue-700 button {
+  color: #0F172A !important;
+}
+
+/* Modal Form Inputs */
+.psr-theme .fixed.inset-0 select,
+.psr-portal-page .fixed.inset-0 select,
+.psr-theme .fixed.inset-0 input,
+.psr-portal-page .fixed.inset-0 input,
+.psr-theme .fixed.inset-0 textarea,
+.psr-portal-page .fixed.inset-0 textarea {
+  background-color: #ffffff !important;
+  border: 1px solid #c4dde9 !important;
+  color: #0F172A !important;
+}
+
+.psr-theme .fixed.inset-0 select:focus,
+.psr-portal-page .fixed.inset-0 select:focus,
+.psr-theme .fixed.inset-0 input:focus,
+.psr-portal-page .fixed.inset-0 input:focus,
+.psr-theme .fixed.inset-0 textarea:focus,
+.psr-portal-page .fixed.inset-0 textarea:focus {
+  border-color: #b7c4cd !important;
+  outline: 2px solid #d6ecff !important;
+}
+
+/* Order Total Estimation Box in Modal */
+.psr-theme .fixed.inset-0 .bg-slate-50,
+.psr-portal-page .fixed.inset-0 .bg-slate-50 {
+  background-color: #e8f4ff !important;
+  border: 1px solid #c4dde9 !important;
+}
+
+.psr-theme .fixed.inset-0 .text-orange-600,
+.psr-portal-page .fixed.inset-0 .text-orange-600 {
+  color: #0F172A !important;
+}
+
+/* Modal Action Submit Buttons */
+.psr-theme .fixed.inset-0 button.bg-orange-600,
+.psr-portal-page .fixed.inset-0 button.bg-orange-600,
+.psr-theme .fixed.inset-0 button.bg-gradient-to-r.from-orange-600,
+.psr-portal-page .fixed.inset-0 button.bg-gradient-to-r.from-orange-600 {
+  background: #0F172A !important;
+  color: #ffffff !important;
+  border: 1px solid #b7c4cd !important;
+}
+
+.psr-theme .fixed.inset-0 button.bg-orange-600:hover,
+.psr-portal-page .fixed.inset-0 button.bg-orange-600:hover,
+.psr-theme .fixed.inset-0 button.bg-gradient-to-r.from-orange-600:hover,
+.psr-portal-page .fixed.inset-0 button.bg-gradient-to-r.from-orange-600:hover {
+  background: #1E293B !important;
+}
+
+/* Modal Cancel Buttons */
+.psr-theme .fixed.inset-0 button.text-slate-600,
+.psr-portal-page .fixed.inset-0 button.text-slate-600 {
+  background-color: #e8f4ff !important;
+  border: 1px solid #c4dde9 !important;
+  color: #334155 !important;
+}
+
+.psr-theme .fixed.inset-0 button.text-slate-600:hover,
+.psr-portal-page .fixed.inset-0 button.text-slate-600:hover {
+  background-color: #d6ecff !important;
+  color: #0F172A !important;
+}

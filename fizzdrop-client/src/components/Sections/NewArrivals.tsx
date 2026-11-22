@@ -187,12 +187,12 @@ const NewArrivals: React.FC<NewArrivalsProps> = ({
             return (
               <div
                 key={product.id}
-                className="group relative rounded-3xl bg-white/70 dark:bg-zinc-900/80 backdrop-blur-md border border-zinc-200/80 dark:border-zinc-800 p-5 flex flex-col justify-between hover:shadow-xl hover:border-indigo-500/30 transition-all duration-300"
+                className="group relative rounded-3xl bg-white border border-[#DCE8E9] p-5 flex flex-col justify-between hover:shadow-xl hover:border-[#FF6A00] transition-all duration-300 shadow-xs"
               >
                 {/* Badges & Wishlist */}
                 <div className="flex items-center justify-between w-full z-10">
                   {product.isNew ? (
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-indigo-600 text-white">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#65B016] text-white shadow-2xs">
                       NEW
                     </span>
                   ) : <span />}
@@ -200,7 +200,7 @@ const NewArrivals: React.FC<NewArrivalsProps> = ({
                   <button
                     type="button"
                     onClick={() => onAddToWishlist && onAddToWishlist(product)}
-                    className="p-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 hover:text-rose-500 transition-colors shadow-sm cursor-pointer"
+                    className="p-1.5 rounded-full bg-[#EDF7F7] text-[#6B8487] hover:text-[#FF6A00] hover:bg-[#FF6A00]/10 transition-colors shadow-2xs cursor-pointer"
                     aria-label="Add to wishlist"
                   >
                     <Heart className="w-4 h-4" />
@@ -209,7 +209,7 @@ const NewArrivals: React.FC<NewArrivalsProps> = ({
 
                 {/* Product Image Stage */}
                 <div className="relative h-52 flex items-center justify-center my-3 overflow-hidden">
-                  <div className="absolute w-28 h-28 rounded-full bg-indigo-500/10 blur-xl pointer-events-none group-hover:scale-125 transition-transform duration-500" />
+                  <div className="absolute w-28 h-28 rounded-full bg-[#9BD8DA]/35 blur-xl pointer-events-none group-hover:scale-125 transition-transform duration-500" />
                   <img
                     src={product.imageUrl}
                     alt={product.name}
@@ -219,21 +219,21 @@ const NewArrivals: React.FC<NewArrivalsProps> = ({
 
                 {/* Product Meta & Price */}
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs text-zinc-500">
-                    <span className="font-medium text-zinc-600 dark:text-zinc-400">
+                  <div className="flex items-center justify-between text-xs text-[#6B8487]">
+                    <span className="font-semibold text-[#3D5558]">
                       {product.brand}
                     </span>
                     <span>{product.volume}</span>
                   </div>
 
-                  <h3 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100 line-clamp-1">
+                  <h3 className="font-bold text-sm text-[#1A282A] line-clamp-1">
                     {product.name}
                   </h3>
 
-                  <div className="flex items-center justify-between pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60">
+                  <div className="flex items-center justify-between pt-2 border-t border-[#DCE8E9]">
                     <div>
-                      <span className="text-xs text-zinc-400">BDT</span>{' '}
-                      <span className="font-oswald text-lg font-bold text-zinc-900 dark:text-zinc-100">
+                      <span className="text-xs text-[#6B8487]">BDT</span>{' '}
+                      <span className="font-oswald text-lg font-bold text-[#1A282A]">
                         {priceVal.toFixed(2)}
                       </span>
                     </div>
@@ -242,10 +242,10 @@ const NewArrivals: React.FC<NewArrivalsProps> = ({
                       type="button"
                       disabled={!inStock}
                       onClick={() => onAddToCart && onAddToCart(product)}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs ${
                         inStock
-                          ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:scale-105 active:scale-95 cursor-pointer'
-                          : 'bg-zinc-200 text-zinc-400 dark:bg-zinc-800 cursor-not-allowed'
+                          ? 'bg-[#FF6A00] hover:bg-[#E55F00] text-white hover:scale-105 active:scale-95 cursor-pointer'
+                          : 'bg-[#DCE8E9] text-[#6B8487] cursor-not-allowed'
                       }`}
                     >
                       <ShoppingBag className="w-3.5 h-3.5" />
@@ -261,18 +261,18 @@ const NewArrivals: React.FC<NewArrivalsProps> = ({
 
       {/* 6. Explore Full Beverages Catalog CTA Banner */}
       {!loading && !error && products.length > 0 && limit && limit < products.length && (
-        <div className="mt-10 sm:mt-12 p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex flex-col sm:flex-row items-center justify-between gap-6 shadow-xl border border-indigo-500/20">
+        <div className="mt-10 sm:mt-12 p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-[#1A282A] via-[#243B3E] to-[#1A282A] text-white flex flex-col sm:flex-row items-center justify-between gap-6 shadow-xl border border-[#9BD8DA]/40">
           <div className="space-y-1 text-center sm:text-left">
             <h3 className="font-oswald text-xl sm:text-2xl font-black uppercase tracking-wide">
               Looking for our complete beverage lineup?
             </h3>
-            <p className="text-xs sm:text-sm text-slate-300 max-w-xl">
+            <p className="text-xs sm:text-sm text-[#9BD8DA] max-w-xl">
               Explore all {products.length}+ chilled sodas, natural waters, energy drinks, and official merchandise in our dedicated Beverages section.
             </p>
           </div>
           <Link
             to="/beverages"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-white text-slate-950 hover:bg-slate-100 font-bold text-xs sm:text-sm tracking-wide shadow-md transition-all active:scale-95 shrink-0 group cursor-pointer"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-[#FF6A00] hover:bg-[#E55F00] text-white font-bold text-xs sm:text-sm tracking-wide shadow-md transition-all active:scale-95 shrink-0 group cursor-pointer"
           >
             <span>Explore All Beverages ({products.length}+ Drinks)</span>
             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />

@@ -394,28 +394,28 @@ export const DeliveryTeamPortal: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white font-sans flex flex-col">
+    <div className="min-h-screen bg-[#d8edf1] text-[#0F172A] font-sans flex flex-col delivery-theme">
       {/* Top Mobile-Friendly Navigation */}
-      <header className="sticky top-0 z-40 bg-slate-950/90 backdrop-blur-md border-b border-slate-800 px-4 py-3">
+      <header className="sticky top-0 z-40 bg-[#8DBCC7] border-b border-[#73a7b3] px-4 py-3 shadow-xs">
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <Link
               to="/"
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+              className="p-2 rounded-xl bg-[#A4CCD9] hover:bg-[#C4E1E6] text-[#0F172A] border border-[#73a7b3] transition-colors cursor-pointer"
               title="Return to Home"
             >
               <ArrowLeft className="w-4 h-4" />
             </Link>
 
-            <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-500 flex items-center justify-center shadow-lg shadow-blue-500/20">
-              <Truck className="w-5 h-5 text-white" />
+            <div className="w-9 h-9 rounded-2xl bg-[#0F172A] flex items-center justify-center shadow-xs text-[#EBFFD8]">
+              <Truck className="w-5 h-5" />
             </div>
 
             <div>
-              <h1 className="font-oswald text-base font-bold uppercase tracking-wider text-white">
+              <h1 className="font-oswald text-base font-bold uppercase tracking-wider text-[#0F172A]">
                 Delivery Team Fleet Portal
               </h1>
-              <p className="text-[10px] text-cyan-400 font-mono font-medium">
+              <p className="text-[10px] text-[#164E63] font-mono font-bold">
                 Vehicle Cargo Manifest & Stop Deliveries
               </p>
             </div>
@@ -426,7 +426,7 @@ export const DeliveryTeamPortal: React.FC = () => {
             <select
               value={regNo || team?.vehicle_registration_no || ''}
               onChange={(e) => handleSelectTeam(e.target.value)}
-              className="px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-700 text-xs text-cyan-300 font-mono font-bold focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              className="px-3 py-1.5 rounded-xl bg-white border border-[#73a7b3] text-xs text-[#0F172A] font-mono font-bold focus:ring-2 focus:ring-[#0F172A] cursor-pointer"
             >
               {allTeams.map((t) => (
                 <option key={t.id} value={t.vehicle_registration_no}>
@@ -438,7 +438,7 @@ export const DeliveryTeamPortal: React.FC = () => {
             <button
               onClick={() => fetchPortalData(currentRegNoRef.current)}
               disabled={loading}
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all cursor-pointer"
+              className="p-2 rounded-xl bg-[#A4CCD9] hover:bg-[#C4E1E6] text-[#0F172A] border border-[#73a7b3] transition-all cursor-pointer"
               title="Refresh Portal Data"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -451,38 +451,38 @@ export const DeliveryTeamPortal: React.FC = () => {
       <main className="max-w-4xl mx-auto p-4 sm:p-6 w-full flex-1 space-y-5">
         {/* Alerts */}
         {successMsg && (
-          <div className="p-3.5 rounded-2xl bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-xs flex items-center justify-between">
+          <div className="p-3.5 rounded-2xl bg-[#EBFFD8] border border-[#8DBCC7] text-[#14532D] text-xs font-semibold flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
               <span>{successMsg}</span>
             </div>
-            <button onClick={() => setSuccessMsg(null)} className="text-emerald-400 hover:text-white font-bold">×</button>
+            <button onClick={() => setSuccessMsg(null)} className="text-[#14532D] hover:text-[#0F172A] font-bold cursor-pointer">×</button>
           </div>
         )}
         {errorMsg && (
-          <div className="p-3.5 rounded-2xl bg-rose-950/80 border border-rose-500/40 text-rose-300 text-xs flex items-center justify-between">
+          <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-300 text-rose-800 text-xs font-semibold flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
               <span>{errorMsg}</span>
             </div>
-            <button onClick={() => setErrorMsg(null)} className="text-rose-400 hover:text-white font-bold">×</button>
+            <button onClick={() => setErrorMsg(null)} className="text-rose-800 hover:text-rose-950 font-bold cursor-pointer">×</button>
           </div>
         )}
 
         {/* Vehicle & Team Profile Card */}
         {team && (
-          <div className="p-5 rounded-3xl bg-gradient-to-br from-slate-800/90 via-slate-800/60 to-slate-900 border border-slate-700/80 shadow-xl space-y-3 relative overflow-hidden">
+          <div className="p-5 rounded-3xl bg-white border border-[#A4CCD9] shadow-xs space-y-3 relative overflow-hidden">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-cyan-400 block mb-0.5">
+                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#164E63] block mb-0.5">
                   ASSIGNED VEHICLE & LOGISTICS CREW
                 </span>
-                <h2 className="font-oswald text-xl font-black text-white tracking-wide flex items-center gap-2">
+                <h2 className="font-oswald text-xl font-black text-[#0F172A] tracking-wide flex items-center gap-2">
                   <span>{team.team_name}</span>
                   <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase font-mono ${
                     team.status === 'AVAILABLE'
-                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                      : 'bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse'
+                      ? 'bg-[#EBFFD8] text-[#14532D] border border-[#8DBCC7]'
+                      : 'bg-[#C4E1E6] text-[#0F172A] border border-[#8DBCC7] animate-pulse'
                   }`}>
                     {team.status}
                   </span>
@@ -490,31 +490,31 @@ export const DeliveryTeamPortal: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-2 self-start sm:self-auto">
-                <span className="font-mono text-sm font-black px-3 py-1 rounded-xl bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                <span className="font-mono text-sm font-black px-3 py-1 rounded-xl bg-[#EBFFD8] text-[#0F172A] border border-[#8DBCC7]">
                   {team.vehicle_registration_no}
                 </span>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 border-t border-slate-700/60 text-xs">
-              <div className="p-2.5 rounded-2xl bg-slate-900/60 border border-slate-700/50">
-                <span className="text-[10px] uppercase font-bold text-slate-400 block">Lead Driver</span>
-                <span className="font-bold text-white flex items-center gap-1.5 mt-0.5">
-                  <Phone className="w-3.5 h-3.5 text-cyan-400" />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 border-t border-[#C4E1E6] text-xs">
+              <div className="p-2.5 rounded-2xl bg-[#d8edf1]/50 border border-[#A4CCD9]">
+                <span className="text-[10px] uppercase font-bold text-[#164E63] block">Lead Driver</span>
+                <span className="font-bold text-[#0F172A] flex items-center gap-1.5 mt-0.5">
+                  <Phone className="w-3.5 h-3.5 text-[#164E63]" />
                   {team.driver_name} ({team.driver_phone})
                 </span>
               </div>
 
-              <div className="p-2.5 rounded-2xl bg-slate-900/60 border border-slate-700/50">
-                <span className="text-[10px] uppercase font-bold text-slate-400 block">Vehicle Specification</span>
-                <span className="font-bold text-slate-200 mt-0.5 block">
+              <div className="p-2.5 rounded-2xl bg-[#d8edf1]/50 border border-[#A4CCD9]">
+                <span className="text-[10px] uppercase font-bold text-[#164E63] block">Vehicle Specification</span>
+                <span className="font-bold text-[#0F172A] mt-0.5 block">
                   {team.vehicle_type} (Capacity: {team.max_capacity_cases} Cases)
                 </span>
               </div>
 
-              <div className="p-2.5 rounded-2xl bg-slate-900/60 border border-slate-700/50">
-                <span className="text-[10px] uppercase font-bold text-slate-400 block">Crew Members</span>
-                <span className="text-slate-300 text-[11px] mt-0.5 block truncate" title={team.team_members}>
+              <div className="p-2.5 rounded-2xl bg-[#d8edf1]/50 border border-[#A4CCD9]">
+                <span className="text-[10px] uppercase font-bold text-[#164E63] block">Crew Members</span>
+                <span className="text-[#334155] font-semibold text-[11px] mt-0.5 block truncate" title={team.team_members}>
                   {team.team_members || 'Driver & Loader crew'}
                 </span>
               </div>
@@ -524,35 +524,35 @@ export const DeliveryTeamPortal: React.FC = () => {
 
         {/* Current Active Trip Card */}
         {activeTrip ? (
-          <div className="p-5 rounded-3xl bg-slate-800/80 border border-slate-700 shadow-xl space-y-5">
+          <div className="p-5 rounded-3xl bg-white border border-[#A4CCD9] shadow-xs space-y-5 text-[#0F172A]">
             {/* Header: Code, Route, Status */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-700">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#C4E1E6]">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 uppercase tracking-wider">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#C4E1E6] text-[#0F172A] border border-[#8DBCC7] uppercase tracking-wider">
                     CURRENT DELIVERY RUN
                   </span>
-                  <span className="font-mono text-xs text-slate-300 font-bold">
+                  <span className="font-mono text-xs text-[#164E63] font-bold">
                     {activeTrip.dispatch_code}
                   </span>
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase font-mono ${
                     activeTrip.status === 'BOARDED'
-                      ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                      ? 'bg-[#A4CCD9] text-[#0F172A] border border-[#8DBCC7]'
                       : activeTrip.status === 'IN_TRANSIT'
-                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                      ? 'bg-[#C4E1E6] text-[#0F172A] border border-[#8DBCC7]'
                       : activeTrip.status === 'DELIVERED' || activeTrip.status === 'COMPLETED'
-                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                      : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                      ? 'bg-[#EBFFD8] text-[#14532D] border border-[#8DBCC7]'
+                      : 'bg-[#C4E1E6] text-[#0F172A] border border-[#8DBCC7]'
                   }`}>
                     {activeTrip.status}
                   </span>
                 </div>
-                <h3 className="font-oswald text-xl font-bold text-white mt-1 flex items-center gap-2">
-                  <Route className="w-5 h-5 text-cyan-400" />
+                <h3 className="font-oswald text-xl font-bold text-[#0F172A] mt-1 flex items-center gap-2">
+                  <Route className="w-5 h-5 text-[#164E63]" />
                   <span>Sub-Route: {activeTrip.sub_route}</span>
                 </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Total Payload: <strong className="text-cyan-300 font-mono">{activeTrip.total_cases} Cases</strong> allocated to <strong className="text-white">{outletsList.length} Outlets</strong>
+                <p className="text-xs text-[#334155] mt-0.5 font-medium">
+                  Total Payload: <strong className="text-[#0F172A] font-mono">{activeTrip.total_cases} Cases</strong> allocated to <strong className="text-[#0F172A]">{outletsList.length} Outlets</strong>
                 </p>
               </div>
 
@@ -561,9 +561,9 @@ export const DeliveryTeamPortal: React.FC = () => {
                 <button
                   onClick={() => handleCompleteTrip(activeTrip.id)}
                   disabled={actionLoading}
-                  className="px-4 py-2 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition-all cursor-pointer shadow-md shadow-emerald-500/20 flex items-center gap-2"
+                  className="px-4 py-2 rounded-2xl bg-[#EBFFD8] hover:bg-[#dbf8be] text-[#0F172A] border border-[#8DBCC7] font-bold text-xs transition-all cursor-pointer shadow-xs flex items-center gap-2"
                 >
-                  <PackageCheck className="w-4 h-4" />
+                  <PackageCheck className="w-4 h-4 text-[#164E63]" />
                   <span>Finish Route & Return Vehicle</span>
                 </button>
               )}
@@ -572,22 +572,22 @@ export const DeliveryTeamPortal: React.FC = () => {
             {/* ======================================================== */}
             {/* CARGO MANIFEST: STOCKS BOARDED ON TRUCK                  */}
             {/* ======================================================== */}
-            <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-700/80 space-y-3">
+            <div className="p-4 rounded-2xl bg-[#d8edf1]/40 border border-[#A4CCD9] space-y-3">
               <div className="flex items-center justify-between">
-                <span className="font-oswald text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                  <Boxes className="w-4 h-4 text-cyan-400" />
+                <span className="font-oswald text-xs font-bold uppercase tracking-wider text-[#0F172A] flex items-center gap-1.5">
+                  <Boxes className="w-4 h-4 text-[#164E63]" />
                   <span>Stocks Loaded / Assigned on Truck</span>
                 </span>
-                <span className="text-xs font-mono font-bold text-cyan-400">
+                <span className="text-xs font-mono font-bold text-[#164E63] bg-[#EBFFD8] px-2.5 py-1 rounded-lg border border-[#8DBCC7]">
                   {activeTrip.total_cases} Total Cases
                 </span>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {Object.values(cargoBreakdown).map((cargo, idx) => (
-                  <div key={idx} className="p-2.5 rounded-xl bg-slate-800/80 border border-slate-700 flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-200 truncate pr-2">{cargo.brand}</span>
-                    <span className="font-mono text-xs font-black px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-300 shrink-0">
+                  <div key={idx} className="p-2.5 rounded-xl bg-white border border-[#A4CCD9] flex items-center justify-between">
+                    <span className="text-xs font-bold text-[#0F172A] truncate pr-2">{cargo.brand}</span>
+                    <span className="font-mono text-xs font-black px-2 py-0.5 rounded-md bg-[#C4E1E6] text-[#0F172A] border border-[#8DBCC7] shrink-0">
                       {cargo.cases} cases
                     </span>
                   </div>
@@ -599,30 +599,30 @@ export const DeliveryTeamPortal: React.FC = () => {
             {/* STEP 1: DRIVER CONFIRMS STOCKS BOARDED ON TRUCK         */}
             {/* ======================================================== */}
             {activeTrip.status === 'DISPATCHED' && (
-              <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-950/80 via-slate-900 to-indigo-950/80 border-2 border-blue-500/50 space-y-3">
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-[#C4E1E6] via-[#d8edf1] to-[#EBFFD8] border-2 border-[#8DBCC7] space-y-3">
                 <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-blue-500 text-white flex items-center justify-center font-bold text-xs">
+                  <div className="w-7 h-7 rounded-lg bg-[#0F172A] text-[#EBFFD8] flex items-center justify-center font-bold text-xs">
                     1
                   </div>
                   <div>
-                    <h4 className="font-oswald text-sm font-bold text-white uppercase tracking-wider">
+                    <h4 className="font-oswald text-sm font-bold text-[#0F172A] uppercase tracking-wider">
                       Step 1: Confirm Order & Verify Stocks Boarded
                     </h4>
-                    <p className="text-[11px] text-slate-400">
+                    <p className="text-[11px] text-[#334155] font-medium">
                       Verify physical inventory loaded onto vehicle {team?.vehicle_registration_no} matches the cargo manifest for destination outlets.
                     </p>
                   </div>
                 </div>
 
-                <label className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-900/60 border border-slate-700 text-xs text-slate-300 cursor-pointer">
+                <label className="flex items-center gap-2.5 p-2.5 rounded-xl bg-white border border-[#A4CCD9] text-xs text-[#0F172A] font-medium cursor-pointer">
                   <input
                     type="checkbox"
                     checked={isBoardingVerified}
                     onChange={(e) => setIsBoardingVerified(e.target.checked)}
-                    className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 bg-slate-800 border-slate-600 cursor-pointer"
+                    className="w-4 h-4 rounded text-[#164E63] focus:ring-[#8DBCC7] bg-white border-[#8DBCC7] cursor-pointer"
                   />
                   <span>
-                    I confirm this delivery order and that all <strong className="text-white">{activeTrip.total_cases} beverage cases</strong> have been inspected and boarded on vehicle.
+                    I confirm this delivery order and that all <strong className="text-[#0F172A] font-bold">{activeTrip.total_cases} beverage cases</strong> have been inspected and boarded on vehicle.
                   </span>
                 </label>
 
@@ -632,8 +632,8 @@ export const DeliveryTeamPortal: React.FC = () => {
                   disabled={actionLoading || !isBoardingVerified}
                   className={`w-full py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all ${
                     isBoardingVerified
-                      ? 'bg-blue-600 hover:bg-blue-500 text-white cursor-pointer shadow-md shadow-blue-600/30'
-                      : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+                      ? 'bg-[#0F172A] hover:bg-[#164E63] text-white cursor-pointer shadow-xs border border-[#8DBCC7]'
+                      : 'bg-[#C4E1E6] text-[#64748B] cursor-not-allowed border border-[#A4CCD9]'
                   }`}
                 >
                   <PackageCheck className="w-4 h-4" />
@@ -646,16 +646,16 @@ export const DeliveryTeamPortal: React.FC = () => {
             {/* STEP 2: RIDER STARTS THE DELIVERY RIDE                   */}
             {/* ======================================================== */}
             {activeTrip.status === 'BOARDED' && (
-              <div className="p-4 rounded-2xl bg-gradient-to-r from-purple-950/80 via-slate-900 to-indigo-950/80 border-2 border-purple-500/50 space-y-3">
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-[#C4E1E6] via-[#d8edf1] to-[#EBFFD8] border-2 border-[#8DBCC7] space-y-3">
                 <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-purple-500 text-white flex items-center justify-center font-bold text-xs">
+                  <div className="w-7 h-7 rounded-lg bg-[#0F172A] text-[#EBFFD8] flex items-center justify-center font-bold text-xs">
                     2
                   </div>
                   <div>
-                    <h4 className="font-oswald text-sm font-bold text-white uppercase tracking-wider">
+                    <h4 className="font-oswald text-sm font-bold text-[#0F172A] uppercase tracking-wider">
                       Step 2: Go for Delivery (Start Ride)
                     </h4>
-                    <p className="text-[11px] text-slate-400">
+                    <p className="text-[11px] text-[#334155] font-medium">
                       Order confirmed and stocks boarded! Click below to begin delivery to assigned outlets. Real-time GPS and status tracking active.
                     </p>
                   </div>
@@ -665,7 +665,7 @@ export const DeliveryTeamPortal: React.FC = () => {
                   type="button"
                   onClick={() => handleStartRide(activeTrip.id)}
                   disabled={actionLoading}
-                  className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md shadow-purple-600/30"
+                  className="w-full py-2.5 rounded-xl bg-[#0F172A] hover:bg-[#164E63] text-white font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs border border-[#8DBCC7]"
                 >
                   <Navigation className="w-4 h-4" />
                   <span>Go for Delivery / Start Ride 🚚</span>
@@ -678,56 +678,56 @@ export const DeliveryTeamPortal: React.FC = () => {
             {/* ======================================================== */}
             <div className="space-y-3 pt-2">
               <div className="flex items-center justify-between">
-                <h4 className="font-oswald text-sm font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
-                  <Store className="w-4 h-4 text-cyan-400" />
+                <h4 className="font-oswald text-sm font-bold uppercase tracking-wider text-[#0F172A] flex items-center gap-2">
+                  <Store className="w-4 h-4 text-[#164E63]" />
                   <span>Outlets to Restock ({outletsList.length} Stores on Route)</span>
                 </h4>
-                <span className="text-xs text-slate-400 font-mono">
+                <span className="text-xs text-[#164E63] font-mono font-bold bg-[#EBFFD8] px-2.5 py-1 rounded-lg border border-[#8DBCC7]">
                   {outletsList.filter((o) => o.stop_status === 'DELIVERED_BY_DRIVER' || o.stop_status === 'CONFIRMED_BY_OUTLET').length} / {outletsList.length} Completed
                 </span>
               </div>
 
               {outletsList.length === 0 ? (
-                <p className="text-xs text-slate-400">No stores assigned on this trip manifest.</p>
+                <p className="text-xs text-[#475569]">No stores assigned on this trip manifest.</p>
               ) : (
                 <div className="space-y-3">
                   {outletsList.some((o) => o.stop_status === 'CANCELLED') && (
-                    <div className="p-4 rounded-2xl bg-gradient-to-r from-rose-950/90 via-slate-900 to-amber-950/80 border-2 border-rose-500/70 text-rose-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg animate-pulse">
+                    <div className="p-4 rounded-2xl bg-rose-50 border-2 border-rose-300 text-rose-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs animate-pulse">
                       <div className="flex items-center gap-3">
-                        <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0" />
+                        <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
                         <div className="text-xs">
-                          <span className="font-bold text-rose-100 uppercase tracking-wider block">🚨 Alert: Order Cancelled — Onboarded Stock Available</span>
-                          <span>A store on this manifest cancelled their order. You have onboarded stock on your truck that can be reallocated to nearby stores!</span>
+                          <span className="font-bold text-rose-950 uppercase tracking-wider block">🚨 Alert: Order Cancelled — Onboarded Stock Available</span>
+                          <span className="text-rose-800 font-medium">A store on this manifest cancelled their order. You have onboarded stock on your truck that can be reallocated to nearby stores!</span>
                         </div>
                       </div>
                       <button
                         type="button"
                         onClick={() => handleOpenOfferModal(outletsList.find((o) => o.stop_status === 'CANCELLED') || outletsList[0])}
-                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5 active:scale-95 shrink-0"
+                        className="px-4 py-2 rounded-xl bg-[#EBFFD8] hover:bg-[#dbf8be] text-[#0F172A] font-black text-xs border border-[#8DBCC7] shadow-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 active:scale-95 shrink-0"
                       >
-                        <Zap className="w-4 h-4 fill-slate-950 text-slate-950" />
+                        <Zap className="w-4 h-4 fill-[#0F172A] text-[#0F172A]" />
                         <span>Offer Stock to Nearby Outlets ⚡</span>
                       </button>
                     </div>
                   )}
 
                   {outletsList.some((o) => o.items.some((it: any) => it.offer_status === 'ACCEPTED') && o.stop_status !== 'DELIVERED_BY_DRIVER' && o.stop_status !== 'CONFIRMED_BY_OUTLET') && (
-                    <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/90 via-slate-900 to-teal-950/80 border-2 border-emerald-500/70 text-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
+                    <div className="p-4 rounded-2xl bg-[#EBFFD8] border-2 border-[#8DBCC7] text-[#14532D] flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-emerald-500 text-slate-950 flex items-center justify-center font-black shrink-0">
-                          <Navigation className="w-5 h-5 animate-pulse" />
+                        <div className="w-9 h-9 rounded-xl bg-[#8DBCC7] text-[#0F172A] flex items-center justify-center font-black shrink-0">
+                          <Navigation className="w-5 h-5 animate-pulse text-[#0F172A]" />
                         </div>
                         <div className="text-xs">
-                          <span className="font-bold text-emerald-300 uppercase tracking-wider block">
+                          <span className="font-bold text-[#14532D] uppercase tracking-wider block">
                             ⚡ Stock Offer Accepted — Head to Destination
                           </span>
-                          <span>
+                          <span className="font-medium text-[#164E63]">
                             {outletsList.find((o) => o.items.some((it: any) => it.offer_status === 'ACCEPTED'))?.outlet_name} accepted your stock offer! Go directly to this store to deliver the cargo.
                           </span>
                         </div>
                       </div>
-                      <span className="px-3 py-1.5 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-mono font-bold shrink-0 flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                      <span className="px-3 py-1.5 rounded-xl bg-white text-[#14532D] border border-[#8DBCC7] text-xs font-mono font-bold shrink-0 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
                         <span>En Route to Store</span>
                       </span>
                     </div>
@@ -748,18 +748,18 @@ export const DeliveryTeamPortal: React.FC = () => {
                         key={outlet.outlet_id}
                         className={`p-4 rounded-2xl border transition-all space-y-3 ${
                           isCancelled
-                            ? 'bg-rose-950/40 border-rose-500/50'
+                            ? 'bg-rose-50/70 border-rose-300'
                             : isOfferDenied
-                            ? 'bg-rose-950/40 border-rose-500/50'
+                            ? 'bg-rose-50/70 border-rose-300'
                             : isConfirmedByOutlet
-                            ? 'bg-emerald-950/40 border-emerald-500/50'
+                            ? 'bg-[#EBFFD8]/60 border-[#8DBCC7]'
                             : isDeliveredByDriver
-                            ? 'bg-cyan-950/40 border-cyan-500/50'
+                            ? 'bg-[#C4E1E6]/50 border-[#8DBCC7]'
                             : isOfferPending
-                            ? 'bg-slate-900/90 border-amber-500/60 shadow-md'
+                            ? 'bg-amber-50/70 border-amber-300 shadow-xs'
                             : isOfferedStock
-                            ? 'bg-gradient-to-r from-purple-950/50 via-slate-900 to-indigo-950/50 border-purple-500/60 shadow-md'
-                            : 'bg-slate-900/80 border-slate-700/80 hover:border-slate-600'
+                            ? 'bg-[#C4E1E6]/40 border-[#8DBCC7] shadow-xs'
+                            : 'bg-white border-[#A4CCD9] hover:border-[#8DBCC7]'
                         }`}
                       >
                         {/* Stop Header */}
@@ -767,27 +767,31 @@ export const DeliveryTeamPortal: React.FC = () => {
                           <div className="space-y-1">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className={`w-6 h-6 rounded-lg flex items-center justify-center font-mono text-xs font-bold ${
-                                isCancelled || isOfferDenied ? 'bg-rose-500 text-white' : isDone ? 'bg-emerald-500 text-slate-950' : 'bg-blue-500/20 text-blue-400'
+                                isCancelled || isOfferDenied
+                                  ? 'bg-rose-500 text-white'
+                                  : isDone
+                                  ? 'bg-[#EBFFD8] text-[#14532D] border border-[#8DBCC7]'
+                                  : 'bg-[#C4E1E6] text-[#0F172A] border border-[#8DBCC7]'
                               }`}>
                                 {isCancelled || isOfferDenied ? '✕' : isDone ? '✓' : idx + 1}
                               </span>
-                              <h5 className="font-bold text-sm text-white">
+                              <h5 className="font-bold text-sm text-[#0F172A]">
                                 {outlet.outlet_name} {outlet.branch_name && `(${outlet.branch_name})`}
                               </h5>
                               <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase font-mono ${
                                 isCancelled
-                                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                                  ? 'bg-rose-100 text-rose-800 border border-rose-300'
                                   : isOfferDenied
-                                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                                  ? 'bg-rose-100 text-rose-800 border border-rose-300'
                                   : isOfferPending
-                                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse'
+                                  ? 'bg-amber-100 text-amber-900 border border-amber-300 animate-pulse'
                                   : isOfferAccepted
-                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                                  ? 'bg-[#EBFFD8] text-[#14532D] border border-[#8DBCC7]'
                                   : isConfirmedByOutlet
-                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                                  ? 'bg-[#EBFFD8] text-[#14532D] border border-[#8DBCC7]'
                                   : isDeliveredByDriver
-                                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                                  : 'bg-slate-800 text-slate-400 border border-slate-700'
+                                  ? 'bg-[#C4E1E6] text-[#0F172A] border border-[#8DBCC7]'
+                                  : 'bg-white text-[#334155] border border-[#A4CCD9]'
                               }`}>
                                 {isCancelled
                                   ? '⛔ Order Cancelled & Refunded'
@@ -805,24 +809,24 @@ export const DeliveryTeamPortal: React.FC = () => {
                               </span>
 
                               {isOfferedStock && (
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase font-mono bg-purple-500/20 text-purple-300 border border-purple-500/40 flex items-center gap-1">
-                                  <Zap className="w-3 h-3 fill-purple-300" />
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase font-mono bg-[#A4CCD9] text-[#0F172A] border border-[#8DBCC7] flex items-center gap-1">
+                                  <Zap className="w-3 h-3 fill-[#0F172A]" />
                                   <span>In-Transit Direct Offer</span>
                                 </span>
                               )}
                             </div>
 
-                            <div className="flex items-center gap-3 text-xs text-slate-400 flex-wrap pl-8">
+                            <div className="flex items-center gap-3 text-xs text-[#334155] flex-wrap pl-8 font-medium">
                               {outlet.location_address && (
                                 <span className="flex items-center gap-1">
-                                  <MapPin className="w-3.5 h-3.5 text-slate-500" />
+                                  <MapPin className="w-3.5 h-3.5 text-[#164E63]" />
                                   {outlet.location_address}
                                 </span>
                               )}
                               {outlet.contact_phone && (
                                 <a
                                   href={`tel:${outlet.contact_phone}`}
-                                  className="flex items-center gap-1 text-cyan-400 hover:underline"
+                                  className="flex items-center gap-1 text-[#164E63] font-bold hover:underline"
                                 >
                                   <Phone className="w-3.5 h-3.5" />
                                   {outlet.contact_phone}
@@ -832,26 +836,26 @@ export const DeliveryTeamPortal: React.FC = () => {
                           </div>
 
                           <div className="text-right sm:self-center pl-8 sm:pl-0">
-                            <span className="text-[10px] uppercase font-bold text-slate-400 block">Assigned Delivery</span>
-                            <span className={`font-mono text-sm font-black ${isCancelled ? 'text-rose-400 line-through' : 'text-cyan-300'}`}>
+                            <span className="text-[10px] uppercase font-bold text-[#164E63] block">Assigned Delivery</span>
+                            <span className={`font-mono text-sm font-black ${isCancelled ? 'text-rose-600 line-through' : 'text-[#0F172A]'}`}>
                               {outlet.total_assigned_cases} Cases
                             </span>
                           </div>
                         </div>
 
                         {/* Product Items Breakdown */}
-                        <div className="pl-8 pt-2 border-t border-slate-800/80 space-y-1.5">
-                          <span className="text-[10px] font-bold uppercase text-slate-400 block">Demanded Products:</span>
+                        <div className="pl-8 pt-2 border-t border-[#C4E1E6] space-y-1.5">
+                          <span className="text-[10px] font-bold uppercase text-[#164E63] block">Demanded Products:</span>
                           <div className="flex flex-wrap gap-2">
                             {outlet.items.map((it: any, itemIdx: number) => (
                               <span
                                 key={itemIdx}
                                 className={`text-xs px-2.5 py-1 rounded-lg border flex items-center gap-1.5 ${
-                                  isCancelled ? 'bg-rose-950/40 border-rose-800/60 text-rose-300' : 'bg-slate-800/90 border-slate-700 text-slate-300'
+                                  isCancelled ? 'bg-rose-100/50 border-rose-300 text-rose-800' : 'bg-white border-[#A4CCD9] text-[#334155]'
                                 }`}
                               >
-                                <span className="text-white font-medium">{it.product_name}</span>
-                                <strong className={`font-mono ${isCancelled ? 'text-rose-300 line-through' : 'text-cyan-400'}`}>
+                                <span className="text-[#0F172A] font-medium">{it.product_name}</span>
+                                <strong className={`font-mono ${isCancelled ? 'text-rose-600 line-through' : 'text-[#164E63] font-bold'}`}>
                                   {it.assigned_cases || it.demanded_cases || 0} cases
                                 </strong>
                               </span>
@@ -862,14 +866,14 @@ export const DeliveryTeamPortal: React.FC = () => {
                         {/* Driver Delivery Action / Confirmation Area */}
                         <div className="pl-8 pt-2">
                           {isCancelled || isOfferDenied ? (
-                            <div className="p-3 rounded-xl bg-rose-950/70 border border-rose-500/40 text-rose-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                            <div className="p-3 rounded-xl bg-rose-50 border border-rose-300 text-rose-900 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                               <div className="flex items-center gap-2">
-                                <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
                                 <div>
-                                  <p className="font-bold text-rose-100">
+                                  <p className="font-bold text-rose-950">
                                     {isOfferDenied ? 'Stock Offer Declined by Outlet' : 'Stop Cancelled & Refunded by Store'}
                                   </p>
-                                  <p className="text-[11px] text-rose-300/80">
+                                  <p className="text-[11px] text-rose-800 font-medium">
                                     {isOfferDenied 
                                       ? 'Outlet declined this stock offer. The cargo remains onboard your vehicle and can be reallocated to another store!'
                                       : 'Order was cancelled and refunded while in transit. Do NOT unload cargo here. Reallocate this stock to nearby stores below.'}
@@ -877,41 +881,41 @@ export const DeliveryTeamPortal: React.FC = () => {
                                 </div>
                               </div>
                               <div className="flex items-center gap-2 shrink-0">
-                                <span className="px-2.5 py-1.5 rounded-xl bg-rose-900/60 text-rose-300 font-bold text-[10px] uppercase border border-rose-700/60">
+                                <span className="px-2.5 py-1.5 rounded-xl bg-rose-100 text-rose-800 font-bold text-[10px] uppercase border border-rose-300">
                                   {isOfferDenied ? 'Offer Declined' : 'Skip Stop'}
                                 </span>
                                 <button
                                   type="button"
                                   onClick={() => handleOpenOfferModal(outlet)}
-                                  className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
+                                  className="px-3.5 py-1.5 rounded-xl bg-[#EBFFD8] hover:bg-[#dbf8be] text-[#0F172A] font-black text-xs border border-[#8DBCC7] shadow-xs transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
                                 >
-                                  <Zap className="w-3.5 h-3.5 fill-slate-950" />
+                                  <Zap className="w-3.5 h-3.5 fill-[#0F172A]" />
                                   <span>Offer Stock to Other Outlet ⚡</span>
                                 </button>
                               </div>
                             </div>
                           ) : isOfferPending ? (
-                            <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-500/40 text-amber-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                            <div className="p-3 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                               <div className="flex items-center gap-2">
-                                <Clock className="w-4 h-4 text-amber-400 shrink-0 animate-pulse" />
+                                <Clock className="w-4 h-4 text-amber-600 shrink-0 animate-pulse" />
                                 <div>
-                                  <p className="font-bold text-amber-100">In-Transit Offer Sent — Awaiting Store Decision</p>
-                                  <p className="text-[11px] text-amber-300/80">A notification has been delivered to {outlet.outlet_name}. They have the option to accept or deny this stock offer.</p>
+                                  <p className="font-bold text-amber-950">In-Transit Offer Sent — Awaiting Store Decision</p>
+                                  <p className="text-[11px] text-amber-800">A notification has been delivered to {outlet.outlet_name}. They have the option to accept or deny this stock offer.</p>
                                 </div>
                               </div>
-                              <span className="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 font-mono text-[11px] font-bold border border-amber-500/40 shrink-0">
+                              <span className="px-2.5 py-1 rounded-lg bg-white text-amber-900 font-mono text-[11px] font-bold border border-amber-300 shrink-0">
                                 Pending Acceptance
                               </span>
                             </div>
                           ) : isConfirmedByOutlet ? (
-                            <div className="p-2.5 rounded-xl bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
-                              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                            <div className="p-2.5 rounded-xl bg-[#EBFFD8] border border-[#8DBCC7] text-[#14532D] text-xs flex items-center gap-2 font-bold">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-700" />
                               <span>Outlet has confirmed receipt of stock! Profit updated on supplier portal.</span>
                             </div>
                           ) : isDeliveredByDriver ? (
-                            <div className="p-2.5 rounded-xl bg-cyan-950/60 border border-cyan-500/30 text-cyan-300 text-xs flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <Check className="w-4 h-4 text-cyan-400" />
+                            <div className="p-2.5 rounded-xl bg-[#C4E1E6]/60 border border-[#8DBCC7] text-[#0F172A] text-xs flex items-center justify-between">
+                              <div className="flex items-center gap-2 font-medium">
+                                <Check className="w-4 h-4 text-[#164E63]" />
                                 <span>
                                   Delivered {outlet.driver_delivered_cases || outlet.total_assigned_cases} cases. Awaiting outlet confirmation in their portal.
                                 </span>
@@ -920,15 +924,15 @@ export const DeliveryTeamPortal: React.FC = () => {
                                 type="button"
                                 onClick={() => handleConfirmOutletDelivery(activeTrip.id, outlet.outlet_id)}
                                 disabled={actionLoading}
-                                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-bold transition-all cursor-pointer"
+                                className="px-2.5 py-1 rounded-lg bg-white hover:bg-[#EBFFD8] text-[#0F172A] border border-[#8DBCC7] text-[11px] font-bold transition-all cursor-pointer"
                               >
                                 Re-verify Quantity
                               </button>
                             </div>
                           ) : (
-                            <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 bg-slate-950/60 p-3 rounded-xl border border-slate-700/80">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 bg-[#d8edf1]/50 p-3 rounded-xl border border-[#A4CCD9]">
                               <div className="flex items-center gap-2">
-                                <span className="text-xs text-slate-300 font-bold shrink-0">Cases Supplied:</span>
+                                <span className="text-xs text-[#0F172A] font-bold shrink-0">Cases Supplied:</span>
                                 <input
                                   type="number"
                                   min={1}
@@ -939,7 +943,7 @@ export const DeliveryTeamPortal: React.FC = () => {
                                       [outlet.outlet_id]: Math.max(1, parseInt(e.target.value) || 0),
                                     })
                                   }
-                                  className="w-20 px-2 py-1 rounded-lg bg-slate-800 border border-slate-600 text-white font-mono font-bold text-xs focus:ring-1 focus:ring-blue-500"
+                                  className="w-20 px-2 py-1 rounded-lg bg-white border border-[#A4CCD9] text-[#0F172A] font-mono font-bold text-xs focus:ring-1 focus:ring-[#8DBCC7]"
                                 />
                               </div>
 
@@ -947,7 +951,7 @@ export const DeliveryTeamPortal: React.FC = () => {
                                 type="button"
                                 onClick={() => handleConfirmOutletDelivery(activeTrip.id, outlet.outlet_id)}
                                 disabled={actionLoading}
-                                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md shadow-blue-600/20 sm:ml-auto"
+                                className="px-4 py-2 rounded-xl bg-[#0F172A] hover:bg-[#164E63] text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs border border-[#8DBCC7] sm:ml-auto"
                               >
                                 <Check className="w-3.5 h-3.5" />
                                 <span>Confirm Delivery to this Outlet</span>
@@ -963,10 +967,10 @@ export const DeliveryTeamPortal: React.FC = () => {
             </div>
           </div>
         ) : (
-          <div className="p-12 text-center bg-slate-800/60 rounded-3xl border border-dashed border-slate-700">
-            <Truck className="w-12 h-12 mx-auto text-slate-500 mb-2" />
-            <h3 className="font-oswald text-lg font-bold text-slate-300">No Active Dispatches for this Vehicle</h3>
-            <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+          <div className="p-12 text-center bg-white rounded-3xl border border-dashed border-[#8DBCC7] shadow-xs">
+            <Truck className="w-12 h-12 mx-auto text-[#8DBCC7] mb-2" />
+            <h3 className="font-oswald text-lg font-bold text-[#0F172A]">No Active Dispatches for this Vehicle</h3>
+            <p className="text-xs text-[#334155] mt-1 max-w-md mx-auto">
               Vehicle {regNo || 'selected'} has no active delivery routes currently. When the Supplier dispatches a route for this vehicle, it will appear here instantly.
             </p>
           </div>
@@ -975,46 +979,46 @@ export const DeliveryTeamPortal: React.FC = () => {
 
       {/* MODAL: Offer Onboarded Stock to Nearby Outlets */}
       {isOfferModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-lg bg-slate-900 rounded-3xl border border-slate-700 p-6 shadow-2xl space-y-4 text-left">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-lg bg-white rounded-3xl border border-[#8DBCC7] p-6 shadow-2xl space-y-4 text-left text-[#0F172A]">
+            <div className="flex items-center justify-between pb-3 border-b border-[#C4E1E6]">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center font-bold">
-                  <Zap className="w-5 h-5 fill-amber-400" />
+                <div className="w-9 h-9 rounded-xl bg-[#EBFFD8] border border-[#8DBCC7] text-[#0F172A] flex items-center justify-center font-bold">
+                  <Zap className="w-5 h-5 fill-[#0F172A]" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-white">Offer Onboarded Stock to Outlets</h3>
-                  <p className="text-xs text-slate-400">Reassign loaded vehicle cargo to nearby stores</p>
+                  <h3 className="text-base font-bold text-[#0F172A]">Offer Onboarded Stock to Outlets</h3>
+                  <p className="text-xs text-[#334155]">Reassign loaded vehicle cargo to nearby stores</p>
                 </div>
               </div>
               <button
                 onClick={() => setIsOfferModalOpen(false)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg text-lg font-bold cursor-pointer"
+                className="text-[#334155] hover:text-[#0F172A] p-1 rounded-lg text-lg font-bold cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs space-y-1">
-              <p className="font-bold text-amber-100 flex items-center gap-1.5 flex-wrap">
+            <div className="p-3.5 rounded-2xl bg-[#EBFFD8] border border-[#8DBCC7] text-[#14532D] text-xs space-y-1">
+              <p className="font-bold text-[#0F172A] flex items-center gap-1.5 flex-wrap">
                 <span>📦 Physical Cargo on Vehicle:</span>
-                <span className="font-mono text-white bg-slate-950 px-2 py-0.5 rounded border border-amber-500/40">{team?.vehicle_registration_no}</span>
-                <span className="text-amber-300 font-bold">({offerCases} Cases Available)</span>
+                <span className="font-mono text-[#0F172A] bg-white px-2 py-0.5 rounded border border-[#8DBCC7] font-bold">{team?.vehicle_registration_no}</span>
+                <span className="text-[#14532D] font-bold">({offerCases} Cases Available)</span>
               </p>
-              <p className="text-slate-300">
+              <p className="text-[#334155] font-medium">
                 This stock was already inspected and boarded on your delivery vehicle. Instead of dead freight returning to depot, offer it directly to other stores nearby or along your route.
               </p>
             </div>
 
             <div className="space-y-3.5 text-xs">
               <div>
-                <label className="block text-slate-300 font-bold mb-1.5">
+                <label className="block text-[#0F172A] font-bold mb-1.5">
                   Select Recipient Outlet (Nearby / Route Stores):
                 </label>
                 <select
                   value={selectedRecipientOutletId}
                   onChange={(e) => setSelectedRecipientOutletId(Number(e.target.value))}
-                  className="w-full px-3 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white font-medium focus:ring-2 focus:ring-amber-500 cursor-pointer"
+                  className="w-full px-3 py-2.5 rounded-xl bg-white border border-[#A4CCD9] text-[#0F172A] font-medium focus:ring-2 focus:ring-[#8DBCC7] cursor-pointer"
                 >
                   <option value="">-- Choose Recipient Store --</option>
                   {availableOutlets
@@ -1029,43 +1033,43 @@ export const DeliveryTeamPortal: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-300 font-bold mb-1">Cases to Offer:</label>
+                  <label className="block text-[#0F172A] font-bold mb-1">Cases to Offer:</label>
                   <input
                     type="number"
                     min={1}
                     value={offerCases}
                     onChange={(e) => setOfferCases(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white font-mono font-bold focus:ring-2 focus:ring-amber-500"
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-[#A4CCD9] text-[#0F172A] font-mono font-bold focus:ring-2 focus:ring-[#8DBCC7]"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-300 font-bold mb-1">Assigned Vehicle:</label>
+                  <label className="block text-[#0F172A] font-bold mb-1">Assigned Vehicle:</label>
                   <input
                     type="text"
                     disabled
                     value={`${team?.vehicle_registration_no || 'FLEET'} (${team?.driver_name || 'Driver'})`}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-800/60 border border-slate-700 text-slate-400 font-mono text-xs"
+                    className="w-full px-3 py-2 rounded-xl bg-[#d8edf1]/40 border border-[#A4CCD9] text-[#334155] font-mono text-xs font-bold"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-slate-300 font-bold mb-1">Delivery Notes / Offer Memo:</label>
+                <label className="block text-[#0F172A] font-bold mb-1">Delivery Notes / Offer Memo:</label>
                 <input
                   type="text"
                   value={offerNotes}
                   onChange={(e) => setOfferNotes(e.target.value)}
                   placeholder="e.g. In-transit direct stock offer from Driver"
-                  className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white focus:ring-2 focus:ring-amber-500"
+                  className="w-full px-3 py-2 rounded-xl bg-white border border-[#A4CCD9] text-[#0F172A] focus:ring-2 focus:ring-[#8DBCC7]"
                 />
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-800">
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[#C4E1E6]">
               <button
                 type="button"
                 onClick={() => setIsOfferModalOpen(false)}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-[#d8edf1] hover:bg-[#C4E1E6] text-[#0F172A] border border-[#A4CCD9] font-bold text-xs cursor-pointer"
               >
                 Cancel
               </button>
@@ -1073,9 +1077,9 @@ export const DeliveryTeamPortal: React.FC = () => {
                 type="button"
                 onClick={handleSubmitOfferStock}
                 disabled={offeringLoading || !selectedRecipientOutletId}
-                className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-5 py-2 rounded-xl bg-[#0F172A] hover:bg-[#164E63] text-white font-black text-xs border border-[#8DBCC7] shadow-xs transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Zap className="w-4 h-4 fill-slate-950" />
+                <Zap className="w-4 h-4 fill-white" />
                 <span>{offeringLoading ? 'Dispatching Offer...' : '🚀 Confirm & Dispatch Stock Offer'}</span>
               </button>
             </div>

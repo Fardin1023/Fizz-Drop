@@ -14,6 +14,7 @@ import {
   Eye,
   Download,
   Warehouse,
+  Tag,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { parseAllocatedAreas } from '../../constants/cityAreas';
@@ -66,9 +67,13 @@ export interface SupplierProfileData {
 
 interface SupplierProfileViewProps {
   onViewAllocatedOutlets?: () => void;
+  onViewPriceBoard?: () => void;
 }
 
-export const SupplierProfileView: React.FC<SupplierProfileViewProps> = ({ onViewAllocatedOutlets }) => {
+export const SupplierProfileView: React.FC<SupplierProfileViewProps> = ({
+  onViewAllocatedOutlets,
+  onViewPriceBoard,
+}) => {
   const { token, user } = useAuth();
   const [profile, setProfile] = useState<SupplierProfileData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -280,6 +285,28 @@ export const SupplierProfileView: React.FC<SupplierProfileViewProps> = ({ onView
                   >
                     <Warehouse className="w-3.5 h-3.5" />
                     <span>View Allocated Outlets</span>
+                  </button>
+                </span>
+              )}
+
+              {onViewPriceBoard && (
+                <span className="mt-2.5 pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 block bg-[#DEFDEF]/60 p-3 rounded-xl border border-[#BFC8C5]">
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-black text-[#15221C] flex items-center gap-1.5 uppercase tracking-wide">
+                      <Tag className="w-3.5 h-3.5 text-[#15221C]" />
+                      Territory Price Board ({profile.district_name || 'Dhaka'} District)
+                    </span>
+                    <span className="text-[11px] text-[#4A5852] block">
+                      Approved wholesale buy costs from Superadmin & outbound supply rates strictly for your territory.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onViewPriceBoard}
+                    className="px-3.5 py-1.5 rounded-xl bg-[#FFE8BD] hover:bg-[#FADECF] text-[#15221C] text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1.5 self-start sm:self-auto border border-[#BFC8C5] shrink-0"
+                  >
+                    <Tag className="w-3.5 h-3.5" />
+                    <span>Open Price Board</span>
                   </button>
                 </span>
               )}

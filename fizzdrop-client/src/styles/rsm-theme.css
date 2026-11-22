@@ -1,0 +1,130 @@
+/* ==========================================================================
+   RSM (REGIONAL SALES MANAGER) PORTAL THEME PALETTE
+   Inspired by Huemint Monochrome Mint / Frosty Cyan Minimal Design:
+   Canvas / Page Background:  #E5FAFB (Frosty Mint Cyan)
+   Card Surface:             #FFFFFF (Pure White) & #F4FDFE
+   Subtle Surface:           #DCF1F2 (Soft Frosted Aqua)
+   Borders & Separators:     #CDE2E3 / #C4E2E4
+   Primary Accent Teal:      #2A969C / #36A4AB
+   Primary Dark Teal:        #163A3C (Deep Slate Cyan)
+   High Contrast Typography:
+     Heading / Text Primary: #112627 / #163A3C
+     Text Secondary:         #3B5759 / #48686A
+     Text Muted:             #67888A
+   ========================================================================== */
+
+:root {
+  --rsm-canvas: #E5FAFB;
+  --rsm-card: #FFFFFF;
+  --rsm-card-subtle: #F4FDFE;
+  --rsm-surface-subtle: #DCF1F2;
+  --rsm-border: #CDE2E3;
+  --rsm-border-dark: #B5DADB;
+  --rsm-accent-teal: #2A969C;
+  --rsm-accent-vibrant: #36A4AB;
+  --rsm-primary-dark: #163A3C;
+  --rsm-text-primary: #112627;
+  --rsm-text-secondary: #3B5759;
+  --rsm-text-muted: #67888A;
+}
+
+.rsm-theme {
+  background-color: #E5FAFB;
+  color: #163A3C;
+  min-height: 100vh;
+}
+
+/* Card surfaces */
+.rsm-theme .rsm-card {
+  background-color: #FFFFFF;
+  border: 1px solid #CDE2E3;
+  box-shadow: 0 2px 8px -2px rgba(22, 58, 60, 0.06);
+  color: #163A3C;
+}
+
+/* Hero container */
+.rsm-theme .rsm-hero {
+  background: linear-gradient(135deg, #FFFFFF 0%, #E5FAFB 50%, #DCF1F2 100%);
+  border: 1px solid #C4E2E4;
+  color: #163A3C;
+  box-shadow: 0 4px 20px -4px rgba(22, 58, 60, 0.08);
+}
+
+/* Header bar */
+.rsm-theme .rsm-header {
+  background-color: rgba(229, 250, 251, 0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid #CDE2E3;
+}
+
+/* Pill badges */
+.rsm-theme .badge-cyan {
+  background-color: #DCF1F2;
+  color: #163A3C;
+  border: 1px solid #CDE2E3;
+  font-weight: 700;
+}
+
+.rsm-theme .badge-teal {
+  background-color: #2A969C;
+  color: #FFFFFF;
+  font-weight: 700;
+}
+
+.rsm-theme .badge-dark {
+  background-color: #163A3C;
+  color: #E5FAFB;
+  font-weight: 700;
+}
+
+.rsm-theme .badge-soft {
+  background-color: #FFFFFF;
+  color: #163A3C;
+  border: 1px solid #CDE2E3;
+  font-weight: 600;
+}
+
+/* Primary dark buttons with high contrast */
+.rsm-theme .btn-rsm-primary {
+  background-color: #163A3C;
+  color: #E5FAFB;
+  font-weight: 700;
+  transition: all 0.2s ease;
+}
+
+.rsm-theme .btn-rsm-primary:hover {
+  background-color: #0E2627;
+  color: #FFFFFF;
+  box-shadow: 0 4px 12px -2px rgba(22, 58, 60, 0.25);
+}
+
+/* Secondary cyan action button */
+.rsm-theme .btn-rsm-cyan {
+  background-color: #DCF1F2;
+  color: #163A3C;
+  border: 1px solid #CDE2E3;
+  font-weight: 700;
+  transition: all 0.2s ease;
+}
+
+.rsm-theme .btn-rsm-cyan:hover {
+  background-color: #CDE2E3;
+  color: #112627;
+}
+
+/* Inputs & Form controls */
+.rsm-theme input,
+.rsm-theme select,
+.rsm-theme textarea {
+  background-color: #FFFFFF;
+  border: 1px solid #CDE2E3;
+  color: #163A3C;
+}
+
+.rsm-theme input:focus,
+.rsm-theme select:focus,
+.rsm-theme textarea:focus {
+  border-color: #2A969C;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(42, 150, 156, 0.25);
+}

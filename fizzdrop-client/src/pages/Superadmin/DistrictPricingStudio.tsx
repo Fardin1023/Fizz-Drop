@@ -17,7 +17,10 @@ import {
   Check,
   Globe,
   Percent,
+  Sparkles,
+  Bell,
 } from 'lucide-react';
+import { playNotificationChime } from '../../utils/sound';
 
 export interface DistrictSummary {
   id: number;
@@ -65,7 +68,11 @@ export const DistrictPricingStudio: React.FC<DistrictPricingStudioProps> = ({
   const [loadingPricing, setLoadingPricing] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
   const [savingProductId, setSavingProductId] = useState<number | null>(null);
-  const [actionAlert, setActionAlert] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [actionAlert, setActionAlert] = useState<{
+    text: string;
+    type: 'success' | 'error';
+    districtName?: string;
+  } | null>(null);
 
   // Copy Modal State
   const [isCopyModalOpen, setIsCopyModalOpen] = useState<boolean>(false);
@@ -112,6 +119,13 @@ export const DistrictPricingStudio: React.FC<DistrictPricingStudioProps> = ({
   useEffect(() => {
     fetchDistricts();
   }, []);
+
+  // Sync initialDistrictId when changed from outside (e.g. Price Board "Adjust Rates" button)
+  useEffect(() => {
+    if (initialDistrictId && initialDistrictId !== selectedDistrictId) {
+      setSelectedDistrictId(initialDistrictId);
+    }
+  }, [initialDistrictId]);
 
   useEffect(() => {
     if (selectedDistrictId) {
@@ -194,22 +208,53 @@ export const DistrictPricingStudio: React.FC<DistrictPricingStudioProps> = ({
 
       const data = await res.json().catch(() => ({}));
       const activeDist = districts.find((d) => d.id === selectedDistrictId);
+      const targetDistName = data.district_name || activeDist?.name || 'Selected';
       setActionAlert({
-        text: data.message || `Successfully allotted 3-tier pricing for ${pricingItems.length} products in ${activeDist?.name || 'selected'} district! Saved in the database and applied to all suppliers and outlets.`,
+        text: data.message || `Price successfully set for ${targetDistName} district (${pricingItems.length} SKUs)! Saved in database and applied to all regional suppliers and outlets.`,
         type: 'success',
+        districtName: targetDistName,
       });
       fetchDistricts();
 
-      // Broadcast real-time pricing update to all active supplier & outlet tabs
+      // Broadcast real-time pricing update to both Superadmin and Suppliers
       try {
         const bc = new BroadcastChannel('fizzdrop_realtime_events');
+        // 1. Superadmin Animated Alert Notification
+        bc.postMessage({
+          type: 'PRICE_UPDATED',
+          recipientRole: 'SUPERADMIN',
+          title: `Price Set for ${targetDistName} District`,
+          message: `3-tier pricing for ${targetDistName} district has been saved in the database (${pricingItems.length} SKUs). Applied to all regional suppliers and outlets.`,
+          status: 'PRICE_UPDATED',
+          referenceId: selectedDistrictId,
+          district_id: selectedDistrictId,
+          district_name: targetDistName,
+          timestamp: Date.now(),
+        });
+        // 2. Regional Supplier Alert Notification
+        bc.postMessage({
+          type: 'PRICE_UPDATED',
+          recipientRole: 'SUPPLIER',
+          title: `Price Set for ${targetDistName} District`,
+          message: `Superadmin updated 3-tier product pricing for ${targetDistName} district (${pricingItems.length} SKUs). New buy rates and wholesale supply prices are now applied.`,
+          status: 'PRICE_UPDATED',
+          referenceId: selectedDistrictId,
+          district_id: selectedDistrictId,
+          district_name: targetDistName,
+          timestamp: Date.now(),
+        });
+        // 3. General listener broadcast
         bc.postMessage({
           type: 'PRICE_UPDATED',
           district_id: selectedDistrictId,
-          district_name: activeDist?.name,
+          district_name: targetDistName,
           timestamp: Date.now(),
         });
         bc.close();
+      } catch (e) {}
+
+      try {
+        playNotificationChime('success');
       } catch (e) {}
 
       setTimeout(() => setActionAlert(null), 6000);
@@ -249,16 +294,44 @@ export const DistrictPricingStudio: React.FC<DistrictPricingStudioProps> = ({
         throw new Error(err.message || 'Failed to update product pricing');
       }
 
+      const data = await res.json().catch(() => ({}));
       const activeDist = districts.find((d) => d.id === selectedDistrictId);
+      const targetDistName = data.district_name || activeDist?.name || 'Selected';
       setActionAlert({
-        text: `Saved & applied pricing for ${item.brand} ${item.flavor_variant} in ${activeDist?.name || 'District'}! Saved in database and applied to all regional suppliers and outlets.`,
+        text: `Price set for ${item.brand} ${item.flavor_variant} in ${targetDistName} District! Saved in database and applied to all regional suppliers and outlets.`,
         type: 'success',
+        districtName: targetDistName,
       });
       fetchDistricts();
 
-      // Real-time broadcast
+      // Real-time broadcast to both Superadmin and Suppliers
       try {
         const bc = new BroadcastChannel('fizzdrop_realtime_events');
+        // 1. Superadmin Animated Alert Notification
+        bc.postMessage({
+          type: 'PRICE_UPDATED',
+          recipientRole: 'SUPERADMIN',
+          title: `Price Set for ${activeDist?.name || 'District'} District`,
+          message: `Pricing for ${item.brand} ${item.flavor_variant} in ${activeDist?.name || 'District'} has been saved in the database: Buy ৳${item.supplier_price}, Wholesale ৳${item.outlet_price}, Retail ৳${item.retail_price}.`,
+          status: 'PRICE_UPDATED',
+          referenceId: selectedDistrictId,
+          product_id: item.product_id,
+          product_name: `${item.brand} ${item.flavor_variant}`,
+          timestamp: Date.now(),
+        });
+        // 2. Regional Supplier Alert Notification
+        bc.postMessage({
+          type: 'PRICE_UPDATED',
+          recipientRole: 'SUPPLIER',
+          title: `Price Set for ${activeDist?.name || 'District'} District`,
+          message: `Superadmin updated pricing for ${item.brand} ${item.flavor_variant} in ${activeDist?.name || 'District'} district. Supplier Buy ৳${item.supplier_price}, Wholesale ৳${item.outlet_price}.`,
+          status: 'PRICE_UPDATED',
+          referenceId: selectedDistrictId,
+          product_id: item.product_id,
+          product_name: `${item.brand} ${item.flavor_variant}`,
+          timestamp: Date.now(),
+        });
+        // 3. General broadcast
         bc.postMessage({
           type: 'PRICE_UPDATED',
           district_id: selectedDistrictId,
@@ -267,6 +340,10 @@ export const DistrictPricingStudio: React.FC<DistrictPricingStudioProps> = ({
           timestamp: Date.now(),
         });
         bc.close();
+      } catch (e) {}
+
+      try {
+        playNotificationChime('success');
       } catch (e) {}
 
       setTimeout(() => setActionAlert(null), 5000);
@@ -325,10 +402,30 @@ export const DistrictPricingStudio: React.FC<DistrictPricingStudioProps> = ({
         const bc = new BroadcastChannel('fizzdrop_realtime_events');
         bc.postMessage({
           type: 'PRICE_UPDATED',
+          recipientRole: 'SUPERADMIN',
+          title: `Pricing Copied Across Districts`,
+          message: `Pricing from ${activeDistrictObj?.name || 'District'} has been copied and saved across target districts in the database.`,
+          status: 'PRICE_UPDATED',
+          timestamp: Date.now(),
+        });
+        bc.postMessage({
+          type: 'PRICE_UPDATED',
+          recipientRole: 'SUPPLIER',
+          title: `District Pricing Allotted`,
+          message: `Superadmin updated 3-tier product pricing for your district. New buy rates and wholesale supply prices are now applied.`,
+          status: 'PRICE_UPDATED',
+          timestamp: Date.now(),
+        });
+        bc.postMessage({
+          type: 'PRICE_UPDATED',
           from_district_id: selectedDistrictId,
           timestamp: Date.now(),
         });
         bc.close();
+      } catch (e) {}
+
+      try {
+        playNotificationChime('success');
       } catch (e) {}
 
       setTimeout(() => setActionAlert(null), 6000);
@@ -348,22 +445,89 @@ export const DistrictPricingStudio: React.FC<DistrictPricingStudioProps> = ({
     return matchesDiv && matchesSearch;
   });
 
+  const handleDivisionChange = (div: string) => {
+    setSelectedDivision(div);
+    if (div !== 'ALL') {
+      const firstInDiv = districts.find((d) => d.division.toLowerCase() === div.toLowerCase());
+      if (firstInDiv && firstInDiv.id !== selectedDistrictId) {
+        setSelectedDistrictId(firstInDiv.id);
+      }
+    }
+  };
+
+  const handleDistrictSelect = (districtId: number) => {
+    setSelectedDistrictId(districtId);
+    const target = districts.find((d) => d.id === districtId);
+    if (target && selectedDivision !== 'ALL' && target.division.toLowerCase() !== selectedDivision.toLowerCase()) {
+      setSelectedDivision(target.division);
+    }
+  };
+
   const activeDistrictObj = districts.find((d) => d.id === selectedDistrictId);
 
   return (
-    <div className="space-y-4">
-      {/* Alert Banner */}
+    <div className="space-y-4 relative">
+      {/* Small Animated Toast Alert when price is set for a particular district */}
       {actionAlert && (
         <div
-          className={`p-4 rounded-2xl border text-xs font-semibold flex items-center justify-between shadow-xs transition-all ${
+          className={`fixed top-24 right-4 sm:right-6 z-[130] w-[calc(100vw-2rem)] sm:w-96 p-4 rounded-3xl border shadow-2xl backdrop-blur-xl flex items-start gap-3 transition-all duration-300 animate-in fade-in slide-in-from-top-4 ${
             actionAlert.type === 'success'
-              ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
+              ? 'bg-[#FFF9F0]/95 text-[#101B14] border-[#B8CBBE] ring-4 ring-[#CFE0D2]/50 shadow-emerald-600/10'
+              : 'bg-rose-50/95 text-rose-900 border-rose-300 ring-4 ring-rose-200/50 shadow-rose-500/10'
+          }`}
+          role="alert"
+          aria-live="assertive"
+        >
+          <div className="w-10 h-10 rounded-2xl bg-[#CFE0D2] border border-[#B8CBBE] flex items-center justify-center shrink-0 shadow-xs mt-0.5">
+            {actionAlert.type === 'success' ? (
+              <span className="relative flex h-5 w-5 items-center justify-center">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <Sparkles className="w-4 h-4 text-[#122018] relative z-10" />
+              </span>
+            ) : (
+              <AlertCircle className="w-5 h-5 text-rose-600" />
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold tracking-wider uppercase bg-[#CFE0D2] text-[#122018] border border-[#B8CBBE] inline-flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-ping" />
+                {actionAlert.type === 'success' ? 'DISTRICT PRICING SET' : 'ALERT'}
+              </span>
+              <span className="text-[10px] font-mono text-[#535E56] font-semibold">
+                {actionAlert.districtName || activeDistrictObj?.name || 'District'}
+              </span>
+            </div>
+            <h4 className="font-oswald text-xs font-bold uppercase text-[#101B14] mt-1 tracking-tight">
+              {actionAlert.type === 'success' ? `Price Set for ${actionAlert.districtName || activeDistrictObj?.name || 'District'} District` : 'Pricing Notice'}
+            </h4>
+            <p className="text-[11px] text-[#3E352C] mt-0.5 leading-relaxed font-medium">
+              {actionAlert.text}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setActionAlert(null)}
+            className="p-1 rounded-xl text-[#535E56] hover:text-[#101B14] hover:bg-[#CFE0D2]/50 transition-colors cursor-pointer shrink-0"
+            title="Dismiss notification"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* In-Page Alert Banner */}
+      {actionAlert && (
+        <div
+          className={`p-4 rounded-2xl border text-xs font-semibold flex items-center justify-between shadow-xs transition-all animate-in fade-in duration-200 ${
+            actionAlert.type === 'success'
+              ? 'bg-[#DEFDEF] text-[#101B14] border-[#B8CBBE]'
               : 'bg-rose-50 text-rose-900 border-rose-300'
           }`}
         >
           <div className="flex items-center gap-2.5">
             {actionAlert.type === 'success' ? (
-              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+              <CheckCircle2 className="w-5 h-5 text-emerald-700 shrink-0" />
             ) : (
               <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
             )}
@@ -371,7 +535,7 @@ export const DistrictPricingStudio: React.FC<DistrictPricingStudioProps> = ({
           </div>
           <button
             onClick={() => setActionAlert(null)}
-            className="text-slate-400 hover:text-slate-600 font-bold ml-3 cursor-pointer"
+            className="text-[#535E56] hover:text-[#101B14] font-bold ml-3 cursor-pointer"
           >
             ✕
           </button>
@@ -459,7 +623,7 @@ export const DistrictPricingStudio: React.FC<DistrictPricingStudioProps> = ({
 
             <select
               value={selectedDistrictId}
-              onChange={(e) => setSelectedDistrictId(Number(e.target.value))}
+              onChange={(e) => handleDistrictSelect(Number(e.target.value))}
               className="px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-300 text-xs font-bold text-emerald-900 focus:outline-none cursor-pointer"
             >
               {filteredDistricts.map((d) => (
@@ -482,7 +646,7 @@ export const DistrictPricingStudio: React.FC<DistrictPricingStudioProps> = ({
               <button
                 key={div}
                 type="button"
-                onClick={() => setSelectedDivision(div)}
+                onClick={() => handleDivisionChange(div)}
                 className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                   isSelected
                     ? 'bg-emerald-600 text-white font-bold shadow-xs'
@@ -490,6 +654,35 @@ export const DistrictPricingStudio: React.FC<DistrictPricingStudioProps> = ({
                 }`}
               >
                 {div}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Clickable District Pills for rapid direct selection */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none pt-2.5 border-t border-slate-100">
+          <span className="text-[10px] font-bold font-mono text-slate-400 uppercase tracking-wider shrink-0 mr-1">
+            Districts ({filteredDistricts.length}):
+          </span>
+          {filteredDistricts.map((d) => {
+            const isSelected = selectedDistrictId === d.id;
+            return (
+              <button
+                key={d.id}
+                type="button"
+                onClick={() => handleDistrictSelect(d.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 border ${
+                  isSelected
+                    ? 'bg-emerald-600 text-white font-bold border-emerald-700 shadow-sm'
+                    : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                }`}
+              >
+                <span>{d.name}</span>
+                <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-mono ${
+                  isSelected ? 'bg-white/25 text-white' : 'bg-slate-200 text-slate-600'
+                }`}>
+                  #{d.id}
+                </span>
               </button>
             );
           })}

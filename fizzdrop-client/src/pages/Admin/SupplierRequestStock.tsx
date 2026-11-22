@@ -140,6 +140,18 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
     }
   };
 
+  const fetchProductsForDistrict = async (dId: number) => {
+    try {
+      const res = await fetch(`http://localhost:8080/api/products?userId=${user?.user_id || 4}&districtId=${dId}`);
+      if (res.ok) {
+        const prodData = await res.json();
+        setProducts(Array.isArray(prodData) ? prodData : []);
+      }
+    } catch (e) {
+      console.warn('Error fetching district products:', e);
+    }
+  };
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -613,7 +625,11 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
               {profile?.assigned_districts && profile.assigned_districts.length > 1 ? (
                 <select
                   value={destinationDistrictId || profile?.primary_district_id || ''}
-                  onChange={(e) => setDestinationDistrictId(Number(e.target.value))}
+                  onChange={(e) => {
+                    const n = Number(e.target.value);
+                    setDestinationDistrictId(n);
+                    fetchProductsForDistrict(n);
+                  }}
                   className="w-full px-3 py-2 rounded-xl bg-white border border-blue-200 text-xs font-bold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500/40 cursor-pointer shadow-2xs"
                 >
                   {profile.assigned_districts.map((d: any) => (

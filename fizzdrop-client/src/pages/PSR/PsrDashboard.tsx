@@ -511,32 +511,32 @@ export default function PsrDashboard() {
   });
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-zinc-950 text-slate-800 dark:text-zinc-100 flex flex-col font-sans transition-colors">
+    <div className="psr-theme psr-portal-page min-h-screen bg-[#e8f4ff] text-[#0F172A] flex flex-col font-sans transition-colors">
       <NotificationPopup notification={popupNotification} onDismiss={dismissPopup} onAction={handleNotificationClick} />
 
       {/* Top Navigation Bar */}
-      <header className="sticky top-0 z-40 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md border-b border-slate-200 dark:border-zinc-800 px-4 sm:px-6 py-3 shadow-sm">
+      <header className="sticky top-0 z-40 bg-[#f7fbff]/95 backdrop-blur-md border-b border-[#c4dde9] px-4 sm:px-6 py-3 shadow-xs">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <img
               src={psrLogo}
               alt="PSR Portal Logo"
-              className="h-10 w-10 sm:h-11 sm:w-11 rounded-2xl object-cover shadow-md shadow-orange-500/25 border border-orange-400/40 shrink-0 transform hover:scale-105 transition-transform"
+              className="h-10 w-10 sm:h-11 sm:w-11 rounded-2xl object-cover shadow-2xs border border-[#c4dde9] shrink-0 transform hover:scale-105 transition-transform bg-white"
             />
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="font-bold text-lg text-slate-900 dark:text-white tracking-tight">
+                <h1 className="font-bold text-lg text-[#0F172A] tracking-tight">
                   Pre-Sales Representative (PSR) Portal
                 </h1>
-                <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-[#d6ecff] text-[#0F172A] border border-[#c4dde9]">
                   {data?.psr?.psr_code || 'PSR'}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 dark:text-zinc-400 flex items-center gap-1.5">
-                <MapPin className="h-3 w-3 text-red-500" />
+              <p className="text-xs text-[#475569] flex items-center gap-1.5 mt-0.5">
+                <MapPin className="h-3 w-3 text-[#0284c7]" />
                 <span>{data?.sub_route || 'Assigned Sub-Route'}</span>
-                <span className="text-slate-300 dark:text-zinc-700">•</span>
-                <span>Area: <strong className="text-slate-700 dark:text-zinc-200">{data?.assigned_area || 'Zone'}</strong></span>
+                <span className="text-[#c4dde9]">•</span>
+                <span>Area: <strong className="text-[#0F172A]">{data?.assigned_area || 'Zone'}</strong></span>
               </p>
             </div>
           </div>
@@ -544,10 +544,10 @@ export default function PsrDashboard() {
           <div className="flex items-center gap-2.5 w-full sm:w-auto justify-between sm:justify-end">
             {/* Quick Switch PSR Dropdown */}
             {allPsrs.length > 0 && (
-              <div className="flex items-center gap-1 bg-slate-100 dark:bg-zinc-800/80 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 text-xs">
-                <User className="h-3.5 w-3.5 text-slate-500" />
+              <div className="flex items-center gap-1.5 bg-[#f7fbff] px-2.5 py-1.5 rounded-xl border border-[#c4dde9] text-xs shadow-2xs">
+                <User className="h-3.5 w-3.5 text-[#475569]" />
                 <select
-                  className="bg-transparent font-medium text-slate-700 dark:text-zinc-200 focus:outline-none cursor-pointer"
+                  className="bg-transparent font-medium text-[#0F172A] focus:outline-none cursor-pointer"
                   value={data?.psr?.id || activePsrId || ''}
                   onChange={(e) => {
                     const selId = Number(e.target.value);
@@ -555,7 +555,7 @@ export default function PsrDashboard() {
                   }}
                 >
                   {allPsrs.map((p) => (
-                    <option key={p.id} value={p.id} className="dark:bg-zinc-900 text-slate-900 dark:text-white">
+                    <option key={p.id} value={p.id} className="bg-white text-[#0F172A]">
                       {p.name} ({p.psr_code} - {p.assigned_area})
                     </option>
                   ))}
@@ -565,7 +565,7 @@ export default function PsrDashboard() {
 
             <button
               onClick={() => { void loadDashboard(); }}
-              className="p-2 rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-zinc-800 transition"
+              className="p-2 rounded-xl text-[#334155] hover:text-[#0F172A] hover:bg-[#d6ecff] border border-transparent hover:border-[#c4dde9] transition cursor-pointer"
               title="Refresh Route Data"
             >
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
@@ -584,7 +584,7 @@ export default function PsrDashboard() {
 
             <button
               onClick={logout}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 dark:text-red-400 transition"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-rose-700 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition cursor-pointer"
               title="Sign Out"
             >
               <LogOut className="h-3.5 w-3.5" />
@@ -595,60 +595,60 @@ export default function PsrDashboard() {
       </header>
 
       {/* Main Workspace */}
-      <main className="max-w-7xl mx-auto w-full p-4 sm:p-6 flex-1 flex flex-col gap-6">
+      <main className="max-w-7xl mx-auto w-full p-4 sm:p-6 flex-1 flex flex-col gap-5">
 
         {/* Assigned Hierarchy Banner */}
-        <div className="bg-gradient-to-r from-orange-600 via-amber-600 to-yellow-600 rounded-2xl p-5 text-white shadow-lg shadow-orange-500/10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="rounded-2xl bg-gradient-to-r from-[#d6ecff] via-[#e8f4ff] to-[#f7fbff] p-5 text-[#0F172A] border border-[#c4dde9] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <img
               src={psrLogo}
               alt="PSR Representative"
-              className="h-16 w-16 sm:h-20 sm:w-20 rounded-2xl object-cover shadow-xl border-2 border-white/40 shrink-0 bg-slate-900/30"
+              className="h-16 w-16 sm:h-20 sm:w-20 rounded-2xl object-cover shadow-xs border border-[#c4dde9] shrink-0 bg-white"
             />
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <span className="text-xs uppercase tracking-wider font-bold bg-white/20 px-2.5 py-0.5 rounded-full">
+                <span className="text-xs uppercase tracking-wider font-bold bg-[#f7fbff] text-[#0F172A] border border-[#c4dde9] px-2.5 py-0.5 rounded-full">
                   Pre-Sales Field Representative
                 </span>
-                <span className="text-xs bg-emerald-500/90 text-white font-semibold px-2 py-0.5 rounded-full flex items-center gap-1">
-                  <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" /> Live Field Duty
+                <span className="text-xs bg-[#d6ecff] text-[#0F172A] border border-[#c4dde9] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-[#0284c7] animate-pulse" /> Live Field Duty
                 </span>
               </div>
-              <h2 className="text-2xl font-black tracking-tight">{data?.psr?.name || 'Pre-Sales Officer'}</h2>
-              <p className="text-sm text-orange-100 flex flex-wrap items-center gap-3">
+              <h2 className="text-2xl font-black tracking-tight text-[#0F172A]">{data?.psr?.name || 'Pre-Sales Officer'}</h2>
+              <p className="text-sm text-[#334155] flex flex-wrap items-center gap-3">
                 <span className="flex items-center gap-1">
-                  <Phone className="h-3.5 w-3.5" /> {data?.psr?.phone || '+8801819001101'}
+                  <Phone className="h-3.5 w-3.5 text-[#475569]" /> {data?.psr?.phone || '+8801819001101'}
                 </span>
                 <span>•</span>
                 <span className="flex items-center gap-1">
-                  <Building2 className="h-3.5 w-3.5" /> Reporting to Sales Officer: <strong className="underline underline-offset-2">{data?.sales_officer?.name || data?.psr?.sales_officer_name || 'Assigned Officer'}</strong>
+                  <Building2 className="h-3.5 w-3.5 text-[#475569]" /> Reporting to Sales Officer: <strong className="underline underline-offset-2 text-[#0F172A]">{data?.sales_officer?.name || data?.psr?.sales_officer_name || 'Assigned Officer'}</strong>
                 </span>
                 <span>•</span>
                 <span className="flex items-center gap-1">
-                  <Truck className="h-3.5 w-3.5" /> Supplier: <strong className="underline underline-offset-2">{data?.psr?.supplier_name || 'Dhaka Metropolitan & Central Beverage Logistics Hub'}</strong>
+                  <Truck className="h-3.5 w-3.5 text-[#475569]" /> Supplier: <strong className="underline underline-offset-2 text-[#0F172A]">{data?.psr?.supplier_name || 'Dhaka Metropolitan & Central Beverage Logistics Hub'}</strong>
                 </span>
               </p>
             </div>
           </div>
 
-          <div className="bg-white/10 backdrop-blur-md rounded-xl p-3 px-4 border border-white/20 flex flex-col sm:flex-row sm:items-center gap-4 text-xs">
+          <div className="bg-[#f7fbff] rounded-xl p-3 px-4 border border-[#c4dde9] shadow-2xs flex flex-col sm:flex-row sm:items-center gap-4 text-xs">
             <div>
-              <p className="text-orange-200 uppercase font-semibold text-[10px]">Territory Area</p>
-              <p className="font-bold text-sm">{data?.assigned_area || 'Dhaka Region'}</p>
+              <p className="text-[#64748B] uppercase font-semibold text-[10px]">Territory Area</p>
+              <p className="font-bold text-sm text-[#0F172A]">{data?.assigned_area || 'Dhaka Region'}</p>
             </div>
-            <div className="hidden sm:block h-8 w-px bg-white/20" />
+            <div className="hidden sm:block h-8 w-px bg-[#c4dde9]" />
             <div>
-              <p className="text-orange-200 uppercase font-semibold text-[10px]">Designated Sub-Route</p>
-              <p className="font-bold text-sm max-w-xs truncate" title={data?.sub_route}>
+              <p className="text-[#64748B] uppercase font-semibold text-[10px]">Designated Sub-Route</p>
+              <p className="font-bold text-sm max-w-xs truncate text-[#0F172A]" title={data?.sub_route}>
                 {data?.sub_route || 'Daily Outlets Route'}
               </p>
             </div>
-            <div className="hidden sm:block h-8 w-px bg-white/20" />
+            <div className="hidden sm:block h-8 w-px bg-[#c4dde9]" />
             <div>
-              <p className="text-orange-200 uppercase font-semibold text-[10px] flex items-center gap-1">
-                <Truck className="h-3 w-3 text-orange-200" /> Dedicated Supplier Hub
+              <p className="text-[#64748B] uppercase font-semibold text-[10px] flex items-center gap-1">
+                <Truck className="h-3 w-3 text-[#475569]" /> Dedicated Supplier Hub
               </p>
-              <p className="font-bold text-sm max-w-[220px] truncate" title={data?.psr?.supplier_name || 'Dhaka Metropolitan & Central Beverage Logistics Hub'}>
+              <p className="font-bold text-sm max-w-[220px] truncate text-[#0F172A]" title={data?.psr?.supplier_name || 'Dhaka Metropolitan & Central Beverage Logistics Hub'}>
                 {data?.psr?.supplier_name || 'Dhaka Metropolitan & Central Beverage Logistics Hub'}
               </p>
             </div>
@@ -657,76 +657,76 @@ export default function PsrDashboard() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-4 shadow-sm flex items-center justify-between">
+          <div className="bg-[#f7fbff] border border-[#c4dde9] hover:border-[#b7c4cd] rounded-xl p-4 shadow-2xs hover:shadow-sm transition flex items-center justify-between">
             <div>
-              <p className="text-xs text-slate-500 dark:text-zinc-400 font-medium">Assigned Outlets</p>
-              <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">
+              <p className="text-xs text-[#475569] font-medium">Assigned Outlets</p>
+              <h3 className="text-2xl font-bold text-[#0F172A] mt-1">
                 {data?.stats?.total_outlets || data?.outlets?.length || 0}
               </h3>
-              <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 font-medium flex items-center gap-1">
-                <Store className="h-3 w-3" /> Along sub-route
+              <p className="text-[11px] text-[#334155] mt-1 font-medium flex items-center gap-1">
+                <Store className="h-3 w-3 text-[#0284c7]" /> Along sub-route
               </p>
             </div>
-            <div className="h-11 w-11 rounded-lg bg-orange-100 dark:bg-orange-950/60 text-orange-600 dark:text-orange-400 flex items-center justify-center">
+            <div className="h-11 w-11 rounded-xl bg-[#d6ecff] border border-[#c4dde9] text-[#0F172A] flex items-center justify-center shadow-2xs">
               <Store className="h-5 w-5" />
             </div>
           </div>
 
-          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-4 shadow-sm flex items-center justify-between">
+          <div className="bg-[#f7fbff] border border-[#c4dde9] hover:border-[#b7c4cd] rounded-xl p-4 shadow-2xs hover:shadow-sm transition flex items-center justify-between">
             <div>
-              <p className="text-xs text-slate-500 dark:text-zinc-400 font-medium">Field Orders Booked</p>
-              <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">
+              <p className="text-xs text-[#475569] font-medium">Field Orders Booked</p>
+              <h3 className="text-2xl font-bold text-[#0F172A] mt-1">
                 {data?.orders?.length || 0}
               </h3>
-              <p className="text-[11px] text-orange-600 dark:text-orange-400 mt-1 font-medium flex items-center gap-1">
-                <ShoppingCart className="h-3 w-3" /> {data?.stats?.active_orders_count || 0} submitted to SO
+              <p className="text-[11px] text-[#334155] mt-1 font-medium flex items-center gap-1">
+                <ShoppingCart className="h-3 w-3 text-[#0284c7]" /> {data?.stats?.active_orders_count || 0} submitted to SO
               </p>
             </div>
-            <div className="h-11 w-11 rounded-lg bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+            <div className="h-11 w-11 rounded-xl bg-[#d6ecff] border border-[#c4dde9] text-[#0F172A] flex items-center justify-center shadow-2xs">
               <ShoppingCart className="h-5 w-5" />
             </div>
           </div>
 
-          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-4 shadow-sm flex items-center justify-between">
+          <div className="bg-[#f7fbff] border border-[#c4dde9] hover:border-[#b7c4cd] rounded-xl p-4 shadow-2xs hover:shadow-sm transition flex items-center justify-between">
             <div>
-              <p className="text-xs text-slate-500 dark:text-zinc-400 font-medium">Total Orders Value</p>
-              <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">
+              <p className="text-xs text-[#475569] font-medium">Total Orders Value</p>
+              <h3 className="text-2xl font-bold text-[#0F172A] mt-1">
                 ৳{Number(data?.stats?.today_orders_value || 0).toLocaleString()}
               </h3>
-              <p className="text-[11px] text-slate-400 dark:text-zinc-500 mt-1">
+              <p className="text-[11px] text-[#64748B] mt-1">
                 From route demand
               </p>
             </div>
-            <div className="h-11 w-11 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+            <div className="h-11 w-11 rounded-xl bg-[#d6ecff] border border-[#c4dde9] text-[#0F172A] flex items-center justify-center shadow-2xs">
               <Sparkles className="h-5 w-5" />
             </div>
           </div>
 
-          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-4 shadow-sm flex items-center justify-between">
+          <div className="bg-[#f7fbff] border border-[#c4dde9] hover:border-[#b7c4cd] rounded-xl p-4 shadow-2xs hover:shadow-sm transition flex items-center justify-between">
             <div>
-              <p className="text-xs text-slate-500 dark:text-zinc-400 font-medium">Refunds & Claims</p>
-              <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">
+              <p className="text-xs text-[#475569] font-medium">Refunds & Claims</p>
+              <h3 className="text-2xl font-bold text-[#0F172A] mt-1">
                 {data?.refunds?.length || 0}
               </h3>
-              <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1 font-medium flex items-center gap-1">
-                <RotateCcw className="h-3 w-3" /> {data?.stats?.pending_refunds_count || 0} pending review
+              <p className="text-[11px] text-[#334155] mt-1 font-medium flex items-center gap-1">
+                <RotateCcw className="h-3 w-3 text-[#0284c7]" /> {data?.stats?.pending_refunds_count || 0} pending review
               </p>
             </div>
-            <div className="h-11 w-11 rounded-lg bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 flex items-center justify-center">
+            <div className="h-11 w-11 rounded-xl bg-[#d6ecff] border border-[#c4dde9] text-[#0F172A] flex items-center justify-center shadow-2xs">
               <RotateCcw className="h-5 w-5" />
             </div>
           </div>
         </div>
 
         {/* Tab Navigation & Search */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-zinc-800 pb-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#c4dde9] pb-3">
           <div className="flex items-center gap-1.5 overflow-x-auto">
             <button
               onClick={() => handleTabChange('outlets')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
                 activeTab === 'outlets'
-                  ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20'
-                  : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800'
+                  ? 'bg-[#0F172A] text-white shadow-xs border border-[#0F172A]'
+                  : 'bg-[#f7fbff] text-[#334155] hover:bg-[#d6ecff] hover:text-[#0F172A] border border-[#c4dde9]'
               }`}
             >
               <Store className="h-4 w-4" />
@@ -734,10 +734,10 @@ export default function PsrDashboard() {
             </button>
             <button
               onClick={() => handleTabChange('orders')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
                 activeTab === 'orders'
-                  ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20'
-                  : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800'
+                  ? 'bg-[#0F172A] text-white shadow-xs border border-[#0F172A]'
+                  : 'bg-[#f7fbff] text-[#334155] hover:bg-[#d6ecff] hover:text-[#0F172A] border border-[#c4dde9]'
               }`}
             >
               <ClipboardList className="h-4 w-4" />
@@ -745,10 +745,10 @@ export default function PsrDashboard() {
             </button>
             <button
               onClick={() => handleTabChange('refunds')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
                 activeTab === 'refunds'
-                  ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20'
-                  : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800'
+                  ? 'bg-[#0F172A] text-white shadow-xs border border-[#0F172A]'
+                  : 'bg-[#f7fbff] text-[#334155] hover:bg-[#d6ecff] hover:text-[#0F172A] border border-[#c4dde9]'
               }`}
             >
               <RotateCcw className="h-4 w-4" />
@@ -756,10 +756,10 @@ export default function PsrDashboard() {
             </button>
             <button
               onClick={() => handleTabChange('visits')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
                 activeTab === 'visits'
-                  ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20'
-                  : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800'
+                  ? 'bg-[#0F172A] text-white shadow-xs border border-[#0F172A]'
+                  : 'bg-[#f7fbff] text-[#334155] hover:bg-[#d6ecff] hover:text-[#0F172A] border border-[#c4dde9]'
               }`}
             >
               <Clock className="h-4 w-4" />
@@ -769,13 +769,13 @@ export default function PsrDashboard() {
 
           {activeTab === 'outlets' && (
             <div className="relative w-full sm:w-64">
-              <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#475569]" />
               <input
                 type="text"
                 placeholder="Search shops & outlets..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                className="w-full pl-9 pr-3 py-1.5 rounded-xl border border-[#c4dde9] bg-[#f7fbff] text-xs sm:text-sm text-[#0F172A] placeholder-[#64748B] focus:outline-none focus:ring-2 focus:ring-[#b7c4cd]"
               />
             </div>
           )}
@@ -784,7 +784,7 @@ export default function PsrDashboard() {
             <button
               onClick={handleBatchSubmit}
               disabled={actionLoading}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow transition self-end"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-[#0F172A] hover:bg-[#1E293B] text-white shadow-xs border border-[#b7c4cd] transition self-end cursor-pointer disabled:opacity-50"
             >
               <Send className="h-3.5 w-3.5" />
               <span>Submit All Drafts to SO</span>
@@ -797,39 +797,39 @@ export default function PsrDashboard() {
           <div className="space-y-4">
             {/* Sales Officer Allotted Target Card */}
             {Boolean(data && data.psr && (data.psr.target_cases || 0) > 0) && data && (
-              <div className="bg-gradient-to-r from-amber-500 via-orange-600 to-amber-600 text-white rounded-2xl p-4 sm:p-5 shadow-sm space-y-3">
+              <div className="bg-gradient-to-r from-[#d6ecff] via-[#e8f4ff] to-[#f7fbff] text-[#0F172A] border border-[#c4dde9] rounded-2xl p-4 sm:p-5 shadow-xs space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
-                      <Target className="w-5 h-5 text-white" />
+                    <div className="w-10 h-10 rounded-2xl bg-[#f7fbff] border border-[#c4dde9] flex items-center justify-center shrink-0 shadow-2xs">
+                      <Target className="w-5 h-5 text-[#0F172A]" />
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] uppercase font-black tracking-wider bg-white/25 px-2.5 py-0.5 rounded-full">
+                        <span className="text-[10px] uppercase font-bold tracking-wider bg-[#f7fbff] text-[#0F172A] border border-[#c4dde9] px-2.5 py-0.5 rounded-full">
                           Sales Officer Assigned Target
                         </span>
-                        <span className="text-xs bg-black/20 px-2 py-0.5 rounded-full font-mono font-bold">
+                        <span className="text-xs bg-[#d6ecff] text-[#0F172A] border border-[#c4dde9] px-2 py-0.5 rounded-full font-mono font-bold">
                           {data?.sub_route || 'Allotted Sub-Route'}
                         </span>
                       </div>
-                      <h4 className="font-black text-base sm:text-lg tracking-tight mt-0.5">
+                      <h4 className="font-black text-base sm:text-lg tracking-tight mt-0.5 text-[#0F172A]">
                         Target: {data.psr.target_cases} Cases Allotted
                       </h4>
                     </div>
                   </div>
 
-                  <div className="bg-white/20 backdrop-blur-xs px-3.5 py-1.5 rounded-xl self-start sm:self-auto text-right">
-                    <span className="text-[10px] uppercase block font-semibold text-orange-100">Progress</span>
-                    <span className="font-mono font-black text-sm sm:text-base">
+                  <div className="bg-[#f7fbff] border border-[#c4dde9] px-3.5 py-1.5 rounded-xl self-start sm:self-auto text-right shadow-2xs">
+                    <span className="text-[10px] uppercase block font-semibold text-[#475569]">Progress</span>
+                    <span className="font-mono font-black text-sm sm:text-base text-[#0F172A]">
                       {data.psr.achieved_cases || 0} / {data.psr.target_cases} Cases
                     </span>
                   </div>
                 </div>
 
                 {data.psr.target_sku_ounces && (
-                  <p className="text-xs text-orange-100 flex flex-wrap items-center gap-1.5">
+                  <p className="text-xs text-[#334155] flex flex-wrap items-center gap-1.5">
                     <span>Target Beverage SKU:</span>
-                    <strong className="text-white font-mono bg-black/20 px-2 py-0.5 rounded">
+                    <strong className="text-[#0F172A] font-mono bg-[#f7fbff] border border-[#c4dde9] px-2 py-0.5 rounded">
                       {data.psr.target_sku_ounces}
                     </strong>
                   </p>
@@ -837,16 +837,16 @@ export default function PsrDashboard() {
 
                 {/* Progress bar */}
                 <div className="space-y-1">
-                  <div className="w-full h-2 rounded-full bg-black/25 overflow-hidden">
+                  <div className="w-full h-2.5 rounded-full bg-[#c4dde9] overflow-hidden">
                     <div
-                      className="h-full bg-white rounded-full transition-all duration-500"
+                      className="h-full bg-[#0F172A] rounded-full transition-all duration-500"
                       style={{
                         width: `${Math.min(100, Math.round(((data.psr.achieved_cases || 0) / data.psr.target_cases) * 100))}%`,
                       }}
                     />
                   </div>
-                  <div className="flex items-center justify-between text-[11px] text-orange-100 font-medium">
-                    <span>{Math.min(100, Math.round(((data.psr.achieved_cases || 0) / data.psr.target_cases) * 100))}% Achieved</span>
+                  <div className="flex items-center justify-between text-[11px] text-[#475569] font-medium">
+                    <span className="font-bold text-[#0F172A]">{Math.min(100, Math.round(((data.psr.achieved_cases || 0) / data.psr.target_cases) * 100))}% Achieved</span>
                     <span>
                       {Math.max(0, data.psr.target_cases - (data.psr.achieved_cases || 0))} Cases Remaining to Target
                     </span>
@@ -855,10 +855,10 @@ export default function PsrDashboard() {
 
                 {/* Category & Brand Targets Breakdown */}
                 {Boolean(data?.psr?.targets && Array.isArray(data.psr.targets) && data.psr.targets.length > 0) && (
-                  <div className="pt-3 border-t border-white/20 space-y-2">
-                    <p className="text-[10px] font-black uppercase tracking-wider text-orange-100 flex items-center justify-between">
+                  <div className="pt-3 border-t border-[#c4dde9] space-y-2">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-[#475569] flex items-center justify-between">
                       <span>Category & Brand Targets Breakdown</span>
-                      <span className="font-mono">{data.psr.targets.length} Target Lines</span>
+                      <span className="font-mono text-[#0F172A]">{data.psr.targets.length} Target Lines</span>
                     </p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
                       {data.psr.targets.map((tgt: any, idx: number) => {
@@ -868,27 +868,27 @@ export default function PsrDashboard() {
                         return (
                           <div
                             key={idx}
-                            className="bg-black/20 rounded-xl p-2.5 space-y-1.5 border border-white/10"
+                            className="bg-[#f7fbff] rounded-xl p-2.5 space-y-1.5 border border-[#c4dde9] shadow-2xs"
                           >
                             <div className="flex items-center justify-between text-xs">
-                              <span className="font-bold text-white truncate max-w-[140px]" title={tgt.brand || tgt.category}>
+                              <span className="font-bold text-[#0F172A] truncate max-w-[140px]" title={tgt.brand || tgt.category}>
                                 {tgt.brand ? `${tgt.brand}` : tgt.category}
                               </span>
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/20 font-mono font-bold">
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#d6ecff] text-[#0F172A] border border-[#c4dde9] font-mono font-bold">
                                 {aCases}/{tCases} cs
                               </span>
                             </div>
-                            <div className="text-[10px] text-orange-200 truncate" title={tgt.category}>
+                            <div className="text-[10px] text-[#475569] truncate" title={tgt.category}>
                               {tgt.category} {tgt.target_sku_ounces ? `• ${tgt.target_sku_ounces}` : ''}
                             </div>
-                            <div className="w-full h-1.5 rounded-full bg-white/20 overflow-hidden">
+                            <div className="w-full h-1.5 rounded-full bg-[#c4dde9] overflow-hidden">
                               <div
-                                className="h-full bg-white rounded-full transition-all duration-300"
+                                className="h-full bg-[#0F172A] rounded-full transition-all duration-300"
                                 style={{ width: `${pct}%` }}
                               />
                             </div>
-                            <div className="flex items-center justify-between text-[9px] text-orange-200">
-                              <span>{pct}% Achieved</span>
+                            <div className="flex items-center justify-between text-[9px] text-[#475569]">
+                              <span className="font-bold text-[#0F172A]">{pct}% Achieved</span>
                               <span>{Math.max(0, tCases - aCases)} cs left</span>
                             </div>
                           </div>
@@ -900,9 +900,9 @@ export default function PsrDashboard() {
               </div>
             )}
 
-            <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 rounded-xl p-3.5 text-xs text-amber-800 dark:text-amber-300 flex items-center justify-between">
+            <div className="bg-[#e8f4ff] border border-[#c4dde9] rounded-xl p-3.5 text-xs text-[#0F172A] flex items-center justify-between shadow-2xs">
               <div className="flex items-center gap-2">
-                <Store className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                <Store className="h-4 w-4 text-[#0284c7] shrink-0" />
                 <span>
                   <strong>Field Operating Rule:</strong> Conduct in-person visits to check cooler & shelf inventory at each shop on your sub-route before taking new replenishment orders.
                 </span>
@@ -910,10 +910,10 @@ export default function PsrDashboard() {
             </div>
 
             {filteredOutlets.length === 0 ? (
-              <div className="p-12 text-center bg-white dark:bg-zinc-900 rounded-2xl border border-dashed border-slate-300 dark:border-zinc-800">
-                <Store className="h-10 w-10 text-slate-400 mx-auto mb-2" />
-                <h4 className="font-semibold text-slate-700 dark:text-zinc-300">No outlets found</h4>
-                <p className="text-xs text-slate-500 dark:text-zinc-500 mt-1">Try another search keyword</p>
+              <div className="p-12 text-center bg-[#f7fbff] rounded-2xl border border-dashed border-[#c4dde9]">
+                <Store className="h-10 w-10 text-[#64748B] mx-auto mb-2" />
+                <h4 className="font-semibold text-[#0F172A]">No outlets found</h4>
+                <p className="text-xs text-[#64748B] mt-1">Try another search keyword</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -922,49 +922,49 @@ export default function PsrDashboard() {
                   return (
                     <div
                       key={outlet.outlet_id}
-                      className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 hover:border-orange-300 dark:hover:border-orange-700 rounded-xl p-4 shadow-sm transition flex flex-col justify-between gap-3 group"
+                      className="bg-[#f7fbff] border border-[#c4dde9] hover:border-[#b7c4cd] rounded-xl p-4 shadow-2xs hover:shadow-xs transition flex flex-col justify-between gap-3 group"
                     >
                       <div className="space-y-2">
                         <div className="flex items-start justify-between gap-2">
                           <div>
-                            <span className="text-[10px] font-bold text-orange-600 dark:text-orange-400 uppercase tracking-wider">
+                            <span className="text-[10px] font-bold text-[#0284c7] uppercase tracking-wider">
                               Outlet #{outlet.outlet_id}
                             </span>
-                            <h3 className="font-bold text-slate-900 dark:text-white text-base group-hover:text-orange-600 dark:group-hover:text-orange-400 transition">
+                            <h3 className="font-bold text-[#0F172A] text-base group-hover:text-[#0284c7] transition">
                               {outletTitle}
                             </h3>
                           </div>
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#d6ecff] text-[#0F172A] border border-[#c4dde9]">
                             Active
                           </span>
                         </div>
 
-                        <p className="text-xs text-slate-500 dark:text-zinc-400 flex items-start gap-1.5">
-                          <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0 mt-0.5" />
+                        <p className="text-xs text-[#475569] flex items-start gap-1.5">
+                          <MapPin className="h-3.5 w-3.5 text-[#64748B] shrink-0 mt-0.5" />
                           <span>{outlet.address || 'Address on sub-route'}</span>
                         </p>
 
                         {outlet.phone_number && (
-                          <p className="text-xs text-slate-500 dark:text-zinc-400 flex items-center gap-1.5">
-                            <Phone className="h-3.5 w-3.5 text-slate-400" />
+                          <p className="text-xs text-[#475569] flex items-center gap-1.5">
+                            <Phone className="h-3.5 w-3.5 text-[#64748B]" />
                             <span>{outlet.phone_number}</span>
                           </p>
                         )}
 
                         <div className="pt-1 flex items-center justify-between">
-                          <span className="inline-block px-2 py-0.5 rounded text-[11px] bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 font-medium">
+                          <span className="inline-block px-2 py-0.5 rounded text-[11px] bg-[#e8f4ff] border border-[#c4dde9] text-[#0F172A] font-medium">
                             Route: {outlet.sub_route || data?.sub_route || 'Standard sub-route'}
                           </span>
                           {outlet.total_shelf_stock !== undefined && (
-                            <span className="text-[11px] font-mono font-bold text-slate-500">
-                              Shelf Stock: <strong className="text-slate-900 dark:text-white">{outlet.total_shelf_stock}</strong>
+                            <span className="text-[11px] font-mono font-bold text-[#475569]">
+                              Shelf Stock: <strong className="text-[#0F172A]">{outlet.total_shelf_stock}</strong>
                             </span>
                           )}
                         </div>
                       </div>
 
                       {/* Action buttons */}
-                      <div className="pt-3 border-t border-slate-100 dark:border-zinc-800/80 flex flex-wrap items-center gap-2">
+                      <div className="pt-3 border-t border-[#c4dde9] flex flex-wrap items-center gap-2">
                         <button
                           type="button"
                           onClick={() => {
@@ -972,10 +972,10 @@ export default function PsrDashboard() {
                             setVisitType('STOCK_AUDIT');
                             setVisitNotes(`Physical cooler & shelf stock audit at ${outlet.branch_name || outlet.outlet_name}`);
                           }}
-                          className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 transition cursor-pointer"
+                          className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-[#e8f4ff] hover:bg-[#d6ecff] text-[#0F172A] border border-[#c4dde9] hover:border-[#b7c4cd] transition cursor-pointer"
                           title="Visit store and inspect shelf stock"
                         >
-                          <ClipboardCheck className="h-3.5 w-3.5" />
+                          <ClipboardCheck className="h-3.5 w-3.5 text-[#0284c7]" />
                           <span>Visit & Check Inventory</span>
                         </button>
 
@@ -989,7 +989,7 @@ export default function PsrDashboard() {
                               setSelectedProductId(String(data.products[0].product_id));
                             }
                           }}
-                          className="flex-1 flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-xs font-semibold bg-orange-600 hover:bg-orange-700 text-white shadow-sm transition cursor-pointer"
+                          className="flex-1 flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-bold bg-[#0F172A] hover:bg-[#1E293B] text-white shadow-2xs border border-[#b7c4cd] transition cursor-pointer"
                         >
                           <PlusCircle className="h-3.5 w-3.5" />
                           <span>Take Order</span>
@@ -1001,7 +1001,7 @@ export default function PsrDashboard() {
                             setRefundModalOutlet(outlet);
                             setSelectedProductId(data?.products?.[0]?.product_id ? String(data.products[0].product_id) : '');
                           }}
-                          className="flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-xs font-semibold bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-900/50 text-red-600 dark:text-red-300 border border-red-200 dark:border-red-900 transition cursor-pointer"
+                          className="flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-bold bg-[#f7fbff] hover:bg-rose-50 text-rose-700 border border-[#c4dde9] hover:border-rose-300 transition cursor-pointer"
                           title="Log defective / expired return"
                         >
                           <RotateCcw className="h-3.5 w-3.5" />
@@ -1018,29 +1018,29 @@ export default function PsrDashboard() {
 
         {/* Tab 2: Field Orders */}
         {activeTab === 'orders' && (
-          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-sm">
-            <div className="p-4 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between">
+          <div className="bg-[#f7fbff] border border-[#c4dde9] rounded-2xl overflow-hidden shadow-xs">
+            <div className="p-4 border-b border-[#c4dde9] bg-[#d6ecff]/30 flex items-center justify-between">
               <div>
-                <h3 className="font-bold text-slate-900 dark:text-white">Field Orders Collected from Outlets</h3>
-                <p className="text-xs text-slate-500 dark:text-zinc-400">
+                <h3 className="font-bold text-[#0F172A]">Field Orders Collected from Outlets</h3>
+                <p className="text-xs text-[#475569]">
                   Every order booked physically by this PSR is routed to Sales Officer for fulfillment.
                 </p>
               </div>
-              <span className="text-xs font-semibold bg-orange-100 text-orange-800 dark:bg-orange-950/60 dark:text-orange-300 px-2.5 py-1 rounded-full">
+              <span className="text-xs font-bold bg-[#d6ecff] text-[#0F172A] border border-[#c4dde9] px-3 py-1 rounded-full">
                 {data?.orders?.length || 0} Total Orders
               </span>
             </div>
 
             {(!data?.orders || data.orders.length === 0) ? (
-              <div className="p-12 text-center text-slate-500 dark:text-zinc-400">
-                <ShoppingCart className="h-10 w-10 mx-auto mb-2 text-slate-300 dark:text-zinc-700" />
-                <p className="font-medium">No field orders taken yet</p>
-                <p className="text-xs mt-1">Visit your assigned sub-route outlets and click "Take Order".</p>
+              <div className="p-12 text-center text-[#475569]">
+                <ShoppingCart className="h-10 w-10 mx-auto mb-2 text-[#b7c4cd]" />
+                <p className="font-medium text-[#0F172A]">No field orders taken yet</p>
+                <p className="text-xs mt-1 text-[#475569]">Visit your assigned sub-route outlets and click "Take Order".</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs sm:text-sm">
-                  <thead className="bg-slate-50 dark:bg-zinc-800/50 text-slate-600 dark:text-zinc-400 font-semibold border-b border-slate-200 dark:border-zinc-800">
+                  <thead className="bg-[#e8f4ff] text-[#0F172A] font-bold border-b border-[#c4dde9]">
                     <tr>
                       <th className="p-3">Order Code</th>
                       <th className="p-3">Outlet Store</th>
@@ -1054,37 +1054,37 @@ export default function PsrDashboard() {
                       <th className="p-3 text-center">Action</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-zinc-800">
+                  <tbody className="divide-y divide-[#c4dde9]/60">
                     {data.orders.map((ord: any) => {
                       const isSubmitted = ord.status === 'SUBMITTED_TO_SO' || ord.status === 'SUBMITTED_TO_PSR';
                       const isApproved = ord.status === 'APPROVED_BY_SO' || ord.status === 'REQUISITIONED_FROM_SUPPLIER';
                       const isDispatched = ord.status === 'DISPATCHED' || ord.status === 'DELIVERED';
                       return (
-                        <tr key={ord.id} className="hover:bg-slate-50/50 dark:hover:bg-zinc-800/40 transition">
-                          <td className="p-3 font-mono font-semibold text-orange-600 dark:text-orange-400">
+                        <tr key={ord.id} className="hover:bg-[#d6ecff]/30 transition">
+                          <td className="p-3 font-mono font-bold text-[#0F172A]">
                             {ord.order_code}
                           </td>
-                          <td className="p-3 font-medium text-slate-900 dark:text-white">
+                          <td className="p-3 font-semibold text-[#0F172A]">
                             {ord.outlet_name}
                           </td>
                           <td className="p-3">
-                            <span className="font-medium">{ord.product_name}</span>
-                            <div className="text-[10px] text-slate-400 dark:text-zinc-500 font-mono flex items-center gap-1 mt-0.5" title={`Fulfillment Supplier: ${ord.supplier_name || data?.psr?.supplier_name || 'Regional Logistics Hub'}`}>
-                              <Truck className="w-2.5 h-2.5 text-orange-500" />
+                            <span className="font-semibold text-[#0F172A]">{ord.product_name}</span>
+                            <div className="text-[10px] text-[#475569] font-mono flex items-center gap-1 mt-0.5" title={`Fulfillment Supplier: ${ord.supplier_name || data?.psr?.supplier_name || 'Regional Logistics Hub'}`}>
+                              <Truck className="w-2.5 h-2.5 text-[#334155]" />
                               <span className="truncate max-w-[150px]">{ord.supplier_name || data?.psr?.supplier_name || 'Regional Logistics Hub'}</span>
                             </div>
                           </td>
-                          <td className="p-3 text-right font-bold">{ord.quantity}</td>
-                          <td className="p-3 text-right text-slate-500">৳{Number(ord.unit_price).toFixed(2)}</td>
-                          <td className="p-3 text-right font-bold text-slate-900 dark:text-white">
+                          <td className="p-3 text-right font-bold text-[#0F172A]">{ord.quantity}</td>
+                          <td className="p-3 text-right text-[#475569] font-medium">৳{Number(ord.unit_price).toFixed(2)}</td>
+                          <td className="p-3 text-right font-bold text-[#0F172A]">
                             ৳{Number(ord.total_amount).toLocaleString()}
                           </td>
                           <td className="p-3 text-center">
                             <span
                               className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                                 ord.urgency === 'HIGH' || ord.urgency === 'URGENT'
-                                  ? 'bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300'
-                                  : 'bg-slate-100 text-slate-700 dark:bg-zinc-800 dark:text-zinc-300'
+                                  ? 'bg-[#d6ecff] text-[#0F172A] border border-[#b7c4cd]'
+                                  : 'bg-[#e8f4ff] text-[#334155] border border-[#c4dde9]'
                               }`}
                             >
                               {ord.urgency || 'NORMAL'}
@@ -1092,22 +1092,22 @@ export default function PsrDashboard() {
                           </td>
                           <td className="p-3 text-center">
                             <span
-                              className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold inline-flex items-center gap-1 ${
+                              className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold inline-flex items-center gap-1 border ${
                                 isDispatched
-                                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+                                  ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
                                   : ord.status === 'REQUESTED_FROM_SUPPLIER' || ord.status === 'APPROVED_BY_SO'
-                                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+                                  ? 'bg-amber-100 text-amber-900 border-amber-300'
                                   : ord.status === 'SUBMITTED_TO_SO'
-                                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300'
+                                  ? 'bg-[#d6ecff] text-[#0F172A] border-[#b7c4cd]'
                                   : ord.status === 'SUBMITTED_TO_PSR'
-                                  ? 'bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300'
-                                  : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'
+                                  ? 'bg-[#e8f4ff] text-[#0F172A] border-[#c4dde9]'
+                                  : 'bg-[#f7fbff] text-[#334155] border-[#c4dde9]'
                               }`}
                             >
                               {isDispatched && <CheckCircle2 className="h-3 w-3" />}
-                              {(ord.status === 'REQUESTED_FROM_SUPPLIER' || ord.status === 'APPROVED_BY_SO') && <Clock className="h-3 w-3 text-amber-600 animate-pulse" />}
+                              {(ord.status === 'REQUESTED_FROM_SUPPLIER' || ord.status === 'APPROVED_BY_SO') && <Clock className="h-3 w-3 text-amber-700 animate-pulse" />}
                               {ord.status === 'SUBMITTED_TO_SO' && <Clock className="h-3 w-3" />}
-                              {ord.status === 'SUBMITTED_TO_PSR' && <Store className="h-3 w-3 text-purple-600" />}
+                              {ord.status === 'SUBMITTED_TO_PSR' && <Store className="h-3 w-3" />}
                               {isDispatched
                                 ? 'Dispatched by Supplier'
                                 : ord.status === 'REQUESTED_FROM_SUPPLIER' || ord.status === 'APPROVED_BY_SO'
@@ -1119,31 +1119,31 @@ export default function PsrDashboard() {
                                 : ord.status}
                             </span>
                           </td>
-                          <td className="p-3 text-xs text-slate-400">
+                          <td className="p-3 text-xs text-[#475569]">
                             {ord.created_at ? new Date(ord.created_at).toLocaleString() : 'Just now'}
                           </td>
                           <td className="p-3 text-center">
                             <div className="flex items-center justify-center gap-1.5">
                               {isDispatched ? (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 text-xs font-bold border border-emerald-200 dark:border-emerald-800">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-50 text-emerald-800 text-xs font-bold border border-emerald-200">
                                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                                   Stock Delivered
                                 </span>
                               ) : ord.status === 'REQUESTED_FROM_SUPPLIER' || ord.status === 'APPROVED_BY_SO' ? (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 text-xs font-bold border border-amber-200 dark:border-amber-800">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-amber-50 text-amber-900 text-xs font-bold border border-amber-200">
                                   <Clock className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
                                   Awaiting Supplier Dispatch
                                 </span>
                               ) : ord.status === 'SUBMITTED_TO_SO' ? (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 text-xs font-bold border border-blue-200 dark:border-blue-800">
-                                  <Clock className="w-3.5 h-3.5 text-blue-600" />
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-[#d6ecff] text-[#0F172A] text-xs font-bold border border-[#b7c4cd]">
+                                  <Clock className="w-3.5 h-3.5 text-[#0F172A]" />
                                   Pending SO Approval
                                 </span>
                               ) : (
                                 <button
                                   onClick={() => handleSubmitOrderToSo(ord)}
                                   disabled={submittingToSoId === ord.id}
-                                  className="px-2.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-1 shadow-sm transition cursor-pointer disabled:opacity-50 whitespace-nowrap active:scale-95"
+                                  className="px-2.5 py-1.5 rounded-xl bg-[#0F172A] hover:bg-[#1E293B] text-white font-bold text-xs flex items-center justify-center gap-1 shadow-2xs border border-[#b7c4cd] transition cursor-pointer disabled:opacity-50 whitespace-nowrap active:scale-95"
                                   title="Request stock approval from Sales Officer"
                                 >
                                   {submittingToSoId === ord.id ? (
@@ -1170,29 +1170,29 @@ export default function PsrDashboard() {
 
         {/* Tab 3: Refund Requests */}
         {activeTab === 'refunds' && (
-          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-sm">
-            <div className="p-4 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between">
+          <div className="bg-[#f7fbff] border border-[#c4dde9] rounded-2xl overflow-hidden shadow-xs">
+            <div className="p-4 border-b border-[#c4dde9] bg-[#d6ecff]/30 flex items-center justify-between">
               <div>
-                <h3 className="font-bold text-slate-900 dark:text-white">Outlet Refund & Damage Return Claims</h3>
-                <p className="text-xs text-slate-500 dark:text-zinc-400">
+                <h3 className="font-bold text-[#0F172A]">Outlet Refund & Damage Return Claims</h3>
+                <p className="text-xs text-[#475569]">
                   Defective, broken, or expired stocks inspected in the field and logged for Sales Officer verification.
                 </p>
               </div>
-              <span className="text-xs font-semibold bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300 px-2.5 py-1 rounded-full">
+              <span className="text-xs font-bold bg-[#d6ecff] text-[#0F172A] border border-[#c4dde9] px-3 py-1 rounded-full">
                 {data?.refunds?.length || 0} Claims
               </span>
             </div>
 
             {(!data?.refunds || data.refunds.length === 0) ? (
-              <div className="p-12 text-center text-slate-500 dark:text-zinc-400">
-                <RotateCcw className="h-10 w-10 mx-auto mb-2 text-slate-300 dark:text-zinc-700" />
-                <p className="font-medium">No refund claims recorded</p>
-                <p className="text-xs mt-1">If an outlet has damaged goods, log a refund from the Outlets tab.</p>
+              <div className="p-12 text-center text-[#475569]">
+                <RotateCcw className="h-10 w-10 mx-auto mb-2 text-[#b7c4cd]" />
+                <p className="font-medium text-[#0F172A]">No refund claims recorded</p>
+                <p className="text-xs mt-1 text-[#475569]">If an outlet has damaged goods, log a refund from the Outlets tab.</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs sm:text-sm">
-                  <thead className="bg-slate-50 dark:bg-zinc-800/50 text-slate-600 dark:text-zinc-400 font-semibold border-b border-slate-200 dark:border-zinc-800">
+                  <thead className="bg-[#e8f4ff] text-[#0F172A] font-bold border-b border-[#c4dde9]">
                     <tr>
                       <th className="p-3">Claim Code</th>
                       <th className="p-3">Outlet Store</th>
@@ -1205,47 +1205,47 @@ export default function PsrDashboard() {
                       <th className="p-3">Logged At</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-zinc-800">
+                  <tbody className="divide-y divide-[#c4dde9]/60">
                     {data.refunds.map((ref: any) => {
                       const isSettled = ref.status === 'SETTLED' || ref.status === 'APPROVED_BY_SO';
                       const isRejected = ref.status === 'REJECTED';
                       return (
-                        <tr key={ref.id} className="hover:bg-slate-50/50 dark:hover:bg-zinc-800/40 transition">
-                          <td className="p-3 font-mono font-semibold text-red-600 dark:text-red-400">
+                        <tr key={ref.id} className="hover:bg-[#d6ecff]/30 transition">
+                          <td className="p-3 font-mono font-bold text-[#0F172A]">
                             {ref.refund_code}
                           </td>
-                          <td className="p-3 font-medium text-slate-900 dark:text-white">
+                          <td className="p-3 font-semibold text-[#0F172A]">
                             {ref.outlet_name}
                           </td>
-                          <td className="p-3 font-medium">{ref.product_name}</td>
-                          <td className="p-3 text-right font-bold text-red-600 dark:text-red-400">
+                          <td className="p-3 font-medium text-[#0F172A]">{ref.product_name}</td>
+                          <td className="p-3 text-right font-bold text-rose-700">
                             {ref.quantity}
                           </td>
-                          <td className="p-3 text-right font-bold text-slate-900 dark:text-white">
+                          <td className="p-3 text-right font-bold text-[#0F172A]">
                             ৳{Number(ref.refund_amount).toLocaleString()}
                           </td>
                           <td className="p-3">
-                            <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300">
+                            <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-[#e8f4ff] text-[#0F172A] border border-[#c4dde9]">
                               {ref.reason}
                             </span>
                           </td>
                           <td className="p-3 text-center">
                             <span
-                              className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
+                              className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
                                 isSettled
-                                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+                                  ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
                                   : isRejected
-                                  ? 'bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300'
-                                  : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+                                  ? 'bg-rose-100 text-rose-800 border-rose-300'
+                                  : 'bg-[#d6ecff] text-[#0F172A] border-[#b7c4cd]'
                               }`}
                             >
                               {ref.status}
                             </span>
                           </td>
-                          <td className="p-3 text-xs text-slate-500 italic max-w-xs truncate">
+                          <td className="p-3 text-xs text-[#475569] italic max-w-xs truncate">
                             {ref.so_remarks || 'Awaiting Sales Officer review'}
                           </td>
-                          <td className="p-3 text-xs text-slate-400">
+                          <td className="p-3 text-xs text-[#475569]">
                             {ref.created_at ? new Date(ref.created_at).toLocaleDateString() : 'Today'}
                           </td>
                         </tr>
@@ -1260,31 +1260,33 @@ export default function PsrDashboard() {
 
         {/* Tab 4: Route Visit History */}
         {activeTab === 'visits' && (
-          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm space-y-4">
-            <h3 className="font-bold text-slate-900 dark:text-white">Sub-Route Daily Field Check-in History</h3>
-            <p className="text-xs text-slate-500 dark:text-zinc-400">
-              Audit log of field visits conducted along {data?.sub_route}.
-            </p>
+          <div className="bg-[#f7fbff] border border-[#c4dde9] rounded-2xl p-5 shadow-xs space-y-4">
+            <div>
+              <h3 className="font-bold text-[#0F172A]">Sub-Route Daily Field Check-in History</h3>
+              <p className="text-xs text-[#475569]">
+                Audit log of field visits conducted along {data?.sub_route}.
+              </p>
+            </div>
 
             {(!data?.visits || data.visits.length === 0) ? (
-              <p className="text-xs text-slate-400 italic py-6 text-center">No field visits logged today yet.</p>
+              <p className="text-xs text-[#475569] italic py-6 text-center">No field visits logged today yet.</p>
             ) : (
               <div className="space-y-3">
                 {data.visits.map((v: any) => (
                   <div
                     key={v.id}
-                    className="p-3 rounded-lg border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-800/40 flex items-start justify-between gap-3 text-xs"
+                    className="p-3 rounded-xl border border-[#c4dde9] bg-[#e8f4ff] hover:bg-[#d6ecff]/40 flex items-start justify-between gap-3 text-xs transition"
                   >
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-900 dark:text-white">{v.outlet_name}</span>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300">
+                        <span className="font-bold text-[#0F172A]">{v.outlet_name}</span>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#d6ecff] text-[#0F172A] border border-[#b7c4cd]">
                           {v.visit_type}
                         </span>
                       </div>
-                      <p className="text-slate-600 dark:text-zinc-300">{v.notes}</p>
+                      <p className="text-[#334155]">{v.notes}</p>
                     </div>
-                    <span className="text-[11px] text-slate-400 shrink-0">
+                    <span className="text-[11px] font-medium text-[#475569] shrink-0">
                       {v.created_at ? new Date(v.created_at).toLocaleTimeString() : ''}
                     </span>
                   </div>
@@ -1299,50 +1301,50 @@ export default function PsrDashboard() {
       {/* MODAL: TAKE OUTLET ORDER */}
       {orderModalOutlet && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl w-full max-w-lg shadow-2xl p-6 space-y-5">
+          <div className="bg-[#f7fbff] border border-[#c4dde9] rounded-2xl w-full max-w-lg shadow-2xl p-6 space-y-5 text-[#0F172A]">
             <div className="flex items-start justify-between">
               <div>
-                <span className="text-xs uppercase font-bold text-orange-600 dark:text-orange-400 tracking-wider">
+                <span className="text-xs uppercase font-bold text-[#0F172A] tracking-wider px-2 py-0.5 rounded bg-[#d6ecff] border border-[#b7c4cd] inline-block mb-1">
                   Field Order Form
                 </span>
-                <h3 className="text-xl font-bold text-slate-900 dark:text-white mt-0.5">
+                <h3 className="text-xl font-bold text-[#0F172A] mt-0.5">
                   {orderModalOutlet.franchise_name} - {orderModalOutlet.branch_name}
                 </h3>
-                <p className="text-xs text-slate-500 dark:text-zinc-400 flex items-center gap-1 mt-1">
-                  <MapPin className="h-3 w-3" /> {orderModalOutlet.address}
+                <p className="text-xs text-[#475569] flex items-center gap-1 mt-1 font-medium">
+                  <MapPin className="h-3 w-3 text-[#334155]" /> {orderModalOutlet.address}
                 </p>
                 <div className="mt-2 flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-orange-50 dark:bg-orange-950/60 text-orange-800 dark:text-orange-300 border border-orange-200 dark:border-orange-800">
-                    <Truck className="h-3.5 w-3.5 text-orange-600" />
+                  <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-lg bg-[#e8f4ff] text-[#0F172A] border border-[#c4dde9]">
+                    <Truck className="h-3.5 w-3.5 text-[#334155]" />
                     Fulfillment Supplier: {data?.psr?.supplier_name || 'Regional Logistics Hub'}
                   </span>
                 </div>
               </div>
               <button
                 onClick={() => setOrderModalOutlet(null)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-white text-lg font-bold"
+                className="text-[#475569] hover:text-[#0F172A] text-lg font-bold p-1 rounded-lg hover:bg-[#d6ecff]/50 transition cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
             {actionSuccess && (
-              <div className="p-3 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 rounded-xl text-xs flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 shrink-0" />
+              <div className="p-3 bg-emerald-50 border border-emerald-300 text-emerald-800 rounded-xl text-xs flex items-center gap-2 font-medium">
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
                 <span>{actionSuccess}</span>
               </div>
             )}
 
             {actionError && (
-              <div className="p-3 bg-red-50 dark:bg-red-950/50 border border-red-300 dark:border-red-800 text-red-800 dark:text-red-200 rounded-xl text-xs flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 shrink-0" />
+              <div className="p-3 bg-red-50 border border-red-300 text-red-800 rounded-xl text-xs flex items-center gap-2 font-medium">
+                <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
                 <span>{actionError}</span>
               </div>
             )}
 
             <form onSubmit={handleCreateOrder} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1">
+                <label className="block text-xs font-bold text-[#0F172A] mb-1">
                   Select Product Item *
                 </label>
                 <select
@@ -1353,7 +1355,7 @@ export default function PsrDashboard() {
                     const pr = data?.products?.find((p) => String(p.product_id) === e.target.value);
                     if (pr) setCustomPrice(String(pr.outlet_price || pr.base_price || ''));
                   }}
-                  className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm focus:ring-2 focus:ring-orange-500"
+                  className="w-full p-2.5 rounded-xl border border-[#c4dde9] bg-white text-sm text-[#0F172A] font-medium focus:ring-2 focus:ring-[#b7c4cd] focus:outline-none"
                 >
                   <option value="">-- Choose beverage product --</option>
                   {(data?.products || []).map((p) => (
@@ -1366,7 +1368,7 @@ export default function PsrDashboard() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1">
+                  <label className="block text-xs font-bold text-[#0F172A] mb-1">
                     Order Quantity (Cases) *
                   </label>
                   <input
@@ -1375,12 +1377,12 @@ export default function PsrDashboard() {
                     required
                     value={quantity}
                     onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm focus:ring-2 focus:ring-orange-500"
+                    className="w-full p-2.5 rounded-xl border border-[#c4dde9] bg-white text-sm text-[#0F172A] font-bold focus:ring-2 focus:ring-[#b7c4cd] focus:outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1">
+                  <label className="block text-xs font-bold text-[#0F172A] mb-1">
                     Unit Price (৳)
                   </label>
                   <input
@@ -1389,20 +1391,20 @@ export default function PsrDashboard() {
                     value={customPrice}
                     onChange={(e) => setCustomPrice(e.target.value)}
                     placeholder={String(selectedProduct?.outlet_price || selectedProduct?.base_price || 0)}
-                    className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm focus:ring-2 focus:ring-orange-500"
+                    className="w-full p-2.5 rounded-xl border border-[#c4dde9] bg-white text-sm text-[#0F172A] font-bold focus:ring-2 focus:ring-[#b7c4cd] focus:outline-none"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1">
+                  <label className="block text-xs font-bold text-[#0F172A] mb-1">
                     Dispatch Priority
                   </label>
                   <select
                     value={urgency}
                     onChange={(e) => setUrgency(e.target.value)}
-                    className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm focus:ring-2 focus:ring-orange-500"
+                    className="w-full p-2.5 rounded-xl border border-[#c4dde9] bg-white text-sm text-[#0F172A] font-medium focus:ring-2 focus:ring-[#b7c4cd] focus:outline-none"
                   >
                     <option value="NORMAL">Normal Delivery</option>
                     <option value="HIGH">High Priority</option>
@@ -1410,16 +1412,16 @@ export default function PsrDashboard() {
                   </select>
                 </div>
 
-                <div className="bg-slate-50 dark:bg-zinc-800/60 p-2.5 rounded-xl border border-slate-200 dark:border-zinc-700 flex flex-col justify-center">
-                  <span className="text-[10px] text-slate-500 uppercase font-bold">Estimated Total</span>
-                  <span className="text-lg font-bold text-orange-600 dark:text-orange-400">
+                <div className="bg-[#e8f4ff] p-2.5 rounded-xl border border-[#c4dde9] flex flex-col justify-center">
+                  <span className="text-[10px] text-[#475569] uppercase font-bold">Estimated Total</span>
+                  <span className="text-lg font-black text-[#0F172A]">
                     ৳{calculatedTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </span>
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1">
+                <label className="block text-xs font-bold text-[#0F172A] mb-1">
                   Outlet Remarks / Special Delivery Instructions
                 </label>
                 <textarea
@@ -1427,7 +1429,7 @@ export default function PsrDashboard() {
                   value={remarks}
                   onChange={(e) => setRemarks(e.target.value)}
                   placeholder="e.g. Needs delivery by Thursday morning before rush hour"
-                  className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs sm:text-sm focus:ring-2 focus:ring-orange-500"
+                  className="w-full p-2.5 rounded-xl border border-[#c4dde9] bg-white text-xs sm:text-sm text-[#0F172A] focus:ring-2 focus:ring-[#b7c4cd] focus:outline-none placeholder:text-[#475569]/60"
                 />
               </div>
 
@@ -1435,14 +1437,14 @@ export default function PsrDashboard() {
                 <button
                   type="button"
                   onClick={() => setOrderModalOutlet(null)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 transition"
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-[#334155] hover:bg-[#e8f4ff] border border-[#c4dde9] transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={actionLoading}
-                  className="flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-orange-600 hover:bg-orange-700 text-white shadow-md shadow-orange-500/20 transition disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-[#0F172A] hover:bg-[#1E293B] text-white shadow-2xs border border-[#b7c4cd] transition disabled:opacity-50 cursor-pointer"
                 >
                   <Send className="h-4 w-4" />
                   <span>{actionLoading ? 'Booking Order...' : 'Submit to Sales Officer'}</span>
@@ -1456,44 +1458,44 @@ export default function PsrDashboard() {
       {/* MODAL: LOG REFUND / RETURN */}
       {refundModalOutlet && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl w-full max-w-lg shadow-2xl p-6 space-y-5">
+          <div className="bg-[#f7fbff] border border-[#c4dde9] rounded-2xl w-full max-w-lg shadow-2xl p-6 space-y-5 text-[#0F172A]">
             <div className="flex items-start justify-between">
               <div>
-                <span className="text-xs uppercase font-bold text-red-600 dark:text-red-400 tracking-wider">
+                <span className="text-xs uppercase font-bold text-[#0F172A] tracking-wider px-2 py-0.5 rounded bg-[#d6ecff] border border-[#b7c4cd] inline-block mb-1">
                   Field Refund & Return Inspection
                 </span>
-                <h3 className="text-xl font-bold text-slate-900 dark:text-white mt-0.5">
+                <h3 className="text-xl font-bold text-[#0F172A] mt-0.5">
                   {refundModalOutlet.franchise_name} - {refundModalOutlet.branch_name}
                 </h3>
-                <p className="text-xs text-slate-500 dark:text-zinc-400 flex items-center gap-1 mt-1">
-                  <MapPin className="h-3 w-3" /> {refundModalOutlet.address}
+                <p className="text-xs text-[#475569] flex items-center gap-1 mt-1 font-medium">
+                  <MapPin className="h-3 w-3 text-[#334155]" /> {refundModalOutlet.address}
                 </p>
               </div>
               <button
                 onClick={() => setRefundModalOutlet(null)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-white text-lg font-bold"
+                className="text-[#475569] hover:text-[#0F172A] text-lg font-bold p-1 rounded-lg hover:bg-[#d6ecff]/50 transition cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
             {actionSuccess && (
-              <div className="p-3 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 rounded-xl text-xs flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 shrink-0" />
+              <div className="p-3 bg-emerald-50 border border-emerald-300 text-emerald-800 rounded-xl text-xs flex items-center gap-2 font-medium">
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
                 <span>{actionSuccess}</span>
               </div>
             )}
 
             {actionError && (
-              <div className="p-3 bg-red-50 dark:bg-red-950/50 border border-red-300 dark:border-red-800 text-red-800 dark:text-red-200 rounded-xl text-xs flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 shrink-0" />
+              <div className="p-3 bg-red-50 border border-red-300 text-red-800 rounded-xl text-xs flex items-center gap-2 font-medium">
+                <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
                 <span>{actionError}</span>
               </div>
             )}
 
             <form onSubmit={handleCreateRefund} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1">
+                <label className="block text-xs font-bold text-[#0F172A] mb-1">
                   Product Item to Return *
                 </label>
                 <select
@@ -1504,7 +1506,7 @@ export default function PsrDashboard() {
                     const pr = data?.products?.find((p) => String(p.product_id) === e.target.value);
                     if (pr) setCustomPrice(String(pr.outlet_price || pr.base_price || ''));
                   }}
-                  className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm focus:ring-2 focus:ring-red-500"
+                  className="w-full p-2.5 rounded-xl border border-[#c4dde9] bg-white text-sm text-[#0F172A] font-medium focus:ring-2 focus:ring-[#b7c4cd] focus:outline-none"
                 >
                   <option value="">-- Choose beverage product --</option>
                   {(data?.products || []).map((p) => (
@@ -1517,7 +1519,7 @@ export default function PsrDashboard() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1">
+                  <label className="block text-xs font-bold text-[#0F172A] mb-1">
                     Defective Units *
                   </label>
                   <input
@@ -1526,18 +1528,18 @@ export default function PsrDashboard() {
                     required
                     value={quantity}
                     onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm focus:ring-2 focus:ring-red-500"
+                    className="w-full p-2.5 rounded-xl border border-[#c4dde9] bg-white text-sm text-[#0F172A] font-bold focus:ring-2 focus:ring-[#b7c4cd] focus:outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1">
+                  <label className="block text-xs font-bold text-[#0F172A] mb-1">
                     Refund Reason *
                   </label>
                   <select
                     value={refundReason}
                     onChange={(e) => setRefundReason(e.target.value)}
-                    className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm focus:ring-2 focus:ring-red-500"
+                    className="w-full p-2.5 rounded-xl border border-[#c4dde9] bg-white text-sm text-[#0F172A] font-medium focus:ring-2 focus:ring-[#b7c4cd] focus:outline-none"
                   >
                     <option value="DAMAGED_LEAKAGE">Damaged / Seal Leakage</option>
                     <option value="EXPIRED_BATCH">Expired Stock</option>
@@ -1548,15 +1550,15 @@ export default function PsrDashboard() {
                 </div>
               </div>
 
-              <div className="bg-red-50 dark:bg-red-950/40 p-3 rounded-xl border border-red-200 dark:border-red-900/50 flex items-center justify-between">
-                <span className="text-xs text-red-700 dark:text-red-300 font-semibold">Total Credit Refund:</span>
-                <span className="text-base font-black text-red-700 dark:text-red-300">
+              <div className="bg-[#e8f4ff] p-3 rounded-xl border border-[#c4dde9] flex items-center justify-between">
+                <span className="text-xs text-[#0F172A] font-bold">Total Credit Refund:</span>
+                <span className="text-base font-black text-rose-700">
                   ৳{calculatedTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </span>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1">
+                <label className="block text-xs font-bold text-[#0F172A] mb-1">
                   PSR Inspection Remarks
                 </label>
                 <textarea
@@ -1564,7 +1566,7 @@ export default function PsrDashboard() {
                   value={remarks}
                   onChange={(e) => setRemarks(e.target.value)}
                   placeholder="e.g. Inspected 4 bottles with cracked caps upon outlet unboxing"
-                  className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs sm:text-sm focus:ring-2 focus:ring-red-500"
+                  className="w-full p-2.5 rounded-xl border border-[#c4dde9] bg-white text-xs sm:text-sm text-[#0F172A] focus:ring-2 focus:ring-[#b7c4cd] focus:outline-none placeholder:text-[#475569]/60"
                 />
               </div>
 
@@ -1572,14 +1574,14 @@ export default function PsrDashboard() {
                 <button
                   type="button"
                   onClick={() => setRefundModalOutlet(null)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 transition"
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-[#334155] hover:bg-[#e8f4ff] border border-[#c4dde9] transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={actionLoading}
-                  className="flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-red-600 hover:bg-red-700 text-white shadow-md shadow-red-500/20 transition disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-[#0F172A] hover:bg-[#1E293B] text-white shadow-2xs border border-[#b7c4cd] transition disabled:opacity-50 cursor-pointer"
                 >
                   <RotateCcw className="h-4 w-4" />
                   <span>{actionLoading ? 'Logging Claim...' : 'Submit Claim to SO'}</span>
@@ -1592,19 +1594,19 @@ export default function PsrDashboard() {
 
       {/* SHOP VISIT & INVENTORY AUDIT MODAL */}
       {visitModalOutlet && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-zinc-900 rounded-3xl max-w-xl w-full border border-slate-200 dark:border-zinc-800 shadow-2xl overflow-hidden animate-scale-up my-8 max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[#f7fbff] rounded-3xl max-w-xl w-full border border-[#c4dde9] shadow-2xl overflow-hidden animate-scale-up my-8 max-h-[90vh] flex flex-col text-[#0F172A]">
             {/* Header */}
-            <div className="px-6 py-5 bg-gradient-to-r from-blue-700 via-indigo-700 to-cyan-700 text-white flex items-center justify-between shrink-0">
+            <div className="px-6 py-5 bg-gradient-to-r from-[#d6ecff] via-[#e8f4ff] to-[#f7fbff] border-b border-[#c4dde9] text-[#0F172A] flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
-                  <ClipboardCheck className="w-5 h-5 text-white" />
+                <div className="w-10 h-10 rounded-2xl bg-white border border-[#c4dde9] flex items-center justify-center shrink-0 text-[#0F172A] shadow-2xs">
+                  <ClipboardCheck className="w-5 h-5 text-[#0F172A]" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-base sm:text-lg">
+                  <h3 className="font-bold text-base sm:text-lg text-[#0F172A]">
                     Shop Visit & Shelf Stock Audit
                   </h3>
-                  <p className="text-xs text-blue-100">
+                  <p className="text-xs text-[#475569] font-medium">
                     {visitModalOutlet.franchise_name || ''} {visitModalOutlet.branch_name || visitModalOutlet.outlet_name}
                   </p>
                 </div>
@@ -1612,7 +1614,7 @@ export default function PsrDashboard() {
               <button
                 type="button"
                 onClick={() => setVisitModalOutlet(null)}
-                className="p-1.5 rounded-xl text-blue-100 hover:text-white hover:bg-white/10 transition cursor-pointer"
+                className="p-1.5 rounded-xl text-[#475569] hover:text-[#0F172A] hover:bg-white/80 transition cursor-pointer"
               >
                 ✕
               </button>
@@ -1621,12 +1623,12 @@ export default function PsrDashboard() {
             {/* Content */}
             <div className="p-6 space-y-4 overflow-y-auto flex-1 text-xs">
               {/* Outlet details bar */}
-              <div className="p-3 rounded-2xl bg-slate-50 dark:bg-zinc-800/50 border border-slate-200 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5 text-slate-600 dark:text-zinc-300">
-                  <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+              <div className="p-3 rounded-2xl bg-[#e8f4ff] border border-[#c4dde9] flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 text-[#334155] font-medium">
+                  <MapPin className="w-3.5 h-3.5 text-[#0F172A] shrink-0" />
                   <span className="truncate max-w-xs">{visitModalOutlet.address || 'Sub-route Location'}</span>
                 </div>
-                <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300">
+                <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-[#d6ecff] text-[#0F172A] border border-[#b7c4cd]">
                   Route: {visitModalOutlet.sub_route || data?.sub_route}
                 </span>
               </div>
@@ -1634,18 +1636,18 @@ export default function PsrDashboard() {
               {/* Shelf Inventory Table */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <h4 className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                    <Boxes className="w-4 h-4 text-blue-600" />
+                  <h4 className="font-bold text-[#0F172A] flex items-center gap-1.5">
+                    <Boxes className="w-4 h-4 text-[#0F172A]" />
                     <span>Current Store Shelf Inventory</span>
                   </h4>
-                  <span className="text-[11px] text-slate-500 dark:text-zinc-400">
+                  <span className="text-[11px] text-[#475569] font-medium">
                     Audit before taking replenishment order
                   </span>
                 </div>
 
-                <div className="rounded-xl border border-slate-200 dark:border-zinc-800 overflow-hidden">
+                <div className="rounded-xl border border-[#c4dde9] overflow-hidden bg-white">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50 dark:bg-zinc-800 text-[10px] uppercase font-bold text-slate-500 dark:text-zinc-400 border-b border-slate-200 dark:border-zinc-800">
+                    <thead className="bg-[#e8f4ff] text-[10px] uppercase font-bold text-[#0F172A] border-b border-[#c4dde9]">
                       <tr>
                         <th className="p-2.5">Beverage Product</th>
                         <th className="p-2.5">SKU / Size (oz)</th>
@@ -1653,7 +1655,7 @@ export default function PsrDashboard() {
                         <th className="p-2.5 text-right">Stock Health</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-zinc-800">
+                    <tbody className="divide-y divide-[#c4dde9]/60">
                       {(visitModalOutlet.inventory || data?.products || []).map((prod: any) => {
                         const stock = prod.stock_quantity ?? prod.branch_stock ?? 0;
                         const isTargetSku =
@@ -1667,33 +1669,33 @@ export default function PsrDashboard() {
                                 (t.category && prod.category && t.category.toLowerCase() === prod.category.toLowerCase())
                             ));
                         return (
-                          <tr key={prod.product_id} className={`hover:bg-slate-50/50 dark:hover:bg-zinc-800/50 ${isTargetSku ? 'bg-amber-50/40 dark:bg-amber-950/20' : ''}`}>
+                          <tr key={prod.product_id} className={`hover:bg-[#d6ecff]/30 transition ${isTargetSku ? 'bg-[#d6ecff]/20' : ''}`}>
                             <td className="p-2.5">
-                              <span className="font-bold text-slate-900 dark:text-white block">
+                              <span className="font-bold text-[#0F172A] block">
                                 {prod.brand} {prod.flavor_variant}
                               </span>
                               {isTargetSku && (
-                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#d6ecff] text-[#0F172A] border border-[#b7c4cd]">
                                   ★ Target Product
                                 </span>
                               )}
                             </td>
-                            <td className="p-2.5 font-mono text-[11px] text-slate-600 dark:text-zinc-400">
+                            <td className="p-2.5 font-mono text-[11px] text-[#475569] font-medium">
                               {prod.sku} • {formatOunces(prod.size_volume)}
                             </td>
                             <td className="p-2.5 text-center font-mono font-bold text-sm">
-                              <span className={stock === 0 ? 'text-rose-600' : stock < 10 ? 'text-amber-600' : 'text-emerald-700'}>
+                              <span className={stock === 0 ? 'text-rose-600' : stock < 10 ? 'text-amber-700' : 'text-emerald-700'}>
                                 {stock}
                               </span>
                             </td>
                             <td className="p-2.5 text-right">
                               <span
-                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
                                   stock === 0
-                                    ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
+                                    ? 'bg-rose-100 text-rose-800 border-rose-300'
                                     : stock < 10
-                                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
-                                    : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                                    ? 'bg-amber-100 text-amber-900 border-amber-300'
+                                    : 'bg-emerald-100 text-emerald-800 border-emerald-300'
                                 }`}
                               >
                                 {stock === 0 ? 'Out of Stock' : stock < 10 ? 'Low Stock' : 'In Stock'}
@@ -1708,16 +1710,16 @@ export default function PsrDashboard() {
               </div>
 
               {/* Log Visit Form */}
-              <div className="space-y-3 pt-3 border-t border-slate-100 dark:border-zinc-800">
+              <div className="space-y-3 pt-3 border-t border-[#c4dde9]">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-zinc-400 mb-1">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-[#0F172A] mb-1">
                       Visit Nature
                     </label>
                     <select
                       value={visitType}
                       onChange={(e) => setVisitType(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-800 font-bold focus:outline-none"
+                      className="w-full px-3 py-2 rounded-xl border border-[#c4dde9] bg-white text-[#0F172A] font-bold focus:ring-2 focus:ring-[#b7c4cd] focus:outline-none"
                     >
                       <option value="STOCK_AUDIT">Physical Stock Audit</option>
                       <option value="ROUTINE_CHECK">Routine Store Visit</option>
@@ -1727,7 +1729,7 @@ export default function PsrDashboard() {
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-zinc-400 mb-1">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-[#0F172A] mb-1">
                       Visit Observation Notes
                     </label>
                     <input
@@ -1735,19 +1737,19 @@ export default function PsrDashboard() {
                       value={visitNotes}
                       onChange={(e) => setVisitNotes(e.target.value)}
                       placeholder="e.g. Shelves running low on 330ml cans, recommended 20 cases"
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-800 focus:outline-none"
+                      className="w-full px-3 py-2 rounded-xl border border-[#c4dde9] bg-white text-[#0F172A] font-medium focus:ring-2 focus:ring-[#b7c4cd] focus:outline-none placeholder:text-[#475569]/60"
                     />
                   </div>
                 </div>
               </div>
 
               {/* Action Buttons */}
-              <div className="pt-3 border-t border-slate-100 dark:border-zinc-800 flex flex-col sm:flex-row items-center justify-between gap-2">
+              <div className="pt-3 border-t border-[#c4dde9] flex flex-col sm:flex-row items-center justify-between gap-2">
                 <button
                   type="button"
                   onClick={() => handleLogVisit(false)}
                   disabled={visitSubmitting}
-                  className="w-full sm:w-auto px-4 py-2 rounded-xl border border-slate-300 dark:border-zinc-700 text-slate-700 dark:text-zinc-300 font-bold hover:bg-slate-50 dark:hover:bg-zinc-800 transition cursor-pointer"
+                  className="w-full sm:w-auto px-4 py-2 rounded-xl border border-[#c4dde9] bg-white text-[#0F172A] font-bold hover:bg-[#e8f4ff] transition cursor-pointer"
                 >
                   {visitSubmitting ? 'Recording...' : 'Record Visit Log Only'}
                 </button>
@@ -1756,15 +1758,15 @@ export default function PsrDashboard() {
                   <button
                     type="button"
                     onClick={() => setVisitModalOutlet(null)}
-                    className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 text-slate-600 dark:text-zinc-400 font-bold transition cursor-pointer"
+                    className="px-4 py-2 rounded-xl bg-[#e8f4ff] hover:bg-[#d6ecff] text-[#334155] border border-[#c4dde9] font-bold transition cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
-                    type="button"
+                    type="submit"
                     onClick={() => handleLogVisit(true)}
                     disabled={visitSubmitting}
-                    className="flex-1 sm:flex-initial px-5 py-2 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white font-bold shadow-md shadow-orange-600/20 flex items-center justify-center gap-2 transition cursor-pointer"
+                    className="flex-1 sm:flex-initial px-5 py-2 rounded-xl bg-[#0F172A] hover:bg-[#1E293B] text-white font-bold shadow-2xs border border-[#b7c4cd] flex items-center justify-center gap-2 transition cursor-pointer"
                   >
                     <PlusCircle className="w-4 h-4" />
                     <span>Proceed to Take Order</span>

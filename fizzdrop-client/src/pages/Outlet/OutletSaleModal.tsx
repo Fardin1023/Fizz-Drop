@@ -160,15 +160,15 @@ export const OutletSaleModal: React.FC<OutletSaleModalProps> = ({
       >
         <div
           onClick={(e) => e.stopPropagation()}
-          className="relative w-full max-w-lg bg-white rounded-3xl border border-slate-200/90 shadow-2xl overflow-hidden animate-scale-up"
+          className="relative w-full max-w-lg bg-white rounded-3xl border border-[#E2C799] shadow-2xl overflow-hidden animate-scale-up"
         >
           {/* Top Bar Glow */}
-          <div className="h-2 w-full bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500" />
+          <div className="h-2.5 w-full bg-gradient-to-r from-[#FFD18D] via-[#FDECAD] to-[#F7E6C9]" />
 
           {/* Close button */}
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 z-20 p-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+            className="absolute top-4 right-4 z-20 p-2 rounded-full bg-[#FAF4EB] hover:bg-[#F7E6C9] text-[#2D2319] transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -176,34 +176,34 @@ export const OutletSaleModal: React.FC<OutletSaleModalProps> = ({
           <form onSubmit={handleSubmit} className="p-6 sm:p-7 space-y-5">
             {/* Header */}
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shadow-lg shadow-emerald-500/25">
+              <div className="w-12 h-12 rounded-2xl bg-[#FFD18D] text-[#2D2319] flex items-center justify-center shadow-md shadow-[#FFD18D]/30">
                 <ShoppingCart className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+                <h3 className="text-xl font-black text-[#2D2319] tracking-tight flex items-center gap-2">
                   <span>POINT OF SALE</span>
-                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-[#F5F1BB] text-[#365314] border border-[#D9D384]">
                     Counter Sale
                   </span>
                 </h3>
-                <p className="text-xs text-slate-500">
-                  Record counter sale at <span className="font-semibold text-slate-700">{outletName}</span>
+                <p className="text-xs text-[#6B5440]">
+                  Record counter sale at <span className="font-semibold text-[#2D2319]">{outletName}</span>
                 </p>
               </div>
             </div>
 
             {/* Error Message */}
             {error && (
-              <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2 animate-shake">
-                <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+              <div className="p-3.5 rounded-2xl bg-[#F6DBD4] border border-[#E29D94] text-[#7C2D12] text-xs flex items-center gap-2 animate-shake">
+                <AlertCircle className="w-4 h-4 shrink-0 text-[#B91C1C]" />
                 <span className="font-medium">{error}</span>
               </div>
             )}
 
             {/* Product Selection */}
             <div className="space-y-1.5">
-              <label className="text-xs font-black uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
-                <Package className="w-3.5 h-3.5 text-emerald-600" />
+              <label className="text-xs font-black uppercase tracking-wider text-[#6B5440] flex items-center gap-1.5">
+                <Package className="w-3.5 h-3.5 text-[#78350F]" />
                 <span>Select Beverage Product</span>
               </label>
               <select
@@ -213,7 +213,7 @@ export const OutletSaleModal: React.FC<OutletSaleModalProps> = ({
                   setQuantity(1);
                   setError(null);
                 }}
-                className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 bg-slate-50/70 hover:bg-slate-50 text-slate-800 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all cursor-pointer"
+                className="w-full px-3.5 py-2.5 rounded-2xl border border-[#E2C799] bg-[#FAF4EB]/60 hover:bg-[#FAF4EB] text-[#2D2319] text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#FFD18D] transition-all cursor-pointer"
               >
                 {products.map((p) => (
                   <option key={p.product_id} value={p.product_id}>
@@ -224,21 +224,21 @@ export const OutletSaleModal: React.FC<OutletSaleModalProps> = ({
             </div>
 
             {/* Live Stock & Price Display Card */}
-            <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-50/60 via-teal-50/40 to-slate-50 border border-emerald-100 flex items-center justify-between">
+            <div className="p-4 rounded-2xl bg-[#FAF4EB] border border-[#E2C799] flex items-center justify-between">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Current Shelf Stock</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[#6B5440]">Current Shelf Stock</p>
                 <div className="flex items-baseline gap-1.5 mt-0.5">
-                  <span className={`text-2xl font-black ${availableStock > 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                  <span className={`text-2xl font-black ${availableStock > 0 ? 'text-[#2D2319]' : 'text-[#B91C1C]'}`}>
                     {availableStock}
                   </span>
-                  <span className="text-xs text-slate-500 font-medium">units</span>
+                  <span className="text-xs text-[#6B5440] font-medium">units</span>
                   {availableStock <= 15 && availableStock > 0 && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#FFD18D] text-[#78350F] font-bold border border-[#E2C799]">
                       Low Stock
                     </span>
                   )}
                   {availableStock === 0 && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#F6DBD4] text-[#7C2D12] font-bold border border-[#E29D94]">
                       Out of Stock
                     </span>
                   )}
@@ -246,12 +246,12 @@ export const OutletSaleModal: React.FC<OutletSaleModalProps> = ({
               </div>
 
               <div className="text-right">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Retail MRP (Tier 3)</p>
-                <p className="text-xl font-black text-emerald-800 font-mono mt-0.5">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[#78350F]">Retail MRP (Tier 3)</p>
+                <p className="text-xl font-black text-[#2D2319] font-mono mt-0.5">
                   ৳{unitPrice.toFixed(2)}
                 </p>
                 {outletUnitMargin > 0 && (
-                  <span className="text-[10px] font-mono font-bold text-slate-500 block">
+                  <span className="text-[10px] font-mono font-bold text-[#6B5440] block">
                     (Margin: +৳{outletUnitMargin.toFixed(2)}/u)
                   </span>
                 )}
@@ -261,11 +261,11 @@ export const OutletSaleModal: React.FC<OutletSaleModalProps> = ({
             {/* Quantity Stepper & Quick Pills */}
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <label className="text-xs font-black uppercase tracking-wider text-slate-600">
+                <label className="text-xs font-black uppercase tracking-wider text-[#6B5440]">
                   Sale Quantity (Units)
                 </label>
-                <span className="text-xs text-slate-500 font-mono">
-                  Remaining After Sale: <strong className={remainingStock < 5 ? 'text-amber-600' : 'text-slate-700'}>{remainingStock}</strong>
+                <span className="text-xs text-[#6B5440] font-mono">
+                  Remaining After Sale: <strong className={remainingStock < 5 ? 'text-[#B45309]' : 'text-[#2D2319]'}>{remainingStock}</strong>
                 </span>
               </div>
 
@@ -273,7 +273,7 @@ export const OutletSaleModal: React.FC<OutletSaleModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                  className="w-11 h-11 rounded-2xl border border-slate-200 bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-lg transition-all cursor-pointer flex items-center justify-center"
+                  className="w-11 h-11 rounded-2xl border border-[#E2C799] bg-[#FAF4EB] hover:bg-[#F7E6C9] text-[#2D2319] font-black text-lg transition-all cursor-pointer flex items-center justify-center"
                 >
                   -
                 </button>
@@ -283,13 +283,13 @@ export const OutletSaleModal: React.FC<OutletSaleModalProps> = ({
                   max={availableStock}
                   value={quantity}
                   onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="flex-1 py-2.5 px-4 text-center font-black text-lg rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 font-mono"
+                  className="flex-1 py-2.5 px-4 text-center font-black text-lg rounded-2xl border border-[#E2C799] bg-white text-[#2D2319] focus:outline-none focus:ring-2 focus:ring-[#FFD18D] font-mono"
                 />
                 <button
                   type="button"
                   onClick={() => setQuantity((q) => Math.min(availableStock, q + 1))}
                   disabled={quantity >= availableStock}
-                  className="w-11 h-11 rounded-2xl border border-slate-200 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-800 font-black text-lg transition-all cursor-pointer flex items-center justify-center"
+                  className="w-11 h-11 rounded-2xl border border-[#E2C799] bg-[#FAF4EB] hover:bg-[#F7E6C9] disabled:opacity-40 text-[#2D2319] font-black text-lg transition-all cursor-pointer flex items-center justify-center"
                 >
                   +
                 </button>
@@ -297,14 +297,14 @@ export const OutletSaleModal: React.FC<OutletSaleModalProps> = ({
 
               {/* Quick Preset Pills */}
               <div className="flex items-center gap-1.5 pt-1">
-                <span className="text-[10px] text-slate-400 uppercase font-bold mr-1">Quick Add:</span>
+                <span className="text-[10px] text-[#6B5440] uppercase font-bold mr-1">Quick Add:</span>
                 {[1, 2, 6, 12, 24].map((amt) => (
                   <button
                     key={amt}
                     type="button"
                     onClick={() => handleQuickQty(amt)}
                     disabled={availableStock < amt}
-                    className="px-2.5 py-1 text-xs rounded-xl bg-slate-100 hover:bg-emerald-100 hover:text-emerald-800 text-slate-700 font-bold border border-slate-200/60 transition-all disabled:opacity-30 cursor-pointer"
+                    className="px-2.5 py-1 text-xs rounded-xl bg-[#FAF4EB] hover:bg-[#FFD18D] hover:text-[#2D2319] text-[#433022] font-bold border border-[#E2C799]/60 transition-all disabled:opacity-30 cursor-pointer"
                   >
                     +{amt}
                   </button>
@@ -314,7 +314,7 @@ export const OutletSaleModal: React.FC<OutletSaleModalProps> = ({
 
             {/* Payment Method Selector */}
             <div className="space-y-1.5">
-              <label className="text-xs font-black uppercase tracking-wider text-slate-600">
+              <label className="text-xs font-black uppercase tracking-wider text-[#6B5440]">
                 Payment Method
               </label>
               <div className="grid grid-cols-3 gap-2">
@@ -332,11 +332,11 @@ export const OutletSaleModal: React.FC<OutletSaleModalProps> = ({
                       onClick={() => setPaymentMethod(mode.id as any)}
                       className={`p-2.5 rounded-2xl border text-xs font-bold flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
                         isSelected
-                          ? 'border-emerald-500 bg-emerald-50/80 text-emerald-800 ring-2 ring-emerald-500/20'
-                          : 'border-slate-200 bg-slate-50/60 hover:bg-slate-100 text-slate-600'
+                          ? 'border-[#2D2319] bg-[#FFD18D] text-[#2D2319] ring-2 ring-[#FFD18D]/40'
+                          : 'border-[#E2C799] bg-[#FAF4EB] hover:bg-[#F7E6C9] text-[#433022]'
                       }`}
                     >
-                      <Icon className={`w-4 h-4 ${isSelected ? 'text-emerald-600' : 'text-slate-400'}`} />
+                      <Icon className={`w-4 h-4 ${isSelected ? 'text-[#2D2319]' : 'text-[#6B5440]'}`} />
                       <span>{mode.label}</span>
                     </button>
                   );
@@ -346,7 +346,7 @@ export const OutletSaleModal: React.FC<OutletSaleModalProps> = ({
 
             {/* Customer Notes (Optional) */}
             <div className="space-y-1">
-              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+              <label className="text-[11px] font-bold text-[#6B5440] uppercase tracking-wider">
                 Customer Name / Bill Note (Optional)
               </label>
               <input
@@ -354,20 +354,20 @@ export const OutletSaleModal: React.FC<OutletSaleModalProps> = ({
                 placeholder="Walk-in customer, takeaway..."
                 value={customerNotes}
                 onChange={(e) => setCustomerNotes(e.target.value)}
-                className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                className="w-full px-3.5 py-2 text-xs rounded-xl border border-[#E2C799] bg-[#FAF4EB]/60 text-[#2D2319] placeholder:text-[#6B5440]/60 focus:outline-none focus:ring-2 focus:ring-[#FFD18D]"
               />
             </div>
 
             {/* Total Due Banner */}
-            <div className="p-3.5 rounded-2xl bg-slate-900 text-white flex items-center justify-between">
+            <div className="p-3.5 rounded-2xl bg-[#2D2319] text-white flex items-center justify-between">
               <div>
-                <p className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Total Bill Payable (Retail)</p>
-                <p className="text-xs text-emerald-400 font-medium">
+                <p className="text-[10px] text-[#F7E6C9] uppercase tracking-wider font-bold">Total Bill Payable (Retail)</p>
+                <p className="text-xs text-[#FFD18D] font-medium">
                   {totalOutletProfit > 0 ? `Outlet Profit: +৳${totalOutletProfit.toFixed(2)}` : 'Includes all taxes'}
                 </p>
               </div>
               <div className="text-right">
-                <span className="text-2xl font-black text-white font-mono">
+                <span className="text-2xl font-black text-[#FFD18D] font-mono">
                   ৳{totalAmount.toFixed(2)}
                 </span>
               </div>
@@ -378,20 +378,20 @@ export const OutletSaleModal: React.FC<OutletSaleModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="py-3 px-4 rounded-2xl border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold text-xs transition-colors cursor-pointer"
+                className="py-3 px-4 rounded-2xl border border-[#E2C799] hover:bg-[#FAF4EB] text-[#433022] font-bold text-xs transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={submitting || availableStock <= 0}
-                className="flex-1 py-3 px-5 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-600/25 disabled:opacity-40 cursor-pointer"
+                className="flex-1 py-3 px-5 rounded-2xl bg-[#2D2319] hover:bg-[#433022] text-[#FDECAD] font-black text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-[#2D2319]/25 disabled:opacity-40 cursor-pointer"
               >
                 {submitting ? (
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <div className="w-5 h-5 border-2 border-[#FDECAD]/30 border-t-[#FDECAD] rounded-full animate-spin" />
                 ) : (
                   <>
-                    <Check className="w-4 h-4" />
+                    <Check className="w-4 h-4 text-[#FFD18D]" />
                     <span>Complete Sale (৳{totalAmount.toFixed(2)})</span>
                   </>
                 )}

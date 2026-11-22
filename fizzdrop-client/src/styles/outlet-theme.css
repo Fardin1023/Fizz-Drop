@@ -1,0 +1,137 @@
+/* ==========================================================================
+   OUTLET PORTAL THEME PALETTE
+   Color 1: #FFD18D (Golden Apricot / Warm Peach Gold)
+   Color 2: #F7E6C9 (Cream Buff / Soft Warm Biscuit)
+   Color 3: #F5F1BB (Pale Butter Lemon Cream)
+   Color 4: #F6DBD4 (Pastel Blush Rose / Soft Warm Coral)
+   Color 5: #FDECAD (Pastel Primrose / Soft Warm Vanilla)
+   High Contrast Text:
+     Primary:   #2D2319 (Deep Espresso Charcoal)
+     Secondary: #433022 (Dark Warm Walnut)
+     Muted:     #78350F / #6B5440
+     Border:    #E2C799 / #DFBC87
+   ========================================================================== */
+
+:root {
+  --outlet-c1: #FFD18D;
+  --outlet-c2: #F7E6C9;
+  --outlet-c3: #F5F1BB;
+  --outlet-c4: #F6DBD4;
+  --outlet-c5: #FDECAD;
+  --outlet-text-primary: #2D2319;
+  --outlet-text-secondary: #433022;
+  --outlet-text-muted: #6B5440;
+  --outlet-border: #E2C799;
+  --outlet-border-dark: #D4B07B;
+}
+
+.outlet-theme {
+  background-color: #FAF4EB;
+  color: #2D2319;
+}
+
+/* Base card styling */
+.outlet-theme .outlet-card {
+  background-color: #FFFFFF;
+  border: 1px solid #E2C799;
+  box-shadow: 0 1px 3px 0 rgba(226, 199, 153, 0.25);
+  color: #2D2319;
+}
+
+/* Warm accented hero container */
+.outlet-theme .outlet-hero {
+  background: linear-gradient(135deg, #FFD18D 0%, #FDECAD 45%, #F7E6C9 100%);
+  border: 1px solid #DFBC87;
+  color: #2D2319;
+}
+
+/* Pill badges */
+.outlet-theme .badge-peach {
+  background-color: #FFD18D;
+  color: #2D2319;
+  border: 1px solid #DFBC87;
+  font-weight: 700;
+}
+
+.outlet-theme .badge-cream {
+  background-color: #F7E6C9;
+  color: #2D2319;
+  border: 1px solid #E2C799;
+  font-weight: 700;
+}
+
+.outlet-theme .badge-lemon {
+  background-color: #F5F1BB;
+  color: #2D2319;
+  border: 1px solid #ded58d;
+  font-weight: 700;
+}
+
+.outlet-theme .badge-blush {
+  background-color: #F6DBD4;
+  color: #7C2D12;
+  border: 1px solid #ebc2b7;
+  font-weight: 700;
+}
+
+.outlet-theme .badge-vanilla {
+  background-color: #FDECAD;
+  color: #2D2319;
+  border: 1px solid #E2C799;
+  font-weight: 700;
+}
+
+/* Inputs & Form Controls */
+.outlet-theme input,
+.outlet-theme select,
+.outlet-theme textarea {
+  background-color: #FFFFFF;
+  border: 1px solid #E2C799;
+  color: #2D2319;
+}
+
+.outlet-theme input:focus,
+.outlet-theme select:focus,
+.outlet-theme textarea:focus {
+  border-color: #D4B07B;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(255, 209, 141, 0.4);
+}
+
+/* Buttons */
+.outlet-theme .btn-outlet-primary {
+  background-color: #2D2319;
+  color: #FDECAD;
+  border: 1px solid #433022;
+  font-weight: 700;
+  transition: all 0.15s ease-in-out;
+}
+
+.outlet-theme .btn-outlet-primary:hover {
+  background-color: #433022;
+  color: #FFFFFF;
+}
+
+.outlet-theme .btn-outlet-peach {
+  background-color: #FFD18D;
+  color: #2D2319;
+  border: 1px solid #DFBC87;
+  font-weight: 700;
+  transition: all 0.15s ease-in-out;
+}
+
+.outlet-theme .btn-outlet-peach:hover {
+  background-color: #f7c274;
+}
+
+.outlet-theme .btn-outlet-blush {
+  background-color: #F6DBD4;
+  color: #7C2D12;
+  border: 1px solid #ebc2b7;
+  font-weight: 700;
+  transition: all 0.15s ease-in-out;
+}
+
+.outlet-theme .btn-outlet-blush:hover {
+  background-color: #f0c9bf;
+}

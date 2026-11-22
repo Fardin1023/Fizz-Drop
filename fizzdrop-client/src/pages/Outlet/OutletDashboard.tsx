@@ -639,34 +639,34 @@ export const OutletDashboard: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 text-zinc-900 flex flex-col selection:bg-emerald-500/20 selection:text-emerald-900">
+    <div className="min-h-screen bg-[#FAF4EB] text-[#2D2319] flex flex-col outlet-theme selection:bg-[#FFD18D]/40 selection:text-[#2D2319]">
       {/* TOP HEADER HUD */}
-      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200/80 shadow-xs">
+      <header className="sticky top-0 z-40 bg-white border-b border-[#E2C799] shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between gap-4">
           {/* Logo & Branch Title */}
           <div className="flex items-center gap-3.5">
             <Link to="/" className="flex items-center gap-2 group">
-              <div className="w-10 h-10 rounded-2xl bg-emerald-50 p-1 border border-emerald-200 flex items-center justify-center shadow-xs group-hover:scale-105 transition-all">
+              <div className="w-10 h-10 rounded-2xl bg-[#FDECAD] p-1 border border-[#DFBC87] flex items-center justify-center shadow-xs group-hover:scale-105 transition-all">
                 <img src={logoImg} alt="FizzDrop" className="w-full h-full object-contain" />
               </div>
             </Link>
 
-            <div className="h-7 w-[1px] bg-slate-200 hidden sm:block" />
+            <div className="h-7 w-[1px] bg-[#E2C799] hidden sm:block" />
 
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-sm sm:text-base font-black text-slate-900 tracking-tight flex items-center gap-1.5">
-                  <Store className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span className="text-sm sm:text-base font-black text-[#2D2319] tracking-tight flex items-center gap-1.5">
+                  <Store className="w-4 h-4 text-[#B45309] shrink-0" />
                   <span>{outlet?.franchise_name || 'Franchise'}</span>
-                  <span className="text-slate-400 font-normal">—</span>
-                  <span className="text-emerald-700 font-bold">{outlet?.branch_name || outlet?.outlet_name || 'Branch'}</span>
+                  <span className="text-[#A88B6E] font-normal">—</span>
+                  <span className="text-[#78350F] font-bold">{outlet?.branch_name || outlet?.outlet_name || 'Branch'}</span>
                 </span>
-                <span className="hidden md:inline-flex px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold border border-emerald-200 uppercase">
+                <span className="hidden md:inline-flex px-2 py-0.5 rounded-full bg-[#F5F1BB] text-[#2D2319] text-[10px] font-bold border border-[#E2C799] uppercase">
                   {outlet?.city || 'Dhaka'} • {outlet?.area || 'Retail Hub'}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500 flex items-center gap-1">
-                <MapPin className="w-3 h-3 text-slate-400" />
+              <p className="text-[11px] text-[#6B5440] flex items-center gap-1 font-medium">
+                <MapPin className="w-3 h-3 text-[#A88B6E]" />
                 <span className="truncate max-w-[260px] sm:max-w-md">{outlet?.location_address || 'Outlet Address'}</span>
               </p>
             </div>
@@ -680,9 +680,9 @@ export const OutletDashboard: React.FC = () => {
                 setSelectedProductIdForSale(null);
                 setIsSaleModalOpen(true);
               }}
-              className="py-2 px-3.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-xs flex items-center gap-1.5 shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
+              className="py-2 px-3.5 rounded-xl bg-[#2D2319] hover:bg-[#433022] text-[#FDECAD] font-black text-xs flex items-center gap-1.5 shadow-xs transition-all cursor-pointer border border-[#433022]"
             >
-              <ShoppingCart className="w-3.5 h-3.5" />
+              <ShoppingCart className="w-3.5 h-3.5 text-[#FFD18D]" />
               <span className="hidden sm:inline">Record Sale (POS)</span>
               <span className="sm:hidden">POS</span>
             </button>
@@ -693,9 +693,9 @@ export const OutletDashboard: React.FC = () => {
                 setSelectedProductIdForReq(null);
                 setIsRequisitionModalOpen(true);
               }}
-              className="py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer hidden md:flex"
+              className="py-2 px-3 rounded-xl bg-[#FDECAD] hover:bg-[#FFD18D] text-[#2D2319] font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer hidden md:flex border border-[#E2C799]"
             >
-              <Truck className="w-3.5 h-3.5 text-blue-600" />
+              <Truck className="w-3.5 h-3.5 text-[#78350F]" />
               <span>Order Restock</span>
             </button>
 
@@ -704,7 +704,7 @@ export const OutletDashboard: React.FC = () => {
               <select
                 value={outlet?.outlet_id || activeOutletId}
                 onChange={(e) => handleSwitchBranch(Number(e.target.value))}
-                className="py-1.5 px-2.5 rounded-xl border border-slate-200 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold focus:outline-none cursor-pointer"
+                className="py-1.5 px-2.5 rounded-xl border border-[#E2C799] bg-[#F7E6C9] hover:bg-[#FFD18D] text-[#2D2319] text-xs font-bold focus:outline-none cursor-pointer"
               >
                 {allOutlets.map((o) => (
                   <option key={o.outlet_id} value={o.outlet_id}>
@@ -732,7 +732,7 @@ export const OutletDashboard: React.FC = () => {
                 navigate('/outlet/login');
               }}
               title="Logout from branch"
-              className="p-2 rounded-xl border border-slate-200 hover:bg-rose-50 hover:border-rose-200 text-slate-500 hover:text-rose-600 transition-colors cursor-pointer"
+              className="p-2 rounded-xl border border-[#E2C799] bg-white hover:bg-[#F6DBD4] text-[#6B5440] hover:text-[#7C2D12] transition-colors cursor-pointer"
             >
               <LogOut className="w-4 h-4" />
             </button>
@@ -741,47 +741,45 @@ export const OutletDashboard: React.FC = () => {
       </header>
 
       {/* DASHBOARD HERO KPI BANNER */}
-      <section className="bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 text-white py-6 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,_rgba(16,185,129,0.15),transparent_70%)] pointer-events-none" />
-
+      <section className="bg-gradient-to-r from-[#FFD18D] via-[#FDECAD] to-[#F7E6C9] text-[#2D2319] border-b border-[#DFBC87] py-6 px-4 sm:px-6 lg:px-8 relative overflow-hidden shadow-xs">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold border border-emerald-500/30 mb-2">
-              <Sparkles className="w-3.5 h-3.5" />
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/80 text-[#78350F] text-xs font-black border border-[#DFBC87] mb-2 shadow-2xs">
+              <Sparkles className="w-3.5 h-3.5 text-[#B45309]" />
               <span>FRANCHISE RETAIL OUTLET PORTAL</span>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+            <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-[#2D2319]">
               {outlet?.outlet_name || 'Outlet Branch'}
             </h2>
-            <p className="text-xs sm:text-sm text-emerald-200/80 mt-1 max-w-xl">
+            <p className="text-xs sm:text-sm text-[#433022] font-medium mt-1 max-w-xl">
               Live beverage shelf inventory, customer transactions, stock adjustments & regional supplier restocks.
             </p>
           </div>
 
           {/* Quick KPI Stat Pills */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="p-3 rounded-2xl bg-white/10 backdrop-blur-md border border-white/15">
-              <p className="text-[10px] uppercase tracking-wider font-bold text-emerald-300">Total Units</p>
-              <p className="text-2xl font-black text-white mt-0.5 font-mono">{kpi.total_stock_units}</p>
-              <p className="text-[10px] text-slate-300">On Shelf & Backroom</p>
+            <div className="p-3 rounded-2xl bg-white/85 backdrop-blur-md border border-[#E2C799] shadow-2xs">
+              <p className="text-[10px] uppercase tracking-wider font-bold text-[#78350F]">Total Units</p>
+              <p className="text-2xl font-black text-[#2D2319] mt-0.5 font-mono">{kpi.total_stock_units}</p>
+              <p className="text-[10px] text-[#6B5440] font-medium">On Shelf & Backroom</p>
             </div>
 
-            <div className="p-3 rounded-2xl bg-white/10 backdrop-blur-md border border-white/15">
-              <p className="text-[10px] uppercase tracking-wider font-bold text-amber-300">Low Stock</p>
-              <p className="text-2xl font-black text-amber-400 mt-0.5 font-mono">{kpi.low_stock_count}</p>
-              <p className="text-[10px] text-slate-300">&le; 15 units remaining</p>
+            <div className="p-3 rounded-2xl bg-white/85 backdrop-blur-md border border-[#E2C799] shadow-2xs">
+              <p className="text-[10px] uppercase tracking-wider font-bold text-[#7C2D12]">Low Stock</p>
+              <p className="text-2xl font-black text-[#7C2D12] mt-0.5 font-mono">{kpi.low_stock_count}</p>
+              <p className="text-[10px] text-[#6B5440] font-medium">&le; 15 units remaining</p>
             </div>
 
-            <div className="p-3 rounded-2xl bg-white/10 backdrop-blur-md border border-white/15">
-              <p className="text-[10px] uppercase tracking-wider font-bold text-cyan-300">Today Sales</p>
-              <p className="text-2xl font-black text-white mt-0.5 font-mono">{kpi.today_sales_count}</p>
-              <p className="text-[10px] text-slate-300">Receipts generated</p>
+            <div className="p-3 rounded-2xl bg-white/85 backdrop-blur-md border border-[#E2C799] shadow-2xs">
+              <p className="text-[10px] uppercase tracking-wider font-bold text-[#78350F]">Today Sales</p>
+              <p className="text-2xl font-black text-[#2D2319] mt-0.5 font-mono">{kpi.today_sales_count}</p>
+              <p className="text-[10px] text-[#6B5440] font-medium">Receipts generated</p>
             </div>
 
-            <div className="p-3 rounded-2xl bg-white/10 backdrop-blur-md border border-white/15">
-              <p className="text-[10px] uppercase tracking-wider font-bold text-emerald-300">Today Revenue</p>
-              <p className="text-2xl font-black text-emerald-400 mt-0.5 font-mono">৳{Number(kpi.today_sales_revenue).toFixed(0)}</p>
-              <p className="text-[10px] text-slate-300">Collected today</p>
+            <div className="p-3 rounded-2xl bg-white/85 backdrop-blur-md border border-[#E2C799] shadow-2xs">
+              <p className="text-[10px] uppercase tracking-wider font-bold text-[#78350F]">Today Revenue</p>
+              <p className="text-2xl font-black text-[#2D2319] mt-0.5 font-mono">৳{Number(kpi.today_sales_revenue).toFixed(0)}</p>
+              <p className="text-[10px] text-[#6B5440] font-medium">Collected today</p>
             </div>
           </div>
         </div>
@@ -789,33 +787,33 @@ export const OutletDashboard: React.FC = () => {
 
       {/* Assigned Route Pre-Sales Officer (PSR) Banner */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
-        <div className="p-4 rounded-3xl bg-gradient-to-r from-orange-50 via-amber-50 to-emerald-50 border border-orange-200/90 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="p-4 rounded-3xl bg-gradient-to-r from-[#FDECAD] via-[#F7E6C9] to-[#F5F1BB] border border-[#E2C799] shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-[#2D2319]">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-orange-500 to-amber-600 text-white font-black flex items-center justify-center text-xs shadow-md shadow-orange-500/20 shrink-0">
+            <div className="w-11 h-11 rounded-2xl bg-[#FFD18D] border border-[#DFBC87] text-[#2D2319] font-black flex items-center justify-center text-xs shadow-2xs shrink-0">
               PSR
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-black uppercase tracking-wider text-orange-950">
+                <span className="text-xs font-black uppercase tracking-wider text-[#78350F]">
                   Exclusive Route Pre-Sales Officer (PSR)
                 </span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-800 border border-orange-200">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#F6DBD4] text-[#7C2D12] border border-[#E2C799]">
                   Primary Contact
                 </span>
               </div>
-              <p className="text-sm font-bold text-slate-900 mt-0.5">
+              <p className="text-sm font-bold text-[#2D2319] mt-0.5">
                 {preSalesOfficer?.name || outlet?.assigned_psr_name || 'Assigned Territory Officer'}
                 {(preSalesOfficer?.code || outlet?.assigned_psr_code) && (
-                  <span className="text-xs font-mono text-orange-700 font-semibold ml-1.5">
+                  <span className="text-xs font-mono text-[#78350F] font-semibold ml-1.5">
                     ({preSalesOfficer?.code || outlet?.assigned_psr_code})
                   </span>
                 )}
-                <span className="text-xs text-slate-500 font-normal ml-2">
-                  • Sub-Route: <strong className="font-semibold text-slate-700">{preSalesOfficer?.sub_route || outlet?.sub_route || 'Territory Sub-Route'}</strong>
+                <span className="text-xs text-[#6B5440] font-medium ml-2">
+                  • Sub-Route: <strong className="font-semibold text-[#2D2319]">{preSalesOfficer?.sub_route || outlet?.sub_route || 'Territory Sub-Route'}</strong>
                 </span>
                 {(preSalesOfficer?.phone || outlet?.assigned_psr_phone) && (
-                  <span className="text-xs text-slate-500 font-normal ml-2">
-                    • 📞 <strong className="font-semibold text-slate-700">{preSalesOfficer?.phone || outlet?.assigned_psr_phone}</strong>
+                  <span className="text-xs text-[#6B5440] font-medium ml-2">
+                    • 📞 <strong className="font-semibold text-[#2D2319]">{preSalesOfficer?.phone || outlet?.assigned_psr_phone}</strong>
                   </span>
                 )}
               </p>
@@ -828,9 +826,9 @@ export const OutletDashboard: React.FC = () => {
                 if (products.length > 0) setSelectedProductIdForReq(products[0].product_id);
                 setIsRequisitionModalOpen(true);
               }}
-              className="px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer active:scale-95"
+              className="px-4 py-2 rounded-xl bg-[#2D2319] hover:bg-[#433022] text-[#FDECAD] font-bold text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer active:scale-95 border border-[#433022]"
             >
-              <Truck className="w-3.5 h-3.5" />
+              <Truck className="w-3.5 h-3.5 text-[#FFD18D]" />
               <span>Order Stock via PSR</span>
             </button>
           </div>
@@ -846,15 +844,15 @@ export const OutletDashboard: React.FC = () => {
               isSidebarCollapsed ? 'lg:w-20' : 'lg:w-72'
             } w-full`}
           >
-            <div className="sticky top-24 bg-white rounded-3xl border border-slate-200/80 shadow-sm p-3 space-y-1.5">
-              <div className="hidden lg:flex items-center justify-between px-3 py-2 border-b border-slate-100 mb-2">
-                <span className={`text-[10px] font-black uppercase tracking-wider text-slate-400 ${isSidebarCollapsed ? 'hidden' : 'block'}`}>
+            <div className="sticky top-24 bg-white rounded-3xl border border-[#E2C799] shadow-xs p-3 space-y-1.5">
+              <div className="hidden lg:flex items-center justify-between px-3 py-2 border-b border-[#FAF4EB] mb-2">
+                <span className={`text-[10px] font-black uppercase tracking-wider text-[#A88B6E] ${isSidebarCollapsed ? 'hidden' : 'block'}`}>
                   Outlet Modules
                 </span>
                 <button
                   type="button"
                   onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                  className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+                  className="p-1 rounded-lg hover:bg-[#FAF4EB] text-[#6B5440] hover:text-[#2D2319] transition-colors"
                 >
                   {isSidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
                 </button>
@@ -870,13 +868,13 @@ export const OutletDashboard: React.FC = () => {
                     onClick={() => handleTabChange(sec.id)}
                     className={`w-full p-2.5 rounded-2xl text-left transition-all flex items-center gap-3 cursor-pointer group ${
                       isActive
-                        ? `bg-gradient-to-r ${sec.gradient} text-white shadow-md shadow-emerald-900/15`
-                        : 'text-slate-700 hover:bg-slate-100/80 hover:text-slate-900'
+                        ? `bg-[#FFD18D] text-[#2D2319] shadow-xs border border-[#DFBC87] font-black`
+                        : 'text-[#433022] hover:bg-[#F7E6C9]/60 hover:text-[#2D2319]'
                     }`}
                   >
                     <div
                       className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${
-                        isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600 group-hover:text-emerald-700'
+                        isActive ? 'bg-white/50 text-[#2D2319] border border-[#DFBC87]' : 'bg-[#FAF4EB] text-[#6B5440] group-hover:text-[#2D2319]'
                       }`}
                     >
                       <Icon className="w-4 h-4" />
@@ -890,10 +888,10 @@ export const OutletDashboard: React.FC = () => {
                             <span
                               className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase ${
                                 isActive
-                                  ? 'bg-white/20 text-white'
+                                  ? 'bg-white/60 text-[#2D2319] border border-[#DFBC87]'
                                   : sec.badgeHighlight
-                                  ? 'bg-rose-100 text-rose-700 border border-rose-200'
-                                  : 'bg-slate-100 text-slate-500'
+                                  ? 'bg-[#F6DBD4] text-[#7C2D12] border border-[#E2C799]'
+                                  : 'bg-[#FDECAD] text-[#2D2319] border border-[#E2C799]'
                               }`}
                             >
                               {sec.badge}
@@ -915,24 +913,24 @@ export const OutletDashboard: React.FC = () => {
           <main className="flex-1 min-w-0 space-y-6">
             {/* REAL-TIME LIVE CUSTOMER ORDER NOTIFICATION BANNER */}
             {customerOrderAlert && (
-              <div className="p-4 rounded-3xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white shadow-xl shadow-emerald-900/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-fade-in border border-emerald-400/30">
+              <div className="p-4 rounded-3xl bg-gradient-to-r from-[#FFD18D] via-[#FDECAD] to-[#F7E6C9] text-[#2D2319] shadow-lg shadow-[#FFD18D]/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-fade-in border border-[#E2C799]">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shrink-0">
-                    <Sparkles className="w-5 h-5 text-yellow-300 animate-spin" />
+                  <div className="w-10 h-10 rounded-2xl bg-[#2D2319]/10 backdrop-blur-md flex items-center justify-center shrink-0">
+                    <Sparkles className="w-5 h-5 text-[#78350F] animate-spin" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-black text-sm uppercase tracking-wide">
+                      <span className="font-black text-sm uppercase tracking-wide text-[#2D2319]">
                         ⚡ New Customer Order Received!
                       </span>
-                      <span className="text-[10px] font-mono bg-white/20 px-2 py-0.5 rounded-full font-bold">
+                      <span className="text-[10px] font-mono bg-[#2D2319]/10 text-[#2D2319] px-2 py-0.5 rounded-full font-bold border border-[#E2C799]">
                         {customerOrderAlert.sale_code || 'PROCESSED'}
                       </span>
                     </div>
-                    <p className="text-xs text-emerald-100 mt-0.5">
-                      Customer bought <strong className="text-white">{customerOrderAlert.quantity}x {customerOrderAlert.product_name}</strong> for{' '}
-                      <strong className="text-yellow-300">৳{Number(customerOrderAlert.total_amount).toFixed(2)}</strong> via{' '}
-                      <span className="underline">{customerOrderAlert.payment_method}</span>. Shelf inventory &amp; Today's Revenue updated automatically!
+                    <p className="text-xs text-[#433022] mt-0.5">
+                      Customer bought <strong className="text-[#2D2319]">{customerOrderAlert.quantity}x {customerOrderAlert.product_name}</strong> for{' '}
+                      <strong className="text-[#78350F]">৳{Number(customerOrderAlert.total_amount).toFixed(2)}</strong> via{' '}
+                      <span className="underline font-medium">{customerOrderAlert.payment_method}</span>. Shelf inventory &amp; Today's Revenue updated automatically!
                     </p>
                   </div>
                 </div>
@@ -941,14 +939,14 @@ export const OutletDashboard: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setActiveTab('ledger')}
-                    className="px-3 py-1.5 rounded-xl bg-white text-emerald-800 text-xs font-bold hover:bg-emerald-50 transition-colors shadow-xs cursor-pointer"
+                    className="px-3.5 py-1.5 rounded-xl bg-[#2D2319] text-[#FDECAD] text-xs font-bold hover:bg-[#433022] transition-colors shadow-xs cursor-pointer"
                   >
                     View in Ledger →
                   </button>
                   <button
                     type="button"
                     onClick={() => setCustomerOrderAlert(null)}
-                    className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+                    className="p-1.5 rounded-xl bg-[#2D2319]/10 hover:bg-[#2D2319]/20 text-[#2D2319] transition-colors cursor-pointer"
                     title="Dismiss alert"
                   >
                     <X className="w-4 h-4" />
@@ -960,16 +958,16 @@ export const OutletDashboard: React.FC = () => {
             {activeTab === 'inventory' && (
               <div className="space-y-5 animate-fade-in">
                 {/* Search & Filter Toolbar */}
-                <div className="p-4 rounded-3xl bg-white border border-slate-200/80 shadow-xs space-y-3">
+                <div className="p-4 rounded-3xl bg-white border border-[#E2C799] shadow-xs space-y-3">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="relative flex-1">
-                      <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#6B5440]" />
                       <input
                         type="text"
                         placeholder="Search beverages by brand, SKU, flavor..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2 text-xs rounded-2xl border border-slate-200 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                        className="w-full pl-9 pr-4 py-2 text-xs rounded-2xl border border-[#E2C799] bg-[#FAF4EB]/60 text-[#2D2319] placeholder:text-[#6B5440]/60 focus:outline-none focus:ring-2 focus:ring-[#FFD18D]"
                       />
                     </div>
 
@@ -987,8 +985,8 @@ export const OutletDashboard: React.FC = () => {
                           onClick={() => setSelectedStockStatus(st.id as any)}
                           className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
                             selectedStockStatus === st.id
-                              ? 'bg-slate-900 text-white shadow-xs'
-                              : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                              ? 'bg-[#2D2319] text-[#FDECAD] shadow-xs'
+                              : 'bg-[#F7E6C9]/60 hover:bg-[#F7E6C9] text-[#433022]'
                           }`}
                         >
                           {st.label}
@@ -999,7 +997,7 @@ export const OutletDashboard: React.FC = () => {
 
                   {/* Brand Category Filter Pills */}
                   <div className="flex items-center gap-1.5 overflow-x-auto pt-1">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 mr-1">Brands:</span>
+                    <span className="text-[10px] uppercase font-bold text-[#78350F] mr-1">Brands:</span>
                     {categories.map((cat) => (
                       <button
                         key={cat}
@@ -1007,8 +1005,8 @@ export const OutletDashboard: React.FC = () => {
                         onClick={() => setSelectedCategory(cat)}
                         className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                           selectedCategory === cat
-                            ? 'bg-emerald-600 text-white shadow-xs'
-                            : 'bg-slate-100 hover:bg-emerald-50 text-slate-600'
+                            ? 'bg-[#FFD18D] text-[#2D2319] shadow-xs border border-[#E2C799]'
+                            : 'bg-[#FAF4EB] hover:bg-[#F7E6C9] text-[#433022] border border-[#E2C799]/40'
                         }`}
                       >
                         {cat}
@@ -1020,13 +1018,13 @@ export const OutletDashboard: React.FC = () => {
                 {/* Product Inventory Cards Grid */}
                 {loadingData ? (
                   <div className="py-20 flex justify-center">
-                    <div className="w-8 h-8 border-3 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
+                    <div className="w-8 h-8 border-3 border-[#FFD18D]/40 border-t-[#2D2319] rounded-full animate-spin" />
                   </div>
                 ) : filteredProducts.length === 0 ? (
-                  <div className="p-12 text-center bg-white rounded-3xl border border-slate-200 text-slate-400">
-                    <Package className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-                    <p className="font-bold text-slate-600">No beverages match your filters</p>
-                    <p className="text-xs text-slate-400 mt-1">Try clearing search terms or selecting 'All Items'.</p>
+                  <div className="p-12 text-center bg-white rounded-3xl border border-[#E2C799] text-[#6B5440]">
+                    <Package className="w-12 h-12 mx-auto mb-3 text-[#E2C799]" />
+                    <p className="font-bold text-[#2D2319]">No beverages match your filters</p>
+                    <p className="text-xs text-[#6B5440] mt-1">Try clearing search terms or selecting 'All Items'.</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -1037,15 +1035,15 @@ export const OutletDashboard: React.FC = () => {
                       return (
                         <div
                           key={p.product_id}
-                          className="bg-white rounded-3xl border border-slate-200/80 shadow-xs hover:shadow-md hover:border-emerald-300/60 transition-all p-5 flex flex-col justify-between group relative overflow-hidden"
+                          className="bg-white rounded-3xl border border-[#E2C799] shadow-xs hover:shadow-md hover:border-[#FFD18D] transition-all p-5 flex flex-col justify-between group relative overflow-hidden"
                         >
                           {/* Top Stock Status Badge */}
                           <div className="flex items-start justify-between gap-3 mb-3">
-                            <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-100 p-2 flex items-center justify-center shrink-0">
+                            <div className="w-14 h-14 rounded-2xl bg-[#FAF4EB] border border-[#E2C799]/60 p-2 flex items-center justify-center shrink-0">
                               {p.image_url ? (
                                 <img src={p.image_url} alt={p.brand} className="w-full h-full object-contain" />
                               ) : (
-                                <Package className="w-6 h-6 text-slate-400" />
+                                <Package className="w-6 h-6 text-[#6B5440]" />
                               )}
                             </div>
 
@@ -1053,15 +1051,15 @@ export const OutletDashboard: React.FC = () => {
                               <span
                                 className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
                                   isZero
-                                    ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                                    ? 'bg-[#F6DBD4] text-[#7C2D12] border border-[#E29D94]'
                                     : isLow
-                                    ? 'bg-amber-100 text-amber-800 border border-amber-200'
-                                    : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                    ? 'bg-[#FFD18D]/60 text-[#78350F] border border-[#FFD18D]'
+                                    : 'bg-[#F5F1BB] text-[#365314] border border-[#D9D384]'
                                 }`}
                               >
                                 {isZero ? 'Out of Stock' : isLow ? 'Low Stock' : 'In Stock'}
                               </span>
-                              <p className="text-xs font-black text-slate-900 font-mono mt-1">
+                              <p className="text-xs font-black text-[#2D2319] font-mono mt-1">
                                 ৳{Number((p as any).retail_price || p.base_price || 25).toFixed(2)}
                               </p>
                             </div>
@@ -1069,36 +1067,36 @@ export const OutletDashboard: React.FC = () => {
 
                           {/* Details */}
                           <div>
-                            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                            <span className="text-[10px] uppercase font-bold text-[#78350F] tracking-wider">
                               {p.category || 'Carbonated Drink'} • {p.packaging || 'Bottle'}
                             </span>
-                            <h4 className="text-base font-black text-slate-900 tracking-tight group-hover:text-emerald-700 transition-colors">
+                            <h4 className="text-base font-black text-[#2D2319] tracking-tight group-hover:text-[#78350F] transition-colors">
                               {p.brand} {p.flavor_variant}
                             </h4>
-                            <p className="text-[11px] text-slate-400 font-mono">
+                            <p className="text-[11px] text-[#6B5440] font-mono">
                               SKU: {p.sku || 'N/A'} • {p.size_volume || '250ml'}
                             </p>
                           </div>
 
                           {/* Live Shelf Quantity Display */}
-                          <div className="mt-4 p-3 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between">
-                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                          <div className="mt-4 p-3 rounded-2xl bg-[#FAF4EB] border border-[#E2C799]/60 flex items-center justify-between">
+                            <span className="text-xs font-bold text-[#6B5440] uppercase tracking-wider">
                               Shelf Stock:
                             </span>
                             <div className="flex items-baseline gap-1">
                               <span
                                 className={`text-xl font-black font-mono ${
-                                  isZero ? 'text-rose-600' : isLow ? 'text-amber-600' : 'text-emerald-700'
+                                  isZero ? 'text-[#B91C1C]' : isLow ? 'text-[#B45309]' : 'text-[#2D2319]'
                                 }`}
                               >
                                 {p.stock_quantity}
                               </span>
-                              <span className="text-xs text-slate-500 font-medium">units</span>
+                              <span className="text-xs text-[#6B5440] font-medium">units</span>
                             </div>
                           </div>
 
                           {/* Quick Action Buttons */}
-                          <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-slate-100">
+                          <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-[#E2C799]/40">
                             {/* Record Sale */}
                             <button
                               type="button"
@@ -1107,7 +1105,7 @@ export const OutletDashboard: React.FC = () => {
                                 setIsSaleModalOpen(true);
                               }}
                               disabled={isZero}
-                              className="py-2 px-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-bold text-[11px] flex items-center justify-center gap-1 transition-all cursor-pointer shadow-xs"
+                              className="py-2 px-2 rounded-xl bg-[#2D2319] hover:bg-[#433022] disabled:opacity-30 text-[#FDECAD] font-bold text-[11px] flex items-center justify-center gap-1 transition-all cursor-pointer shadow-xs"
                               title="Record Point of Sale checkout"
                             >
                               <ShoppingCart className="w-3 h-3" />
@@ -1121,10 +1119,10 @@ export const OutletDashboard: React.FC = () => {
                                 setSelectedProductIdForReq(p.product_id);
                                 setIsRequisitionModalOpen(true);
                               }}
-                              className="py-2 px-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[11px] border border-blue-200 flex items-center justify-center gap-1 transition-all cursor-pointer"
+                              className="py-2 px-2 rounded-xl bg-[#FDECAD] hover:bg-[#FFD18D] text-[#2D2319] font-bold text-[11px] border border-[#E2C799] flex items-center justify-center gap-1 transition-all cursor-pointer"
                               title="Order stock from Regional Supplier"
                             >
-                              <Truck className="w-3 h-3 text-blue-600" />
+                              <Truck className="w-3 h-3 text-[#78350F]" />
                               <span>Restock</span>
                             </button>
 
@@ -1135,10 +1133,10 @@ export const OutletDashboard: React.FC = () => {
                                 setSelectedProductForAdjust(p);
                                 setIsAdjustModalOpen(true);
                               }}
-                              className="py-2 px-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] flex items-center justify-center gap-1 transition-all cursor-pointer"
+                              className="py-2 px-2 rounded-xl bg-[#FAF4EB] hover:bg-[#F7E6C9] text-[#433022] font-bold text-[11px] border border-[#E2C799]/60 flex items-center justify-center gap-1 transition-all cursor-pointer"
                               title="Adjust physical inventory count"
                             >
-                              <Sliders className="w-3 h-3 text-slate-500" />
+                              <Sliders className="w-3 h-3 text-[#6B5440]" />
                               <span>Count</span>
                             </button>
                           </div>
@@ -1155,15 +1153,15 @@ export const OutletDashboard: React.FC = () => {
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
                 {/* Left Side: Product Selector Grid */}
                 <div className="lg:col-span-7 space-y-4">
-                  <div className="p-4 bg-white rounded-3xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+                  <div className="p-4 bg-white rounded-3xl border border-[#E2C799] shadow-xs flex items-center justify-between">
                     <div>
-                      <h3 className="text-base font-black text-slate-900 tracking-tight flex items-center gap-2">
-                        <ShoppingCart className="w-5 h-5 text-emerald-600" />
+                      <h3 className="text-base font-black text-[#2D2319] tracking-tight flex items-center gap-2">
+                        <ShoppingCart className="w-5 h-5 text-[#78350F]" />
                         <span>QUICK COUNTER REGISTER</span>
                       </h3>
-                      <p className="text-xs text-slate-500">Tap any beverage to add it to customer cart</p>
+                      <p className="text-xs text-[#6B5440]">Tap any beverage to add it to customer cart</p>
                     </div>
-                    <span className="text-xs font-mono px-2.5 py-1 rounded-xl bg-emerald-50 text-emerald-800 font-bold border border-emerald-200">
+                    <span className="text-xs font-mono px-2.5 py-1 rounded-xl bg-[#F5F1BB] text-[#365314] font-bold border border-[#D9D384]">
                       {products.filter((p) => p.stock_quantity > 0).length} Available SKUs
                     </span>
                   </div>
@@ -1177,27 +1175,27 @@ export const OutletDashboard: React.FC = () => {
                           type="button"
                           onClick={() => handleAddToPosCart(p)}
                           disabled={isZero}
-                          className="p-3.5 rounded-2xl bg-white hover:bg-emerald-50/60 border border-slate-200 hover:border-emerald-300 text-left transition-all flex flex-col justify-between shadow-xs disabled:opacity-40 cursor-pointer group"
+                          className="p-3.5 rounded-2xl bg-white hover:bg-[#FDECAD]/50 border border-[#E2C799] hover:border-[#FFD18D] text-left transition-all flex flex-col justify-between shadow-xs disabled:opacity-40 cursor-pointer group"
                         >
                           <div className="flex items-center justify-between gap-1 mb-2">
-                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 font-bold">
+                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-[#FAF4EB] text-[#433022] font-bold border border-[#E2C799]/40">
                               Stock: {p.stock_quantity}
                             </span>
-                            <span className="text-xs font-black text-slate-900 font-mono">
+                            <span className="text-xs font-black text-[#2D2319] font-mono">
                               ৳{Number((p as any).retail_price || p.base_price || 25).toFixed(0)}
                             </span>
                           </div>
 
                           <div>
-                            <p className="text-xs font-black text-slate-900 group-hover:text-emerald-700 truncate">
+                            <p className="text-xs font-black text-[#2D2319] group-hover:text-[#78350F] truncate">
                               {p.brand} {p.flavor_variant}
                             </p>
-                            <p className="text-[10px] text-slate-400 truncate">
+                            <p className="text-[10px] text-[#6B5440] truncate">
                               {p.packaging} • {p.size_volume}
                             </p>
                           </div>
 
-                          <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] font-bold text-emerald-700">
+                          <div className="mt-2.5 pt-2 border-t border-[#E2C799]/40 flex items-center justify-between text-[11px] font-bold text-[#78350F]">
                             <span>+ Tap to Add</span>
                             <Plus className="w-3.5 h-3.5" />
                           </div>
@@ -1209,17 +1207,17 @@ export const OutletDashboard: React.FC = () => {
 
                 {/* Right Side: Active Customer Cart & Checkout */}
                 <div className="lg:col-span-5 space-y-4">
-                  <div className="bg-white rounded-3xl border border-slate-200/80 shadow-md p-5 space-y-4 sticky top-24">
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div className="bg-white rounded-3xl border border-[#E2C799] shadow-md p-5 space-y-4 sticky top-24">
+                    <div className="flex items-center justify-between border-b border-[#E2C799]/40 pb-3">
                       <div>
-                        <h4 className="text-sm font-black text-slate-900 uppercase tracking-tight">Active Bill / Cart</h4>
-                        <p className="text-[11px] text-slate-500 font-mono">{outlet?.outlet_name}</p>
+                        <h4 className="text-sm font-black text-[#2D2319] uppercase tracking-tight">Active Bill / Cart</h4>
+                        <p className="text-[11px] text-[#6B5440] font-mono">{outlet?.outlet_name}</p>
                       </div>
                       {posCart.length > 0 && (
                         <button
                           type="button"
                           onClick={() => setPosCart([])}
-                          className="text-[11px] text-rose-600 hover:underline font-bold"
+                          className="text-[11px] text-[#B91C1C] hover:underline font-bold"
                         >
                           Clear Cart
                         </button>
@@ -1227,8 +1225,8 @@ export const OutletDashboard: React.FC = () => {
                     </div>
 
                     {posError && (
-                      <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
-                        <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                      <div className="p-3 rounded-xl bg-[#F6DBD4] border border-[#E29D94] text-[#7C2D12] text-xs flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 shrink-0 text-[#B91C1C]" />
                         <span>{posError}</span>
                       </div>
                     )}
@@ -1236,10 +1234,10 @@ export const OutletDashboard: React.FC = () => {
                     {/* Cart Items List */}
                     <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                       {posCart.length === 0 ? (
-                        <div className="py-8 text-center text-slate-400 text-xs">
-                          <ShoppingCart className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                        <div className="py-8 text-center text-[#6B5440] text-xs">
+                          <ShoppingCart className="w-8 h-8 mx-auto mb-2 text-[#E2C799]" />
                           <p>Cart is currently empty.</p>
-                          <p className="text-[11px] text-slate-400 mt-0.5">Click beverages on the left to add items.</p>
+                          <p className="text-[11px] text-[#6B5440]/70 mt-0.5">Click beverages on the left to add items.</p>
                         </div>
                       ) : (
                         posCart.map((item) => {
@@ -1248,39 +1246,39 @@ export const OutletDashboard: React.FC = () => {
                           return (
                             <div
                               key={item.product.product_id}
-                              className="p-3 rounded-2xl bg-slate-50 border border-slate-200/70 flex items-center justify-between gap-3"
+                              className="p-3 rounded-2xl bg-[#FAF4EB] border border-[#E2C799]/70 flex items-center justify-between gap-3"
                             >
                               <div className="min-w-0">
-                                <p className="text-xs font-bold text-slate-900 truncate">
+                                <p className="text-xs font-bold text-[#2D2319] truncate">
                                   {item.product.brand} {item.product.flavor_variant}
                                 </p>
-                                <p className="text-[10px] text-slate-400 font-mono">
+                                <p className="text-[10px] text-[#6B5440] font-mono">
                                   ৳{Number((item.product as any).retail_price || item.product.base_price || 25).toFixed(2)} each
                                 </p>
                               </div>
 
                               <div className="flex items-center gap-3">
                                 {/* Stepper */}
-                                <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl px-1.5 py-0.5">
+                                <div className="flex items-center gap-1.5 bg-white border border-[#E2C799] rounded-xl px-1.5 py-0.5">
                                   <button
                                     type="button"
                                     onClick={() => handleUpdatePosQty(item.product.product_id, -1)}
-                                    className="w-5 h-5 flex items-center justify-center text-slate-600 font-bold hover:text-slate-900"
+                                    className="w-5 h-5 flex items-center justify-center text-[#2D2319] font-bold hover:text-[#78350F]"
                                   >
                                     -
                                   </button>
-                                  <span className="text-xs font-black font-mono px-1">{item.qty}</span>
+                                  <span className="text-xs font-black font-mono px-1 text-[#2D2319]">{item.qty}</span>
                                   <button
                                     type="button"
                                     onClick={() => handleUpdatePosQty(item.product.product_id, 1)}
                                     disabled={item.qty >= item.product.stock_quantity}
-                                    className="w-5 h-5 flex items-center justify-center text-slate-600 font-bold hover:text-slate-900 disabled:opacity-30"
+                                    className="w-5 h-5 flex items-center justify-center text-[#2D2319] font-bold hover:text-[#78350F] disabled:opacity-30"
                                   >
                                     +
                                   </button>
                                 </div>
 
-                                <span className="text-xs font-black text-slate-900 font-mono w-14 text-right">
+                                <span className="text-xs font-black text-[#2D2319] font-mono w-14 text-right">
                                   ৳{sub.toFixed(2)}
                                 </span>
                               </div>
@@ -1292,8 +1290,8 @@ export const OutletDashboard: React.FC = () => {
 
                     {/* Payment Mode Selector */}
                     {posCart.length > 0 && (
-                      <div className="space-y-3 pt-3 border-t border-slate-100">
-                        <label className="text-[11px] font-black uppercase tracking-wider text-slate-500">
+                      <div className="space-y-3 pt-3 border-t border-[#E2C799]/40">
+                        <label className="text-[11px] font-black uppercase tracking-wider text-[#6B5440]">
                           Payment Mode
                         </label>
                         <div className="grid grid-cols-3 gap-2">
@@ -1311,11 +1309,11 @@ export const OutletDashboard: React.FC = () => {
                                 onClick={() => setPosPaymentMethod(mode.id as any)}
                                 className={`p-2 rounded-xl border text-xs font-bold flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
                                   isSelected
-                                    ? 'border-emerald-500 bg-emerald-50 text-emerald-800 ring-2 ring-emerald-500/20'
-                                    : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                                    ? 'border-[#2D2319] bg-[#FFD18D] text-[#2D2319] ring-2 ring-[#FFD18D]/40'
+                                    : 'border-[#E2C799] bg-[#FAF4EB] text-[#433022] hover:bg-[#F7E6C9]'
                                 }`}
                               >
-                                <Icon className={`w-3.5 h-3.5 ${isSelected ? 'text-emerald-600' : 'text-slate-400'}`} />
+                                <Icon className={`w-3.5 h-3.5 ${isSelected ? 'text-[#2D2319]' : 'text-[#6B5440]'}`} />
                                 <span className="text-[10px]">{mode.label}</span>
                               </button>
                             );
@@ -1327,18 +1325,18 @@ export const OutletDashboard: React.FC = () => {
                           placeholder="Optional customer reference / notes..."
                           value={posCustomerNote}
                           onChange={(e) => setPosCustomerNote(e.target.value)}
-                          className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:outline-none"
+                          className="w-full px-3 py-2 text-xs rounded-xl border border-[#E2C799] bg-[#FAF4EB]/60 text-[#2D2319] placeholder:text-[#6B5440]/60 focus:outline-none focus:ring-2 focus:ring-[#FFD18D]"
                         />
 
                         {/* Total Due Banner */}
-                        <div className="p-4 rounded-2xl bg-slate-900 text-white flex items-center justify-between">
+                        <div className="p-4 rounded-2xl bg-[#2D2319] text-white flex items-center justify-between">
                           <div>
-                            <span className="text-[10px] uppercase font-bold text-slate-400">Total Payable</span>
-                            <p className="text-xs text-emerald-400">
+                            <span className="text-[10px] uppercase font-bold text-[#F7E6C9]">Total Payable</span>
+                            <p className="text-xs text-[#FFD18D]">
                               {posCart.reduce((s, i) => s + i.qty, 0)} item(s) in bill
                             </p>
                           </div>
-                          <span className="text-2xl font-black font-mono text-emerald-400">
+                          <span className="text-2xl font-black font-mono text-[#FFD18D]">
                             ৳
                             {posCart
                               .reduce((sum, item) => sum + Number((item.product as any).retail_price || item.product.base_price || 25) * item.qty, 0)
@@ -1350,13 +1348,13 @@ export const OutletDashboard: React.FC = () => {
                           type="button"
                           onClick={handleCheckoutPos}
                           disabled={posSubmitting}
-                          className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25 transition-all cursor-pointer"
+                          className="w-full py-3.5 px-4 rounded-2xl bg-[#2D2319] hover:bg-[#433022] text-[#FDECAD] font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-[#2D2319]/25 transition-all cursor-pointer"
                         >
                           {posSubmitting ? (
-                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            <div className="w-5 h-5 border-2 border-[#FDECAD]/30 border-t-[#FDECAD] rounded-full animate-spin" />
                           ) : (
                             <>
-                              <CheckCircle className="w-4 h-4" />
+                              <CheckCircle className="w-4 h-4 text-[#FFD18D]" />
                               <span>Complete & Generate Receipt</span>
                             </>
                           )}
@@ -1371,27 +1369,27 @@ export const OutletDashboard: React.FC = () => {
             {/* TAB 3: REQUEST STOCK REQUISITION */}
             {activeTab === 'request' && (
               <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
-                <div className="p-6 bg-white rounded-3xl border border-slate-200/80 shadow-md space-y-5">
-                  <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
-                    <div className="w-12 h-12 rounded-2xl bg-blue-500 text-white flex items-center justify-center shadow-lg shadow-blue-500/20">
+                <div className="p-6 bg-white rounded-3xl border border-[#E2C799] shadow-md space-y-5">
+                  <div className="flex items-center gap-3 border-b border-[#E2C799]/40 pb-4">
+                    <div className="w-12 h-12 rounded-2xl bg-[#FFD18D] text-[#2D2319] flex items-center justify-center shadow-md shadow-[#FFD18D]/30">
                       <Truck className="w-6 h-6" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-black text-slate-900 tracking-tight">
+                      <h3 className="text-lg font-black text-[#2D2319] tracking-tight">
                         ORDER RESTOCK VIA ROUTE PRE-SALES OFFICER (PSR)
                       </h3>
-                      <p className="text-xs text-slate-500">
+                      <p className="text-xs text-[#6B5440]">
                         Orders are placed exclusively with your assigned Route Pre-Sales Officer for sub-route delivery.
                       </p>
                     </div>
                   </div>
 
-                  <div className="p-4 rounded-2xl bg-orange-50/70 border border-orange-200/60 text-xs text-orange-950 space-y-1">
+                  <div className="p-4 rounded-2xl bg-[#F7E6C9]/70 border border-[#E2C799] text-xs text-[#2D2319] space-y-1">
                     <p className="font-bold">
                       Assigned Officer: {preSalesOfficer?.name || outlet?.assigned_psr_name || 'Territory PSR'} 
                       {(preSalesOfficer?.code || outlet?.assigned_psr_code) && ` (${preSalesOfficer?.code || outlet?.assigned_psr_code})`}
                     </p>
-                    <p className="text-orange-800">
+                    <p className="text-[#433022]">
                       Sub-Route: {preSalesOfficer?.sub_route || outlet?.sub_route || 'Local Sub-Route'}. Your Route Officer verifies stock orders and personally executes or coordinates delivery replenishment to your shop.
                     </p>
                   </div>
@@ -1402,9 +1400,9 @@ export const OutletDashboard: React.FC = () => {
                       setSelectedProductIdForReq(null);
                       setIsRequisitionModalOpen(true);
                     }}
-                    className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-orange-600 via-amber-600 to-emerald-600 hover:from-orange-700 hover:to-emerald-700 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-orange-600/25 transition-all cursor-pointer"
+                    className="w-full py-4 px-6 rounded-2xl bg-[#2D2319] hover:bg-[#433022] text-[#FDECAD] font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-[#2D2319]/25 transition-all cursor-pointer"
                   >
-                    <Plus className="w-5 h-5" />
+                    <Plus className="w-5 h-5 text-[#FFD18D]" />
                     <span>Open New Order to Pre-Sales Officer</span>
                   </button>
                 </div>
@@ -1414,48 +1412,48 @@ export const OutletDashboard: React.FC = () => {
             {/* TAB 4: INBOUND DELIVERIES & REQUISITIONS HISTORY */}
             {activeTab === 'deliveries' && (
               <div className="space-y-4 animate-fade-in">
-                <div className="p-4 bg-white rounded-3xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+                <div className="p-4 bg-white rounded-3xl border border-[#E2C799] shadow-xs flex items-center justify-between">
                   <div>
-                    <h3 className="text-base font-black text-slate-900 tracking-tight flex items-center gap-2">
-                      <ClipboardList className="w-5 h-5 text-blue-600" />
+                    <h3 className="text-base font-black text-[#2D2319] tracking-tight flex items-center gap-2">
+                      <ClipboardList className="w-5 h-5 text-[#78350F]" />
                       <span>INBOUND DELIVERIES & ORDER TRACKER</span>
                     </h3>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-[#6B5440]">
                       Track beverage restock requests and depot shipments sent to this branch
                     </p>
                   </div>
                   <button
                     type="button"
                     onClick={() => fetchDashboardData(outlet?.outlet_id || activeOutletId)}
-                    className="p-2 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 transition-colors"
+                    className="p-2 rounded-xl border border-[#E2C799] hover:bg-[#FAF4EB] text-[#2D2319] transition-colors cursor-pointer"
                   >
                     <RefreshCw className="w-4 h-4" />
                   </button>
                 </div>
 
                 {receiptSuccessMsg && (
-                  <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center justify-between">
+                  <div className="p-3.5 rounded-2xl bg-[#F5F1BB] border border-[#D9D384] text-[#365314] text-xs flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <CheckCircle className="w-4 h-4 text-[#365314] shrink-0" />
                       <span>{receiptSuccessMsg}</span>
                     </div>
-                    <button onClick={() => setReceiptSuccessMsg(null)} className="text-emerald-700 hover:text-emerald-900 font-bold">×</button>
+                    <button onClick={() => setReceiptSuccessMsg(null)} className="text-[#365314] hover:opacity-80 font-bold cursor-pointer">×</button>
                   </div>
                 )}
 
                 {/* Active Inbound Live Alert Banner */}
                 {fleetDeliveries.some((d) => !d.is_confirmed_by_outlet && (d.status === 'IN_TRANSIT' || d.status === 'BOARDED' || d.is_delivered_by_driver)) && (
-                  <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-teal-500/10 border-2 border-blue-400/50 shadow-sm flex items-center justify-between gap-3">
+                  <div className="p-4 rounded-2xl bg-gradient-to-r from-[#FFD18D]/30 via-[#FDECAD]/40 to-[#F7E6C9]/40 border-2 border-[#E2C799] shadow-sm flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md animate-pulse shrink-0">
+                      <div className="w-10 h-10 rounded-xl bg-[#2D2319] text-[#FFD18D] flex items-center justify-center shadow-md animate-pulse shrink-0">
                         <Truck className="w-5 h-5" />
                       </div>
                       <div>
-                        <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                        <h4 className="text-sm font-bold text-[#2D2319] flex items-center gap-2">
                           <span>Active Inbound Stock In Progress</span>
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-black uppercase">Live Tracking</span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#FFD18D] text-[#2D2319] font-black uppercase border border-[#E2C799]">Live Tracking</span>
                         </h4>
-                        <p className="text-xs text-slate-600 mt-0.5">
+                        <p className="text-xs text-[#433022] mt-0.5">
                           {fleetDeliveries.find((d) => !d.is_confirmed_by_outlet && d.is_delivered_by_driver)
                             ? 'A delivery vehicle has arrived at your store and unloaded cases. Please confirm stock receipt below.'
                             : fleetDeliveries.find((d) => !d.is_confirmed_by_outlet && d.status === 'IN_TRANSIT')
@@ -1471,11 +1469,11 @@ export const OutletDashboard: React.FC = () => {
                 {fleetDeliveries.length > 0 && (
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <h4 className="font-oswald text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                        <Truck className="w-4 h-4 text-indigo-600" />
+                      <h4 className="font-oswald text-xs font-bold uppercase tracking-wider text-[#2D2319] flex items-center gap-1.5">
+                        <Truck className="w-4 h-4 text-[#78350F]" />
                         <span>Supplier Delivery Fleet Consignments</span>
                       </h4>
-                      <span className="text-[11px] font-mono text-slate-500 font-bold">
+                      <span className="text-[11px] font-mono text-[#6B5440] font-bold">
                         {fleetDeliveries.length} Consignments
                       </span>
                     </div>
@@ -1493,39 +1491,39 @@ export const OutletDashboard: React.FC = () => {
                             key={delivery.id}
                             className={`p-4 rounded-2xl border transition-all ${
                               isCancelled
-                                ? 'bg-rose-50/40 border-rose-300 shadow-xs'
+                                ? 'bg-[#F6DBD4]/40 border-[#E29D94] shadow-xs'
                                 : isConfirmedByOutlet
-                                ? 'bg-white border-emerald-200 shadow-xs'
+                                ? 'bg-white border-[#E2C799] shadow-xs'
                                 : isDeliveredByDriver
-                                ? 'bg-gradient-to-r from-cyan-50/70 via-blue-50/40 to-emerald-50/50 border-2 border-cyan-400 shadow-md'
+                                ? 'bg-[#F5F1BB]/50 border-2 border-[#D9D384] shadow-md'
                                 : delivery.status === 'IN_TRANSIT'
-                                ? 'bg-gradient-to-r from-blue-50/70 via-indigo-50/30 to-sky-50/50 border-2 border-blue-400 shadow-md'
+                                ? 'bg-[#FFD18D]/30 border-2 border-[#FFD18D] shadow-md'
                                 : delivery.status === 'BOARDED'
-                                ? 'bg-gradient-to-r from-amber-50/70 via-yellow-50/30 to-amber-50/50 border-2 border-amber-300 shadow-sm'
-                                : 'bg-white border-slate-200/80 shadow-xs'
+                                ? 'bg-[#FDECAD]/50 border-2 border-[#E2C799] shadow-sm'
+                                : 'bg-white border-[#E2C799] shadow-xs'
                             }`}
                           >
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                               <div className="space-y-1">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="text-xs font-black font-mono text-slate-900">
+                                  <span className="text-xs font-black font-mono text-[#2D2319]">
                                     {delivery.dispatch_code}
                                   </span>
-                                  <span className="font-mono text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
+                                  <span className="font-mono text-xs font-bold text-[#2D2319] bg-[#F7E6C9] px-2 py-0.5 rounded-md border border-[#E2C799]">
                                     Vehicle: {delivery.vehicle_registration_no}
                                   </span>
                                   <span className={`text-[10px] px-2 py-0.5 rounded-full font-black uppercase ${
                                     isCancelled
-                                      ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                                      ? 'bg-[#F6DBD4] text-[#7C2D12] border border-[#E29D94]'
                                       : isConfirmedByOutlet
-                                      ? 'bg-emerald-100 text-emerald-800'
+                                      ? 'bg-[#F5F1BB] text-[#365314] border border-[#D9D384]'
                                       : isDeliveredByDriver
-                                      ? 'bg-cyan-100 text-cyan-800 animate-pulse'
+                                      ? 'bg-[#FFD18D] text-[#2D2319] border border-[#E2C799] animate-pulse'
                                       : delivery.status === 'IN_TRANSIT'
-                                      ? 'bg-blue-100 text-blue-800 animate-pulse border border-blue-300'
+                                      ? 'bg-[#FDECAD] text-[#2D2319] animate-pulse border border-[#E2C799]'
                                       : delivery.status === 'BOARDED'
-                                      ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                                      : 'bg-slate-100 text-slate-800'
+                                      ? 'bg-[#F7E6C9] text-[#2D2319] border border-[#E2C799]'
+                                      : 'bg-[#FAF4EB] text-[#2D2319] border border-[#E2C799]'
                                   }`}>
                                     {isCancelled
                                       ? '⛔ Order Cancelled & Refunded'
@@ -1541,7 +1539,7 @@ export const OutletDashboard: React.FC = () => {
                                   </span>
                                 </div>
 
-                                <p className="text-xs text-slate-600">
+                                <p className="text-xs text-[#433022]">
                                   Sub-Route: <strong>{delivery.sub_route}</strong> • Driver: <strong>{delivery.driver_name}</strong> ({delivery.driver_phone})
                                 </p>
 
@@ -1550,9 +1548,9 @@ export const OutletDashboard: React.FC = () => {
                                   {delivery.outlet_items?.map((it: any, itemIdx: number) => (
                                     <span
                                       key={itemIdx}
-                                      className="text-xs px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-800 font-medium"
+                                      className="text-xs px-2 py-0.5 rounded-md bg-[#FAF4EB] border border-[#E2C799]/70 text-[#2D2319] font-medium"
                                     >
-                                      {it.product_name} • <strong className="text-indigo-600 font-mono font-bold">{it.assigned_cases || it.demanded_cases} cases</strong>
+                                      {it.product_name} • <strong className="text-[#78350F] font-mono font-bold">{it.assigned_cases || it.demanded_cases} cases</strong>
                                     </span>
                                   ))}
                                 </div>
@@ -1561,13 +1559,13 @@ export const OutletDashboard: React.FC = () => {
                               {/* Outlet Confirmation / Cancellation Action Button */}
                               <div className="text-right sm:self-center">
                                 {isCancelled ? (
-                                  <div className="flex items-center gap-1.5 text-xs text-rose-700 font-bold bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-200">
-                                    <AlertCircle className="w-4 h-4 text-rose-600" />
+                                  <div className="flex items-center gap-1.5 text-xs text-[#7C2D12] font-bold bg-[#F6DBD4] px-3 py-1.5 rounded-xl border border-[#E29D94]">
+                                    <AlertCircle className="w-4 h-4 text-[#B91C1C]" />
                                     <span>Refund Processed</span>
                                   </div>
                                 ) : isConfirmedByOutlet ? (
-                                  <div className="flex items-center gap-1.5 text-xs text-emerald-700 font-bold bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
-                                    <CheckCircle className="w-4 h-4 text-emerald-600" />
+                                  <div className="flex items-center gap-1.5 text-xs text-[#365314] font-bold bg-[#F5F1BB] px-3 py-1.5 rounded-xl border border-[#D9D384]">
+                                    <CheckCircle className="w-4 h-4 text-[#365314]" />
                                     <span>Consignment Accepted</span>
                                   </div>
                                 ) : isDeliveredByDriver ? (
@@ -1576,9 +1574,9 @@ export const OutletDashboard: React.FC = () => {
                                       type="button"
                                       onClick={() => handleConfirmFleetDelivery(delivery.id)}
                                       disabled={confirmingReceiptId === delivery.id || cancellingOrderId !== null}
-                                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-sm transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
+                                      className="px-4 py-2 rounded-xl bg-[#2D2319] hover:bg-[#433022] text-[#FDECAD] font-bold text-xs shadow-sm transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
                                     >
-                                      <CheckCircle className="w-4 h-4" />
+                                      <CheckCircle className="w-4 h-4 text-[#FFD18D]" />
                                       <span>{confirmingReceiptId === delivery.id ? 'Confirming...' : 'Confirm Stock Received'}</span>
                                     </button>
                                     <button
@@ -1589,7 +1587,7 @@ export const OutletDashboard: React.FC = () => {
                                         refundEstimate: delivery.outlet_items?.reduce((s: number, it: any) => s + (it.assigned_cases || it.demanded_cases || 0) * (it.unit_price || 42), 0) || 0,
                                       })}
                                       disabled={cancellingOrderId === delivery.id}
-                                      className="px-3 py-2 rounded-xl border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs transition-all active:scale-95 cursor-pointer flex items-center gap-1"
+                                      className="px-3 py-2 rounded-xl border border-[#E29D94] bg-[#F6DBD4] hover:bg-[#f3cac1] text-[#7C2D12] font-bold text-xs transition-all active:scale-95 cursor-pointer flex items-center gap-1"
                                       title="Cancel order and request full refund"
                                     >
                                       <X className="w-3.5 h-3.5" />
@@ -1607,9 +1605,9 @@ export const OutletDashboard: React.FC = () => {
                                             handleRespondStockOffer(code, 'ACCEPT');
                                           }}
                                           disabled={respondingOfferId !== null}
-                                          className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1 shadow-sm active:scale-95 transition-all cursor-pointer"
+                                          className="px-3 py-1.5 rounded-xl bg-[#2D2319] hover:bg-[#433022] text-[#FDECAD] font-bold text-xs flex items-center gap-1 shadow-sm active:scale-95 transition-all cursor-pointer"
                                         >
-                                          <CheckCircle className="w-3.5 h-3.5" />
+                                          <CheckCircle className="w-3.5 h-3.5 text-[#FFD18D]" />
                                           <span>Accept Stock</span>
                                         </button>
                                         <button
@@ -1619,23 +1617,23 @@ export const OutletDashboard: React.FC = () => {
                                             handleRespondStockOffer(code, 'DENY');
                                           }}
                                           disabled={respondingOfferId !== null}
-                                          className="px-3 py-1.5 rounded-xl border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs flex items-center gap-1 shadow-sm active:scale-95 transition-all cursor-pointer"
+                                          className="px-3 py-1.5 rounded-xl border border-[#E29D94] bg-[#F6DBD4] hover:bg-[#f3cac1] text-[#7C2D12] font-bold text-xs flex items-center gap-1 shadow-sm active:scale-95 transition-all cursor-pointer"
                                         >
                                           <X className="w-3.5 h-3.5" />
                                           <span>Deny Stock</span>
                                         </button>
                                       </div>
                                     ) : delivery.is_offer_denied ? (
-                                      <span className="text-xs text-rose-700 font-bold bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-200">
+                                      <span className="text-xs text-[#7C2D12] font-bold bg-[#F6DBD4] px-3 py-1.5 rounded-xl border border-[#E29D94]">
                                         Stock Offer Denied
                                       </span>
                                     ) : delivery.status === 'IN_TRANSIT' ? (
-                                      <span className="inline-flex items-center gap-1.5 text-xs text-blue-700 font-bold bg-blue-50 px-3 py-1.5 rounded-xl border border-blue-200 animate-pulse">
-                                        <Truck className="w-4 h-4 text-blue-600" />
+                                      <span className="inline-flex items-center gap-1.5 text-xs text-[#2D2319] font-bold bg-[#FFD18D] px-3 py-1.5 rounded-xl border border-[#E2C799] animate-pulse">
+                                        <Truck className="w-4 h-4 text-[#78350F]" />
                                         <span>En Route to Store</span>
                                       </span>
                                     ) : (
-                                      <span className="text-[11px] text-slate-400 italic">
+                                      <span className="text-[11px] text-[#6B5440] italic">
                                         Awaiting vehicle departure
                                       </span>
                                     )}
@@ -1647,7 +1645,7 @@ export const OutletDashboard: React.FC = () => {
                                         refundEstimate: delivery.outlet_items?.reduce((s: number, it: any) => s + (it.assigned_cases || it.demanded_cases || 0) * (it.unit_price || 42), 0) || 0,
                                       })}
                                       disabled={cancellingOrderId === delivery.id}
-                                      className="px-3 py-1.5 rounded-xl border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs transition-all active:scale-95 cursor-pointer flex items-center gap-1"
+                                      className="px-3 py-1.5 rounded-xl border border-[#E29D94] bg-[#F6DBD4] hover:bg-[#f3cac1] text-[#7C2D12] font-bold text-xs transition-all active:scale-95 cursor-pointer flex items-center gap-1"
                                       title="Cancel delivery order and get full refund"
                                     >
                                       <X className="w-3.5 h-3.5" />
@@ -1659,77 +1657,77 @@ export const OutletDashboard: React.FC = () => {
                             </div>
 
                             {/* 4-Step Visual Delivery Progress Stepper */}
-                            <div className="grid grid-cols-4 gap-2 pt-3 mt-3 border-t border-slate-100">
+                            <div className="grid grid-cols-4 gap-2 pt-3 mt-3 border-t border-[#E2C799]/40">
                               {/* Step 1: Dispatched */}
-                              <div className="flex flex-col items-center text-center p-1.5 rounded-xl border bg-blue-50/70 border-blue-200 text-blue-900 font-bold text-[11px]">
+                              <div className="flex flex-col items-center text-center p-1.5 rounded-xl border bg-[#F7E6C9] border-[#E2C799] text-[#2D2319] font-bold text-[11px]">
                                 <div className="flex items-center gap-1">
-                                  <CheckCircle className="w-3.5 h-3.5 text-blue-600" />
+                                  <CheckCircle className="w-3.5 h-3.5 text-[#78350F]" />
                                   <span>1. Dispatched</span>
                                 </div>
-                                <span className="text-[9px] text-slate-500 font-normal">By Supplier</span>
+                                <span className="text-[9px] text-[#6B5440] font-normal">By Supplier</span>
                               </div>
 
                               {/* Step 2: Boarded */}
                               <div className={`flex flex-col items-center text-center p-1.5 rounded-xl border text-[11px] ${
                                 isBoarded
-                                  ? 'bg-amber-50/80 border-amber-300 text-amber-900 font-bold'
-                                  : 'bg-slate-50 border-slate-200 text-slate-400'
+                                  ? 'bg-[#FDECAD] border-[#E2C799] text-[#2D2319] font-bold'
+                                  : 'bg-[#FAF4EB]/60 border-[#E2C799]/40 text-[#6B5440]'
                               }`}>
                                 <div className="flex items-center gap-1">
                                   {isBoarded ? (
-                                    <CheckCircle className="w-3.5 h-3.5 text-amber-600" />
+                                    <CheckCircle className="w-3.5 h-3.5 text-[#78350F]" />
                                   ) : (
-                                    <div className="w-3.5 h-3.5 rounded-full border border-slate-300 flex items-center justify-center text-[9px] text-slate-400 font-mono">2</div>
+                                    <div className="w-3.5 h-3.5 rounded-full border border-[#E2C799] flex items-center justify-center text-[9px] text-[#6B5440] font-mono">2</div>
                                   )}
                                   <span>2. Boarded</span>
                                 </div>
-                                <span className="text-[9px] text-slate-500 font-normal">Onto Truck</span>
+                                <span className="text-[9px] text-[#6B5440] font-normal">Onto Truck</span>
                               </div>
 
                               {/* Step 3: On The Way */}
                               <div className={`flex flex-col items-center text-center p-1.5 rounded-xl border text-[11px] ${
                                 isCancelled
-                                  ? 'bg-rose-50 border-rose-300 text-rose-900 font-bold'
+                                  ? 'bg-[#F6DBD4] border-[#E29D94] text-[#7C2D12] font-bold'
                                   : isInTransit
-                                  ? 'bg-indigo-50/80 border-indigo-300 text-indigo-900 font-bold'
-                                  : 'bg-slate-50 border-slate-200 text-slate-400'
+                                  ? 'bg-[#FFD18D]/60 border-[#FFD18D] text-[#2D2319] font-bold'
+                                  : 'bg-[#FAF4EB]/60 border-[#E2C799]/40 text-[#6B5440]'
                               }`}>
                                 <div className="flex items-center gap-1">
                                   {isCancelled ? (
-                                    <X className="w-3.5 h-3.5 text-rose-600" />
+                                    <X className="w-3.5 h-3.5 text-[#B91C1C]" />
                                   ) : isInTransit ? (
-                                    <CheckCircle className="w-3.5 h-3.5 text-indigo-600" />
+                                    <CheckCircle className="w-3.5 h-3.5 text-[#78350F]" />
                                   ) : (
-                                    <div className="w-3.5 h-3.5 rounded-full border border-slate-300 flex items-center justify-center text-[9px] text-slate-400 font-mono">3</div>
+                                    <div className="w-3.5 h-3.5 rounded-full border border-[#E2C799] flex items-center justify-center text-[9px] text-[#6B5440] font-mono">3</div>
                                   )}
                                   <span>3. {isCancelled ? 'Cancelled' : 'On The Way'}</span>
                                 </div>
-                                <span className="text-[9px] text-slate-500 font-normal">{isCancelled ? 'Order Voided' : 'In Transit'}</span>
+                                <span className="text-[9px] text-[#6B5440] font-normal">{isCancelled ? 'Order Voided' : 'In Transit'}</span>
                               </div>
 
                               {/* Step 4: Arrived / Confirmed / Refunded */}
                               <div className={`flex flex-col items-center text-center p-1.5 rounded-xl border text-[11px] ${
                                 isCancelled
-                                  ? 'bg-rose-50 border-rose-300 text-rose-900 font-bold'
+                                  ? 'bg-[#F6DBD4] border-[#E29D94] text-[#7C2D12] font-bold'
                                   : isConfirmedByOutlet
-                                  ? 'bg-emerald-50 border-emerald-300 text-emerald-900 font-bold'
+                                  ? 'bg-[#F5F1BB] border-[#D9D384] text-[#365314] font-bold'
                                   : isDeliveredByDriver
-                                  ? 'bg-cyan-50 border-cyan-300 text-cyan-900 font-bold animate-pulse'
-                                  : 'bg-slate-50 border-slate-200 text-slate-400'
+                                  ? 'bg-[#FFD18D] border-[#E2C799] text-[#2D2319] font-bold animate-pulse'
+                                  : 'bg-[#FAF4EB]/60 border-[#E2C799]/40 text-[#6B5440]'
                               }`}>
                                 <div className="flex items-center gap-1">
                                   {isCancelled ? (
-                                    <CheckCircle className="w-3.5 h-3.5 text-rose-600" />
+                                    <CheckCircle className="w-3.5 h-3.5 text-[#B91C1C]" />
                                   ) : isConfirmedByOutlet ? (
-                                    <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                                    <CheckCircle className="w-3.5 h-3.5 text-[#365314]" />
                                   ) : isDeliveredByDriver ? (
-                                    <Clock className="w-3.5 h-3.5 text-cyan-600 animate-spin" />
+                                    <Clock className="w-3.5 h-3.5 text-[#78350F] animate-spin" />
                                   ) : (
-                                    <div className="w-3.5 h-3.5 rounded-full border border-slate-300 flex items-center justify-center text-[9px] text-slate-400 font-mono">4</div>
+                                    <div className="w-3.5 h-3.5 rounded-full border border-[#E2C799] flex items-center justify-center text-[9px] text-[#6B5440] font-mono">4</div>
                                   )}
                                   <span>4. {isCancelled ? 'Refunded' : 'Confirmed'}</span>
                                 </div>
-                                <span className="text-[9px] text-slate-500 font-normal">{isCancelled ? 'Refund Issued' : isConfirmedByOutlet ? 'In Stock' : isDeliveredByDriver ? 'Unloaded' : 'Pending'}</span>
+                                <span className="text-[9px] text-[#6B5440] font-normal">{isCancelled ? 'Refund Issued' : isConfirmedByOutlet ? 'In Stock' : isDeliveredByDriver ? 'Unloaded' : 'Pending'}</span>
                               </div>
                             </div>
                           </div>
@@ -1740,10 +1738,10 @@ export const OutletDashboard: React.FC = () => {
                 )}
 
                 {requisitions.length === 0 ? (
-                  <div className="p-12 text-center bg-white rounded-3xl border border-slate-200 text-slate-400">
-                    <Truck className="w-12 h-12 mx-auto mb-2 text-slate-300" />
-                    <p className="font-bold text-slate-600">No requisitions placed yet</p>
-                    <p className="text-xs text-slate-400 mt-1">
+                  <div className="p-12 text-center bg-white rounded-3xl border border-[#E2C799] text-[#6B5440]">
+                    <Truck className="w-12 h-12 mx-auto mb-2 text-[#E2C799]" />
+                    <p className="font-bold text-[#2D2319]">No requisitions placed yet</p>
+                    <p className="text-xs text-[#6B5440] mt-1">
                       Click "+ Order Restock" to submit your first inventory requisition.
                     </p>
                   </div>
@@ -1762,34 +1760,34 @@ export const OutletDashboard: React.FC = () => {
                           key={req.id}
                           className={`p-4 rounded-2xl bg-white border shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all ${
                             isCancelled
-                              ? 'border-rose-300 bg-rose-50/20'
+                              ? 'border-[#E29D94] bg-[#F6DBD4]/20'
                               : isInTransit
-                              ? 'border-blue-400 bg-blue-50/20'
+                              ? 'border-[#FFD18D] bg-[#FFD18D]/15'
                               : isBoarded
-                              ? 'border-amber-300 bg-amber-50/20'
-                              : 'border-slate-200/80 hover:border-blue-300'
+                              ? 'border-[#E2C799] bg-[#FDECAD]/20'
+                              : 'border-[#E2C799] hover:border-[#FFD18D]'
                           }`}
                         >
                           <div className="space-y-1">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-xs font-black text-slate-900 font-mono">
+                              <span className="text-xs font-black text-[#2D2319] font-mono">
                                 {req.requisition_code}
                               </span>
                               <span
                                 className={`text-[10px] px-2 py-0.5 rounded-full font-black uppercase ${
                                   isCancelled
-                                    ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                                    ? 'bg-[#F6DBD4] text-[#7C2D12] border border-[#E29D94]'
                                     : isCompleted
-                                    ? 'bg-emerald-100 text-emerald-800'
+                                    ? 'bg-[#F5F1BB] text-[#365314] border border-[#D9D384]'
                                     : isDelivered
-                                    ? 'bg-cyan-100 text-cyan-800'
+                                    ? 'bg-[#FFD18D] text-[#2D2319] border border-[#E2C799]'
                                     : isInTransit
-                                    ? 'bg-blue-100 text-blue-800 border border-blue-300 animate-pulse'
+                                    ? 'bg-[#FDECAD] text-[#2D2319] border border-[#E2C799] animate-pulse'
                                     : isBoarded
-                                    ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                    ? 'bg-[#F7E6C9] text-[#2D2319] border border-[#E2C799]'
                                     : isDispatched
-                                    ? 'bg-sky-100 text-sky-800'
-                                    : 'bg-amber-100 text-amber-800'
+                                    ? 'bg-[#FAF4EB] text-[#2D2319] border border-[#E2C799]'
+                                    : 'bg-[#FDECAD] text-[#2D2319] border border-[#E2C799]'
                                 }`}
                               >
                                 {isCancelled
@@ -1807,24 +1805,24 @@ export const OutletDashboard: React.FC = () => {
                                   : '⏳ Order Placed (Pending Review)'}
                               </span>
                               {req.urgency === 'DIRECT_SUPPLY' ? (
-                                <span className="text-[10px] px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 font-black uppercase flex items-center gap-1 border border-purple-200">
+                                <span className="text-[10px] px-2 py-0.5 rounded-md bg-[#FFD18D] text-[#2D2319] font-black uppercase flex items-center gap-1 border border-[#E2C799]">
                                   <span>⚡ Direct Push (Unrequested)</span>
                                 </span>
                               ) : (
-                                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 font-bold uppercase">
+                                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[#FAF4EB] text-[#433022] font-bold uppercase border border-[#E2C799]/40">
                                   {req.urgency} Urgency
                                 </span>
                               )}
                             </div>
-                            <p className="text-sm font-bold text-slate-800">
-                              {req.product_name} • <span className="text-blue-600 font-mono font-black">{req.quantity} units</span>
+                            <p className="text-sm font-bold text-[#2D2319]">
+                              {req.product_name} • <span className="text-[#78350F] font-mono font-black">{req.quantity} units</span>
                             </p>
 
                             {/* Assigned Vehicle & Driver Details if Boarded / In Transit */}
                             {(req.vehicle_registration_no || req.driver_name) && (
-                              <div className="flex items-center gap-2 text-xs text-slate-700 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200 w-fit">
-                                <Truck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                                <span>Vehicle: <strong className="font-mono text-slate-900">{req.vehicle_registration_no || 'Assigned'}</strong></span>
+                              <div className="flex items-center gap-2 text-xs text-[#2D2319] bg-[#FAF4EB] px-2.5 py-1 rounded-lg border border-[#E2C799] w-fit">
+                                <Truck className="w-3.5 h-3.5 text-[#78350F] shrink-0" />
+                                <span>Vehicle: <strong className="font-mono text-[#2D2319]">{req.vehicle_registration_no || 'Assigned'}</strong></span>
                                 {req.driver_name && (
                                   <span>• Driver: <strong>{req.driver_name}</strong> {req.driver_phone ? `(${req.driver_phone})` : ''}</span>
                                 )}
@@ -1832,14 +1830,14 @@ export const OutletDashboard: React.FC = () => {
                             )}
 
                             {req.outlet_remarks && (
-                              <p className="text-xs text-slate-500 italic">Notes: {req.outlet_remarks}</p>
+                              <p className="text-xs text-[#6B5440] italic">Notes: {req.outlet_remarks}</p>
                             )}
                             {req.admin_supplier_notes && (
-                              <p className="text-xs text-indigo-600 font-medium">Supplier Memo: {req.admin_supplier_notes}</p>
+                              <p className="text-xs text-[#78350F] font-medium">Supplier Memo: {req.admin_supplier_notes}</p>
                             )}
                           </div>
 
-                          <div className="text-right text-xs text-slate-400 font-mono flex flex-col items-end justify-between">
+                          <div className="text-right text-xs text-[#6B5440] font-mono flex flex-col items-end justify-between">
                             <div>
                               <p>{new Date(req.created_date).toLocaleDateString()}</p>
                               <p>{new Date(req.created_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
@@ -1857,9 +1855,9 @@ export const OutletDashboard: React.FC = () => {
                                     description: `Restock consignment payment for ${req.quantity} units of ${req.product_name}`,
                                   });
                                 }}
-                                className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-bold text-xs shadow-xs transition-all active:scale-95 cursor-pointer"
+                                className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#2D2319] hover:bg-[#433022] text-[#FDECAD] font-bold text-xs shadow-xs transition-all active:scale-95 cursor-pointer"
                               >
-                                <CreditCard className="w-3.5 h-3.5" />
+                                <CreditCard className="w-3.5 h-3.5 text-[#FFD18D]" />
                                 <span>Pay ৳{Number(req.total_amount || (req.quantity * (req.unit_price || 35))).toFixed(2)} with Stripe</span>
                               </button>
                             )}
@@ -1879,16 +1877,16 @@ export const OutletDashboard: React.FC = () => {
                                       type="button"
                                       onClick={() => handleRespondStockOffer(req.requisition_code || req.id, 'ACCEPT')}
                                       disabled={respondingOfferId === (req.requisition_code || req.id)}
-                                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-xs transition-all active:scale-95 cursor-pointer"
+                                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#2D2319] hover:bg-[#433022] text-[#FDECAD] font-bold text-xs shadow-xs transition-all active:scale-95 cursor-pointer"
                                     >
-                                      <CheckCircle className="w-3.5 h-3.5" />
+                                      <CheckCircle className="w-3.5 h-3.5 text-[#FFD18D]" />
                                       <span>{respondingOfferId === (req.requisition_code || req.id) ? 'Accepting...' : 'Accept Stock'}</span>
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => handleRespondStockOffer(req.requisition_code || req.id, 'DENY')}
                                       disabled={respondingOfferId === (req.requisition_code || req.id)}
-                                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs shadow-xs transition-all active:scale-95 cursor-pointer"
+                                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-[#E29D94] bg-[#F6DBD4] hover:bg-[#f3cac1] text-[#7C2D12] font-bold text-xs shadow-xs transition-all active:scale-95 cursor-pointer"
                                     >
                                       <X className="w-3.5 h-3.5" />
                                       <span>{respondingOfferId === (req.requisition_code || req.id) ? 'Denying...' : 'Deny Stock'}</span>
@@ -1898,16 +1896,16 @@ export const OutletDashboard: React.FC = () => {
                               }
                               if (isOfferAccepted) {
                                 return (
-                                  <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
-                                    <CheckCircle className="w-3 h-3 text-emerald-600" />
+                                  <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-[#365314] bg-[#F5F1BB] px-2.5 py-1 rounded-lg border border-[#D9D384]">
+                                    <CheckCircle className="w-3 h-3 text-[#365314]" />
                                     <span>Stock Offer Accepted • In Transit</span>
                                   </span>
                                 );
                               }
                               if (isOfferDenied) {
                                 return (
-                                  <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-rose-700 bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200">
-                                    <X className="w-3 h-3 text-rose-600" />
+                                  <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-[#7C2D12] bg-[#F6DBD4] px-2.5 py-1 rounded-lg border border-[#E29D94]">
+                                    <X className="w-3 h-3 text-[#B91C1C]" />
                                     <span>Stock Offer Denied</span>
                                   </span>
                                 );
@@ -1925,7 +1923,7 @@ export const OutletDashboard: React.FC = () => {
                                   refundEstimate: Number(req.total_amount || (req.quantity * (req.unit_price || 35))),
                                 })}
                                 disabled={cancellingOrderId === req.id}
-                                className="mt-2 inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs shadow-xs transition-all active:scale-95 cursor-pointer"
+                                className="mt-2 inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-[#E29D94] bg-[#F6DBD4] hover:bg-[#f3cac1] text-[#7C2D12] font-bold text-xs shadow-xs transition-all active:scale-95 cursor-pointer"
                                 title="Cancel order and request full refund"
                               >
                                 <X className="w-3.5 h-3.5" />
@@ -1934,7 +1932,7 @@ export const OutletDashboard: React.FC = () => {
                             )}
 
                             {isCancelled && (
-                              <span className="mt-2 text-[11px] font-bold text-rose-600 bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200">
+                              <span className="mt-2 text-[11px] font-bold text-[#7C2D12] bg-[#F6DBD4] px-2.5 py-1 rounded-lg border border-[#E29D94]">
                                 Refund Credited
                               </span>
                             )}
@@ -1951,13 +1949,13 @@ export const OutletDashboard: React.FC = () => {
             {activeTab === 'ledger' && (
               <div className="space-y-5 animate-fade-in">
                 {/* Ledger Top Header */}
-                <div className="p-4 bg-white rounded-3xl border border-slate-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="p-4 bg-white rounded-3xl border border-[#E2C799] shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
-                    <h3 className="text-base font-black text-slate-900 tracking-tight flex items-center gap-2">
-                      <Receipt className="w-5 h-5 text-amber-600" />
+                    <h3 className="text-base font-black text-[#2D2319] tracking-tight flex items-center gap-2">
+                      <Receipt className="w-5 h-5 text-[#78350F]" />
                       <span>BRANCH DAILY SALES LEDGER</span>
                     </h3>
-                    <p className="text-xs text-slate-500">Itemized log of customer transactions recorded at this register</p>
+                    <p className="text-xs text-[#6B5440]">Itemized log of customer transactions recorded at this register</p>
                   </div>
 
                   <button
@@ -1983,26 +1981,26 @@ export const OutletDashboard: React.FC = () => {
                       a.download = `sales_ledger_${outlet?.outlet_id || 'branch'}_${Date.now()}.csv`;
                       a.click();
                     }}
-                    className="py-2 px-3.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                    className="py-2 px-3.5 rounded-xl border border-[#E2C799] hover:bg-[#FAF4EB] text-[#2D2319] font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
                   >
-                    <Download className="w-3.5 h-3.5 text-slate-500" />
+                    <Download className="w-3.5 h-3.5 text-[#78350F]" />
                     <span>Export CSV</span>
                   </button>
                 </div>
 
                 {salesHistory.length === 0 ? (
-                  <div className="p-12 text-center bg-white rounded-3xl border border-slate-200 text-slate-400">
-                    <Receipt className="w-12 h-12 mx-auto mb-2 text-slate-300" />
-                    <p className="font-bold text-slate-600">No sales transactions logged yet</p>
-                    <p className="text-xs text-slate-400 mt-1">
+                  <div className="p-12 text-center bg-white rounded-3xl border border-[#E2C799] text-[#6B5440]">
+                    <Receipt className="w-12 h-12 mx-auto mb-2 text-[#E2C799]" />
+                    <p className="font-bold text-[#2D2319]">No sales transactions logged yet</p>
+                    <p className="text-xs text-[#6B5440] mt-1">
                       Transactions completed in POS will be recorded here immediately.
                     </p>
                   </div>
                 ) : (
-                  <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden">
+                  <div className="bg-white rounded-3xl border border-[#E2C799] shadow-xs overflow-hidden">
                     <div className="overflow-x-auto">
                       <table className="w-full text-left text-xs">
-                        <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-black text-[10px] tracking-wider">
+                        <thead className="bg-[#F7E6C9] border-b border-[#E2C799] text-[#2D2319] uppercase font-black text-[10px] tracking-wider">
                           <tr>
                             <th className="py-3 px-4">Receipt / Code</th>
                             <th className="py-3 px-4">Timestamp</th>
@@ -2013,32 +2011,32 @@ export const OutletDashboard: React.FC = () => {
                             <th className="py-3 px-4">Payment</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100">
+                        <tbody className="divide-y divide-[#E2C799]/40">
                           {salesHistory.map((s) => (
-                            <tr key={s.id} className="hover:bg-slate-50/80 transition-colors">
-                              <td className="py-3 px-4 font-mono font-bold text-slate-800">
+                            <tr key={s.id} className="hover:bg-[#FAF4EB]/60 transition-colors">
+                              <td className="py-3 px-4 font-mono font-bold text-[#2D2319]">
                                 {s.sale_code}
                               </td>
-                              <td className="py-3 px-4 text-slate-500 font-mono text-[11px]">
+                              <td className="py-3 px-4 text-[#6B5440] font-mono text-[11px]">
                                 {new Date(s.sale_date).toLocaleString([], {
                                   dateStyle: 'short',
                                   timeStyle: 'short',
                                 })}
                               </td>
-                              <td className="py-3 px-4 font-bold text-slate-900">
+                              <td className="py-3 px-4 font-bold text-[#2D2319]">
                                 {s.product_name}
                               </td>
-                              <td className="py-3 px-4 text-center font-black font-mono">
+                              <td className="py-3 px-4 text-center font-black font-mono text-[#2D2319]">
                                 {s.quantity}
                               </td>
-                              <td className="py-3 px-4 font-mono text-slate-600">
+                              <td className="py-3 px-4 font-mono text-[#433022]">
                                 ৳{Number(s.unit_price).toFixed(2)}
                               </td>
-                              <td className="py-3 px-4 font-black font-mono text-emerald-700">
+                              <td className="py-3 px-4 font-black font-mono text-[#2D2319]">
                                 ৳{Number(s.total_amount).toFixed(2)}
                               </td>
                               <td className="py-3 px-4">
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-bold">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#FDECAD] text-[#2D2319] border border-[#E2C799]/70 text-[10px] font-bold">
                                   {s.payment_method}
                                 </span>
                               </td>
@@ -2055,57 +2053,57 @@ export const OutletDashboard: React.FC = () => {
             {/* TAB 6: BRANCH PROFILE & OPERATING SETTINGS */}
             {activeTab === 'profile' && (
               <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
-                <div className="bg-white rounded-3xl border border-slate-200/80 shadow-md p-6 sm:p-8 space-y-6">
-                  <div className="flex items-center gap-3 border-b border-slate-100 pb-5">
-                    <div className="w-12 h-12 rounded-2xl bg-purple-600 text-white flex items-center justify-center shadow-lg shadow-purple-600/20">
+                <div className="bg-white rounded-3xl border border-[#E2C799] shadow-md p-6 sm:p-8 space-y-6">
+                  <div className="flex items-center gap-3 border-b border-[#E2C799]/40 pb-5">
+                    <div className="w-12 h-12 rounded-2xl bg-[#FFD18D] text-[#2D2319] flex items-center justify-center shadow-md shadow-[#FFD18D]/30">
                       <Building className="w-6 h-6" />
                     </div>
                     <div>
-                      <h3 className="text-xl font-black text-slate-900 tracking-tight">
+                      <h3 className="text-xl font-black text-[#2D2319] tracking-tight">
                         BRANCH PROFILE & OPERATING DETAILS
                       </h3>
-                      <p className="text-xs text-slate-500">
+                      <p className="text-xs text-[#6B5440]">
                         Official franchise branch registry and geographic allocation
                       </p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/70 space-y-1">
-                      <span className="text-[10px] uppercase font-bold text-slate-400">Franchise Brand</span>
-                      <p className="text-base font-black text-slate-900">{outlet?.franchise_name || 'N/A'}</p>
+                    <div className="p-4 rounded-2xl bg-[#FAF4EB] border border-[#E2C799]/70 space-y-1">
+                      <span className="text-[10px] uppercase font-bold text-[#78350F]">Franchise Brand</span>
+                      <p className="text-base font-black text-[#2D2319]">{outlet?.franchise_name || 'N/A'}</p>
                     </div>
 
-                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/70 space-y-1">
-                      <span className="text-[10px] uppercase font-bold text-slate-400">Branch Identifier</span>
-                      <p className="text-base font-black text-slate-900">{outlet?.branch_name || outlet?.outlet_name || 'N/A'}</p>
+                    <div className="p-4 rounded-2xl bg-[#FAF4EB] border border-[#E2C799]/70 space-y-1">
+                      <span className="text-[10px] uppercase font-bold text-[#78350F]">Branch Identifier</span>
+                      <p className="text-base font-black text-[#2D2319]">{outlet?.branch_name || outlet?.outlet_name || 'N/A'}</p>
                     </div>
 
-                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/70 space-y-1">
-                      <span className="text-[10px] uppercase font-bold text-slate-400">City & Area</span>
-                      <p className="text-base font-black text-slate-900">
+                    <div className="p-4 rounded-2xl bg-[#FAF4EB] border border-[#E2C799]/70 space-y-1">
+                      <span className="text-[10px] uppercase font-bold text-[#78350F]">City & Area</span>
+                      <p className="text-base font-black text-[#2D2319]">
                         {outlet?.city || 'Dhaka'}, {outlet?.area || 'Gulshan'}
                       </p>
                     </div>
 
-                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/70 space-y-1">
-                      <span className="text-[10px] uppercase font-bold text-slate-400">Division</span>
-                      <p className="text-base font-black text-slate-900">{outlet?.division_name || 'Dhaka'}</p>
+                    <div className="p-4 rounded-2xl bg-[#FAF4EB] border border-[#E2C799]/70 space-y-1">
+                      <span className="text-[10px] uppercase font-bold text-[#78350F]">Division</span>
+                      <p className="text-base font-black text-[#2D2319]">{outlet?.division_name || 'Dhaka'}</p>
                     </div>
 
-                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/70 space-y-1 sm:col-span-2">
-                      <span className="text-[10px] uppercase font-bold text-slate-400">Street Address</span>
-                      <p className="text-sm font-semibold text-slate-800">{outlet?.location_address || 'N/A'}</p>
+                    <div className="p-4 rounded-2xl bg-[#FAF4EB] border border-[#E2C799]/70 space-y-1 sm:col-span-2">
+                      <span className="text-[10px] uppercase font-bold text-[#78350F]">Street Address</span>
+                      <p className="text-sm font-semibold text-[#2D2319]">{outlet?.location_address || 'N/A'}</p>
                     </div>
 
-                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/70 space-y-1">
-                      <span className="text-[10px] uppercase font-bold text-slate-400">Hotline Phone</span>
-                      <p className="text-sm font-black text-slate-800 font-mono">{outlet?.contact_phone || '01900-112233'}</p>
+                    <div className="p-4 rounded-2xl bg-[#FAF4EB] border border-[#E2C799]/70 space-y-1">
+                      <span className="text-[10px] uppercase font-bold text-[#78350F]">Hotline Phone</span>
+                      <p className="text-sm font-black text-[#2D2319] font-mono">{outlet?.contact_phone || '01900-112233'}</p>
                     </div>
 
-                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/70 space-y-1">
-                      <span className="text-[10px] uppercase font-bold text-slate-400">Operating Status</span>
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold">
+                    <div className="p-4 rounded-2xl bg-[#FAF4EB] border border-[#E2C799]/70 space-y-1">
+                      <span className="text-[10px] uppercase font-bold text-[#78350F]">Operating Status</span>
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#F5F1BB] text-[#365314] text-xs font-bold border border-[#D9D384]">
                         <CheckCircle className="w-3.5 h-3.5" />
                         {outlet?.status || 'Active'}
                       </span>

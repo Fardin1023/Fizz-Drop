@@ -559,14 +559,25 @@
 .superadmin-theme .text-indigo-700,
 .superadmin-theme .text-blue-700,
 .superadmin-theme .text-cyan-700,
-.superadmin-theme .text-emerald-700 {
+.superadmin-theme .text-emerald-700,
+.superadmin-theme .text-emerald-300,
+.superadmin-theme .text-emerald-400,
+.superadmin-theme .text-cyan-300,
+.superadmin-theme .text-cyan-400,
+.superadmin-theme .text-indigo-300,
+.superadmin-theme .text-indigo-400,
+.superadmin-theme .text-teal-300,
+.superadmin-theme .text-teal-400 {
   color: #122018 !important;
 }
 
-/* Ensure no text-white leaks on light cards in superadmin */
-.superadmin-theme .bg-white .text-white,
-.superadmin-theme .bg-\[\#FFF9F0\] .text-white,
-.superadmin-theme .bg-\[\#F2E6D5\] .text-white {
+/* Ensure no text-white leaks on light cards in superadmin, EXCEPT on buttons or dark badges */
+.superadmin-theme .bg-white span.text-white:not([class*="bg-"]):not(button *),
+.superadmin-theme .bg-\[\#FFF9F0\] span.text-white:not([class*="bg-"]):not(button *),
+.superadmin-theme .bg-\[\#F2E6D5\] span.text-white:not([class*="bg-"]):not(button *),
+.superadmin-theme .bg-white p.text-white,
+.superadmin-theme .bg-\[\#FFF9F0\] p.text-white,
+.superadmin-theme .bg-\[\#F2E6D5\] p.text-white {
   color: #101B14 !important;
 }
 
@@ -600,19 +611,46 @@
 }
 
 /* Badges inside headers */
-.superadmin-theme div[class*="from-slate-900"] .rounded-full,
-.superadmin-theme div[class*="from-blue-900"] .rounded-full,
-.superadmin-theme .inline-flex.rounded-full {
+.superadmin-theme div[class*="from-slate-900"] .rounded-full:not(.animate-ping):not(.h-2):not(.h-2\.5):not(.h-3),
+.superadmin-theme div[class*="from-blue-900"] .rounded-full:not(.animate-ping):not(.h-2):not(.h-2\.5):not(.h-3),
+.superadmin-theme div[class*="from-slate-900"] .rounded-xl,
+.superadmin-theme div[class*="from-blue-900"] .rounded-xl,
+.superadmin-theme div[class*="from-slate-900"] .rounded-2xl,
+.superadmin-theme div[class*="from-blue-900"] .rounded-2xl,
+.superadmin-theme div[class*="from-slate-900"] span.inline-flex:not(.animate-ping):not(.h-2):not(.h-2\.5):not(.h-3),
+.superadmin-theme div[class*="from-blue-900"] span.inline-flex:not(.animate-ping):not(.h-2):not(.h-2\.5):not(.h-3),
+.superadmin-theme .inline-flex.rounded-full:not(.animate-ping):not(.h-2):not(.h-2\.5):not(.h-3) {
   background-color: #CFE0D2 !important;
   color: #122018 !important;
   border: 1px solid #B8CBBE !important;
 }
 
-.superadmin-theme div[class*="from-slate-900"] .rounded-full *,
-.superadmin-theme div[class*="from-blue-900"] .rounded-full *,
-.superadmin-theme .inline-flex.rounded-full * {
+.superadmin-theme div[class*="from-slate-900"] .rounded-full:not(.animate-ping):not(.h-2):not(.h-2\.5):not(.h-3) *,
+.superadmin-theme div[class*="from-blue-900"] .rounded-full:not(.animate-ping):not(.h-2):not(.h-2\.5):not(.h-3) *,
+.superadmin-theme div[class*="from-slate-900"] .rounded-xl *,
+.superadmin-theme div[class*="from-blue-900"] .rounded-xl *,
+.superadmin-theme div[class*="from-slate-900"] .rounded-2xl *,
+.superadmin-theme div[class*="from-blue-900"] .rounded-2xl *,
+.superadmin-theme div[class*="from-slate-900"] span.inline-flex:not(.animate-ping):not(.h-2):not(.h-2\.5):not(.h-3) *,
+.superadmin-theme div[class*="from-blue-900"] span.inline-flex:not(.animate-ping):not(.h-2):not(.h-2\.5):not(.h-3) *,
+.superadmin-theme .inline-flex.rounded-full:not(.animate-ping):not(.h-2):not(.h-2\.5):not(.h-3) * {
   color: #122018 !important;
   stroke: #122018 !important;
+}
+
+/* Green real-time indicator dots */
+.superadmin-theme .status-dot-green,
+.superadmin-theme span.bg-emerald-500,
+.superadmin-theme span.bg-emerald-600,
+.superadmin-theme span.bg-emerald-700 {
+  background-color: #059669 !important;
+  border: none !important;
+}
+.superadmin-theme span.animate-ping.bg-emerald-400,
+.superadmin-theme span.animate-ping.bg-emerald-500,
+.superadmin-theme span.animate-ping.bg-emerald-600 {
+  background-color: #10B981 !important;
+  border: none !important;
 }
 
 /* Button Gradients (e.g. from-indigo-500 to-cyan-500) */

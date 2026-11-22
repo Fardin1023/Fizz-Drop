@@ -1,0 +1,95 @@
+/* =========================================================================
+   Area Sales Manager (ASM) Portal Theme
+   Inspired by: Sage Green / Celadon / Pale Eucalyptus Swatch
+   Average Hex: #A1BBA8 | Swatch Highlights: #A9C2AF, #AAC3B0, #B6CFBE | Swatch Grain: #83A48D
+   ========================================================================= */
+
+:root {
+  --asm-canvas: #F0F5F2;
+  --asm-card: #FFFFFF;
+  --asm-card-surface: #F5FAF7;
+  --asm-surface-subtle: #DEEAE1;
+  --asm-border: #C8DCD0;
+  --asm-border-strong: #A9C2AF;
+  --asm-accent-sage: #6B9479;
+  --asm-accent-vibrant: #4D7B5D;
+  --asm-primary-dark: #193824;
+  --asm-text-primary: #102618;
+  --asm-text-secondary: #365340;
+  --asm-text-muted: #607C6B;
+}
+
+.asm-theme {
+  background-color: var(--asm-canvas);
+  color: var(--asm-text-primary);
+}
+
+/* Card Surface */
+.asm-card {
+  background-color: var(--asm-card);
+  border: 1px solid var(--asm-border);
+  box-shadow: 0 1px 3px 0 rgba(25, 56, 36, 0.05);
+  transition: all 0.25s ease-in-out;
+}
+
+.asm-card:hover {
+  border-color: var(--asm-border-strong);
+}
+
+/* Hero Division / District Banner */
+.asm-hero {
+  background: linear-gradient(135deg, #193824 0%, #244833 50%, #305840 100%);
+  border: 1px solid rgba(169, 194, 175, 0.35);
+  color: #FFFFFF;
+  box-shadow: 0 10px 25px -5px rgba(25, 56, 36, 0.2);
+}
+
+/* Badges */
+.badge-sage {
+  background-color: var(--asm-surface-subtle);
+  color: var(--asm-primary-dark);
+  border: 1px solid var(--asm-border);
+}
+
+.badge-forest {
+  background-color: var(--asm-primary-dark);
+  color: #F0F5F2;
+}
+
+.badge-swatch {
+  background-color: #A9C2AF;
+  color: #102618;
+  font-weight: 800;
+}
+
+/* Buttons */
+.btn-asm-primary {
+  background-color: var(--asm-primary-dark);
+  color: #FFFFFF;
+  transition: all 0.2s ease;
+}
+
+.btn-asm-primary:hover {
+  background-color: #244833;
+}
+
+.btn-asm-secondary {
+  background-color: #FFFFFF;
+  color: var(--asm-primary-dark);
+  border: 1px solid var(--asm-border);
+  transition: all 0.2s ease;
+}
+
+.btn-asm-secondary:hover {
+  background-color: var(--asm-surface-subtle);
+}
+
+.btn-asm-accent {
+  background-color: #6B9479;
+  color: #FFFFFF;
+  transition: all 0.2s ease;
+}
+
+.btn-asm-accent:hover {
+  background-color: #588367;
+}

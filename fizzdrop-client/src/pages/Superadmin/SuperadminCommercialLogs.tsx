@@ -389,6 +389,9 @@ export const SuperadminCommercialLogs: React.FC = () => {
   const [selectedPsrId, setSelectedPsrId] = useState<string>('ALL');
   const [selectedOutletId, setSelectedOutletId] = useState<string>('ALL');
   const [selectedProductId, setSelectedProductId] = useState<string>('ALL');
+  const [selectedEntityType, setSelectedEntityType] = useState<
+    'ALL' | 'SUPPLIER' | 'SALES_OFFICER' | 'PSR' | 'OUTLET' | 'PRODUCT'
+  >('ALL');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -495,6 +498,7 @@ export const SuperadminCommercialLogs: React.FC = () => {
     setSelectedPsrId('ALL');
     setSelectedOutletId('ALL');
     setSelectedProductId('ALL');
+    setSelectedEntityType('ALL');
     setStartDate('');
     setEndDate('');
     setDatePreset('ALL');
@@ -589,22 +593,189 @@ export const SuperadminCommercialLogs: React.FC = () => {
     setSelectedOutletId('ALL');
   };
 
-  // Filtered Collections
+  // Normalized search query
+  const normalizedQuery = useMemo(() => searchQuery.trim().toLowerCase(), [searchQuery]);
+
+  // Specific Filter Scope Derivations (Strict Single-Object Isolation)
+  const validSupplierIds = useMemo(() => {
+    if (selectedSupplierId !== 'ALL') {
+      return new Set([Number(selectedSupplierId)]);
+    }
+    if (selectedSalesOfficerId !== 'ALL') {
+      const so = salesOfficers.find((s) => String(s.id) === String(selectedSalesOfficerId));
+      if (so && so.supplier_id) return new Set([Number(so.supplier_id)]);
+    }
+    if (selectedPsrId !== 'ALL') {
+      const p = psrs.find((psr) => String(psr.id) === String(selectedPsrId));
+      if (p && p.supplier_id) return new Set([Number(p.supplier_id)]);
+    }
+    if (selectedOutletId !== 'ALL') {
+      const o = outlets.find((out) => String(out.outlet_id) === String(selectedOutletId));
+      if (o && o.supplier_id) return new Set([Number(o.supplier_id)]);
+    }
+    return null;
+  }, [selectedSupplierId, selectedSalesOfficerId, selectedPsrId, selectedOutletId, salesOfficers, psrs, outlets]);
+
+  const validSalesOfficerIds = useMemo(() => {
+    if (selectedSalesOfficerId !== 'ALL') {
+      return new Set([Number(selectedSalesOfficerId)]);
+    }
+    if (selectedPsrId !== 'ALL') {
+      const p = psrs.find((psr) => String(psr.id) === String(selectedPsrId));
+      if (p && p.sales_officer_id) return new Set([Number(p.sales_officer_id)]);
+    }
+    if (selectedOutletId !== 'ALL') {
+      const o = outlets.find((out) => String(out.outlet_id) === String(selectedOutletId));
+      if (o?.assigned_psr_id) {
+        const p = psrs.find((psr) => Number(psr.id) === Number(o.assigned_psr_id));
+        if (p?.sales_officer_id) return new Set([Number(p.sales_officer_id)]);
+      }
+    }
+    if (selectedSupplierId !== 'ALL') {
+      return new Set(
+        salesOfficers.filter((so) => String(so.supplier_id) === String(selectedSupplierId)).map((so) => Number(so.id))
+      );
+    }
+    return null;
+  }, [selectedSalesOfficerId, selectedPsrId, selectedOutletId, selectedSupplierId, psrs, outlets, salesOfficers]);
+
+  const validPsrIds = useMemo(() => {
+    if (selectedPsrId !== 'ALL') {
+      return new Set([Number(selectedPsrId)]);
+    }
+    if (selectedOutletId !== 'ALL') {
+      const o = outlets.find((out) => String(out.outlet_id) === String(selectedOutletId));
+      if (o?.assigned_psr_id) return new Set([Number(o.assigned_psr_id)]);
+      const targetPsrs = psrs.filter((p) => p.assigned_outlets?.some((out) => String(out.outlet_id) === String(selectedOutletId)));
+      if (targetPsrs.length > 0) return new Set(targetPsrs.map((p) => Number(p.id)));
+    }
+    if (selectedSalesOfficerId !== 'ALL') {
+      return new Set(
+        psrs.filter((p) => String(p.sales_officer_id) === String(selectedSalesOfficerId)).map((p) => Number(p.id))
+      );
+    }
+    if (selectedSupplierId !== 'ALL') {
+      return new Set(
+        psrs.filter((p) => String(p.supplier_id) === String(selectedSupplierId)).map((p) => Number(p.id))
+      );
+    }
+    return null;
+  }, [selectedPsrId, selectedOutletId, selectedSalesOfficerId, selectedSupplierId, outlets, psrs]);
+
+  const validOutletIds = useMemo(() => {
+    if (selectedOutletId !== 'ALL') {
+      return new Set([Number(selectedOutletId)]);
+    }
+    if (selectedPsrId !== 'ALL' || selectedSalesOfficerId !== 'ALL' || selectedSupplierId !== 'ALL') {
+      return new Set(availableOutlets.map((o) => Number(o.outlet_id)));
+    }
+    return null;
+  }, [selectedOutletId, selectedPsrId, selectedSalesOfficerId, selectedSupplierId, availableOutlets]);
+
+  const validProductIds = useMemo(() => {
+    if (selectedProductId !== 'ALL') {
+      return new Set([Number(selectedProductId)]);
+    }
+    return null;
+  }, [selectedProductId]);
+
+  // Filtered Hierarchy Suppliers (Strict Isolation: Only matching branches, zero extraneous parents/siblings)
+  const filteredHierarchySuppliers = useMemo(() => {
+    return suppliers.filter((sup) => {
+      if (validSupplierIds && !validSupplierIds.has(Number(sup.supplier_id))) {
+        return false;
+      }
+
+      let supOfficers = salesOfficers.filter((so) => Number(so.supplier_id) === Number(sup.supplier_id));
+      if (validSalesOfficerIds) {
+        supOfficers = supOfficers.filter((so) => validSalesOfficerIds.has(Number(so.id)));
+      }
+      if (
+        (selectedSalesOfficerId !== 'ALL' || selectedPsrId !== 'ALL' || selectedOutletId !== 'ALL') &&
+        supOfficers.length === 0
+      ) {
+        return false;
+      }
+
+      let supPsrs = psrs.filter((p) => Number(p.supplier_id) === Number(sup.supplier_id));
+      if (validPsrIds) {
+        supPsrs = supPsrs.filter((p) => validPsrIds.has(Number(p.id)));
+      }
+      if ((selectedPsrId !== 'ALL' || selectedOutletId !== 'ALL') && supPsrs.length === 0) {
+        return false;
+      }
+
+      if (validProductIds) {
+        const hasProductSale = supPsrs.some((p) =>
+          p.product_sales?.some((ps) => validProductIds.has(Number(ps.product_id)))
+        );
+        const hasStock = allSupplierInventory.some(
+          (item) => Number(item.supplier_id) === Number(sup.supplier_id) && validProductIds.has(Number(item.product_id))
+        );
+        if (!hasProductSale && !hasStock) return false;
+      }
+
+      if (normalizedQuery) {
+        const supMatch =
+          (sup.supplier_name || '').toLowerCase().includes(normalizedQuery) ||
+          (sup.business_name || '').toLowerCase().includes(normalizedQuery) ||
+          (sup.division_name || '').toLowerCase().includes(normalizedQuery) ||
+          (sup.depot_address || '').toLowerCase().includes(normalizedQuery) ||
+          String(sup.supplier_id).includes(normalizedQuery);
+
+        const soMatch = supOfficers.some(
+          (so) =>
+            (so.name || '').toLowerCase().includes(normalizedQuery) ||
+            (so.officer_code || '').toLowerCase().includes(normalizedQuery) ||
+            (so.assigned_area || '').toLowerCase().includes(normalizedQuery) ||
+            (so.city || '').toLowerCase().includes(normalizedQuery)
+        );
+
+        const psrMatch = supPsrs.some(
+          (p) =>
+            (p.name || '').toLowerCase().includes(normalizedQuery) ||
+            (p.psr_code || '').toLowerCase().includes(normalizedQuery) ||
+            (p.sub_route || '').toLowerCase().includes(normalizedQuery) ||
+            p.assigned_outlets?.some((out) => (out.outlet_name || '').toLowerCase().includes(normalizedQuery)) ||
+            p.product_sales?.some((ps) => (ps.product_name || '').toLowerCase().includes(normalizedQuery))
+        );
+
+        if (!supMatch && !soMatch && !psrMatch) return false;
+      }
+
+      return true;
+    });
+  }, [
+    suppliers,
+    salesOfficers,
+    psrs,
+    allSupplierInventory,
+    validSupplierIds,
+    validSalesOfficerIds,
+    validPsrIds,
+    validProductIds,
+    selectedSalesOfficerId,
+    selectedPsrId,
+    selectedOutletId,
+    normalizedQuery,
+  ]);
+
+  // Filtered Collections with Strict Single-Object Isolation
   const filteredPsrOrders = useMemo(() => {
     return psrOrders.filter((ord) => {
-      if (selectedSupplierId !== 'ALL' && String(ord.supplier_id) !== String(selectedSupplierId)) {
+      if (validSupplierIds && !validSupplierIds.has(Number(ord.supplier_id))) {
         return false;
       }
-      if (selectedSalesOfficerId !== 'ALL' && String(ord.sales_officer_id) !== String(selectedSalesOfficerId)) {
+      if (validSalesOfficerIds && !validSalesOfficerIds.has(Number(ord.sales_officer_id))) {
         return false;
       }
-      if (selectedPsrId !== 'ALL' && String(ord.psr_id) !== String(selectedPsrId)) {
+      if (validPsrIds && !validPsrIds.has(Number(ord.psr_id))) {
         return false;
       }
-      if (selectedOutletId !== 'ALL' && String(ord.outlet_id) !== String(selectedOutletId)) {
+      if (validOutletIds && !validOutletIds.has(Number(ord.outlet_id))) {
         return false;
       }
-      if (selectedProductId !== 'ALL' && String(ord.product_id) !== String(selectedProductId)) {
+      if (validProductIds && !validProductIds.has(Number(ord.product_id))) {
         return false;
       }
       if (startDate && ord.created_at && String(ord.created_at).slice(0, 10) < startDate) {
@@ -613,59 +784,49 @@ export const SuperadminCommercialLogs: React.FC = () => {
       if (endDate && ord.created_at && String(ord.created_at).slice(0, 10) > endDate) {
         return false;
       }
-      if (!searchQuery.trim()) return true;
-      const q = searchQuery.toLowerCase();
+      if (!normalizedQuery) return true;
       return (
-        (ord.order_code || '').toLowerCase().includes(q) ||
-        (ord.psr_name || '').toLowerCase().includes(q) ||
-        (ord.outlet_name || '').toLowerCase().includes(q) ||
-        (ord.product_name || '').toLowerCase().includes(q) ||
-        (ord.sub_route || '').toLowerCase().includes(q) ||
-        (ord.status || '').toLowerCase().includes(q)
+        (ord.order_code || '').toLowerCase().includes(normalizedQuery) ||
+        (ord.psr_name || '').toLowerCase().includes(normalizedQuery) ||
+        (ord.outlet_name || '').toLowerCase().includes(normalizedQuery) ||
+        (ord.product_name || '').toLowerCase().includes(normalizedQuery) ||
+        (ord.sub_route || '').toLowerCase().includes(normalizedQuery) ||
+        (ord.status || '').toLowerCase().includes(normalizedQuery)
       );
     });
-  }, [psrOrders, selectedSupplierId, selectedSalesOfficerId, selectedPsrId, selectedOutletId, selectedProductId, startDate, endDate, searchQuery]);
-
-  const filteredHierarchySuppliers = useMemo(() => {
-    let list = suppliers;
-    if (selectedSupplierId !== 'ALL') {
-      list = list.filter((s) => String(s.supplier_id) === String(selectedSupplierId));
-    }
-    return list;
-  }, [suppliers, selectedSupplierId]);
+  }, [psrOrders, validSupplierIds, validSalesOfficerIds, validPsrIds, validOutletIds, validProductIds, startDate, endDate, normalizedQuery]);
 
   // Filtered Ledger (Sub-tab: matrix)
   const filteredLedger = useMemo(() => {
     return ledger.filter((item) => {
-      if (selectedSupplierId !== 'ALL' && String(item.supplier_id) !== String(selectedSupplierId)) {
+      if (validSupplierIds && !validSupplierIds.has(Number(item.supplier_id))) {
         return false;
       }
-      if (selectedOutletId !== 'ALL' && String(item.outlet_id) !== String(selectedOutletId)) {
+      if (validOutletIds && !validOutletIds.has(Number(item.outlet_id))) {
         return false;
       }
-      if (selectedProductId !== 'ALL' && String(item.product_id) !== String(selectedProductId)) {
+      if (validProductIds && !validProductIds.has(Number(item.product_id))) {
         return false;
       }
-      if (searchQuery.trim() === '') return true;
-      const query = searchQuery.toLowerCase();
+      if (normalizedQuery === '') return true;
       return (
-        item.outlet_name.toLowerCase().includes(query) ||
-        item.brand.toLowerCase().includes(query) ||
-        item.flavor_variant.toLowerCase().includes(query) ||
-        item.sku.toLowerCase().includes(query) ||
-        item.supplier_name.toLowerCase().includes(query) ||
-        item.city.toLowerCase().includes(query)
+        item.outlet_name.toLowerCase().includes(normalizedQuery) ||
+        item.brand.toLowerCase().includes(normalizedQuery) ||
+        item.flavor_variant.toLowerCase().includes(normalizedQuery) ||
+        item.sku.toLowerCase().includes(normalizedQuery) ||
+        item.supplier_name.toLowerCase().includes(normalizedQuery) ||
+        item.city.toLowerCase().includes(normalizedQuery)
       );
     });
-  }, [ledger, selectedSupplierId, selectedOutletId, selectedProductId, searchQuery]);
+  }, [ledger, validSupplierIds, validOutletIds, validProductIds, normalizedQuery]);
 
   // Filtered Supplier Transactions
   const filteredSupplierTxns = useMemo(() => {
     return supplierTxns.filter((txn) => {
-      if (selectedSupplierId !== 'ALL' && String(txn.supplier_id) !== String(selectedSupplierId)) {
+      if (validSupplierIds && !validSupplierIds.has(Number(txn.supplier_id))) {
         return false;
       }
-      if (selectedOutletId !== 'ALL' && String(txn.outlet_id) !== String(selectedOutletId)) {
+      if (validOutletIds && txn.outlet_id && !validOutletIds.has(Number(txn.outlet_id))) {
         return false;
       }
       const txnDate = txn.transaction_date || txn.created_at;
@@ -675,23 +836,22 @@ export const SuperadminCommercialLogs: React.FC = () => {
       if (endDate && txnDate && String(txnDate).slice(0, 10) > endDate) {
         return false;
       }
-      if (searchQuery.trim() === '') return true;
-      const query = searchQuery.toLowerCase();
+      if (normalizedQuery === '') return true;
       const name = (txn.supplier_name || '').toLowerCase();
       const ref = (txn.reference_code || '').toLowerCase();
       const desc = (txn.description || '').toLowerCase();
       const type = (txn.transaction_type || txn.type || '').toLowerCase();
-      return name.includes(query) || ref.includes(query) || desc.includes(query) || type.includes(query);
+      return name.includes(normalizedQuery) || ref.includes(normalizedQuery) || desc.includes(normalizedQuery) || type.includes(normalizedQuery);
     });
-  }, [supplierTxns, selectedSupplierId, selectedOutletId, startDate, endDate, searchQuery]);
+  }, [supplierTxns, validSupplierIds, validOutletIds, startDate, endDate, normalizedQuery]);
 
   // Filtered Outlet Sales Receipts
   const filteredSalesLogs = useMemo(() => {
     return salesLogs.filter((sale) => {
-      if (selectedOutletId !== 'ALL' && String(sale.outlet_id) !== String(selectedOutletId)) {
+      if (validOutletIds && !validOutletIds.has(Number(sale.outlet_id))) {
         return false;
       }
-      if (selectedProductId !== 'ALL' && String(sale.product_id) !== String(selectedProductId)) {
+      if (validProductIds && !validProductIds.has(Number(sale.product_id))) {
         return false;
       }
       const sDate = sale.sale_date;
@@ -701,61 +861,61 @@ export const SuperadminCommercialLogs: React.FC = () => {
       if (endDate && sDate && String(sDate).slice(0, 10) > endDate) {
         return false;
       }
-      if (searchQuery.trim() === '') return true;
-      const query = searchQuery.toLowerCase();
+      if (normalizedQuery === '') return true;
       const code = (sale.sale_code || sale.order_code || '').toLowerCase();
       const outlet = (sale.outlet_name || '').toLowerCase();
       const prod = (sale.product_name || sale.brand || '').toLowerCase();
       const note = (sale.customer_notes || sale.customer_note || '').toLowerCase();
-      return code.includes(query) || outlet.includes(query) || prod.includes(query) || note.includes(query);
+      return code.includes(normalizedQuery) || outlet.includes(normalizedQuery) || prod.includes(normalizedQuery) || note.includes(normalizedQuery);
     });
-  }, [salesLogs, selectedOutletId, selectedProductId, startDate, endDate, searchQuery]);
+  }, [salesLogs, validOutletIds, validProductIds, startDate, endDate, normalizedQuery]);
 
   // Filtered Requisitions
   const filteredRequisitions = useMemo(() => {
     return requisitions.filter((req) => {
-      if (selectedOutletId !== 'ALL' && String(req.outlet_id) !== String(selectedOutletId)) {
+      if (validSupplierIds && req.supplier_id && !validSupplierIds.has(Number(req.supplier_id))) {
         return false;
       }
-      if (selectedProductId !== 'ALL' && String(req.product_id) !== String(selectedProductId)) {
+      if (validOutletIds && !validOutletIds.has(Number(req.outlet_id))) {
         return false;
       }
-      const rDate = req.created_date;
+      if (validProductIds && !validProductIds.has(Number(req.product_id))) {
+        return false;
+      }
+      const rDate = req.created_date || req.created_at;
       if (startDate && rDate && String(rDate).slice(0, 10) < startDate) {
         return false;
       }
       if (endDate && rDate && String(rDate).slice(0, 10) > endDate) {
         return false;
       }
-      if (searchQuery.trim() === '') return true;
-      const query = searchQuery.toLowerCase();
+      if (normalizedQuery === '') return true;
       const code = (req.requisition_code || '').toLowerCase();
       const outlet = (req.outlet_name || '').toLowerCase();
       const sup = (req.supplier_name || '').toLowerCase();
       const brand = (req.brand || req.product_name || '').toLowerCase();
       const status = (req.status || '').toLowerCase();
-      return code.includes(query) || outlet.includes(query) || sup.includes(query) || brand.includes(query) || status.includes(query);
+      return code.includes(normalizedQuery) || outlet.includes(normalizedQuery) || sup.includes(normalizedQuery) || brand.includes(normalizedQuery) || status.includes(normalizedQuery);
     });
-  }, [requisitions, selectedOutletId, selectedProductId, startDate, endDate, searchQuery]);
+  }, [requisitions, validSupplierIds, validOutletIds, validProductIds, startDate, endDate, normalizedQuery]);
 
   // Filtered Supplier Available Stocks
   const filteredSupplierStocks = useMemo(() => {
     return allSupplierInventory.filter((item) => {
-      if (selectedSupplierId !== 'ALL' && String(item.supplier_id) !== String(selectedSupplierId)) {
+      if (validSupplierIds && !validSupplierIds.has(Number(item.supplier_id))) {
         return false;
       }
-      if (selectedProductId !== 'ALL' && String(item.product_id) !== String(selectedProductId)) {
+      if (validProductIds && !validProductIds.has(Number(item.product_id))) {
         return false;
       }
-      if (searchQuery.trim() === '') return true;
-      const query = searchQuery.toLowerCase();
+      if (normalizedQuery === '') return true;
       const brand = (item.brand || '').toLowerCase();
       const flavor = (item.flavor_variant || '').toLowerCase();
       const sku = (item.sku || '').toLowerCase();
       const supplier = (item.supplier_name || '').toLowerCase();
-      return brand.includes(query) || flavor.includes(query) || sku.includes(query) || supplier.includes(query);
+      return brand.includes(normalizedQuery) || flavor.includes(normalizedQuery) || sku.includes(normalizedQuery) || supplier.includes(normalizedQuery);
     });
-  }, [allSupplierInventory, selectedSupplierId, selectedProductId, searchQuery]);
+  }, [allSupplierInventory, validSupplierIds, validProductIds, normalizedQuery]);
 
   // Dynamic in-memory KPI Summary computed instantly from current active filters
   const computedSummary = useMemo(() => {
@@ -1013,6 +1173,7 @@ export const SuperadminCommercialLogs: React.FC = () => {
     selectedPsrId !== 'ALL' ||
     selectedOutletId !== 'ALL' ||
     selectedProductId !== 'ALL' ||
+    selectedEntityType !== 'ALL' ||
     startDate !== '' ||
     endDate !== '' ||
     searchQuery.trim() !== '';
@@ -1157,8 +1318,13 @@ export const SuperadminCommercialLogs: React.FC = () => {
           <div className="flex items-center gap-2">
             <SlidersHorizontal className="w-4 h-4 text-indigo-600" />
             <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-              Supply Chain Master Filter Hierarchy
+              Specific Commercial Telemetry Filtering
             </h3>
+            {hasActiveFilters && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                <ShieldCheck className="w-3 h-3 text-emerald-600" /> Exact Match Only
+              </span>
+            )}
           </div>
 
           {/* Quick Date Range Pills */}
@@ -1188,8 +1354,28 @@ export const SuperadminCommercialLogs: React.FC = () => {
           </div>
         </div>
 
-        {/* 5 Clean Cascading Selectors */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5">
+        {/* 6 Clean Cascading Selectors with Specific Object Focus */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5">
+          {/* Specific Object Filter Scope */}
+          <div>
+            <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1 flex items-center gap-1">
+              <Crosshair className="w-3 h-3 text-indigo-600" />
+              <span>Target Object Focus</span>
+            </label>
+            <select
+              value={selectedEntityType}
+              onChange={(e) => setSelectedEntityType(e.target.value as any)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-indigo-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all cursor-pointer"
+            >
+              <option value="ALL">🎯 All Objects</option>
+              <option value="SUPPLIER">🏢 Suppliers Only</option>
+              <option value="SALES_OFFICER">👔 Sales Officers Only</option>
+              <option value="PSR">🛵 Field PSRs Only</option>
+              <option value="OUTLET">🏪 Retail Outlets Only</option>
+              <option value="PRODUCT">📦 Beverage SKUs Only</option>
+            </select>
+          </div>
+
           {/* 1. Supplier Selector */}
           <div>
             <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1 flex items-center gap-1">
@@ -1299,13 +1485,13 @@ export const SuperadminCommercialLogs: React.FC = () => {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by code, supplier, SO, PSR, outlet, or beverage SKU..."
+              placeholder="Search exact code, name, phone, area, route, or SKU..."
               className="w-full pl-8 pr-7 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 <X className="w-3 h-3" />
               </button>
@@ -1342,14 +1528,23 @@ export const SuperadminCommercialLogs: React.FC = () => {
         {hasActiveFilters && (
           <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 text-xs">
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1 mr-1">
-                <Filter className="w-3 h-3 text-indigo-600" /> Active:
+              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 flex items-center gap-1 mr-1">
+                <Filter className="w-3 h-3 text-emerald-600" /> Specific Filter Scope:
               </span>
+
+              {selectedEntityType !== 'ALL' && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-800 text-[11px] font-bold border border-indigo-200">
+                  <span>Scope: {selectedEntityType.replace('_', ' ')}</span>
+                  <button onClick={() => setSelectedEntityType('ALL')} className="hover:text-indigo-950 cursor-pointer">
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
 
               {activeSupplier && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-800 text-[11px] font-semibold border border-indigo-200">
                   <span>Supplier: {getSupplierDisplayName(activeSupplier)}</span>
-                  <button onClick={() => handleSupplierChange('ALL')} className="hover:text-indigo-950">
+                  <button onClick={() => handleSupplierChange('ALL')} className="hover:text-indigo-950 cursor-pointer">
                     <X className="w-3 h-3" />
                   </button>
                 </span>
@@ -1358,7 +1553,7 @@ export const SuperadminCommercialLogs: React.FC = () => {
               {activeSalesOfficer && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-blue-50 text-blue-800 text-[11px] font-semibold border border-blue-200">
                   <span>SO: {activeSalesOfficer.name}</span>
-                  <button onClick={() => handleSalesOfficerChange('ALL')} className="hover:text-blue-950">
+                  <button onClick={() => handleSalesOfficerChange('ALL')} className="hover:text-blue-950 cursor-pointer">
                     <X className="w-3 h-3" />
                   </button>
                 </span>
@@ -1367,7 +1562,7 @@ export const SuperadminCommercialLogs: React.FC = () => {
               {activePsr && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-teal-50 text-teal-800 text-[11px] font-semibold border border-teal-200">
                   <span>PSR: {activePsr.name}</span>
-                  <button onClick={() => handlePsrChange('ALL')} className="hover:text-teal-950">
+                  <button onClick={() => handlePsrChange('ALL')} className="hover:text-teal-950 cursor-pointer">
                     <X className="w-3 h-3" />
                   </button>
                 </span>
@@ -1376,7 +1571,7 @@ export const SuperadminCommercialLogs: React.FC = () => {
               {activeOutlet && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-50 text-amber-800 text-[11px] font-semibold border border-amber-200">
                   <span>Outlet: {activeOutlet.outlet_name}</span>
-                  <button onClick={() => setSelectedOutletId('ALL')} className="hover:text-amber-950">
+                  <button onClick={() => setSelectedOutletId('ALL')} className="hover:text-amber-950 cursor-pointer">
                     <X className="w-3 h-3" />
                   </button>
                 </span>
@@ -1385,7 +1580,7 @@ export const SuperadminCommercialLogs: React.FC = () => {
               {selectedProductId !== 'ALL' && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-purple-50 text-purple-800 text-[11px] font-semibold border border-purple-200">
                   <span>Product: {products.find((p) => String(p.product_id) === selectedProductId)?.brand}</span>
-                  <button onClick={() => setSelectedProductId('ALL')} className="hover:text-purple-950">
+                  <button onClick={() => setSelectedProductId('ALL')} className="hover:text-purple-950 cursor-pointer">
                     <X className="w-3 h-3" />
                   </button>
                 </span>
@@ -1394,19 +1589,22 @@ export const SuperadminCommercialLogs: React.FC = () => {
               {searchQuery && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-100 text-slate-800 text-[11px] font-mono">
                   <span>"{searchQuery}"</span>
-                  <button onClick={() => setSearchQuery('')} className="hover:text-slate-900">
+                  <button onClick={() => setSearchQuery('')} className="hover:text-slate-900 cursor-pointer">
                     <X className="w-3 h-3" />
                   </button>
                 </span>
               )}
             </div>
 
-            <button
-              onClick={handleResetFilters}
-              className="text-[11px] font-bold text-rose-600 hover:text-rose-700 hover:underline cursor-pointer"
-            >
-              Reset All Filters
-            </button>
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] text-slate-400">Strict isolation active — zero extraneous objects shown</span>
+              <button
+                onClick={handleResetFilters}
+                className="text-[11px] font-bold text-rose-600 hover:text-rose-700 hover:underline cursor-pointer"
+              >
+                Reset All Filters
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -1586,9 +1784,73 @@ export const SuperadminCommercialLogs: React.FC = () => {
             ) : (
               <div className="space-y-6">
                 {filteredHierarchySuppliers.map((sup) => {
-                  const supOfficers = salesOfficers.filter((so) => Number(so.supplier_id) === Number(sup.supplier_id));
-                  const supPsrs = psrs.filter((p) => Number(p.supplier_id) === Number(sup.supplier_id));
-                  const supOutlets = outlets.filter((o) => Number(o.supplier_id) === Number(sup.supplier_id));
+                  let supOfficers = salesOfficers.filter((so) => Number(so.supplier_id) === Number(sup.supplier_id));
+                  if (validSalesOfficerIds) {
+                    supOfficers = supOfficers.filter((so) => validSalesOfficerIds.has(Number(so.id)));
+                  }
+                  if (validPsrIds) {
+                    supOfficers = supOfficers.filter((so) =>
+                      psrs.some((p) => Number(p.sales_officer_id) === Number(so.id) && validPsrIds.has(Number(p.id)))
+                    );
+                  }
+                  if (validOutletIds) {
+                    supOfficers = supOfficers.filter((so) => {
+                      const soPsrIds = new Set(psrs.filter((p) => Number(p.sales_officer_id) === Number(so.id)).map((p) => Number(p.id)));
+                      return outlets.some((o) => validOutletIds.has(Number(o.outlet_id)) && o.assigned_psr_id && soPsrIds.has(Number(o.assigned_psr_id)));
+                    });
+                  }
+                  if (validProductIds) {
+                    supOfficers = supOfficers.filter((so) =>
+                      psrs.some((p) => Number(p.sales_officer_id) === Number(so.id) && p.product_sales?.some((ps) => validProductIds.has(Number(ps.product_id))))
+                    );
+                  }
+                  if (normalizedQuery) {
+                    const supMatch =
+                      (sup.supplier_name || '').toLowerCase().includes(normalizedQuery) ||
+                      (sup.business_name || '').toLowerCase().includes(normalizedQuery) ||
+                      (sup.division_name || '').toLowerCase().includes(normalizedQuery) ||
+                      (sup.depot_address || '').toLowerCase().includes(normalizedQuery);
+
+                    if (!supMatch) {
+                      supOfficers = supOfficers.filter((so) => {
+                        const soMatch =
+                          (so.name || '').toLowerCase().includes(normalizedQuery) ||
+                          (so.officer_code || '').toLowerCase().includes(normalizedQuery) ||
+                          (so.city || '').toLowerCase().includes(normalizedQuery) ||
+                          (so.assigned_area || '').toLowerCase().includes(normalizedQuery);
+                        if (soMatch) return true;
+                        const childPsrs = psrs.filter((p) => Number(p.sales_officer_id) === Number(so.id));
+                        return childPsrs.some(
+                          (p) =>
+                            (p.name || '').toLowerCase().includes(normalizedQuery) ||
+                            (p.psr_code || '').toLowerCase().includes(normalizedQuery) ||
+                            (p.sub_route || '').toLowerCase().includes(normalizedQuery) ||
+                            p.assigned_outlets?.some((out) => (out.outlet_name || '').toLowerCase().includes(normalizedQuery)) ||
+                            p.product_sales?.some((ps) => (ps.product_name || '').toLowerCase().includes(normalizedQuery))
+                        );
+                      });
+                    }
+                  }
+
+                  let supPsrs = psrs.filter((p) => Number(p.supplier_id) === Number(sup.supplier_id));
+                  if (validSalesOfficerIds) {
+                    supPsrs = supPsrs.filter((p) => validSalesOfficerIds.has(Number(p.sales_officer_id)));
+                  }
+                  if (validPsrIds) {
+                    supPsrs = supPsrs.filter((p) => validPsrIds.has(Number(p.id)));
+                  }
+                  if (validOutletIds) {
+                    supPsrs = supPsrs.filter((p) =>
+                      p.assigned_outlets?.some((out) => validOutletIds.has(Number(out.outlet_id))) ||
+                      outlets.some((o) => Number(o.assigned_psr_id) === Number(p.id) && validOutletIds.has(Number(o.outlet_id)))
+                    );
+                  }
+                  if (validProductIds) {
+                    supPsrs = supPsrs.filter((p) =>
+                      p.product_sales?.some((ps) => validProductIds.has(Number(ps.product_id)))
+                    );
+                  }
+
                   const totalCasesSold = supPsrs.reduce((sum, p) => sum + (p.total_cases_sold || 0), 0);
                   const totalRev = supPsrs.reduce((sum, p) => sum + (p.total_revenue || 0), 0);
 
@@ -1660,7 +1922,40 @@ export const SuperadminCommercialLogs: React.FC = () => {
                         ) : (
                           <div className="space-y-3">
                             {supOfficers.map((so) => {
-                              const soPsrs = psrs.filter((p) => Number(p.sales_officer_id) === Number(so.id));
+                              let soPsrs = psrs.filter((p) => Number(p.sales_officer_id) === Number(so.id));
+                              if (validPsrIds) {
+                                soPsrs = soPsrs.filter((p) => validPsrIds.has(Number(p.id)));
+                              }
+                              if (validOutletIds) {
+                                soPsrs = soPsrs.filter((p) =>
+                                  p.assigned_outlets?.some((out) => validOutletIds.has(Number(out.outlet_id))) ||
+                                  outlets.some((o) => Number(o.assigned_psr_id) === Number(p.id) && validOutletIds.has(Number(o.outlet_id)))
+                                );
+                              }
+                              if (validProductIds) {
+                                soPsrs = soPsrs.filter((p) =>
+                                  p.product_sales?.some((ps) => validProductIds.has(Number(ps.product_id)))
+                                );
+                              }
+                              if (normalizedQuery) {
+                                const soMatch =
+                                  (so.name || '').toLowerCase().includes(normalizedQuery) ||
+                                  (so.officer_code || '').toLowerCase().includes(normalizedQuery) ||
+                                  (so.city || '').toLowerCase().includes(normalizedQuery) ||
+                                  (so.assigned_area || '').toLowerCase().includes(normalizedQuery);
+
+                                if (!soMatch) {
+                                  soPsrs = soPsrs.filter(
+                                    (p) =>
+                                      (p.name || '').toLowerCase().includes(normalizedQuery) ||
+                                      (p.psr_code || '').toLowerCase().includes(normalizedQuery) ||
+                                      (p.sub_route || '').toLowerCase().includes(normalizedQuery) ||
+                                      p.assigned_outlets?.some((out) => (out.outlet_name || '').toLowerCase().includes(normalizedQuery)) ||
+                                      p.product_sales?.some((ps) => (ps.product_name || '').toLowerCase().includes(normalizedQuery))
+                                  );
+                                }
+                              }
+
                               const soCases = soPsrs.reduce((sum, p) => sum + (p.total_cases_sold || 0), 0);
                               const soRev = soPsrs.reduce((sum, p) => sum + (p.total_revenue || 0), 0);
 
@@ -1721,6 +2016,38 @@ export const SuperadminCommercialLogs: React.FC = () => {
                                     ) : (
                                       <div className="grid grid-cols-1 gap-3">
                                         {soPsrs.map((psr) => {
+                                          let psrSales = psr.product_sales || [];
+                                          if (validProductIds) {
+                                            psrSales = psrSales.filter((ps) => validProductIds.has(Number(ps.product_id)));
+                                          }
+                                          if (normalizedQuery) {
+                                            const psrMatch =
+                                              (psr.name || '').toLowerCase().includes(normalizedQuery) ||
+                                              (psr.psr_code || '').toLowerCase().includes(normalizedQuery) ||
+                                              (psr.sub_route || '').toLowerCase().includes(normalizedQuery);
+                                            if (!psrMatch) {
+                                              psrSales = psrSales.filter((ps) =>
+                                                (ps.product_name || '').toLowerCase().includes(normalizedQuery)
+                                              );
+                                            }
+                                          }
+
+                                          let psrOutlets = psr.assigned_outlets || [];
+                                          if (validOutletIds) {
+                                            psrOutlets = psrOutlets.filter((out) => validOutletIds.has(Number(out.outlet_id)));
+                                          }
+                                          if (normalizedQuery) {
+                                            const psrMatch =
+                                              (psr.name || '').toLowerCase().includes(normalizedQuery) ||
+                                              (psr.psr_code || '').toLowerCase().includes(normalizedQuery) ||
+                                              (psr.sub_route || '').toLowerCase().includes(normalizedQuery);
+                                            if (!psrMatch) {
+                                              psrOutlets = psrOutlets.filter((out) =>
+                                                (out.outlet_name || '').toLowerCase().includes(normalizedQuery)
+                                              );
+                                            }
+                                          }
+
                                           return (
                                             <div
                                               key={psr.id}
@@ -1796,12 +2123,12 @@ export const SuperadminCommercialLogs: React.FC = () => {
                                               <div className="space-y-1.5 pt-0.5">
                                                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1">
                                                   <Package className="w-3 h-3 text-blue-500" />
-                                                  <span>Products Sold by {psr.name} ({psr.product_sales?.length || 0} Beverage SKUs)</span>
+                                                  <span>Products Sold by {psr.name} ({psrSales.length} Beverage SKUs)</span>
                                                 </span>
 
-                                                {(!psr.product_sales || psr.product_sales.length === 0) ? (
+                                                {psrSales.length === 0 ? (
                                                   <div className="p-2 rounded-lg bg-white border border-dashed border-slate-200 text-[11px] text-slate-400 text-center">
-                                                    No outlet orders booked by this PSR yet.
+                                                    {validProductIds || normalizedQuery ? 'No matching product orders found for this filter.' : 'No outlet orders booked by this PSR yet.'}
                                                   </div>
                                                 ) : (
                                                   <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
@@ -1815,7 +2142,7 @@ export const SuperadminCommercialLogs: React.FC = () => {
                                                         </tr>
                                                       </thead>
                                                       <tbody className="divide-y divide-slate-100">
-                                                        {psr.product_sales.map((ps) => (
+                                                        {psrSales.map((ps) => (
                                                           <tr key={ps.product_id} className="hover:bg-slate-50">
                                                             <td className="py-1.5 px-3 font-semibold text-slate-900">
                                                               {ps.product_name}
@@ -1841,16 +2168,16 @@ export const SuperadminCommercialLogs: React.FC = () => {
                                               <div className="space-y-1 pt-0.5">
                                                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1">
                                                   <Store className="w-3 h-3 text-amber-600" />
-                                                  <span>Allocated Retail Outlets ({psr.assigned_outlets_count || 0} Shops)</span>
+                                                  <span>Allocated Retail Outlets ({psrOutlets.length} Shops)</span>
                                                 </span>
 
-                                                {(!psr.assigned_outlets || psr.assigned_outlets.length === 0) ? (
+                                                {psrOutlets.length === 0 ? (
                                                   <span className="text-[11px] text-slate-400 italic block">
-                                                    No retail outlets allocated to this PSR yet.
+                                                    {validOutletIds || normalizedQuery ? 'No matching retail outlets found for this filter.' : 'No retail outlets allocated to this PSR yet.'}
                                                   </span>
                                                 ) : (
                                                   <div className="flex items-center gap-1.5 flex-wrap">
-                                                    {psr.assigned_outlets.map((shop) => (
+                                                    {psrOutlets.map((shop) => (
                                                       <span
                                                         key={shop.outlet_id}
                                                         className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-slate-200 text-[11px] font-medium text-slate-800 shadow-2xs"

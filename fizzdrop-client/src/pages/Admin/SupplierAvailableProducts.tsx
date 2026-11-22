@@ -9,6 +9,7 @@ import {
   Store,
   Warehouse,
   Tag,
+  MapPin,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { SupplyStockModal, type OutletOption } from './SupplyStockModal';
@@ -54,6 +55,12 @@ export const SupplierAvailableProducts: React.FC<SupplierAvailableProductsProps>
   const [search, setSearch] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
 
+  const [selectedDistrictId, setSelectedDistrictId] = useState<number | null>(null);
+  const [districtName, setDistrictName] = useState<string>('');
+  const [assignedDistricts, setAssignedDistricts] = useState<
+    Array<{ id: number; name: string; division: string; is_primary?: boolean }>
+  >([]);
+
   // Supply Stock to Outlet Modal state
   const [isSupplyModalOpen, setIsSupplyModalOpen] = useState<boolean>(false);
   const [targetProduct, setTargetProduct] = useState<number | null>(null);
@@ -62,14 +69,31 @@ export const SupplierAvailableProducts: React.FC<SupplierAvailableProductsProps>
   const [isZeroStockAlertOpen, setIsZeroStockAlertOpen] = useState<boolean>(false);
   const [zeroStockAlertData, setZeroStockAlertData] = useState<ZeroStockAlertData | null>(null);
 
-  const fetchAvailableProducts = async () => {
+  const fetchAvailableProducts = async (targetDistId?: number) => {
     setLoading(true);
     try {
       const userId = user?.user_id || 4;
-      const [prodRes, outletRes] = await Promise.all([
-        fetch(`http://localhost:8080/api/products?userId=${userId}`),
+      const distToUse = targetDistId !== undefined ? targetDistId : selectedDistrictId;
+      const distParam = distToUse ? `&districtId=${distToUse}` : '';
+
+      const [prodRes, outletRes, boardRes] = await Promise.all([
+        fetch(`http://localhost:8080/api/products?userId=${userId}${distParam}`),
         fetch(`http://localhost:8080/api/outlets?userId=${userId}`),
+        fetch(`http://localhost:8080/api/v1/pricing/supplier/board?userId=${userId}${distParam}`),
       ]);
+
+      if (boardRes.ok) {
+        const boardData = await boardRes.json();
+        if (Array.isArray(boardData.assigned_districts)) {
+          setAssignedDistricts(boardData.assigned_districts);
+        }
+        if (targetDistId === undefined && !selectedDistrictId && boardData.district_id) {
+          setSelectedDistrictId(boardData.district_id);
+          setDistrictName(boardData.district_name);
+        } else if (boardData.district_name) {
+          setDistrictName(boardData.district_name);
+        }
+      }
 
       if (prodRes.ok) {
         const prodData = await prodRes.json();
@@ -95,6 +119,12 @@ export const SupplierAvailableProducts: React.FC<SupplierAvailableProductsProps>
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSelectDistrict = (distId: number, dName: string) => {
+    setSelectedDistrictId(distId);
+    setDistrictName(dName);
+    fetchAvailableProducts(distId);
   };
 
   useEffect(() => {
@@ -168,6 +198,42 @@ export const SupplierAvailableProducts: React.FC<SupplierAvailableProductsProps>
           </button>
         </div>
       </div>
+
+      {/* Assigned Districts Territory Switcher */}
+      {assignedDistricts.length > 0 && (
+        <div className="bg-[#DEFDEF] rounded-2xl p-4 border border-[#BFC8C5] shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <MapPin className="w-4 h-4 text-[#15221C]" />
+            <div>
+              <span className="text-xs font-black uppercase text-[#15221C] tracking-wide block">
+                Official Pricing Territory:
+              </span>
+              <span className="text-[11px] text-[#4A5852]">
+                Active: <strong>{districtName || 'Territory'}</strong> (Showing Superadmin approved buy/wholesale rates for this district)
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {assignedDistricts.map((d) => {
+              const isSelected = selectedDistrictId === d.id;
+              return (
+                <button
+                  key={d.id}
+                  type="button"
+                  onClick={() => handleSelectDistrict(d.id, d.name)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                    isSelected
+                      ? 'bg-[#FFE8BD] text-[#15221C] border-2 border-[#15221C] shadow-md scale-105'
+                      : 'bg-white text-[#15221C] border-[#BFC8C5] hover:bg-[#C8F1E8]'
+                  }`}
+                >
+                  📍 {d.name} {d.is_primary && '★'}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Metric Counters */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">

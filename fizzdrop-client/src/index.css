@@ -2,6 +2,12 @@
 @import "./styles/superadmin-theme.css";
 @import "./styles/supplier-theme.css";
 @import "./styles/sales-officer-theme.css";
+@import "./styles/psr-theme.css";
+@import "./styles/delivery-theme.css";
+@import "./styles/outlet-theme.css";
+@import "./styles/rsm-theme.css";
+@import "./styles/asm-theme.css";
+@import "./styles/home-theme.css";
 
 /* 1. Register Tailwind v4 Utility Classes (creates font-oswald and font-italia) */
 @theme {

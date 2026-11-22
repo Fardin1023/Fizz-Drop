@@ -147,17 +147,17 @@ const HeroSection: React.FC = () => {
           <div className="lg:col-span-7 flex flex-col items-center lg:items-start text-center lg:text-left space-y-7">
             
             {/* Live Pill */}
-            <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-zinc-900/[0.04] dark:bg-zinc-100/[0.06] backdrop-blur-md border border-zinc-200/80 dark:border-zinc-800 shadow-xs text-xs font-semibold tracking-wider text-zinc-700 dark:text-zinc-300">
+            <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-[#9BD8DA]/25 backdrop-blur-md border border-[#9BD8DA] shadow-xs text-xs font-bold tracking-wider text-[#1A282A]">
               <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-600"></span>
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#65B016] opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#65B016]"></span>
               </span>
               <span>LIVE FRANCHISE INVENTORY DISPATCH</span>
             </div>
 
             {/* Headline with Slide Transition */}
             <div className="w-full">
-              <h1 className="font-oswald text-5xl sm:text-6xl lg:text-7xl font-black uppercase tracking-tight leading-[0.93] text-zinc-900 dark:text-zinc-50">
+              <h1 className="font-oswald text-5xl sm:text-6xl lg:text-7xl font-black uppercase tracking-tight leading-[0.93] text-[#1A282A]">
                 Refreshment <br />
                 <span className="block h-[1.18em] overflow-hidden my-1">
                   <span
@@ -172,12 +172,12 @@ const HeroSection: React.FC = () => {
                     {currentProduct.name}
                   </span>
                 </span>
-                <span className="text-zinc-900 dark:text-zinc-100">Delivered Instantly</span>
+                <span className="text-[#1A282A]">Delivered Instantly</span>
               </h1>
 
               {/* Synchronized Tagline */}
               <p
-                className={`mt-3 text-sm sm:text-base font-medium text-zinc-500 dark:text-zinc-400 transition-all duration-500 ease-out ${
+                className={`mt-3 text-sm sm:text-base font-semibold text-[#3D5558] transition-all duration-500 ease-out ${
                   animState !== 'active' ? 'opacity-0 translate-y-2' : 'opacity-100 translate-y-0'
                 }`}
               >
@@ -185,7 +185,7 @@ const HeroSection: React.FC = () => {
               </p>
             </div>
 
-            <p className="max-w-xl text-base text-zinc-600 dark:text-zinc-400 leading-relaxed font-sans">
+            <p className="max-w-xl text-base text-[#3D5558] leading-relaxed font-sans">
               Hand-picked cold drinks, isotonic boosters, and exclusive lifestyle merch sourced straight from authorized outlets.
             </p>
 
@@ -193,7 +193,7 @@ const HeroSection: React.FC = () => {
             <div className="flex flex-wrap items-center justify-center lg:justify-start gap-4 pt-1">
               <Link
                 to="/shop"
-                className="group relative flex items-center gap-2.5 px-7 py-4 rounded-2xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-medium text-sm shadow-xl shadow-zinc-900/10 dark:shadow-white/5 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 ease-out cursor-pointer"
+                className="group relative flex items-center gap-2.5 px-7 py-4 rounded-2xl bg-[#FF6A00] hover:bg-[#E55F00] text-white font-bold text-sm shadow-xl shadow-[#FF6A00]/25 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 ease-out cursor-pointer"
               >
                 <ShoppingBag className="w-4 h-4 transition-transform group-hover:-translate-y-0.5" />
                 <span>Explore Catalog</span>
@@ -202,7 +202,7 @@ const HeroSection: React.FC = () => {
 
               <Link
                 to="/shop"
-                className="flex items-center gap-2 px-7 py-4 rounded-2xl bg-zinc-100/80 dark:bg-zinc-800/60 hover:bg-zinc-200/70 dark:hover:bg-zinc-700/60 border border-zinc-200/70 dark:border-zinc-700/70 text-zinc-800 dark:text-zinc-200 font-medium text-sm backdrop-blur-sm transition-all duration-300 ease-out hover:scale-[1.01] cursor-pointer"
+                className="flex items-center gap-2 px-7 py-4 rounded-2xl bg-white hover:bg-[#EDF7F7] border border-[#DCE8E9] text-[#1A282A] font-bold text-sm backdrop-blur-sm transition-all duration-300 ease-out hover:scale-[1.01] cursor-pointer shadow-xs"
               >
                 Find Local Outlet
               </Link>
@@ -216,8 +216,8 @@ const HeroSection: React.FC = () => {
                   onClick={() => handleManualSelect(idx)}
                   className={`h-1.5 rounded-full transition-all duration-500 ease-out cursor-pointer ${
                     idx === currentIndex
-                      ? 'w-9 bg-zinc-900 dark:bg-zinc-100 shadow-sm'
-                      : 'w-2.5 bg-zinc-300 dark:bg-zinc-700 hover:bg-zinc-400'
+                      ? 'w-9 bg-[#FF6A00] shadow-sm'
+                      : 'w-2.5 bg-[#DCE8E9] hover:bg-[#9CB7BB]'
                   }`}
                   aria-label={`Slide to ${prod.name}`}
                 />
@@ -225,18 +225,18 @@ const HeroSection: React.FC = () => {
             </div>
 
             {/* Brand Specs */}
-            <div className="grid grid-cols-3 gap-6 pt-6 border-t border-zinc-200/80 dark:border-zinc-800/80 w-full max-w-md">
+            <div className="grid grid-cols-3 gap-6 pt-6 border-t border-[#DCE8E9] w-full max-w-md">
               <div className="flex flex-col">
-                <span className="font-oswald text-xl font-bold text-zinc-900 dark:text-zinc-100 tracking-wide">30 MIN</span>
-                <span className="text-[11px] text-zinc-500 font-medium">Flash Dispatch</span>
+                <span className="font-oswald text-xl font-bold text-[#1A282A] tracking-wide">30 MIN</span>
+                <span className="text-[11px] text-[#6B8487] font-semibold">Flash Dispatch</span>
               </div>
               <div className="flex flex-col">
-                <span className="font-oswald text-xl font-bold text-zinc-900 dark:text-zinc-100 tracking-wide">4°C COLD</span>
-                <span className="text-[11px] text-zinc-500 font-medium">Chilled Transport</span>
+                <span className="font-oswald text-xl font-bold text-[#1A282A] tracking-wide">4°C COLD</span>
+                <span className="text-[11px] text-[#6B8487] font-semibold">Chilled Transport</span>
               </div>
               <div className="flex flex-col">
-                <span className="font-oswald text-xl font-bold text-zinc-900 dark:text-zinc-100 tracking-wide">GENUINE</span>
-                <span className="text-[11px] text-zinc-500 font-medium">Sealed Bottle</span>
+                <span className="font-oswald text-xl font-bold text-[#1A282A] tracking-wide">GENUINE</span>
+                <span className="text-[11px] text-[#6B8487] font-semibold">Sealed Bottle</span>
               </div>
             </div>
 
@@ -254,25 +254,25 @@ const HeroSection: React.FC = () => {
 
             {/* Main Stage Glassmorphic Card */}
             <div
-              className={`group relative w-full max-w-[390px] sm:max-w-[430px] h-[500px] sm:h-[550px] rounded-[40px] bg-gradient-to-b from-white/75 via-white/45 to-white/65 dark:from-zinc-900/75 dark:via-zinc-900/45 dark:to-zinc-900/65 backdrop-blur-2xl border border-white/80 dark:border-zinc-800/80 p-7 sm:p-8 flex flex-col justify-between items-center shadow-[0_25px_60px_-15px_rgba(0,0,0,0.08)] dark:shadow-[0_25px_70px_-20px_rgba(0,0,0,0.6)] transition-all duration-700 ease-out hover:shadow-2xl overflow-hidden ${currentProduct.borderGlow}`}
+              className={`group relative w-full max-w-[390px] sm:max-w-[430px] h-[500px] sm:h-[550px] rounded-[40px] bg-gradient-to-b from-white/90 via-[#FAFCFC]/80 to-white/90 backdrop-blur-2xl border border-[#DCE8E9] p-7 sm:p-8 flex flex-col justify-between items-center shadow-[0_20px_50px_-15px_rgba(26,40,42,0.08)] transition-all duration-700 ease-out hover:shadow-2xl overflow-hidden hover:border-[#FF6A00]/40`}
             >
               
               {/* Card Top Row Badges */}
               <div className="w-full flex items-center justify-between z-10">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/85 dark:bg-zinc-800/85 border border-white/60 dark:border-zinc-700/60 text-[11px] font-semibold text-zinc-800 dark:text-zinc-200 backdrop-blur-md shadow-xs">
-                  <Zap className="w-3 h-3 text-amber-500 fill-amber-500" /> Instant Drop
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-[#DCE8E9] text-[11px] font-bold text-[#1A282A] backdrop-blur-md shadow-xs">
+                  <Zap className="w-3 h-3 text-[#FFB62A] fill-[#FFB62A]" /> Instant Drop
                 </span>
-                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" /> Authenticated
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#4B8510]">
+                  <ShieldCheck className="w-3.5 h-3.5 text-[#65B016]" /> Authenticated
                 </span>
               </div>
 
               {/* Animated Carousel Center Stage */}
-              <div className="relative flex-1 w-full flex items-center justify-center my-3 rounded-3xl bg-radial from-white/60 via-zinc-50/20 to-transparent dark:from-zinc-800/30 dark:via-zinc-900/10 dark:to-transparent overflow-hidden">
+              <div className="relative flex-1 w-full flex items-center justify-center my-3 rounded-3xl bg-radial from-white/80 via-[#EDF7F7]/40 to-transparent overflow-hidden">
                 
                 {/* Pedestal Reflection Halo */}
                 <div
-                  className={`absolute bottom-6 w-52 h-14 rounded-full ${currentProduct.pedestalGlow} blur-xl pointer-events-none transition-all duration-700 ${
+                  className={`absolute bottom-6 w-52 h-14 rounded-full bg-[#9BD8DA]/40 blur-xl pointer-events-none transition-all duration-700 ${
                     animState === 'active' ? 'scale-100 opacity-100' : 'scale-75 opacity-40'
                   }`}
                 />
@@ -283,7 +283,7 @@ const HeroSection: React.FC = () => {
                     key={currentProduct.name}
                     src={currentProduct.image}
                     alt={currentProduct.name}
-                    className={`max-h-[300px] sm:max-h-[365px] w-auto object-contain drop-shadow-[0_24px_32px_rgba(0,0,0,0.22)] transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-105 group-hover:-translate-y-2 group-hover:rotate-1 ${
+                    className={`max-h-[300px] sm:max-h-[365px] w-auto object-contain drop-shadow-[0_24px_32px_rgba(26,40,42,0.18)] transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-105 group-hover:-translate-y-2 group-hover:rotate-1 ${
                       animState === 'exiting'
                         ? 'opacity-0 scale-75 translate-y-12 rotate-[-6deg] blur-xs'
                         : animState === 'entering'
@@ -296,17 +296,17 @@ const HeroSection: React.FC = () => {
 
               {/* Card Footer: Synchronized Product Meta */}
               <div className="w-full z-10">
-                <div className="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-white/85 dark:bg-zinc-800/80 backdrop-blur-md border border-white/70 dark:border-zinc-700/60 shadow-xs transition-all duration-300">
+                <div className="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-white border border-[#DCE8E9] shadow-xs transition-all duration-300">
                   <div className="overflow-hidden">
                     <p
-                      className={`text-xs font-bold text-zinc-900 dark:text-zinc-100 tracking-tight transition-all duration-300 ${
+                      className={`text-xs font-bold text-[#1A282A] tracking-tight transition-all duration-300 ${
                         animState !== 'active' ? 'opacity-0 translate-y-1' : 'opacity-100 translate-y-0'
                       }`}
                     >
                       {currentProduct.name}
                     </p>
                     <p
-                      className={`text-[10px] text-zinc-500 font-medium transition-all duration-300 delay-75 ${
+                      className={`text-[10px] text-[#6B8487] font-semibold transition-all duration-300 delay-75 ${
                         animState !== 'active' ? 'opacity-0 translate-y-1' : 'opacity-100 translate-y-0'
                       }`}
                     >
@@ -316,7 +316,7 @@ const HeroSection: React.FC = () => {
                   
                   <Link
                     to="/shop"
-                    className="p-2.5 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:scale-105 active:scale-95 transition-transform shadow-xs cursor-pointer shrink-0"
+                    className="p-2.5 rounded-xl bg-[#FF6A00] hover:bg-[#E55F00] text-white hover:scale-105 active:scale-95 transition-transform shadow-xs cursor-pointer shrink-0"
                     aria-label={`Buy ${currentProduct.name}`}
                   >
                     <ArrowRight className="w-3.5 h-3.5" />

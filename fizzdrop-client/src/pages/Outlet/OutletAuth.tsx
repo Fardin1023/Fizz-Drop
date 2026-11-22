@@ -206,29 +206,29 @@ export const OutletAuth: React.FC = () => {
 
       {/* Center Auth Card */}
       <main className="relative z-10 w-full max-w-2xl mx-auto px-4 py-8">
-        <div className="bg-slate-900/80 backdrop-blur-xl border border-emerald-500/20 rounded-3xl shadow-2xl shadow-emerald-950/50 overflow-hidden">
+        <div className="bg-slate-900/80 backdrop-blur-xl border border-[#E2C799]/40 rounded-3xl shadow-2xl shadow-black/50 overflow-hidden">
           {/* Top Brand Banner */}
-          <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 p-6 sm:p-7 text-center relative overflow-hidden">
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white/20 to-transparent pointer-events-none" />
-            <div className="inline-flex p-3 rounded-2xl bg-white/15 backdrop-blur-md mb-2 shadow-inner ring-1 ring-white/25">
-              <Store className="w-8 h-8 text-white" />
+          <div className="bg-gradient-to-r from-[#FFD18D] via-[#FDECAD] to-[#F7E6C9] p-6 sm:p-7 text-center relative overflow-hidden border-b border-[#E2C799]">
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white/30 to-transparent pointer-events-none" />
+            <div className="inline-flex p-3 rounded-2xl bg-[#2D2319]/10 backdrop-blur-md mb-2 shadow-inner ring-1 ring-[#E2C799]">
+              <Store className="w-8 h-8 text-[#78350F]" />
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-black text-[#2D2319] tracking-tight">
               OUTLET BRANCH PORTAL
             </h1>
-            <p className="text-xs sm:text-sm text-emerald-100 font-medium max-w-md mx-auto mt-1">
+            <p className="text-xs sm:text-sm text-[#433022] font-medium max-w-md mx-auto mt-1">
               Point of Sale, live inventory management, customer sales & supplier restock requisitions
             </p>
 
             {/* Tab Switcher Pills */}
-            <div className="flex p-1.5 mt-5 rounded-2xl bg-black/25 backdrop-blur-md max-w-xs mx-auto border border-white/15">
+            <div className="flex p-1.5 mt-5 rounded-2xl bg-[#2D2319]/15 backdrop-blur-md max-w-xs mx-auto border border-[#E2C799]/60">
               <button
                 type="button"
                 onClick={() => setActiveTab('login')}
                 className={`flex-1 py-2 px-3 text-xs font-black rounded-xl transition-all cursor-pointer ${
                   activeTab === 'login'
-                    ? 'bg-white text-emerald-900 shadow-md scale-100'
-                    : 'text-white/80 hover:text-white'
+                    ? 'bg-[#2D2319] text-[#FDECAD] shadow-md scale-100'
+                    : 'text-[#2D2319]/80 hover:text-[#2D2319]'
                 }`}
               >
                 Sign In to Branch
@@ -238,8 +238,8 @@ export const OutletAuth: React.FC = () => {
                 onClick={() => setActiveTab('register')}
                 className={`flex-1 py-2 px-3 text-xs font-black rounded-xl transition-all cursor-pointer ${
                   activeTab === 'register'
-                    ? 'bg-white text-emerald-900 shadow-md scale-100'
-                    : 'text-white/80 hover:text-white'
+                    ? 'bg-[#2D2319] text-[#FDECAD] shadow-md scale-100'
+                    : 'text-[#2D2319]/80 hover:text-[#2D2319]'
                 }`}
               >
                 + Register Branch
@@ -252,8 +252,8 @@ export const OutletAuth: React.FC = () => {
             {activeTab === 'login' && (
               <div className="space-y-6 animate-fade-in">
                 {loginError && (
-                  <div className="p-3.5 rounded-2xl bg-rose-950/70 border border-rose-500/40 text-rose-300 text-xs flex items-center gap-2 animate-shake">
-                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                  <div className="p-3.5 rounded-2xl bg-[#F6DBD4]/20 border border-[#E29D94] text-[#F6DBD4] text-xs flex items-center gap-2 animate-shake">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-[#E29D94]" />
                     <span>{loginError}</span>
                   </div>
                 )}
@@ -261,18 +261,18 @@ export const OutletAuth: React.FC = () => {
                 {/* Quick One-Click Branch Selection */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
-                      <Sparkles className="w-4 h-4" />
+                    <label className="text-xs font-black uppercase tracking-wider text-[#FFD18D] flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-[#FFD18D]" />
                       <span>One-Click Active Branch Access</span>
                     </label>
-                    <span className="text-[11px] text-slate-400 font-mono">
+                    <span className="text-[11px] text-[#F7E6C9]/70 font-mono">
                       {outlets.length} active branches in database
                     </span>
                   </div>
 
                   {loadingOutlets ? (
                     <div className="py-8 flex justify-center">
-                      <div className="w-6 h-6 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
+                      <div className="w-6 h-6 border-2 border-[#FFD18D]/30 border-t-[#FFD18D] rounded-full animate-spin" />
                     </div>
                   ) : outlets.length === 0 ? (
                     <div className="p-4 rounded-2xl bg-white/5 border border-white/10 text-center text-xs text-slate-400">
@@ -286,14 +286,14 @@ export const OutletAuth: React.FC = () => {
                           type="button"
                           onClick={() => handleQuickLogin(o.outlet_id)}
                           disabled={submittingLogin}
-                          className="p-3 rounded-2xl bg-white/5 hover:bg-emerald-500/15 border border-white/10 hover:border-emerald-500/40 text-left transition-all group flex items-center justify-between cursor-pointer"
+                          className="p-3 rounded-2xl bg-white/5 hover:bg-[#FFD18D]/15 border border-white/10 hover:border-[#FFD18D]/50 text-left transition-all group flex items-center justify-between cursor-pointer"
                         >
                           <div className="min-w-0 pr-2">
                             <div className="flex items-center gap-1.5">
-                              <span className="text-xs font-black text-white group-hover:text-emerald-300 truncate">
+                              <span className="text-xs font-black text-white group-hover:text-[#FFD18D] truncate">
                                 {o.franchise_name || o.outlet_name}
                               </span>
-                              <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-emerald-500/20 text-emerald-300 font-mono">
+                              <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-[#FFD18D]/20 text-[#FFD18D] font-mono border border-[#FFD18D]/30">
                                 #{o.outlet_id}
                               </span>
                             </div>
@@ -301,7 +301,7 @@ export const OutletAuth: React.FC = () => {
                               {o.branch_name || o.area || o.city} • {o.city}
                             </p>
                           </div>
-                          <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all shrink-0" />
+                          <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-[#FFD18D] group-hover:translate-x-0.5 transition-all shrink-0" />
                         </button>
                       ))}
                     </div>
@@ -311,7 +311,7 @@ export const OutletAuth: React.FC = () => {
                 {/* Divider */}
                 <div className="relative flex items-center py-2">
                   <div className="flex-grow border-t border-white/10" />
-                  <span className="flex-shrink mx-4 text-[10px] uppercase font-bold tracking-widest text-slate-500">
+                  <span className="flex-shrink mx-4 text-[10px] uppercase font-bold tracking-widest text-[#F7E6C9]/60">
                     Or Sign In with Credentials
                   </span>
                   <div className="flex-grow border-t border-white/10" />
@@ -326,7 +326,7 @@ export const OutletAuth: React.FC = () => {
                     <select
                       value={selectedOutletId}
                       onChange={(e) => setSelectedOutletId(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-white/10 bg-slate-800 text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/40 cursor-pointer"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-white/10 bg-slate-800 text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#FFD18D]/50 cursor-pointer"
                     >
                       {outlets.map((o) => (
                         <option key={o.outlet_id} value={o.outlet_id}>
@@ -339,7 +339,7 @@ export const OutletAuth: React.FC = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <label className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
-                        <Mail className="w-3.5 h-3.5 text-emerald-400" />
+                        <Mail className="w-3.5 h-3.5 text-[#FFD18D]" />
                         <span>Email (Optional)</span>
                       </label>
                       <input
@@ -347,13 +347,13 @@ export const OutletAuth: React.FC = () => {
                         placeholder="branch@outlet.fizzdrop.com"
                         value={loginEmail}
                         onChange={(e) => setLoginEmail(e.target.value)}
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-white/10 bg-slate-800 text-white text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-white/10 bg-slate-800 text-white text-xs focus:outline-none focus:ring-2 focus:ring-[#FFD18D]/50"
                       />
                     </div>
 
                     <div className="space-y-1">
                       <label className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
-                        <Lock className="w-3.5 h-3.5 text-emerald-400" />
+                        <Lock className="w-3.5 h-3.5 text-[#FFD18D]" />
                         <span>Password</span>
                       </label>
                       <input
@@ -361,7 +361,7 @@ export const OutletAuth: React.FC = () => {
                         placeholder="••••••••"
                         value={loginPassword}
                         onChange={(e) => setLoginPassword(e.target.value)}
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-white/10 bg-slate-800 text-white text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-white/10 bg-slate-800 text-white text-xs focus:outline-none focus:ring-2 focus:ring-[#FFD18D]/50"
                       />
                     </div>
                   </div>
@@ -369,14 +369,14 @@ export const OutletAuth: React.FC = () => {
                   <button
                     type="submit"
                     disabled={submittingLogin}
-                    className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/40 transition-all cursor-pointer"
+                    className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-[#FFD18D] via-[#FDECAD] to-[#FFD18D] hover:opacity-95 text-[#2D2319] font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-[#FFD18D]/20 transition-all cursor-pointer"
                   >
                     {submittingLogin ? (
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <div className="w-5 h-5 border-2 border-[#2D2319]/30 border-t-[#2D2319] rounded-full animate-spin" />
                     ) : (
                       <>
                         <span>Enter Selected Branch Dashboard</span>
-                        <ArrowRight className="w-4 h-4" />
+                        <ArrowRight className="w-4 h-4 text-[#2D2319]" />
                       </>
                     )}
                   </button>
@@ -388,15 +388,15 @@ export const OutletAuth: React.FC = () => {
             {activeTab === 'register' && (
               <form onSubmit={handleRegisterSubmit} className="space-y-5 animate-fade-in">
                 {registerError && (
-                  <div className="p-3.5 rounded-2xl bg-rose-950/70 border border-rose-500/40 text-rose-300 text-xs flex items-center gap-2 animate-shake">
-                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                  <div className="p-3.5 rounded-2xl bg-[#F6DBD4]/20 border border-[#E29D94] text-[#F6DBD4] text-xs flex items-center gap-2 animate-shake">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-[#E29D94]" />
                     <span>{registerError}</span>
                   </div>
                 )}
 
                 {/* Franchise Brand Selector */}
                 <div className="space-y-2">
-                  <label className="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                  <label className="text-xs font-black uppercase tracking-wider text-[#FFD18D] flex items-center gap-1.5">
                     <Building className="w-4 h-4" />
                     <span>1. Franchise Brand</span>
                   </label>
@@ -410,7 +410,7 @@ export const OutletAuth: React.FC = () => {
                           onClick={() => setFranchiseBrand(brand)}
                           className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                             isSelected
-                              ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/30 ring-2 ring-emerald-300'
+                              ? 'bg-[#FFD18D] text-[#2D2319] shadow-md shadow-[#FFD18D]/25 ring-2 ring-[#FFD18D]'
                               : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10'
                           }`}
                         >
@@ -426,14 +426,14 @@ export const OutletAuth: React.FC = () => {
                       placeholder="Enter custom retail / franchise chain name..."
                       value={customBrand}
                       onChange={(e) => setCustomBrand(e.target.value)}
-                      className="w-full mt-2 px-3.5 py-2.5 rounded-xl border border-emerald-500/40 bg-slate-800 text-white text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                      className="w-full mt-2 px-3.5 py-2.5 rounded-xl border border-[#FFD18D]/40 bg-slate-800 text-white text-xs focus:outline-none focus:ring-2 focus:ring-[#FFD18D]/50"
                     />
                   )}
                 </div>
 
                 {/* Branch Location Name */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-black uppercase tracking-wider text-emerald-400">
+                  <label className="text-xs font-black uppercase tracking-wider text-[#FFD18D]">
                     2. Physical Branch Location
                   </label>
                   <input
@@ -442,7 +442,7 @@ export const OutletAuth: React.FC = () => {
                     placeholder="e.g. Gulshan 2 Branch, Joydebpur Branch, Uttara Sector 7..."
                     value={branchName}
                     onChange={(e) => setBranchName(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-white/10 bg-slate-800 text-white text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-white/10 bg-slate-800 text-white text-xs focus:outline-none focus:ring-2 focus:ring-[#FFD18D]/50"
                   />
                 </div>
 
@@ -450,7 +450,7 @@ export const OutletAuth: React.FC = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
-                      <MapPin className="w-3.5 h-3.5 text-emerald-400" />
+                      <MapPin className="w-3.5 h-3.5 text-[#FFD18D]" />
                       <span>City</span>
                     </label>
                     <select
@@ -461,7 +461,7 @@ export const OutletAuth: React.FC = () => {
                         const areas = CITY_AREAS_MAP[newCity] || [];
                         if (areas.length > 0) setArea(areas[0]);
                       }}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-white/10 bg-slate-800 text-white text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/40 cursor-pointer"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-white/10 bg-slate-800 text-white text-xs focus:outline-none focus:ring-2 focus:ring-[#FFD18D]/50 cursor-pointer"
                     >
                       {Object.keys(CITY_AREAS_MAP).map((c) => (
                         <option key={c} value={c}>{c}</option>
@@ -476,7 +476,7 @@ export const OutletAuth: React.FC = () => {
                     <select
                       value={area}
                       onChange={(e) => setArea(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-white/10 bg-slate-800 text-white text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/40 cursor-pointer"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-white/10 bg-slate-800 text-white text-xs focus:outline-none focus:ring-2 focus:ring-[#FFD18D]/50 cursor-pointer"
                     >
                       {availableAreas.map((a) => (
                         <option key={a} value={a}>{a}</option>
@@ -496,13 +496,13 @@ export const OutletAuth: React.FC = () => {
                       placeholder="Plot No., Road, Landmark..."
                       value={address}
                       onChange={(e) => setAddress(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-white/10 bg-slate-800 text-white text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-white/10 bg-slate-800 text-white text-xs focus:outline-none focus:ring-2 focus:ring-[#FFD18D]/50"
                     />
                   </div>
 
                   <div className="space-y-1">
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
-                      <Phone className="w-3.5 h-3.5 text-emerald-400" />
+                      <Phone className="w-3.5 h-3.5 text-[#FFD18D]" />
                       <span>Contact Phone</span>
                     </label>
                     <input
@@ -510,7 +510,7 @@ export const OutletAuth: React.FC = () => {
                       placeholder="01992-001122"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-white/10 bg-slate-800 text-white text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-white/10 bg-slate-800 text-white text-xs focus:outline-none focus:ring-2 focus:ring-[#FFD18D]/50"
                     />
                   </div>
                 </div>
@@ -526,7 +526,7 @@ export const OutletAuth: React.FC = () => {
                       placeholder="manager@branch.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-white/10 bg-slate-800 text-white text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-white/10 bg-slate-800 text-white text-xs focus:outline-none focus:ring-2 focus:ring-[#FFD18D]/50"
                     />
                   </div>
 
@@ -539,7 +539,7 @@ export const OutletAuth: React.FC = () => {
                       placeholder="Password123!"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-white/10 bg-slate-800 text-white text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-white/10 bg-slate-800 text-white text-xs focus:outline-none focus:ring-2 focus:ring-[#FFD18D]/50"
                     />
                   </div>
                 </div>
@@ -547,13 +547,13 @@ export const OutletAuth: React.FC = () => {
                 <button
                   type="submit"
                   disabled={submittingRegister}
-                  className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:from-emerald-600 hover:to-teal-600 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 transition-all cursor-pointer"
+                  className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-[#FFD18D] via-[#FDECAD] to-[#FFD18D] hover:opacity-95 text-[#2D2319] font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-[#FFD18D]/25 transition-all cursor-pointer"
                 >
                   {submittingRegister ? (
-                    <div className="w-5 h-5 border-2 border-slate-950/30 border-t-slate-950 rounded-full animate-spin" />
+                    <div className="w-5 h-5 border-2 border-[#2D2319]/30 border-t-[#2D2319] rounded-full animate-spin" />
                   ) : (
                     <>
-                      <CheckCircle className="w-4 h-4" />
+                      <CheckCircle className="w-4 h-4 text-[#2D2319]" />
                       <span>Register Branch & Enter Dashboard</span>
                     </>
                   )}

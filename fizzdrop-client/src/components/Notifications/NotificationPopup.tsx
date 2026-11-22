@@ -61,6 +61,7 @@ export const NotificationPopup: React.FC<NotificationPopupProps> = ({
   const isStockOffer = notification.type === 'STOCK_OFFER_RECEIVED';
   const isDirectDispatch = notification.type === 'DIRECT_DISPATCH' || notification.type === 'DIRECT_SUPPLY';
   const isApproved = notification.type === 'APPROVED';
+  const isPriceUpdated = notification.type === 'PRICE_UPDATED' || notification.type === 'DISTRICT_PRICING';
   const isPartial = notification.type === 'PARTIALLY_APPROVED';
   const isRejected = notification.type === 'REJECTED';
   const isNewReq = notification.type === 'NEW_REQUISITION';
@@ -125,6 +126,8 @@ export const NotificationPopup: React.FC<NotificationPopupProps> = ({
           className={`absolute -top-12 -right-12 w-28 h-28 rounded-full blur-2xl pointer-events-none opacity-40 ${
             isStockOffer
               ? 'bg-purple-400'
+              : isPriceUpdated
+              ? 'bg-teal-400'
               : isApproved
               ? 'bg-emerald-400'
               : isRejected
@@ -144,6 +147,8 @@ export const NotificationPopup: React.FC<NotificationPopupProps> = ({
                   ? 'bg-purple-50 text-purple-600 border border-purple-200'
                   : isDirectDispatch
                   ? 'bg-purple-50 text-purple-600 border border-purple-200'
+                  : isPriceUpdated
+                  ? 'bg-teal-50 text-teal-600 border border-teal-200'
                   : isApproved
                   ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
                   : isRejected
@@ -157,6 +162,8 @@ export const NotificationPopup: React.FC<NotificationPopupProps> = ({
                 <Zap className="w-5 h-5 text-purple-600" />
               ) : isDirectDispatch ? (
                 <PackageCheck className="w-5 h-5 text-purple-600" />
+              ) : isPriceUpdated ? (
+                <Sparkles className="w-5 h-5 text-teal-600 animate-pulse" />
               ) : isApproved ? (
                 <CheckCircle2 className="w-5 h-5 text-emerald-600" />
               ) : isRejected ? (
@@ -178,6 +185,8 @@ export const NotificationPopup: React.FC<NotificationPopupProps> = ({
                       ? 'bg-purple-100 text-purple-800 border border-purple-200'
                       : isDirectDispatch
                       ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                      : isPriceUpdated
+                      ? 'bg-teal-100 text-teal-800 border border-teal-200'
                       : isApproved
                       ? 'bg-emerald-100 text-emerald-800'
                       : isRejected
@@ -192,6 +201,8 @@ export const NotificationPopup: React.FC<NotificationPopupProps> = ({
                     ? 'IN-TRANSIT STOCK OFFER'
                     : isDirectDispatch
                     ? 'DIRECT SHIPMENT (UNREQUESTED)'
+                    : isPriceUpdated
+                    ? 'DISTRICT PRICING ALLOTTED'
                     : isApproved
                     ? 'STOCK PERMITTED'
                     : isRejected

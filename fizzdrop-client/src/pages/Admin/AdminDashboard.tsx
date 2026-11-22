@@ -10,6 +10,7 @@ import { SupplierOutletRequisitions } from './SupplierOutletRequisitions';
 import { SupplierStockSalesTracking } from './SupplierStockSalesTracking';
 import { SupplierDeliveryManagement } from './SupplierDeliveryManagement';
 import { SupplierWalletModal } from './SupplierWalletModal';
+import { SupplierPriceBoard } from './SupplierPriceBoard';
 import {
   Package,
   LogOut,
@@ -28,6 +29,7 @@ import {
   TrendingUp,
   Wallet,
   Users,
+  Tag,
 } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { getNotificationDestination } from '../../utils/notificationRouter';
@@ -41,8 +43,8 @@ export const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = (searchParams.get('tab') as any) || 'outlet-requests';
-  const validTabs = ['outlet-requests', 'stock-sales-dispatch', 'delivery-fleet', 'request', 'history', 'outlets', 'profile', 'transactions'];
-  const [activeTab, setActiveTab] = useState<'outlet-requests' | 'stock-sales-dispatch' | 'delivery-fleet' | 'request' | 'history' | 'outlets' | 'profile' | 'transactions'>(
+  const validTabs = ['outlet-requests', 'stock-sales-dispatch', 'price-board', 'delivery-fleet', 'request', 'history', 'outlets', 'profile', 'transactions'];
+  const [activeTab, setActiveTab] = useState<'outlet-requests' | 'stock-sales-dispatch' | 'price-board' | 'delivery-fleet' | 'request' | 'history' | 'outlets' | 'profile' | 'transactions'>(
     validTabs.includes(initialTab) ? initialTab : 'outlet-requests'
   );
 
@@ -190,6 +192,15 @@ export const AdminDashboard: React.FC = () => {
       icon: TrendingUp,
       gradient: 'from-blue-600 via-indigo-600 to-purple-600',
       badge: 'Fulfillment',
+    },
+    {
+      id: 'price-board' as const,
+      label: 'Territory Official Price Board',
+      shortLabel: 'Price Board',
+      desc: 'Approved regional buy rates, wholesale prices & profit margins',
+      icon: Tag,
+      gradient: 'from-amber-600 via-orange-600 to-emerald-600',
+      badge: 'Territory Rates',
     },
     {
       id: 'delivery-fleet' as const,
@@ -494,6 +505,16 @@ export const AdminDashboard: React.FC = () => {
               }}
             />
           )}
+          {activeTab === 'price-board' && (
+            <SupplierPriceBoard
+              userId={searchParams.get('userId') ? Number(searchParams.get('userId')) : (user?.user_id || 4)}
+              supplierId={searchParams.get('supplierId') ? Number(searchParams.get('supplierId')) : undefined}
+              onRequestStock={(prodId) => {
+                setSelectedProductId(prodId);
+                setActiveTab('request');
+              }}
+            />
+          )}
           {activeTab === 'delivery-fleet' && (
             <SupplierDeliveryManagement userId={user?.user_id || 4} />
           )}
@@ -520,7 +541,12 @@ export const AdminDashboard: React.FC = () => {
             />
 
           )}
-          {activeTab === 'profile' && <SupplierProfileView onViewAllocatedOutlets={() => setActiveTab('outlets')} />}
+          {activeTab === 'profile' && (
+            <SupplierProfileView
+              onViewAllocatedOutlets={() => setActiveTab('outlets')}
+              onViewPriceBoard={() => setActiveTab('price-board')}
+            />
+          )}
           {activeTab === 'transactions' && <SupplierTransactionsView />}
         </main>
       </div>

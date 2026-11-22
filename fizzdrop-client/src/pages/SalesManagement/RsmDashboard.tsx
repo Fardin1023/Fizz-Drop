@@ -322,26 +322,26 @@ export const RsmDashboard: React.FC = () => {
   const achievementPct = targetAmount > 0 ? Math.min(100, Math.round((currentRevenue * 100) / targetAmount)) : 0;
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans selection:bg-rose-500 selection:text-white">
+    <div className="min-h-screen bg-[#E5FAFB] text-[#163A3C] flex flex-col font-sans selection:bg-[#36A4AB] selection:text-white rsm-theme">
       {/* Top Floating App Bar */}
-      <header className="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-4 sm:px-6 py-3 transition-all">
+      <header className="sticky top-0 z-40 bg-[#E5FAFB]/95 backdrop-blur-md border-b border-[#CDE2E3] px-4 sm:px-6 py-3 transition-all shadow-xs">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <img
               src={rsmLogo}
               alt="FizzDrop RSM Logo"
-              className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl object-cover shadow-lg shadow-emerald-900/30 border border-emerald-500/40 shrink-0 transform hover:scale-105 transition-transform"
+              className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl object-cover shadow-sm border border-[#CDE2E3] shrink-0 transform hover:scale-105 transition-transform bg-white"
             />
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2 py-0.5 rounded-full">
+                <span className="text-[10px] font-black uppercase tracking-wider bg-[#DCF1F2] text-[#163A3C] border border-[#CDE2E3] px-2 py-0.5 rounded-full">
                   Regional Command
                 </span>
-                <span className="text-xs text-slate-400 font-mono">6 Divisions System</span>
+                <span className="text-xs text-[#48686A] font-mono">6 Divisions System</span>
               </div>
-              <h1 className="text-base sm:text-lg font-black tracking-tight text-white flex items-center gap-1.5">
+              <h1 className="text-base sm:text-lg font-black tracking-tight text-[#112627] flex items-center gap-1.5">
                 <span>FizzDrop RSM Executive Portal</span>
-                <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
+                <Sparkles className="w-4 h-4 text-[#2A969C] animate-pulse" />
               </h1>
             </div>
           </div>
@@ -352,7 +352,7 @@ export const RsmDashboard: React.FC = () => {
               <select
                 value={selectedRsmId || ''}
                 onChange={(e) => setSelectedRsmId(Number(e.target.value))}
-                className="bg-slate-800 hover:bg-slate-700/80 text-white text-xs font-bold rounded-xl border border-slate-700 px-3.5 py-2 pr-8 focus:ring-2 focus:ring-rose-500 focus:outline-none transition appearance-none cursor-pointer"
+                className="bg-white hover:bg-[#F4FDFE] text-[#163A3C] text-xs font-bold rounded-xl border border-[#CDE2E3] px-3.5 py-2 pr-8 focus:ring-2 focus:ring-[#36A4AB] focus:outline-none transition appearance-none cursor-pointer shadow-xs"
               >
                 {rsms.map((r) => (
                   <option key={r.id} value={r.id}>
@@ -360,32 +360,32 @@ export const RsmDashboard: React.FC = () => {
                   </option>
                 ))}
               </select>
-              <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <ChevronDown className="w-4 h-4 text-[#48686A] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
 
             <button
               type="button"
               onClick={() => selectedRsmId && fetchRsmData(selectedRsmId)}
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer"
+              className="p-2 rounded-xl bg-white hover:bg-[#DCF1F2] text-[#163A3C] border border-[#CDE2E3] transition cursor-pointer shadow-xs"
               title="Refresh Division Data"
             >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-rose-400' : ''}`} />
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-[#2A969C]' : ''}`} />
             </button>
 
             <Link
               to="/asm"
-              className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-blue-900/30 transition cursor-pointer active:scale-95"
+              className="px-3.5 py-2 rounded-xl bg-[#163A3C] hover:bg-[#235356] text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition cursor-pointer active:scale-95"
             >
-              <Users className="w-3.5 h-3.5" />
+              <Users className="w-3.5 h-3.5 text-[#E5FAFB]" />
               <span>Area Managers (ASM)</span>
             </Link>
 
             <Link
               to="/sales-officer"
-              className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold transition flex items-center gap-1"
+              className="px-3 py-2 rounded-xl bg-white hover:bg-[#DCF1F2] text-[#163A3C] border border-[#CDE2E3] text-xs font-bold transition flex items-center gap-1 shadow-xs"
             >
               <span>SO Portal</span>
-              <ExternalLink className="w-3 h-3" />
+              <ExternalLink className="w-3 h-3 text-[#48686A]" />
             </Link>
           </div>
         </div>
@@ -394,58 +394,58 @@ export const RsmDashboard: React.FC = () => {
       {/* Main Content Body */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
         {/* Banner: Assigned Regional Sales Manager & Division Identity */}
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-950 via-slate-900 to-rose-950/80 border border-slate-800 p-6 shadow-2xl space-y-4">
-          <div className="absolute right-0 top-0 -mt-10 -mr-10 w-72 h-72 rounded-full bg-rose-600/10 blur-3xl pointer-events-none" />
-          <div className="absolute left-1/3 bottom-0 -mb-10 w-60 h-60 rounded-full bg-amber-500/10 blur-3xl pointer-events-none" />
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-white via-[#F4FDFE] to-[#DCF1F2] border border-[#CDE2E3] p-6 shadow-sm space-y-4">
+          <div className="absolute right-0 top-0 -mt-10 -mr-10 w-72 h-72 rounded-full bg-[#36A4AB]/10 blur-3xl pointer-events-none" />
+          <div className="absolute left-1/3 bottom-0 -mb-10 w-60 h-60 rounded-full bg-[#DCF1F2]/60 blur-3xl pointer-events-none" />
 
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
             <div className="flex items-start sm:items-center gap-4">
               <img
                 src={rsmLogo}
                 alt="Regional Sales Manager Emblem"
-                className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover shadow-2xl border-2 border-emerald-500/40 shrink-0 bg-slate-900/60"
+                className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover shadow-sm border-2 border-[#CDE2E3] shrink-0 bg-white"
               />
               <div className="space-y-1.5">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-mono font-black uppercase px-2.5 py-0.5 rounded-lg bg-rose-600 text-white shadow-xs">
+                  <span className="text-xs font-mono font-black uppercase px-2.5 py-0.5 rounded-lg bg-[#163A3C] text-[#E5FAFB] shadow-xs">
                     {selectedRsm?.code || 'RSM'}
                   </span>
-                  <span className="text-xs bg-slate-800 text-slate-300 border border-slate-700 px-2.5 py-0.5 rounded-lg font-bold flex items-center gap-1">
-                    <MapPin className="w-3 h-3 text-rose-400" />
+                  <span className="text-xs bg-white text-[#163A3C] border border-[#CDE2E3] px-2.5 py-0.5 rounded-lg font-bold flex items-center gap-1 shadow-xs">
+                    <MapPin className="w-3 h-3 text-[#2A969C]" />
                     {selectedRsm?.division || 'Division'} Regional Division
                   </span>
-                  <span className="text-xs bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-lg font-bold">
+                  <span className="text-xs bg-[#DCF1F2] text-[#163A3C] border border-[#CDE2E3] px-2 py-0.5 rounded-lg font-bold">
                     {asms.length} Assigned Districts
                   </span>
                 </div>
-                <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                <h2 className="text-2xl sm:text-3xl font-black text-[#112627] tracking-tight">
                   {selectedRsm?.name || 'Regional Sales Manager'}
                 </h2>
-                <p className="text-xs text-slate-400 max-w-2xl flex flex-wrap items-center gap-3">
-                  <span>Email: <strong className="text-slate-200">{selectedRsm?.email}</strong></span>
+                <p className="text-xs text-[#3B5759] max-w-2xl flex flex-wrap items-center gap-3">
+                  <span>Email: <strong className="text-[#163A3C] font-semibold">{selectedRsm?.email}</strong></span>
                   <span>•</span>
-                  <span>Phone: <strong className="text-slate-200">{selectedRsm?.phone}</strong></span>
+                  <span>Phone: <strong className="text-[#163A3C] font-semibold">{selectedRsm?.phone}</strong></span>
                   <span>•</span>
-                  <span>Districts Covered: <strong className="text-rose-400">{asms.length} Area Sales Managers (ASMs)</strong></span>
+                  <span>Districts Covered: <strong className="text-[#2A969C] font-bold">{asms.length} Area Sales Managers (ASMs)</strong></span>
                 </p>
               </div>
             </div>
 
             {/* Division Target & Achievement Gauge */}
-            <div className="bg-slate-800/80 backdrop-blur-md border border-slate-700/80 rounded-2xl p-4 min-w-[240px] space-y-2 text-right">
-              <div className="flex items-center justify-between text-xs text-slate-400 font-bold uppercase tracking-wider">
+            <div className="bg-white/90 backdrop-blur-md border border-[#CDE2E3] rounded-2xl p-4 min-w-[240px] space-y-2 text-right shadow-xs">
+              <div className="flex items-center justify-between text-xs text-[#48686A] font-bold uppercase tracking-wider">
                 <span>Monthly Target</span>
-                <span className="font-mono text-white">৳{targetAmount.toLocaleString()}</span>
+                <span className="font-mono text-[#112627] font-extrabold">৳{targetAmount.toLocaleString()}</span>
               </div>
-              <div className="w-full h-2.5 bg-slate-700 rounded-full overflow-hidden">
+              <div className="w-full h-2.5 bg-[#DCF1F2] rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-rose-500 via-amber-500 to-emerald-400 rounded-full transition-all duration-700"
+                  className="h-full bg-gradient-to-r from-[#36A4AB] to-[#163A3C] rounded-full transition-all duration-700"
                   style={{ width: `${achievementPct}%` }}
                 />
               </div>
               <div className="flex items-center justify-between text-[11px] font-mono">
-                <span className="text-slate-400">Achieved: ৳{currentRevenue.toLocaleString()}</span>
-                <span className="font-black text-emerald-400">{achievementPct}%</span>
+                <span className="text-[#48686A]">Achieved: ৳{currentRevenue.toLocaleString()}</span>
+                <span className="font-black text-[#163A3C]">{achievementPct}%</span>
               </div>
             </div>
           </div>
@@ -454,113 +454,113 @@ export const RsmDashboard: React.FC = () => {
         {/* 4 Animated KPI Cards (Sales, Demands, Profit, Loss) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Card 1: Total Sales */}
-          <div className="p-5 rounded-3xl bg-slate-800/60 border border-slate-700/70 shadow-lg relative overflow-hidden group hover:border-blue-500/50 hover:bg-slate-800/90 transition-all duration-300">
+          <div className="p-5 rounded-3xl bg-white border border-[#CDE2E3] shadow-xs relative overflow-hidden group hover:border-[#36A4AB] transition-all duration-300">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Division Sales</span>
-              <div className="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[#48686A]">Total Division Sales</span>
+              <div className="w-9 h-9 rounded-xl bg-[#DCF1F2] text-[#163A3C] flex items-center justify-center">
                 <Truck className="w-4 h-4" />
               </div>
             </div>
             <div className="mt-3">
               <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-black font-mono text-white tracking-tight">
+                <span className="text-2xl font-black font-mono text-[#112627] tracking-tight">
                   {(summary.total_sales_cases ?? 0).toLocaleString()}
                 </span>
-                <span className="text-xs text-slate-400 font-medium">Cases</span>
+                <span className="text-xs text-[#48686A] font-medium">Cases</span>
               </div>
-              <p className="text-xs text-blue-400 font-mono font-bold mt-1">
+              <p className="text-xs text-[#2A969C] font-mono font-bold mt-1">
                 ৳{(summary.total_revenue ?? 0).toLocaleString()} Revenue
               </p>
             </div>
-            <div className="mt-3 pt-3 border-t border-slate-700/50 flex items-center justify-between text-[10px] text-slate-400">
+            <div className="mt-3 pt-3 border-t border-[#CDE2E3] flex items-center justify-between text-[10px] text-[#48686A]">
               <span>Across {asms.length} Districts</span>
-              <span className="text-blue-300 font-bold">{summary.total_sos ?? 0} Active SOs</span>
+              <span className="text-[#163A3C] font-bold">{summary.total_sos ?? 0} Active SOs</span>
             </div>
           </div>
 
           {/* Card 2: Product Demands */}
-          <div className="p-5 rounded-3xl bg-slate-800/60 border border-slate-700/70 shadow-lg relative overflow-hidden group hover:border-amber-500/50 hover:bg-slate-800/90 transition-all duration-300">
+          <div className="p-5 rounded-3xl bg-white border border-[#CDE2E3] shadow-xs relative overflow-hidden group hover:border-[#36A4AB] transition-all duration-300">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Product Demands</span>
-              <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[#48686A]">Product Demands</span>
+              <div className="w-9 h-9 rounded-xl bg-[#DCF1F2] text-[#163A3C] flex items-center justify-center">
                 <Package className="w-4 h-4" />
               </div>
             </div>
             <div className="mt-3">
               <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-black font-mono text-white tracking-tight">
+                <span className="text-2xl font-black font-mono text-[#112627] tracking-tight">
                   {(summary.total_product_demands_cases ?? 0).toLocaleString()}
                 </span>
-                <span className="text-xs text-slate-400 font-medium">Cases Req.</span>
+                <span className="text-xs text-[#48686A] font-medium">Cases Req.</span>
               </div>
-              <p className="text-xs text-amber-400 font-mono font-bold mt-1">
+              <p className="text-xs text-[#2A969C] font-mono font-bold mt-1">
                 {productDemands.length} Beverage Lines
               </p>
             </div>
-            <div className="mt-3 pt-3 border-t border-slate-700/50 flex items-center justify-between text-[10px] text-slate-400">
+            <div className="mt-3 pt-3 border-t border-[#CDE2E3] flex items-center justify-between text-[10px] text-[#48686A]">
               <span>Wholesale Market Demand</span>
-              <span className="text-amber-300 font-bold">{summary.total_outlets ?? 0} Retail Outlets</span>
+              <span className="text-[#163A3C] font-bold">{summary.total_outlets ?? 0} Retail Outlets</span>
             </div>
           </div>
 
           {/* Card 3: Overall Profit */}
-          <div className="p-5 rounded-3xl bg-slate-800/60 border border-slate-700/70 shadow-lg relative overflow-hidden group hover:border-emerald-500/50 hover:bg-slate-800/90 transition-all duration-300">
+          <div className="p-5 rounded-3xl bg-white border border-[#CDE2E3] shadow-xs relative overflow-hidden group hover:border-[#36A4AB] transition-all duration-300">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Overall Profit</span>
-              <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[#48686A]">Overall Profit</span>
+              <div className="w-9 h-9 rounded-xl bg-[#DCF1F2] text-[#163A3C] flex items-center justify-center">
                 <TrendingUp className="w-4 h-4" />
               </div>
             </div>
             <div className="mt-3">
               <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-black font-mono text-emerald-400 tracking-tight">
+                <span className="text-2xl font-black font-mono text-[#167a68] tracking-tight">
                   ৳{(summary.overall_profit ?? 0).toLocaleString()}
                 </span>
               </div>
-              <p className="text-xs text-emerald-400/80 font-medium mt-1">
+              <p className="text-xs text-[#48686A] font-medium mt-1">
                 Wholesale Channel Gross Margin
               </p>
             </div>
-            <div className="mt-3 pt-3 border-t border-slate-700/50 flex items-center justify-between text-[10px] text-slate-400">
+            <div className="mt-3 pt-3 border-t border-[#CDE2E3] flex items-center justify-between text-[10px] text-[#48686A]">
               <span>Operating Margin</span>
-              <span className="text-emerald-300 font-bold font-mono">12.5% avg</span>
+              <span className="text-[#163A3C] font-bold font-mono">12.5% avg</span>
             </div>
           </div>
 
           {/* Card 4: Overall Loss */}
-          <div className="p-5 rounded-3xl bg-slate-800/60 border border-slate-700/70 shadow-lg relative overflow-hidden group hover:border-rose-500/50 hover:bg-slate-800/90 transition-all duration-300">
+          <div className="p-5 rounded-3xl bg-white border border-[#CDE2E3] shadow-xs relative overflow-hidden group hover:border-[#36A4AB] transition-all duration-300">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Overall Loss</span>
-              <div className="w-9 h-9 rounded-xl bg-rose-500/20 text-rose-400 flex items-center justify-center">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[#48686A]">Overall Loss</span>
+              <div className="w-9 h-9 rounded-xl bg-[#DCF1F2] text-[#163A3C] flex items-center justify-center">
                 <TrendingDown className="w-4 h-4" />
               </div>
             </div>
             <div className="mt-3">
               <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-black font-mono text-rose-400 tracking-tight">
+                <span className="text-2xl font-black font-mono text-[#b91c1c] tracking-tight">
                   ৳{(summary.overall_loss ?? 0).toLocaleString()}
                 </span>
               </div>
-              <p className="text-xs text-rose-400/80 font-medium mt-1">
+              <p className="text-xs text-[#48686A] font-medium mt-1">
                 Returns, Expired & Damaged Claims
               </p>
             </div>
-            <div className="mt-3 pt-3 border-t border-slate-700/50 flex items-center justify-between text-[10px] text-slate-400">
+            <div className="mt-3 pt-3 border-t border-[#CDE2E3] flex items-center justify-between text-[10px] text-[#48686A]">
               <span>Write-off Risk</span>
-              <span className="text-rose-300 font-bold font-mono">Low</span>
+              <span className="text-[#163A3C] font-bold font-mono">Low</span>
             </div>
           </div>
         </div>
 
         {/* Tab Navigation Pill Bar */}
-        <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 pb-3">
+        <div className="flex flex-wrap items-center gap-2 border-b border-[#CDE2E3] pb-3">
           <button
             type="button"
             onClick={() => setActiveTab('asms')}
             className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
               activeTab === 'asms'
-                ? 'bg-rose-600 text-white shadow-lg shadow-rose-900/30'
-                : 'bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/70'
+                ? 'bg-[#163A3C] text-white shadow-md'
+                : 'bg-white hover:bg-[#DCF1F2] text-[#3B5759] hover:text-[#163A3C] border border-[#CDE2E3] shadow-xs'
             }`}
           >
             <Users className="w-4 h-4" />
@@ -572,8 +572,8 @@ export const RsmDashboard: React.FC = () => {
             onClick={() => setActiveTab('demands')}
             className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
               activeTab === 'demands'
-                ? 'bg-rose-600 text-white shadow-lg shadow-rose-900/30'
-                : 'bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/70'
+                ? 'bg-[#163A3C] text-white shadow-md'
+                : 'bg-white hover:bg-[#DCF1F2] text-[#3B5759] hover:text-[#163A3C] border border-[#CDE2E3] shadow-xs'
             }`}
           >
             <Package className="w-4 h-4" />
@@ -585,8 +585,8 @@ export const RsmDashboard: React.FC = () => {
             onClick={() => setActiveTab('reports')}
             className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
               activeTab === 'reports'
-                ? 'bg-rose-600 text-white shadow-lg shadow-rose-900/30'
-                : 'bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/70'
+                ? 'bg-[#163A3C] text-white shadow-md'
+                : 'bg-white hover:bg-[#DCF1F2] text-[#3B5759] hover:text-[#163A3C] border border-[#CDE2E3] shadow-xs'
             }`}
           >
             <FileText className="w-4 h-4" />
@@ -598,13 +598,13 @@ export const RsmDashboard: React.FC = () => {
             onClick={() => setActiveTab('fleet-map')}
             className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
               activeTab === 'fleet-map'
-                ? 'bg-rose-600 text-white shadow-lg shadow-rose-900/30 ring-2 ring-rose-400'
-                : 'bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/70'
+                ? 'bg-[#163A3C] text-white shadow-md ring-2 ring-[#36A4AB]'
+                : 'bg-white hover:bg-[#DCF1F2] text-[#3B5759] hover:text-[#163A3C] border border-[#CDE2E3] shadow-xs'
             }`}
           >
-            <Navigation className="w-4 h-4 text-cyan-400 animate-pulse" />
+            <Navigation className="w-4 h-4 text-[#2A969C] animate-pulse" />
             <span>Regional Fleet Movements Map</span>
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+            <span className="w-2 h-2 rounded-full bg-[#36A4AB] animate-ping" />
           </button>
         </div>
 
@@ -615,25 +615,25 @@ export const RsmDashboard: React.FC = () => {
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h3 className="text-lg font-black text-white tracking-tight flex items-center gap-2">
+                <h3 className="text-lg font-black text-[#112627] tracking-tight flex items-center gap-2">
                   <span>Area Sales Managers under {selectedRsm?.division} Division</span>
-                  <span className="text-xs bg-slate-800 border border-slate-700 text-slate-300 px-2 py-0.5 rounded-full font-mono">
+                  <span className="text-xs bg-[#DCF1F2] border border-[#CDE2E3] text-[#163A3C] px-2 py-0.5 rounded-full font-mono">
                     {asms.length} Districts
                   </span>
                 </h3>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-[#48686A]">
                   Each Area Sales Manager oversees the cities, Sales Officers, and retail demands within their assigned district.
                 </p>
               </div>
 
               <div className="relative min-w-[240px]">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Search className="w-4 h-4 text-[#48686A] absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   placeholder="Search district or ASM name..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 text-xs rounded-xl pl-9 pr-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  className="w-full bg-white border border-[#CDE2E3] text-xs rounded-xl pl-9 pr-3 py-2 text-[#163A3C] placeholder-[#67888A] focus:outline-none focus:ring-2 focus:ring-[#36A4AB] shadow-xs"
                 />
               </div>
             </div>
@@ -643,52 +643,52 @@ export const RsmDashboard: React.FC = () => {
               {filteredAsms.map((asm) => (
                 <div
                   key={asm.id}
-                  className="rounded-3xl bg-slate-800/70 border border-slate-700/80 hover:border-rose-500/50 p-5 shadow-lg space-y-4 hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between"
+                  className="rounded-3xl bg-white border border-[#CDE2E3] hover:border-[#36A4AB] p-5 shadow-xs space-y-4 hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between"
                 >
                   <div className="space-y-3">
                     {/* Header: District Name & ASM Badge */}
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <div className="flex items-center gap-1.5 text-rose-400 text-xs font-bold">
+                        <div className="flex items-center gap-1.5 text-[#2A969C] text-xs font-bold">
                           <MapPin className="w-3.5 h-3.5" />
                           <span>{asm.district_name} District</span>
                         </div>
-                        <h4 className="text-base font-black text-white tracking-tight mt-0.5">
+                        <h4 className="text-base font-black text-[#112627] tracking-tight mt-0.5">
                           {asm.name}
                         </h4>
                       </div>
-                      <span className="font-mono text-[10px] font-black px-2 py-0.5 rounded-lg bg-slate-900 text-slate-300 border border-slate-700">
+                      <span className="font-mono text-[10px] font-black px-2 py-0.5 rounded-lg bg-[#DCF1F2] text-[#163A3C] border border-[#CDE2E3]">
                         {asm.code}
                       </span>
                     </div>
 
-                    <p className="text-[11px] text-slate-400">
+                    <p className="text-[11px] text-[#48686A]">
                       {asm.email} • {asm.phone}
                     </p>
 
                     {/* Sales & Demands Matrix */}
-                    <div className="grid grid-cols-2 gap-2 p-3 rounded-2xl bg-slate-900/60 border border-slate-700/60 text-xs font-mono">
+                    <div className="grid grid-cols-2 gap-2 p-3 rounded-2xl bg-[#F4FDFE] border border-[#CDE2E3] text-xs font-mono">
                       <div>
-                        <span className="text-[10px] text-slate-500 block uppercase font-bold">Sales Volume</span>
-                        <span className="font-black text-white">{asm.total_sales_cases} cs</span>
-                        <span className="text-[10px] text-blue-400 block font-bold">৳{asm.total_revenue.toLocaleString()}</span>
+                        <span className="text-[10px] text-[#67888A] block uppercase font-bold">Sales Volume</span>
+                        <span className="font-black text-[#112627]">{asm.total_sales_cases} cs</span>
+                        <span className="text-[10px] text-[#2A969C] block font-bold">৳{asm.total_revenue.toLocaleString()}</span>
                       </div>
                       <div>
-                        <span className="text-[10px] text-slate-500 block uppercase font-bold">Profit / Loss</span>
-                        <span className="font-black text-emerald-400">৳{asm.overall_profit.toLocaleString()}</span>
-                        <span className="text-[10px] text-rose-400 block font-bold">-৳{asm.overall_loss.toLocaleString()}</span>
+                        <span className="text-[10px] text-[#67888A] block uppercase font-bold">Profit / Loss</span>
+                        <span className="font-black text-[#167a68]">৳{asm.overall_profit.toLocaleString()}</span>
+                        <span className="text-[10px] text-[#b91c1c] block font-bold">-৳{asm.overall_loss.toLocaleString()}</span>
                       </div>
                     </div>
 
                     {/* Target Achievement Progress */}
                     <div className="space-y-1">
-                      <div className="flex items-center justify-between text-[10px] font-bold text-slate-400">
+                      <div className="flex items-center justify-between text-[10px] font-bold text-[#48686A]">
                         <span>District Target: ৳{Number(asm.target_sales).toLocaleString()}</span>
-                        <span className="text-white font-mono">{asm.achievement_percentage}%</span>
+                        <span className="text-[#112627] font-mono font-bold">{asm.achievement_percentage}%</span>
                       </div>
-                      <div className="w-full h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                      <div className="w-full h-1.5 bg-[#DCF1F2] rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-gradient-to-r from-rose-500 to-amber-400 rounded-full transition-all duration-500"
+                          className="h-full bg-gradient-to-r from-[#36A4AB] to-[#163A3C] rounded-full transition-all duration-500"
                           style={{ width: `${asm.achievement_percentage}%` }}
                         />
                       </div>
@@ -696,15 +696,15 @@ export const RsmDashboard: React.FC = () => {
                   </div>
 
                   {/* Actions & Report Status */}
-                  <div className="pt-3 border-t border-slate-700/60 flex items-center justify-between gap-2">
+                  <div className="pt-3 border-t border-[#CDE2E3] flex items-center justify-between gap-2">
                     {asm.has_submitted_report ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-950/40 border border-emerald-800/60 px-2 py-0.5 rounded-full">
-                        <CheckCircle2 className="w-3 h-3" />
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#167a68] bg-[#DCF1F2] border border-[#CDE2E3] px-2 py-0.5 rounded-full">
+                        <CheckCircle2 className="w-3 h-3 text-[#167a68]" />
                         <span>Report Received</span>
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-400 bg-amber-950/40 border border-amber-800/60 px-2 py-0.5 rounded-full">
-                        <Clock className="w-3 h-3" />
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#b45309] bg-[#fef3c7] border border-[#fde68a] px-2 py-0.5 rounded-full">
+                        <Clock className="w-3 h-3 text-[#b45309]" />
                         <span>Awaiting Report</span>
                       </span>
                     )}
@@ -714,10 +714,10 @@ export const RsmDashboard: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => setSelectedReportModal(asm.latest_report)}
-                          className="px-2.5 py-1 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-[11px] font-bold transition cursor-pointer flex items-center gap-1"
+                          className="px-2.5 py-1 rounded-xl bg-white hover:bg-[#DCF1F2] text-[#163A3C] border border-[#CDE2E3] text-[11px] font-bold transition cursor-pointer flex items-center gap-1 shadow-xs"
                           title="View Combined Report"
                         >
-                          <Eye className="w-3 h-3" />
+                          <Eye className="w-3 h-3 text-[#2A969C]" />
                           <span>Report</span>
                         </button>
                       )}
@@ -727,18 +727,18 @@ export const RsmDashboard: React.FC = () => {
                           setSelectedAsmFilter(asm.id);
                           setActiveTab('fleet-map');
                         }}
-                        className="px-2.5 py-1 rounded-xl bg-blue-600/80 hover:bg-blue-600 text-white text-[11px] font-bold transition cursor-pointer flex items-center gap-1 shadow-xs"
+                        className="px-2.5 py-1 rounded-xl bg-[#DCF1F2] hover:bg-[#CDE2E3] text-[#163A3C] border border-[#CDE2E3] text-[11px] font-bold transition cursor-pointer flex items-center gap-1 shadow-xs"
                         title={`Track live delivery movements for ${asm.name} (${asm.district_name})`}
                       >
-                        <Navigation className="w-3 h-3 text-cyan-300" />
+                        <Navigation className="w-3 h-3 text-[#2A969C]" />
                         <span>Fleet</span>
                       </button>
                       <Link
                         to={`/asm?asmId=${asm.id}`}
-                        className="px-2.5 py-1 rounded-xl bg-rose-600/80 hover:bg-rose-600 text-white text-[11px] font-bold transition cursor-pointer flex items-center gap-1"
+                        className="px-2.5 py-1 rounded-xl bg-[#163A3C] hover:bg-[#235356] text-white text-[11px] font-bold transition cursor-pointer flex items-center gap-1 shadow-xs"
                       >
                         <span>Open ASM</span>
-                        <ArrowUpRight className="w-3 h-3" />
+                        <ArrowUpRight className="w-3 h-3 text-[#E5FAFB]" />
                       </Link>
                     </div>
                   </div>
@@ -754,13 +754,13 @@ export const RsmDashboard: React.FC = () => {
         {activeTab === 'demands' && (
           <div className="space-y-6">
             <div>
-              <h3 className="text-lg font-black text-white tracking-tight flex items-center gap-2">
+              <h3 className="text-lg font-black text-[#112627] tracking-tight flex items-center gap-2">
                 <span>Product Demands Across {selectedRsm?.division} Division</span>
-                <span className="text-xs bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-mono">
+                <span className="text-xs bg-[#DCF1F2] text-[#163A3C] border border-[#CDE2E3] px-2 py-0.5 rounded-full font-mono">
                   {productDemands.length} Products
                 </span>
               </h3>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-[#48686A]">
                 Aggregated beverage market demand from retail outlets channeled via Area Sales Managers and Sales Officers.
               </p>
             </div>
@@ -770,23 +770,23 @@ export const RsmDashboard: React.FC = () => {
               {categoryBreakdown.map((cat) => (
                 <div
                   key={cat.category}
-                  className="p-4 rounded-2xl bg-slate-800/80 border border-slate-700/80 space-y-1.5"
+                  className="p-4 rounded-2xl bg-white border border-[#CDE2E3] space-y-1.5 shadow-xs"
                 >
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Category Demand</span>
-                  <h4 className="text-sm font-black text-white">{cat.category}</h4>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#67888A]">Category Demand</span>
+                  <h4 className="text-sm font-black text-[#112627]">{cat.category}</h4>
                   <div className="flex items-baseline justify-between pt-1 font-mono">
-                    <span className="text-lg font-black text-amber-400">{cat.cases} cs</span>
-                    <span className="text-xs text-slate-400">৳{cat.value.toLocaleString()}</span>
+                    <span className="text-lg font-black text-[#2A969C]">{cat.cases} cs</span>
+                    <span className="text-xs text-[#48686A]">৳{cat.value.toLocaleString()}</span>
                   </div>
                 </div>
               ))}
             </div>
 
             {/* Product Demands Table */}
-            <div className="rounded-3xl bg-slate-800/70 border border-slate-700/80 overflow-hidden shadow-xl">
+            <div className="rounded-3xl bg-white border border-[#CDE2E3] overflow-hidden shadow-xs">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-900/80 text-slate-400 font-bold uppercase tracking-wider border-b border-slate-700/70">
+                  <thead className="bg-[#DCF1F2] text-[#163A3C] font-bold uppercase tracking-wider border-b border-[#CDE2E3]">
                     <tr>
                       <th className="p-3.5">Beverage Product</th>
                       <th className="p-3.5">Category & Brand</th>
@@ -795,30 +795,30 @@ export const RsmDashboard: React.FC = () => {
                       <th className="p-3.5 text-right">Wholesale Value (৳)</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-700/50">
+                  <tbody className="divide-y divide-[#CDE2E3]">
                     {productDemands.map((p) => (
-                      <tr key={p.product_id} className="hover:bg-slate-700/30 transition">
-                        <td className="p-3.5 font-bold text-white flex items-center gap-2">
-                          <Package className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                      <tr key={p.product_id} className="hover:bg-[#F4FDFE] transition">
+                        <td className="p-3.5 font-bold text-[#112627] flex items-center gap-2">
+                          <Package className="w-3.5 h-3.5 text-[#2A969C] shrink-0" />
                           <span>{p.product_name}</span>
                         </td>
                         <td className="p-3.5">
-                          <span className="px-2 py-0.5 rounded-full bg-slate-700 text-slate-300 font-medium">
+                          <span className="px-2 py-0.5 rounded-full bg-[#DCF1F2] text-[#163A3C] border border-[#CDE2E3] font-medium text-[11px]">
                             {p.brand} • {p.category}
                           </span>
                         </td>
-                        <td className="p-3.5 font-mono text-slate-400">{p.sku}</td>
-                        <td className="p-3.5 text-right font-mono font-black text-amber-400 text-sm">
+                        <td className="p-3.5 font-mono text-[#48686A]">{p.sku}</td>
+                        <td className="p-3.5 text-right font-mono font-black text-[#2A969C] text-sm">
                           {p.total_cases_demanded} cs
                         </td>
-                        <td className="p-3.5 text-right font-mono font-bold text-white">
+                        <td className="p-3.5 text-right font-mono font-bold text-[#112627]">
                           ৳{Number(p.total_demand_value).toLocaleString()}
                         </td>
                       </tr>
                     ))}
                     {productDemands.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="p-8 text-center text-slate-500 italic">
+                        <td colSpan={5} className="p-8 text-center text-[#67888A] italic">
                           No product demands logged yet for {selectedRsm?.division} division.
                         </td>
                       </tr>
@@ -836,13 +836,13 @@ export const RsmDashboard: React.FC = () => {
         {activeTab === 'reports' && (
           <div className="space-y-4">
             <div>
-              <h3 className="text-lg font-black text-white tracking-tight flex items-center gap-2">
+              <h3 className="text-lg font-black text-[#112627] tracking-tight flex items-center gap-2">
                 <span>District Reports Feed (ASM to RSM)</span>
-                <span className="text-xs bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2 py-0.5 rounded-full font-mono">
+                <span className="text-xs bg-[#DCF1F2] text-[#163A3C] border border-[#CDE2E3] px-2 py-0.5 rounded-full font-mono">
                   {reports.length} Reports
                 </span>
               </h3>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-[#48686A]">
                 Consolidated operational reports submitted by Area Sales Managers for review by the Regional Sales Manager.
               </p>
             </div>
@@ -851,56 +851,56 @@ export const RsmDashboard: React.FC = () => {
               {reports.map((rep) => (
                 <div
                   key={rep.id}
-                  className="p-5 rounded-3xl bg-slate-800/70 border border-slate-700/80 hover:border-rose-500/40 transition space-y-3 shadow-md"
+                  className="p-5 rounded-3xl bg-white border border-[#CDE2E3] hover:border-[#36A4AB] transition space-y-3 shadow-xs"
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-black uppercase px-2.5 py-0.5 rounded-lg bg-rose-600 text-white font-mono">
+                      <span className="text-xs font-black uppercase px-2.5 py-0.5 rounded-lg bg-[#163A3C] text-white font-mono shadow-xs">
                         {rep.district_name} District
                       </span>
-                      <span className="text-xs text-slate-400 font-medium">Period: {rep.reporting_period}</span>
+                      <span className="text-xs text-[#48686A] font-medium">Period: {rep.reporting_period}</span>
                     </div>
-                    <span className="text-[11px] font-mono text-slate-400">
+                    <span className="text-[11px] font-mono text-[#67888A]">
                       Submitted: {new Date(rep.submitted_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 rounded-2xl bg-slate-900/70 border border-slate-700/60 font-mono text-xs">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 rounded-2xl bg-[#F4FDFE] border border-[#CDE2E3] font-mono text-xs">
                     <div>
-                      <span className="text-[10px] text-slate-500 block uppercase">Sales Volume</span>
-                      <span className="font-bold text-white">{rep.total_sales_cases} Cases</span>
+                      <span className="text-[10px] text-[#67888A] block uppercase font-bold">Sales Volume</span>
+                      <span className="font-bold text-[#112627]">{rep.total_sales_cases} Cases</span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-slate-500 block uppercase">Revenue</span>
-                      <span className="font-bold text-blue-400">৳{Number(rep.total_revenue).toLocaleString()}</span>
+                      <span className="text-[10px] text-[#67888A] block uppercase font-bold">Revenue</span>
+                      <span className="font-bold text-[#2A969C]">৳{Number(rep.total_revenue).toLocaleString()}</span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-slate-500 block uppercase">Overall Profit</span>
-                      <span className="font-bold text-emerald-400">৳{Number(rep.overall_profit).toLocaleString()}</span>
+                      <span className="text-[10px] text-[#67888A] block uppercase font-bold">Overall Profit</span>
+                      <span className="font-bold text-[#167a68]">৳{Number(rep.overall_profit).toLocaleString()}</span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-slate-500 block uppercase">Overall Loss</span>
-                      <span className="font-bold text-rose-400">৳{Number(rep.overall_loss).toLocaleString()}</span>
+                      <span className="text-[10px] text-[#67888A] block uppercase font-bold">Overall Loss</span>
+                      <span className="font-bold text-[#b91c1c]">৳{Number(rep.overall_loss).toLocaleString()}</span>
                     </div>
                   </div>
 
                   {rep.notes && (
-                    <div className="p-3 rounded-xl bg-slate-900/40 text-xs text-slate-300 italic border border-slate-800">
+                    <div className="p-3 rounded-xl bg-[#F4FDFE] text-xs text-[#3B5759] italic border border-[#CDE2E3]">
                       "{rep.notes}"
                     </div>
                   )}
 
                   <div className="flex items-center justify-between pt-1">
-                    <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3" />
+                    <span className="text-[10px] text-[#167a68] font-bold uppercase tracking-wider flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3 text-[#167a68]" />
                       <span>Transmitted & Verified to RSM</span>
                     </span>
                     <button
                       type="button"
                       onClick={() => setSelectedReportModal(rep)}
-                      className="px-3 py-1.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold transition cursor-pointer flex items-center gap-1"
+                      className="px-3 py-1.5 rounded-xl bg-[#163A3C] hover:bg-[#235356] text-white text-xs font-bold transition cursor-pointer flex items-center gap-1 shadow-xs"
                     >
-                      <Eye className="w-3.5 h-3.5" />
+                      <Eye className="w-3.5 h-3.5 text-[#E5FAFB]" />
                       <span>Inspect Breakdown</span>
                     </button>
                   </div>
@@ -908,15 +908,15 @@ export const RsmDashboard: React.FC = () => {
               ))}
 
               {reports.length === 0 && (
-                <div className="p-12 text-center rounded-3xl bg-slate-800/40 border border-slate-800 text-slate-500 space-y-2">
-                  <FileText className="w-8 h-8 text-slate-600 mx-auto" />
-                  <p className="font-bold text-sm text-slate-400">No Combined Reports Received Yet</p>
-                  <p className="text-xs">
+                <div className="p-12 text-center rounded-3xl bg-white border border-[#CDE2E3] text-[#67888A] space-y-2 shadow-xs">
+                  <FileText className="w-8 h-8 text-[#48686A] mx-auto" />
+                  <p className="font-bold text-sm text-[#112627]">No Combined Reports Received Yet</p>
+                  <p className="text-xs text-[#48686A]">
                     Area Sales Managers can generate and submit consolidated reports from the ASM District Portal.
                   </p>
                   <Link
                     to="/asm"
-                    className="inline-block mt-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold"
+                    className="inline-block mt-2 px-4 py-2 rounded-xl bg-[#163A3C] hover:bg-[#235356] text-white text-xs font-bold shadow-xs"
                   >
                     Go to ASM Portal to Submit Report
                   </Link>
@@ -932,30 +932,30 @@ export const RsmDashboard: React.FC = () => {
         {activeTab === 'fleet-map' && (
           <div className="space-y-5">
             {/* 1. Header & Hierarchy Pipeline Banner */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-slate-800/80 p-5 rounded-3xl border border-slate-700/80 shadow-lg">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-5 rounded-3xl border border-[#CDE2E3] shadow-xs">
               <div className="space-y-1.5">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-mono font-black uppercase px-2.5 py-0.5 rounded-lg bg-rose-600 text-white shadow-xs">
+                  <span className="text-xs font-mono font-black uppercase px-2.5 py-0.5 rounded-lg bg-[#163A3C] text-white shadow-xs">
                     {selectedRsm?.code || 'RSM'} FLEET COMMAND
                   </span>
-                  <span className="text-xs bg-slate-900 text-emerald-400 border border-emerald-500/40 px-2.5 py-0.5 rounded-lg font-bold flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                  <span className="text-xs bg-[#DCF1F2] text-[#163A3C] border border-[#CDE2E3] px-2.5 py-0.5 rounded-lg font-bold flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-[#2A969C] animate-ping" />
                     <span>{selectedRsm?.division} Regional Movement</span>
                   </span>
-                  <span className="text-xs bg-slate-900/90 text-cyan-300 border border-cyan-500/40 px-2.5 py-0.5 rounded-lg font-mono font-bold">
+                  <span className="text-xs bg-[#DCF1F2] text-[#163A3C] border border-[#CDE2E3] px-2.5 py-0.5 rounded-lg font-mono font-bold">
                     🔒 STRICT REGION ISOLATION
                   </span>
                 </div>
-                <h3 className="text-xl font-black text-white tracking-tight flex items-center gap-2">
+                <h3 className="text-xl font-black text-[#112627] tracking-tight flex items-center gap-2">
                   <span>Regional Delivery Fleet Telemetry & Route Movements</span>
                 </h3>
-                <p className="text-xs text-slate-400 max-w-3xl">
+                <p className="text-xs text-[#3B5759] max-w-3xl">
                   Live tracking of vehicle movements and transit dispatches flowing through your division's hierarchy:
-                  <strong className="text-rose-300"> RSM ({selectedRsm?.division})</strong> ➔
-                  <strong className="text-amber-300"> ASMs ({asms.length} Districts)</strong> ➔
-                  <strong className="text-blue-300"> Sales Officers (SOs)</strong> ➔
-                  <strong className="text-indigo-300"> Regional Suppliers</strong> ➔
-                  <strong className="text-emerald-300"> Delivery Teams & Vehicles</strong>.
+                  <strong className="text-[#163A3C]"> RSM ({selectedRsm?.division})</strong> ➔
+                  <strong className="text-[#2A969C]"> ASMs ({asms.length} Districts)</strong> ➔
+                  <strong className="text-[#163A3C]"> Sales Officers (SOs)</strong> ➔
+                  <strong className="text-[#2A969C]"> Regional Suppliers</strong> ➔
+                  <strong className="text-[#167a68]"> Delivery Teams & Vehicles</strong>.
                   Movement from other regional managers is strictly excluded.
                 </p>
               </div>
@@ -976,7 +976,7 @@ export const RsmDashboard: React.FC = () => {
                         setSelectedDistrictId(null);
                       }
                     }}
-                    className="w-full bg-slate-900 border border-slate-700 text-xs rounded-xl px-3 py-2.5 text-white pr-8 focus:ring-2 focus:ring-rose-500 focus:outline-none cursor-pointer appearance-none font-bold"
+                    className="w-full bg-white border border-[#CDE2E3] text-xs rounded-xl px-3 py-2.5 text-[#163A3C] pr-8 focus:ring-2 focus:ring-[#36A4AB] focus:outline-none cursor-pointer appearance-none font-bold shadow-xs"
                   >
                     <option value="">All {asms.length} District ASMs</option>
                     {asms.map((a) => (
@@ -985,36 +985,36 @@ export const RsmDashboard: React.FC = () => {
                       </option>
                     ))}
                   </select>
-                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <ChevronDown className="w-4 h-4 text-[#48686A] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
 
                 <button
                   type="button"
                   onClick={() => selectedRsmId && fetchRsmFleet(selectedRsmId, selectedAsmFilter)}
-                  className="px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-700 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 border border-slate-700 cursor-pointer active:scale-95"
+                  className="px-3.5 py-2.5 rounded-xl bg-[#163A3C] hover:bg-[#235356] text-white text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer active:scale-95"
                   title="Sync Live Fleet Dispatches"
                 >
-                  <RefreshCw className={`w-3.5 h-3.5 ${loadingFleet ? 'animate-spin text-rose-400' : 'text-slate-400'}`} />
+                  <RefreshCw className={`w-3.5 h-3.5 ${loadingFleet ? 'animate-spin text-[#2A969C]' : 'text-[#DCF1F2]'}`} />
                   <span>Sync Fleet</span>
                 </button>
               </div>
             </div>
 
             {/* District Depot Switcher Bar */}
-            <div className="bg-slate-800/80 p-4 rounded-3xl border border-slate-700/80 shadow-md space-y-3">
+            <div className="bg-white p-4 rounded-3xl border border-[#CDE2E3] shadow-xs space-y-3">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
-                  <span className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 text-base">
+                  <span className="p-2 rounded-xl bg-[#DCF1F2] text-[#163A3C] border border-[#CDE2E3] text-base">
                     🏭
                   </span>
                   <div>
-                    <h4 className="font-bold text-white text-sm flex items-center gap-2">
+                    <h4 className="font-bold text-[#112627] text-sm flex items-center gap-2">
                       <span>Switch District Supplier Depot Location</span>
-                      <span className="text-[10px] font-mono text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded-full border border-amber-500/30">
+                      <span className="text-[10px] font-mono text-[#163A3C] bg-[#DCF1F2] px-2 py-0.5 rounded-full border border-[#CDE2E3]">
                         {asms.length} Districts Available
                       </span>
                     </h4>
-                    <p className="text-[11px] text-slate-400">
+                    <p className="text-[11px] text-[#48686A]">
                       Select any district in {selectedRsm?.division} division to view its registered supplier depot address, contact info, and GPS coordinates on the map.
                     </p>
                   </div>
@@ -1034,7 +1034,7 @@ export const RsmDashboard: React.FC = () => {
                         setSelectedAsmFilter(null);
                       }
                     }}
-                    className="w-full bg-slate-900 border border-amber-500/50 text-xs rounded-xl px-3 py-2.5 text-amber-300 pr-8 focus:ring-2 focus:ring-amber-500 focus:outline-none cursor-pointer appearance-none font-bold font-mono shadow-xs"
+                    className="w-full bg-white border border-[#CDE2E3] text-xs rounded-xl px-3 py-2.5 text-[#163A3C] pr-8 focus:ring-2 focus:ring-[#36A4AB] focus:outline-none cursor-pointer appearance-none font-bold font-mono shadow-xs"
                   >
                     <option value="">🗺️ All {asms.length} Districts (Division Depots Overview)</option>
                     {asms.map((a) => (
@@ -1043,12 +1043,12 @@ export const RsmDashboard: React.FC = () => {
                       </option>
                     ))}
                   </select>
-                  <ChevronDown className="w-4 h-4 text-amber-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <ChevronDown className="w-4 h-4 text-[#48686A] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
               </div>
 
               {/* Quick Select District Pills */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-1 border-t border-slate-700/60 scrollbar-thin">
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-1 border-t border-[#CDE2E3] scrollbar-thin">
                 <button
                   type="button"
                   onClick={() => {
@@ -1057,12 +1057,12 @@ export const RsmDashboard: React.FC = () => {
                   }}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold font-mono transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer shrink-0 ${
                     selectedDistrictId === null
-                      ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 font-black'
-                      : 'bg-slate-900/90 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                      ? 'bg-[#163A3C] text-white shadow-xs font-black'
+                      : 'bg-[#F4FDFE] hover:bg-[#DCF1F2] text-[#3B5759] border border-[#CDE2E3]'
                   }`}
                 >
                   <span>🗺️ All Districts</span>
-                  <span className="text-[10px] bg-slate-950/40 px-1.5 py-0.2 rounded-full">
+                  <span className="text-[10px] bg-black/20 px-1.5 py-0.2 rounded-full text-white">
                     {asms.length}
                   </span>
                 </button>
@@ -1079,12 +1079,12 @@ export const RsmDashboard: React.FC = () => {
                       }}
                       className={`px-3 py-1.5 rounded-xl text-xs font-bold font-mono transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer shrink-0 ${
                         isSelected
-                          ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 font-black'
-                          : 'bg-slate-900/90 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                          ? 'bg-[#163A3C] text-white shadow-xs font-black'
+                          : 'bg-[#F4FDFE] hover:bg-[#DCF1F2] text-[#3B5759] border border-[#CDE2E3]'
                       }`}
                     >
                       <span>📍 {a.district_name}</span>
-                      {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-slate-950 animate-ping" />}
+                      {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-[#2A969C] animate-ping" />}
                     </button>
                   );
                 })}
@@ -1116,28 +1116,28 @@ export const RsmDashboard: React.FC = () => {
             </div>
 
             {/* 3. Delivery Fleet Teams & Moving Vehicles Roster */}
-            <div className="bg-slate-800/80 rounded-3xl border border-slate-700/80 p-5 shadow-lg space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-700/60 pb-3">
+            <div className="bg-white rounded-3xl border border-[#CDE2E3] p-5 shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#CDE2E3] pb-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-rose-600 to-amber-600 text-white flex items-center justify-center font-bold text-lg shadow-md">
+                  <div className="w-10 h-10 rounded-2xl bg-[#DCF1F2] text-[#163A3C] border border-[#CDE2E3] flex items-center justify-center font-bold text-lg shadow-xs">
                     🚚
                   </div>
                   <div>
-                    <h4 className="font-bold text-white text-base">
+                    <h4 className="font-bold text-[#112627] text-base">
                       {selectedRsm?.division} Regional Delivery Teams & Vehicles
                     </h4>
-                    <p className="text-xs text-slate-400">
+                    <p className="text-xs text-[#48686A]">
                       {fleetTeams.length} delivery teams assigned under your regional suppliers and Sales Officers.
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-3 text-xs font-mono">
-                  <span className="text-slate-400">
-                    Active Trips: <strong className="text-white">{fleetDispatches.length} Dispatches</strong>
+                  <span className="text-[#48686A]">
+                    Active Trips: <strong className="text-[#112627]">{fleetDispatches.length} Dispatches</strong>
                   </span>
-                  <span className="text-slate-400">
-                    Stores in Region: <strong className="text-emerald-400">{divisionOutlets.length} Outlets</strong>
+                  <span className="text-[#48686A]">
+                    Stores in Region: <strong className="text-[#167a68]">{divisionOutlets.length} Outlets</strong>
                   </span>
                 </div>
               </div>
@@ -1155,40 +1155,40 @@ export const RsmDashboard: React.FC = () => {
                       onClick={() => activeDisp && setSelectedFleetDispatch(activeDisp)}
                       className={`p-4 rounded-2xl border transition-all cursor-pointer ${
                         selectedFleetDispatch?.id === activeDisp?.id
-                          ? 'bg-slate-900 border-rose-500 shadow-md ring-1 ring-rose-500'
-                          : 'bg-slate-900/60 hover:bg-slate-900 border-slate-700/60 hover:border-slate-600'
+                          ? 'bg-white border-[#163A3C] shadow-sm ring-2 ring-[#163A3C]/30'
+                          : 'bg-[#F4FDFE] hover:bg-white border-[#CDE2E3] hover:border-[#36A4AB]'
                       }`}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
-                          <span className="font-mono font-bold text-xs text-white">
+                          <span className="w-2.5 h-2.5 rounded-full bg-[#167a68]" />
+                          <span className="font-mono font-bold text-xs text-[#112627]">
                             {team.vehicle_registration_no}
                           </span>
                         </div>
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-mono ${
                           isMoving
-                            ? 'bg-blue-600/30 text-blue-300 border border-blue-500/40 animate-pulse'
-                            : 'bg-slate-800 text-slate-400 border border-slate-700'
+                            ? 'bg-[#DCF1F2] text-[#163A3C] border border-[#36A4AB] animate-pulse'
+                            : 'bg-white text-[#48686A] border border-[#CDE2E3]'
                         }`}>
                           {isMoving ? 'ON ROUTE' : team.status || 'AVAILABLE'}
                         </span>
                       </div>
 
                       <div className="mt-2 space-y-1">
-                        <p className="text-xs font-bold text-slate-200">{team.team_name}</p>
-                        <p className="text-[11px] text-slate-400">
-                          Supplier: <strong className="text-slate-300">{team.supplier_name || 'Regional Supplier'}</strong>
+                        <p className="text-xs font-bold text-[#112627]">{team.team_name}</p>
+                        <p className="text-[11px] text-[#48686A]">
+                          Supplier: <strong className="text-[#163A3C]">{team.supplier_name || 'Regional Supplier'}</strong>
                         </p>
-                        <p className="text-[11px] text-slate-400">
-                          Driver: <strong className="text-slate-300">{team.driver_name}</strong> ({team.driver_phone || 'N/A'})
+                        <p className="text-[11px] text-[#48686A]">
+                          Driver: <strong className="text-[#163A3C]">{team.driver_name}</strong> ({team.driver_phone || 'N/A'})
                         </p>
                       </div>
 
                       {activeDisp && (
-                        <div className="mt-3 pt-2 border-t border-slate-800 flex items-center justify-between text-[10px] font-mono">
-                          <span className="text-amber-400 font-bold">{activeDisp.sub_route}</span>
-                          <span className="text-slate-400">{activeDisp.dispatch_code}</span>
+                        <div className="mt-3 pt-2 border-t border-[#CDE2E3] flex items-center justify-between text-[10px] font-mono">
+                          <span className="text-[#2A969C] font-bold">{activeDisp.sub_route}</span>
+                          <span className="text-[#67888A]">{activeDisp.dispatch_code}</span>
                         </div>
                       )}
                     </div>
@@ -1196,10 +1196,10 @@ export const RsmDashboard: React.FC = () => {
                 })}
 
                 {fleetTeams.length === 0 && (
-                  <div className="col-span-full p-8 text-center text-slate-500 rounded-2xl bg-slate-900/40 border border-slate-800">
-                    <Truck className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-                    <p className="font-bold text-xs text-slate-400">No Delivery Teams Configured in {selectedRsm?.division} Division</p>
-                    <p className="text-[11px] text-slate-500 mt-1">
+                  <div className="col-span-full p-8 text-center text-[#67888A] rounded-2xl bg-[#F4FDFE] border border-[#CDE2E3]">
+                    <Truck className="w-8 h-8 text-[#48686A] mx-auto mb-2" />
+                    <p className="font-bold text-xs text-[#112627]">No Delivery Teams Configured in {selectedRsm?.division} Division</p>
+                    <p className="text-[11px] text-[#48686A] mt-1">
                       Delivery teams will appear here once allocated to regional suppliers and Area Sales Managers in this territory.
                     </p>
                   </div>
@@ -1212,23 +1212,23 @@ export const RsmDashboard: React.FC = () => {
 
       {/* MODAL: Full Report Breakdown Viewer */}
       {selectedReportModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-2xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#163A3C]/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white border border-[#CDE2E3] rounded-3xl max-w-2xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto text-[#163A3C]">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
                 <img
                   src={rsmLogo}
                   alt="RSM Emblem"
-                  className="w-12 h-12 rounded-xl object-cover border border-emerald-500/40 shrink-0 shadow-md"
+                  className="w-12 h-12 rounded-xl object-cover border border-[#CDE2E3] shrink-0 shadow-xs bg-white"
                 />
                 <div>
-                  <span className="text-xs font-mono font-black uppercase px-2 py-0.5 rounded-md bg-rose-600 text-white">
+                  <span className="text-xs font-mono font-black uppercase px-2 py-0.5 rounded-md bg-[#163A3C] text-white shadow-xs">
                     {selectedReportModal.district_name} District Report
                   </span>
-                  <h3 className="text-xl font-black text-white mt-1">
+                  <h3 className="text-xl font-black text-[#112627] mt-1">
                     Consolidated District Performance
                   </h3>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-[#48686A]">
                     Period: {selectedReportModal.reporting_period} • Division: {selectedReportModal.division}
                   </p>
                 </div>
@@ -1236,36 +1236,36 @@ export const RsmDashboard: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setSelectedReportModal(null)}
-                className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition cursor-pointer"
+                className="p-1.5 rounded-xl bg-white hover:bg-[#DCF1F2] text-[#48686A] hover:text-[#163A3C] border border-[#CDE2E3] transition cursor-pointer shadow-xs"
               >
                 ✕
               </button>
             </div>
 
             {/* Financial Totals */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 rounded-2xl bg-slate-800/80 border border-slate-700/80 font-mono text-xs">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 rounded-2xl bg-[#F4FDFE] border border-[#CDE2E3] font-mono text-xs">
               <div>
-                <span className="text-[10px] text-slate-400 uppercase block font-bold">Total Sales</span>
-                <span className="text-base font-black text-white">{selectedReportModal.total_sales_cases} cs</span>
+                <span className="text-[10px] text-[#67888A] uppercase block font-bold">Total Sales</span>
+                <span className="text-base font-black text-[#112627]">{selectedReportModal.total_sales_cases} cs</span>
               </div>
               <div>
-                <span className="text-[10px] text-slate-400 uppercase block font-bold">Revenue</span>
-                <span className="text-base font-black text-blue-400">৳{Number(selectedReportModal.total_revenue).toLocaleString()}</span>
+                <span className="text-[10px] text-[#67888A] uppercase block font-bold">Revenue</span>
+                <span className="text-base font-black text-[#2A969C]">৳{Number(selectedReportModal.total_revenue).toLocaleString()}</span>
               </div>
               <div>
-                <span className="text-[10px] text-slate-400 uppercase block font-bold">Profit</span>
-                <span className="text-base font-black text-emerald-400">৳{Number(selectedReportModal.overall_profit).toLocaleString()}</span>
+                <span className="text-[10px] text-[#67888A] uppercase block font-bold">Profit</span>
+                <span className="text-base font-black text-[#167a68]">৳{Number(selectedReportModal.overall_profit).toLocaleString()}</span>
               </div>
               <div>
-                <span className="text-[10px] text-slate-400 uppercase block font-bold">Loss</span>
-                <span className="text-base font-black text-rose-400">৳{Number(selectedReportModal.overall_loss).toLocaleString()}</span>
+                <span className="text-[10px] text-[#67888A] uppercase block font-bold">Loss</span>
+                <span className="text-base font-black text-[#b91c1c]">৳{Number(selectedReportModal.overall_loss).toLocaleString()}</span>
               </div>
             </div>
 
             {selectedReportModal.notes && (
               <div className="space-y-1">
-                <span className="text-xs font-bold text-slate-400 uppercase">Operational Notes:</span>
-                <p className="p-3 rounded-xl bg-slate-800 text-xs text-slate-200">
+                <span className="text-xs font-bold text-[#48686A] uppercase">Operational Notes:</span>
+                <p className="p-3 rounded-xl bg-[#F4FDFE] border border-[#CDE2E3] text-xs text-[#3B5759]">
                   {selectedReportModal.notes}
                 </p>
               </div>
@@ -1275,7 +1275,7 @@ export const RsmDashboard: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setSelectedReportModal(null)}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-[#163A3C] hover:bg-[#235356] text-white text-xs font-bold cursor-pointer shadow-xs"
               >
                 Close Report
               </button>

@@ -27,6 +27,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -168,6 +169,16 @@ public class ProductController {
             distStockMap.put(di.getDistrictId() + "_" + di.getProductId(), di.getCurrentStock());
         }
 
+        Map<String, DistrictProductPricing> distPriceMap = new HashMap<>();
+        if (!districtIds.isEmpty()) {
+            List<DistrictProductPricing> allDpp = districtProductPricingRepository.findAll();
+            for (DistrictProductPricing dp : allDpp) {
+                if (districtIds.contains(dp.getDistrictId())) {
+                    distPriceMap.put(dp.getDistrictId() + "_" + dp.getProductId(), dp);
+                }
+            }
+        }
+
         for (Product p : products) {
             List<Map<String, Object>> outletList = new ArrayList<>();
             int calculatedTotalStock = 0;
@@ -214,6 +225,18 @@ public class ProductController {
                 dm.put("district_id", distId);
                 dm.put("district_name", distName);
                 dm.put("stock", st);
+
+                DistrictProductPricing dpp = distPriceMap.get(distId + "_" + p.getProductId());
+                if (dpp != null) {
+                    dm.put("supplier_price", dpp.getSupplierPrice());
+                    dm.put("outlet_price", dpp.getOutletPrice());
+                    dm.put("retail_price", dpp.getRetailPrice());
+                } else {
+                    BigDecimal sup = p.getBasePrice() != null ? p.getBasePrice() : new BigDecimal("25.00");
+                    dm.put("supplier_price", sup);
+                    dm.put("outlet_price", sup.multiply(new BigDecimal("1.15")).setScale(2, RoundingMode.HALF_UP));
+                    dm.put("retail_price", sup.multiply(new BigDecimal("1.30")).setScale(2, RoundingMode.HALF_UP));
+                }
                 depotBreakdown.add(dm);
             }
             p.setSupplierStock(totalSupplierDepotStock);

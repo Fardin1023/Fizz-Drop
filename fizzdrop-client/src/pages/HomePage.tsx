@@ -11,7 +11,7 @@ interface HomePageProps {
 
 const HomePage: React.FC<HomePageProps> = ({ onAddToCart, branchId }) => {
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col bg-[#FAFCFC] text-[#1A282A] home-theme min-h-screen">
       {/* 1. Interactive Product Carousel Hero */}
       <HeroSection />
 

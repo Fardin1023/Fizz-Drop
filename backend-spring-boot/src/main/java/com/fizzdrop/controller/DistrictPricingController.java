@@ -5,7 +5,9 @@ import com.fizzdrop.entity.CentralInventory;
 import com.fizzdrop.entity.District;
 import com.fizzdrop.entity.DistrictProductPricing;
 import com.fizzdrop.entity.Product;
+import com.fizzdrop.entity.SupplierProfile;
 import com.fizzdrop.repository.*;
+import jakarta.annotation.PostConstruct;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,6 +46,43 @@ public class DistrictPricingController {
         this.supplierProfileRepository = supplierProfileRepository;
         this.outletRepository = outletRepository;
         this.notificationRepository = notificationRepository;
+    }
+
+    /**
+     * Pre-seeds all 64 districts with their own independent pricing records.
+     * Guarantees each district has completely isolated, individual rows in district_product_pricing.
+     */
+    @PostConstruct
+    @Transactional
+    public void seedAllDistrictsIfEmpty() {
+        try {
+            List<District> districts = districtRepository.findAll();
+            List<Product> products = productRepository.findAll();
+            if (districts.isEmpty() || products.isEmpty()) return;
+
+            List<DistrictProductPricing> allExisting = pricingRepository.findAll();
+            Set<String> existingKeys = allExisting.stream()
+                    .map(p -> p.getDistrictId() + "_" + p.getProductId())
+                    .collect(Collectors.toSet());
+
+            List<DistrictProductPricing> toSeed = new ArrayList<>();
+            for (District d : districts) {
+                for (Product prod : products) {
+                    String key = d.getId() + "_" + prod.getProductId();
+                    if (!existingKeys.contains(key)) {
+                        BigDecimal base = prod.getBasePrice() != null ? prod.getBasePrice() : new BigDecimal("25.00");
+                        BigDecimal out = base.multiply(new BigDecimal("1.15")).setScale(2, RoundingMode.HALF_UP);
+                        BigDecimal ret = out.multiply(new BigDecimal("1.15")).setScale(2, RoundingMode.HALF_UP);
+
+                        toSeed.add(new DistrictProductPricing(d.getId(), prod.getProductId(), base, out, ret));
+                    }
+                }
+            }
+
+            if (!toSeed.isEmpty()) {
+                pricingRepository.saveAll(toSeed);
+            }
+        } catch (Exception ignored) {}
     }
 
     /**
@@ -104,21 +143,14 @@ public class DistrictPricingController {
         for (Product prod : products) {
             DistrictProductPricing item = pricingMap.get(prod.getProductId());
             if (item == null) {
-                // Initialize default prices:
-                // Superadmin -> Supplier buy price: product.supplierPrice or basePrice
-                BigDecimal supPrice = prod.getSupplierPrice() != null
-                        ? prod.getSupplierPrice()
-                        : (prod.getBasePrice() != null ? prod.getBasePrice() : new BigDecimal("30.00"));
+                // Initialize default prices from product factory benchmark, completely independent per district
+                BigDecimal supPrice = prod.getBasePrice() != null ? prod.getBasePrice() : new BigDecimal("25.00");
 
-                // Supplier -> Outlet price: product.outletPrice or 15% wholesale markup
-                BigDecimal outPrice = prod.getOutletPrice() != null
-                        ? prod.getOutletPrice()
-                        : supPrice.multiply(new BigDecimal("1.15")).setScale(2, RoundingMode.HALF_UP);
+                // Supplier -> Outlet price: 15% wholesale markup
+                BigDecimal outPrice = supPrice.multiply(new BigDecimal("1.15")).setScale(2, RoundingMode.HALF_UP);
 
-                // Outlet -> Customer price: product.retailPrice or 15% retail markup
-                BigDecimal retPrice = prod.getRetailPrice() != null
-                        ? prod.getRetailPrice()
-                        : outPrice.multiply(new BigDecimal("1.15")).setScale(2, RoundingMode.HALF_UP);
+                // Outlet -> Customer price: 15% retail markup
+                BigDecimal retPrice = outPrice.multiply(new BigDecimal("1.15")).setScale(2, RoundingMode.HALF_UP);
 
                 item = new DistrictProductPricing(districtId, prod.getProductId(), supPrice, outPrice, retPrice);
                 toSave.add(item);
@@ -236,45 +268,58 @@ public class DistrictPricingController {
             pricingRepository.saveAll(updatedList);
         }
 
-        // Keep master product table fallback rates in sync when central HQ district #1 is updated
-        if (Long.valueOf(1L).equals(districtId)) {
-            for (DistrictProductPricing p : updatedList) {
-                productRepository.findById(p.getProductId()).ifPresent(prod -> {
-                    prod.setSupplierPrice(p.getSupplierPrice());
-                    prod.setOutletPrice(p.getOutletPrice());
-                    prod.setRetailPrice(p.getRetailPrice());
-                    prod.setBasePrice(p.getSupplierPrice());
-                    productRepository.save(prod);
-                });
-            }
-        }
-
         ProductController.invalidateCatalogCache();
 
-        long supplierCount = supplierProfileRepository.findAll().stream()
+        List<SupplierProfile> targetSuppliers = supplierProfileRepository.findAll().stream()
                 .filter(s -> (s.getPrimaryDistrictId() != null && s.getPrimaryDistrictId().equals(districtId)) ||
                              (s.getCoveredDistrictIds() != null && Arrays.asList(s.getCoveredDistrictIds().split(",")).contains(String.valueOf(districtId))))
-                .count();
+                .collect(Collectors.toList());
+        long supplierCount = targetSuppliers.size();
 
         long outletCount = outletRepository.findAll().stream()
                 .filter(o -> o.getDistrictId() != null && o.getDistrictId().equals(districtId))
                 .count();
 
-        // Send real-time notifications to suppliers and outlets of this district
+        // Send real-time notifications to superadmin, regional suppliers and outlets of this district
         try {
+            // 1. Superadmin Alert
+            AppNotification adminNotif = new AppNotification();
+            adminNotif.setRecipientRole("SUPERADMIN");
+            adminNotif.setTitle("Price Set for " + district.getName() + " District");
+            adminNotif.setMessage("Pricing successfully allotted and saved in database for " + district.getName() + " (" + updatedList.size() + " SKUs). Applied to " + supplierCount + " suppliers and " + outletCount + " outlets.");
+            adminNotif.setType("PRICE_UPDATED");
+            adminNotif.setReferenceId(districtId);
+            notificationRepository.save(adminNotif);
+
+            // 2. Role-wide Supplier Alert for this district
             AppNotification supNotif = new AppNotification();
             supNotif.setRecipientRole("SUPPLIER");
-            supNotif.setTitle("District Pricing Allotted: " + district.getName());
-            supNotif.setMessage("Superadmin updated 3-tier product pricing for " + district.getName() + " district (" + updatedList.size() + " SKUs). Buy rate and wholesale supply prices are now applied.");
-            supNotif.setType("INFO");
+            supNotif.setTitle("Price Set for " + district.getName() + " District");
+            supNotif.setMessage("Superadmin updated 3-tier product pricing for " + district.getName() + " district (" + updatedList.size() + " SKUs). New buy rates and wholesale prices are now in effect.");
+            supNotif.setType("PRICE_UPDATED");
             supNotif.setReferenceId(districtId);
             notificationRepository.save(supNotif);
 
+            // 3. User-specific notifications for all suppliers assigned to this district
+            for (SupplierProfile sp : targetSuppliers) {
+                if (sp.getUserId() != null) {
+                    AppNotification indivSupNotif = new AppNotification();
+                    indivSupNotif.setRecipientRole("SUPPLIER");
+                    indivSupNotif.setRecipientUserId(sp.getUserId());
+                    indivSupNotif.setTitle("Price Set for " + district.getName() + " District");
+                    indivSupNotif.setMessage("Superadmin updated product pricing for your district (" + district.getName() + "). New inventory buy rates and wholesale supply prices are now applied.");
+                    indivSupNotif.setType("PRICE_UPDATED");
+                    indivSupNotif.setReferenceId(districtId);
+                    notificationRepository.save(indivSupNotif);
+                }
+            }
+
+            // 4. Outlet Alert for this district
             AppNotification outNotif = new AppNotification();
             outNotif.setRecipientRole("OUTLET");
-            outNotif.setTitle("District Pricing Allotted: " + district.getName());
-            outNotif.setMessage("Superadmin updated wholesale purchase and consumer retail MRP rates for " + district.getName() + " district (" + updatedList.size() + " SKUs).");
-            outNotif.setType("INFO");
+            outNotif.setTitle("Price Set for " + district.getName() + " District");
+            outNotif.setMessage("Superadmin updated wholesale purchase and retail MRP rates for " + district.getName() + " district (" + updatedList.size() + " SKUs).");
+            outNotif.setType("PRICE_UPDATED");
             outNotif.setReferenceId(districtId);
             notificationRepository.save(outNotif);
         } catch (Exception ignored) {}
@@ -348,20 +393,6 @@ public class DistrictPricingController {
             pricingRepository.saveAll(toSave);
         }
 
-        if (targetDistrictIds.contains(1L)) {
-            for (DistrictProductPricing p : toSave) {
-                if (Long.valueOf(1L).equals(p.getDistrictId())) {
-                    productRepository.findById(p.getProductId()).ifPresent(prod -> {
-                        prod.setSupplierPrice(p.getSupplierPrice());
-                        prod.setOutletPrice(p.getOutletPrice());
-                        prod.setRetailPrice(p.getRetailPrice());
-                        prod.setBasePrice(p.getSupplierPrice());
-                        productRepository.save(prod);
-                    });
-                }
-            }
-        }
-
         ProductController.invalidateCatalogCache();
 
         return ResponseEntity.ok(Map.of(
@@ -369,5 +400,188 @@ public class DistrictPricingController {
                 "message", "Successfully copied pricing from district #" + fromDistrictId + " to " + targetDistrictIds.size() + " districts.",
                 "target_districts_count", targetDistrictIds.size()
         ));
+    }
+
+    /**
+     * Get Price Board for a supplier across their assigned districts.
+     * Supports selecting any district assigned to the supplier (e.g. Comilla, Chittagong, etc.),
+     * and returns the multi-district pricing matrix for all assigned territories.
+     */
+    @GetMapping("/supplier/board")
+    @Transactional
+    public ResponseEntity<?> getSupplierPriceBoard(
+            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) Long supplierId,
+            @RequestParam(required = false) Long districtId) {
+
+        Optional<SupplierProfile> profileOpt = Optional.empty();
+        if (supplierId != null && supplierId > 0) {
+            profileOpt = supplierProfileRepository.findById(supplierId);
+        }
+        if (profileOpt.isEmpty() && userId != null && userId > 0) {
+            profileOpt = supplierProfileRepository.findByUserId(userId);
+        }
+        if (profileOpt.isEmpty()) {
+            profileOpt = supplierProfileRepository.findByUserId(4L);
+        }
+        if (profileOpt.isEmpty()) {
+            profileOpt = supplierProfileRepository.findAll().stream().findFirst();
+        }
+
+        Long targetUserId = userId != null ? userId : (profileOpt.map(SupplierProfile::getUserId).orElse(4L));
+        Long primaryDistrictId = 1L;
+        String businessName = "Regional Supplier";
+        String depotAddress = "Regional Territory Depot";
+        List<Long> assignedDistrictIds = new ArrayList<>();
+
+        if (profileOpt.isPresent()) {
+            SupplierProfile profile = profileOpt.get();
+            if (profile.getUserId() != null) {
+                targetUserId = profile.getUserId();
+            }
+            if (profile.getPrimaryDistrictId() != null) {
+                primaryDistrictId = profile.getPrimaryDistrictId();
+                if (!assignedDistrictIds.contains(primaryDistrictId)) {
+                    assignedDistrictIds.add(primaryDistrictId);
+                }
+            }
+            if (profile.getCoveredDistrictIds() != null && !profile.getCoveredDistrictIds().isBlank()) {
+                String[] parts = profile.getCoveredDistrictIds().split(",");
+                for (String part : parts) {
+                    try {
+                        Long pId = Long.parseLong(part.trim());
+                        if (!assignedDistrictIds.contains(pId)) {
+                            assignedDistrictIds.add(pId);
+                        }
+                    } catch (Exception ignored) {}
+                }
+            }
+            if (profile.getBusinessName() != null && !profile.getBusinessName().isBlank()) {
+                businessName = profile.getBusinessName();
+            }
+            if (profile.getDepotAddress() != null && !profile.getDepotAddress().isBlank()) {
+                depotAddress = profile.getDepotAddress();
+            }
+        }
+
+        if (assignedDistrictIds.isEmpty()) {
+            assignedDistrictIds.add(primaryDistrictId);
+        }
+
+        // Fetch District entities for metadata
+        List<District> allDistricts = districtRepository.findAll();
+        Map<Long, District> distMap = allDistricts.stream().collect(Collectors.toMap(District::getId, d -> d, (a, b) -> a));
+
+        List<Map<String, Object>> assignedDistrictsList = new ArrayList<>();
+        for (Long dId : assignedDistrictIds) {
+            District d = distMap.get(dId);
+            if (d != null) {
+                Map<String, Object> dm = new HashMap<>();
+                dm.put("id", d.getId());
+                dm.put("name", d.getName());
+                dm.put("division", d.getDivision());
+                dm.put("is_primary", Objects.equals(d.getId(), primaryDistrictId));
+                assignedDistrictsList.add(dm);
+            }
+        }
+
+        // Determine effective district: if requested districtId is among assigned districts (or user is superadmin), use it!
+        Long effectiveDistrictId = primaryDistrictId;
+        if (districtId != null && districtId > 0) {
+            if (assignedDistrictIds.contains(districtId) || targetUserId.equals(4L) || targetUserId.equals(1L)) {
+                effectiveDistrictId = districtId;
+            }
+        }
+
+        // Delegate to existing getPricingForDistrict logic which guarantees seeded rates
+        ResponseEntity<?> distPricingRes = getPricingForDistrict(effectiveDistrictId);
+        if (distPricingRes.getStatusCode() != HttpStatus.OK || !(distPricingRes.getBody() instanceof Map)) {
+            return distPricingRes;
+        }
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = new HashMap<>((Map<String, Object>) distPricingRes.getBody());
+        body.put("supplier_user_id", targetUserId);
+        body.put("supplier_id", profileOpt.map(SupplierProfile::getId).orElse(null));
+        body.put("business_name", businessName);
+        body.put("depot_address", depotAddress);
+        body.put("primary_district_id", primaryDistrictId);
+        body.put("selected_district_id", effectiveDistrictId);
+        body.put("assigned_districts", assignedDistrictsList);
+        body.put("is_supplier_locked", true);
+        body.put("timestamp", System.currentTimeMillis());
+
+        // Multi-district pricing compilation for all assigned districts
+        Map<String, Object> multiDistrictPricing = new HashMap<>();
+        for (Long dId : assignedDistrictIds) {
+            List<DistrictProductPricing> dpps = pricingRepository.findByDistrictId(dId);
+            Map<String, Object> prodPricingMap = new HashMap<>();
+            for (DistrictProductPricing p : dpps) {
+                Map<String, Object> pDetail = new HashMap<>();
+                pDetail.put("supplier_price", p.getSupplierPrice());
+                pDetail.put("outlet_price", p.getOutletPrice());
+                pDetail.put("retail_price", p.getRetailPrice());
+                pDetail.put("district_id", p.getDistrictId());
+                prodPricingMap.put(String.valueOf(p.getProductId()), pDetail);
+            }
+            multiDistrictPricing.put(String.valueOf(dId), prodPricingMap);
+        }
+        body.put("multi_district_pricing", multiDistrictPricing);
+
+        return ResponseEntity.ok(body);
+    }
+
+    /**
+     * Get multi-district price board for Superadmin across all districts.
+     */
+    @GetMapping("/board/all")
+    public ResponseEntity<?> getAllDistrictsPriceBoard() {
+        List<District> districts = districtRepository.findAll();
+        districts.sort(Comparator.comparing(District::getId));
+
+        List<DistrictProductPricing> allPricing = pricingRepository.findAll();
+        Map<Long, List<DistrictProductPricing>> pricingByDistrict = allPricing.stream()
+                .collect(Collectors.groupingBy(DistrictProductPricing::getDistrictId));
+
+        List<Product> products = productRepository.findAll();
+        Map<Long, Product> productMap = products.stream()
+                .collect(Collectors.toMap(Product::getProductId, p -> p, (a, b) -> a));
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (District d : districts) {
+            Map<String, Object> dMap = new HashMap<>();
+            dMap.put("district_id", d.getId());
+            dMap.put("district_name", d.getName());
+            dMap.put("division_name", d.getDivision());
+
+            List<DistrictProductPricing> pList = pricingByDistrict.getOrDefault(d.getId(), Collections.emptyList());
+            List<Map<String, Object>> pricingDetails = new ArrayList<>();
+            for (DistrictProductPricing dp : pList) {
+                Product prod = productMap.get(dp.getProductId());
+                Map<String, Object> item = new HashMap<>();
+                item.put("id", dp.getId());
+                item.put("product_id", dp.getProductId());
+                item.put("supplier_price", dp.getSupplierPrice());
+                item.put("outlet_price", dp.getOutletPrice());
+                item.put("retail_price", dp.getRetailPrice());
+                item.put("updated_at", dp.getUpdatedAt());
+                if (prod != null) {
+                    item.put("product_name", prod.getBrand() + " " + prod.getFlavorVariant());
+                    item.put("brand", prod.getBrand());
+                    item.put("flavor_variant", prod.getFlavorVariant());
+                    item.put("category", prod.getCategory());
+                    item.put("sku", prod.getSku());
+                    item.put("packaging", prod.getPackaging());
+                    item.put("size_volume", prod.getSizeVolume());
+                    item.put("image_url", prod.getImageUrl());
+                }
+                pricingDetails.add(item);
+            }
+            dMap.put("pricing", pricingDetails);
+            dMap.put("priced_count", pricingDetails.size());
+            result.add(dMap);
+        }
+
+        return ResponseEntity.ok(result);
     }
 }

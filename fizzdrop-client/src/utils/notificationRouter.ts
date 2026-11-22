@@ -23,6 +23,15 @@ export const getNotificationDestination = (
   // 1. REGIONAL SUPPLIER PORTAL (/admin)
   if (role === 'SUPPLIER') {
     if (
+      type.includes('PRICE') ||
+      title.includes('PRICING') ||
+      title.includes('PRICE') ||
+      msg.includes('PRICING') ||
+      msg.includes('PRICE')
+    ) {
+      return { path: '/admin', tab: 'price-board', label: 'Territory Price Board', fullUrl: '/admin?tab=price-board' };
+    }
+    if (
       type.includes('SO_STOCK_REQUEST') ||
       type.includes('NEW_REQUISITION') ||
       type.includes('SALES_OFFICER_REQUISITION') ||
@@ -306,6 +315,15 @@ export const getNotificationDestination = (
       title.includes('SHOP')
     ) {
       return { path: '/superadmin', tab: 'outlets', label: 'Retail Stores', fullUrl: '/superadmin?tab=outlets' };
+    }
+    if (
+      type.includes('PRICE') ||
+      title.includes('PRICING') ||
+      title.includes('PRICE') ||
+      msg.includes('PRICING') ||
+      msg.includes('PRICE')
+    ) {
+      return { path: '/superadmin', tab: 'products', label: 'District Pricing Studio', fullUrl: '/superadmin?tab=products' };
     }
     if (
       type.includes('PRODUCT') ||

@@ -1,0 +1,116 @@
+/* ==========================================================================
+   DELIVERY TEAM PORTAL PALETTE
+   Theme Colors:
+     Color 1 (Deep Steel Cyan): #8DBCC7
+     Color 2 (Soft Sky Cyan):   #A4CCD9
+     Color 3 (Pale Ice Cyan):   #C4E1E6
+     Color 4 (Pale Lime Mint):  #EBFFD8
+   Text Colors:
+     Primary:   #0F172A
+     Secondary: #164E63
+     Muted:     #334155
+   ========================================================================== */
+
+:root {
+  --deliv-c1: #8DBCC7;
+  --deliv-c2: #A4CCD9;
+  --deliv-c3: #C4E1E6;
+  --deliv-c4: #EBFFD8;
+  --deliv-text-primary: #0F172A;
+  --deliv-text-secondary: #164E63;
+  --deliv-text-muted: #334155;
+  --deliv-border: #8DBCC7;
+  --deliv-border-subtle: #A4CCD9;
+}
+
+.delivery-theme {
+  background-color: #d8edf1;
+  color: #0F172A;
+  font-family: inherit;
+}
+
+/* Header */
+.delivery-theme .delivery-header {
+  background-color: #8DBCC7;
+  border-bottom: 1px solid #73a7b3;
+  color: #0F172A;
+}
+
+/* Card surfaces */
+.delivery-theme .delivery-card {
+  background-color: #ffffff;
+  border: 1px solid #A4CCD9;
+  box-shadow: 0 1px 3px 0 rgba(141, 188, 199, 0.2);
+}
+
+.delivery-theme .delivery-card-accent {
+  background: linear-gradient(135deg, #C4E1E6 0%, #dcf0f3 50%, #EBFFD8 100%);
+  border: 1px solid #8DBCC7;
+}
+
+/* Badges */
+.delivery-theme .badge-lime {
+  background-color: #EBFFD8;
+  color: #14532D;
+  border: 1px solid #bce69c;
+}
+
+.delivery-theme .badge-cyan {
+  background-color: #C4E1E6;
+  color: #0F172A;
+  border: 1px solid #8DBCC7;
+}
+
+.delivery-theme .badge-sky {
+  background-color: #A4CCD9;
+  color: #0F172A;
+  border: 1px solid #8DBCC7;
+}
+
+.delivery-theme .badge-steel {
+  background-color: #8DBCC7;
+  color: #0F172A;
+  border: 1px solid #6c9fa9;
+}
+
+/* Form Controls */
+.delivery-theme input,
+.delivery-theme select,
+.delivery-theme textarea {
+  background-color: #ffffff;
+  border: 1px solid #A4CCD9;
+  color: #0F172A;
+}
+
+.delivery-theme input:focus,
+.delivery-theme select:focus,
+.delivery-theme textarea:focus {
+  border-color: #8DBCC7;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(141, 188, 199, 0.4);
+}
+
+/* Primary Action Buttons */
+.delivery-theme .btn-primary {
+  background-color: #0F172A;
+  color: #ffffff;
+  border: 1px solid #8DBCC7;
+  transition: all 0.15s ease-in-out;
+}
+
+.delivery-theme .btn-primary:hover {
+  background-color: #164E63;
+  color: #EBFFD8;
+}
+
+.delivery-theme .btn-accent {
+  background-color: #EBFFD8;
+  color: #0F172A;
+  border: 1px solid #8DBCC7;
+  font-weight: 700;
+  transition: all 0.15s ease-in-out;
+}
+
+.delivery-theme .btn-accent:hover {
+  background-color: #dbf8be;
+}

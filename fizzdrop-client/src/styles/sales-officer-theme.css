@@ -103,16 +103,25 @@
   color: #0F172A !important;
 }
 
+.sales-officer-theme div[class*="from-slate-900"][class*="via-blue-950"] .text-white,
+.so-theme div[class*="from-slate-900"][class*="via-blue-950"] .text-white,
+.sales-officer-theme div[class*="from-slate-900"][class*="via-blue-950"] span.text-white,
+.so-theme div[class*="from-slate-900"][class*="via-blue-950"] span.text-white {
+  color: #0F172A !important;
+}
+
 .sales-officer-theme div[class*="from-slate-900"][class*="via-blue-950"] .text-blue-200,
 .so-theme div[class*="from-slate-900"][class*="via-blue-950"] .text-blue-200,
 .sales-officer-theme div[class*="from-slate-900"][class*="via-blue-950"] .text-blue-200\/90,
-.so-theme div[class*="from-slate-900"][class*="via-blue-950"] .text-blue-200\/90 {
+.so-theme div[class*="from-slate-900"][class*="via-blue-950"] .text-blue-200\/90,
+.sales-officer-theme div[class*="from-slate-900"][class*="via-blue-950"] .text-blue-200\/80,
+.so-theme div[class*="from-slate-900"][class*="via-blue-950"] .text-blue-200\/80 {
   color: #334155 !important;
 }
 
 .sales-officer-theme div[class*="from-slate-900"][class*="via-blue-950"] .text-blue-400,
 .so-theme div[class*="from-slate-900"][class*="via-blue-950"] .text-blue-400 {
-  color: #475569 !important;
+  color: #334155 !important;
 }
 
 .sales-officer-theme div[class*="from-slate-900"][class*="via-blue-950"] .bg-blue-500\/20,
@@ -150,7 +159,21 @@
 .so-theme .bg-slate-900\/80 .text-cyan-300,
 .sales-officer-theme .bg-slate-900\/80 .text-cyan-400,
 .so-theme .bg-slate-900\/80 .text-cyan-400 {
-  color: #1E293B !important;
+  color: #0F172A !important;
+}
+
+.sales-officer-theme .bg-slate-900\/80 .text-blue-200,
+.so-theme .bg-slate-900\/80 .text-blue-200,
+.sales-officer-theme .bg-slate-900\/80 .text-blue-200\/80,
+.so-theme .bg-slate-900\/80 .text-blue-200\/80,
+.sales-officer-theme .bg-slate-900\/80 .text-blue-200\/90,
+.so-theme .bg-slate-900\/80 .text-blue-200\/90 {
+  color: #334155 !important;
+}
+
+.sales-officer-theme .bg-slate-900\/80 .border-white\/10,
+.so-theme .bg-slate-900\/80 .border-white\/10 {
+  border-color: #E6EBF1 !important;
 }
 
 .sales-officer-theme .bg-slate-900\/80 .bg-indigo-500\/30,
@@ -667,7 +690,11 @@
 .sales-officer-theme .bg-\[\#F4F6F8\] .text-white,
 .so-theme .bg-\[\#F4F6F8\] .text-white,
 .sales-officer-theme .bg-\[\#E6EBF1\] .text-white,
-.so-theme .bg-\[\#E6EBF1\] .text-white {
+.so-theme .bg-\[\#E6EBF1\] .text-white,
+.sales-officer-theme span.text-white:not(button *),
+.so-theme span.text-white:not(button *),
+.sales-officer-theme p.text-white:not(button *),
+.so-theme p.text-white:not(button *) {
   color: #0F172A !important;
 }
 

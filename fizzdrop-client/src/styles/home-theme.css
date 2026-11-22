@@ -1,0 +1,95 @@
+/* =========================================================================
+   FizzDrop Customer Home Page Theme
+   5-Swatch Palette:
+   1. Vibrant Electric Orange: #FF6A00
+   2. Warm Amber Sun Gold:     #FFB62A
+   3. Fresh Crisp Lime Green:  #65B016
+   4. Thirst Quencher Aqua:    #9BD8DA
+   5. Slate Aqua / Muted Gray: #9CB7BB
+   ========================================================================= */
+
+:root {
+  --home-canvas: #FAFCFC;
+  --home-card: #FFFFFF;
+  --home-orange: #FF6A00;
+  --home-orange-hover: #E55F00;
+  --home-gold: #FFB62A;
+  --home-green: #65B016;
+  --home-aqua: #9BD8DA;
+  --home-slate: #9CB7BB;
+  --home-slate-dark: #1A282A;
+  --home-text-primary: #1A282A;
+  --home-text-secondary: #3D5558;
+  --home-text-muted: #6B8487;
+  --home-surface-subtle: #EDF7F7;
+  --home-border: #DCE8E9;
+  --home-border-hover: #FF6A00;
+}
+
+.home-theme {
+  background-color: var(--home-canvas);
+  color: var(--home-text-primary);
+}
+
+/* Card Surface */
+.home-card {
+  background-color: var(--home-card);
+  border: 1px solid var(--home-border);
+  box-shadow: 0 1px 3px 0 rgba(26, 40, 42, 0.04);
+  transition: all 0.25s ease-in-out;
+}
+
+.home-card:hover {
+  border-color: var(--home-orange);
+  box-shadow: 0 10px 25px -5px rgba(255, 106, 0, 0.12);
+}
+
+/* Buttons */
+.btn-home-primary {
+  background-color: var(--home-orange);
+  color: #FFFFFF;
+  box-shadow: 0 4px 14px 0 rgba(255, 106, 0, 0.28);
+  transition: all 0.2s ease;
+}
+
+.btn-home-primary:hover {
+  background-color: var(--home-orange-hover);
+  transform: translateY(-1px);
+}
+
+.btn-home-secondary {
+  background-color: #FFFFFF;
+  color: var(--home-text-primary);
+  border: 1px solid var(--home-border);
+  transition: all 0.2s ease;
+}
+
+.btn-home-secondary:hover {
+  background-color: var(--home-surface-subtle);
+  border-color: var(--home-aqua);
+}
+
+/* Badges */
+.badge-home-orange {
+  background-color: rgba(255, 106, 0, 0.1);
+  color: #FF6A00;
+  border: 1px solid rgba(255, 106, 0, 0.25);
+}
+
+.badge-home-gold {
+  background-color: rgba(255, 182, 42, 0.15);
+  color: #D98E00;
+  border: 1px solid rgba(255, 182, 42, 0.35);
+}
+
+.badge-home-green {
+  background-color: rgba(101, 176, 22, 0.12);
+  color: #4B8510;
+  border: 1px solid rgba(101, 176, 22, 0.3);
+}
+
+.badge-home-aqua {
+  background-color: var(--home-surface-subtle);
+  color: #1A282A;
+  border: 1px solid var(--home-aqua);
+}

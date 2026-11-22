@@ -213,12 +213,12 @@ export const BrandVideoSection: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-10 sm:mb-14 space-y-3">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-cyan-50 dark:bg-cyan-950/50 border border-cyan-200/80 dark:border-cyan-800/80 text-cyan-700 dark:text-cyan-300 text-xs font-bold tracking-wider uppercase shadow-xs">
-            <Sparkles className="w-3.5 h-3.5 text-cyan-500 animate-pulse" />
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#9BD8DA]/25 border border-[#9BD8DA] text-[#1A282A] text-xs font-bold tracking-wider uppercase shadow-xs">
+            <Sparkles className="w-3.5 h-3.5 text-[#FFB62A] animate-pulse" />
             <span>The FizzDrop Experience</span>
           </div>
 
-          <h2 className="font-oswald text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
+          <h2 className="font-oswald text-3xl sm:text-4xl lg:text-5xl font-black text-[#1A282A] uppercase tracking-tight">
             Feel The Chill.{' '}
             <span
               className="bg-clip-text text-transparent transition-all duration-500"
@@ -230,7 +230,7 @@ export const BrandVideoSection: React.FC = () => {
             </span>
           </h2>
 
-          <p className="text-slate-600 dark:text-zinc-400 text-sm sm:text-base leading-relaxed">
+          <p className="text-[#3D5558] text-sm sm:text-base leading-relaxed">
             From state-of-the-art regional cold depots to authorized franchise outlets, witness the relentless freshness and sub-zero logistics powering every single drop.
           </p>
         </div>
@@ -393,40 +393,40 @@ export const BrandVideoSection: React.FC = () => {
         {/* 3 Value Proposition Cards Under Video to Maintain Elegant White Space */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mt-10 sm:mt-12">
           {/* Feature 1 */}
-          <div className="p-5 sm:p-6 rounded-2xl sm:rounded-3xl bg-white dark:bg-zinc-900/60 border border-slate-200/80 dark:border-zinc-800/80 shadow-xs hover:shadow-md hover:border-cyan-500/30 transition-all group">
-            <div className="w-10 h-10 rounded-xl bg-cyan-50 dark:bg-cyan-950/60 text-cyan-600 dark:text-cyan-400 flex items-center justify-center mb-3.5 group-hover:scale-110 transition-transform">
-              <Snowflake className="w-5 h-5" />
+          <div className="p-5 sm:p-6 rounded-2xl sm:rounded-3xl bg-white border border-[#DCE8E9] shadow-xs hover:shadow-md hover:border-[#9BD8DA] transition-all group">
+            <div className="w-10 h-10 rounded-xl bg-[#9BD8DA]/25 text-[#1A282A] flex items-center justify-center mb-3.5 group-hover:scale-110 transition-transform">
+              <Snowflake className="w-5 h-5 text-[#3D5558]" />
             </div>
-            <h3 className="font-oswald text-lg font-bold text-slate-900 dark:text-white uppercase tracking-wide">
+            <h3 className="font-oswald text-lg font-bold text-[#1A282A] uppercase tracking-wide">
               Sub-Zero Cold Chain
             </h3>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 mt-1 leading-relaxed">
+            <p className="text-xs sm:text-sm text-[#6B8487] mt-1 leading-relaxed">
               Every beverage is temperature-monitored through our regional depot network to ensure genuine crisp carbonation upon arrival.
             </p>
           </div>
 
           {/* Feature 2 */}
-          <div className="p-5 sm:p-6 rounded-2xl sm:rounded-3xl bg-white dark:bg-zinc-900/60 border border-slate-200/80 dark:border-zinc-800/80 shadow-xs hover:shadow-md hover:border-blue-500/30 transition-all group">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-3.5 group-hover:scale-110 transition-transform">
-              <ShieldCheck className="w-5 h-5" />
+          <div className="p-5 sm:p-6 rounded-2xl sm:rounded-3xl bg-white border border-[#DCE8E9] shadow-xs hover:shadow-md hover:border-[#65B016] transition-all group">
+            <div className="w-10 h-10 rounded-xl bg-[#65B016]/15 text-[#4B8510] flex items-center justify-center mb-3.5 group-hover:scale-110 transition-transform">
+              <ShieldCheck className="w-5 h-5 text-[#65B016]" />
             </div>
-            <h3 className="font-oswald text-lg font-bold text-slate-900 dark:text-white uppercase tracking-wide">
+            <h3 className="font-oswald text-lg font-bold text-[#1A282A] uppercase tracking-wide">
               100% Authentic Stock
             </h3>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 mt-1 leading-relaxed">
+            <p className="text-xs sm:text-sm text-[#6B8487] mt-1 leading-relaxed">
               Certified franchise batches from PepsiCo, Mountain Dew, 7UP, and Aquafina direct from authorized superadmin central supplies.
             </p>
           </div>
 
           {/* Feature 3 */}
-          <div className="p-5 sm:p-6 rounded-2xl sm:rounded-3xl bg-white dark:bg-zinc-900/60 border border-slate-200/80 dark:border-zinc-800/80 shadow-xs hover:shadow-md hover:border-indigo-500/30 transition-all group">
-            <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-3.5 group-hover:scale-110 transition-transform">
-              <Zap className="w-5 h-5" />
+          <div className="p-5 sm:p-6 rounded-2xl sm:rounded-3xl bg-white border border-[#DCE8E9] shadow-xs hover:shadow-md hover:border-[#FF6A00] transition-all group">
+            <div className="w-10 h-10 rounded-xl bg-[#FF6A00]/15 text-[#FF6A00] flex items-center justify-center mb-3.5 group-hover:scale-110 transition-transform">
+              <Zap className="w-5 h-5 text-[#FF6A00]" />
             </div>
-            <h3 className="font-oswald text-lg font-bold text-slate-900 dark:text-white uppercase tracking-wide">
+            <h3 className="font-oswald text-lg font-bold text-[#1A282A] uppercase tracking-wide">
               Real-Time Depot Logistics
             </h3>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 mt-1 leading-relaxed">
+            <p className="text-xs sm:text-sm text-[#6B8487] mt-1 leading-relaxed">
               Integrated franchise replenishment keeping local supermarket and grocery shelves constantly stocked with ice-cold drinks.
             </p>
           </div>
@@ -436,7 +436,7 @@ export const BrandVideoSection: React.FC = () => {
         <div className="mt-8 text-center">
           <Link
             to="/beverages"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 font-bold text-xs sm:text-sm tracking-wide shadow-md transition-all active:scale-95 group"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-[#FF6A00] hover:bg-[#E55F00] text-white font-bold text-xs sm:text-sm tracking-wide shadow-md transition-all active:scale-95 group"
           >
             <span>Explore All Chilled Beverages</span>
             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />

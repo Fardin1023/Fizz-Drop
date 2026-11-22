@@ -1036,82 +1036,81 @@ export const SalesOfficerDashboard: React.FC = () => {
       </header>
 
       {/* Main Content Workspace */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-5 space-y-5 flex-1 w-full">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 space-y-4 flex-1 w-full">
         {/* Toast Alerts */}
         {actionSuccessMsg && (
-          <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center justify-between shadow-xs animate-scale-up">
+          <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center justify-between shadow-xs animate-scale-up">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
               <span className="font-bold">{actionSuccessMsg}</span>
             </div>
-            <button onClick={() => setActionSuccessMsg(null)} className="font-bold text-emerald-700 hover:text-emerald-900 ml-3">✕</button>
+            <button onClick={() => setActionSuccessMsg(null)} className="font-bold text-emerald-700 hover:text-emerald-900 ml-3 cursor-pointer">✕</button>
           </div>
         )}
 
         {actionErrorMsg && (
-          <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between shadow-xs animate-shake">
+          <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between shadow-xs animate-shake">
             <div className="flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
               <span className="font-bold">{actionErrorMsg}</span>
             </div>
-            <button onClick={() => setActionErrorMsg(null)} className="font-bold text-rose-700 hover:text-rose-900 ml-3">✕</button>
+            <button onClick={() => setActionErrorMsg(null)} className="font-bold text-rose-700 hover:text-rose-900 ml-3 cursor-pointer">✕</button>
           </div>
         )}
 
         {/* 2. Territory Jurisdiction Banner */}
-        <div className="rounded-3xl bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 text-white p-6 shadow-xl relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-          
-          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
-            <div className="flex items-start gap-4">
+        <div className="rounded-2xl bg-gradient-to-r from-white via-[#F4F6F8] to-[#E6EBF1] text-slate-900 p-4 sm:p-5 border border-[#C7D0DB] shadow-xs relative overflow-hidden">
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
               <img
                 src={salesOfficerLogo}
                 alt="Sales Officer Emblem"
-                className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover shadow-2xl border-2 border-indigo-400/40 shrink-0 bg-slate-900/60"
+                className="w-13 h-13 sm:w-14 sm:h-14 rounded-xl object-cover shadow-2xs border border-[#C7D0DB] shrink-0 bg-white"
               />
-              <div className="space-y-1">
+              <div className="space-y-0.5">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-200 border border-blue-400/30">
+                  <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-md bg-[#E6EBF1] text-slate-800 border border-[#D7DEE8]">
                     {officer?.officer_code || 'SO-TERRITORY'}
                   </span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-800 border border-emerald-200">
                     {officer?.status || 'ACTIVE'}
                   </span>
                 </div>
-                <h2 className="font-oswald text-2xl sm:text-3xl font-bold uppercase tracking-wide bg-gradient-to-r from-teal-300 via-cyan-300 to-emerald-400 bg-clip-text text-transparent drop-shadow-sm">
+                <h2 className="font-oswald text-2xl sm:text-3xl font-bold uppercase tracking-wide text-slate-900">
                   {officer?.name || 'Assigned Sales Officer'}
                 </h2>
-                <div className="flex flex-wrap items-center gap-3 text-xs text-blue-200/90 pt-1">
-                  <span className="flex items-center gap-1.5 font-bold text-white">
-                    <MapPin className="w-3.5 h-3.5 text-blue-400" />
-                    Jurisdiction: {officer?.city} • {officer?.assigned_area} Zone
-                  </span>
-                  <span>•</span>
-                  <span className="flex items-center gap-1.5 font-mono">
-                    <Phone className="w-3.5 h-3.5 text-blue-400" />
-                    {officer?.phone}
-                  </span>
-                  {officer?.email && (
-                    <>
-                      <span>•</span>
-                      <span className="flex items-center gap-1.5">
-                        <Mail className="w-3.5 h-3.5 text-blue-400" />
-                        {officer.email}
-                      </span>
-                    </>
-                  )}
+                <div className="space-y-1 pt-0.5 text-xs">
+                  <div className="flex items-center gap-1.5 font-bold text-slate-900">
+                    <MapPin className="w-3.5 h-3.5 text-slate-700 shrink-0" />
+                    <span>Jurisdiction: {officer?.city} • {officer?.assigned_area} Zone</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-slate-700 font-medium">
+                    <span className="flex items-center gap-1.5 font-mono">
+                      <Phone className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                      {officer?.phone}
+                    </span>
+                    {officer?.email && (
+                      <>
+                        <span className="text-slate-400">•</span>
+                        <span className="flex items-center gap-1.5">
+                          <Mail className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                          {officer.email}
+                        </span>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Active Supplier Hub Selector & Status */}
-            <div className="p-4 rounded-3xl bg-slate-900/80 backdrop-blur-md border border-indigo-400/30 space-y-2 shrink-0 max-w-md w-full shadow-lg">
+            <div className="p-3 rounded-xl bg-white border border-[#D7DEE8] space-y-1.5 shrink-0 max-w-md w-full shadow-2xs">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-300 flex items-center gap-1.5">
-                  <Building2 className="w-3.5 h-3.5 text-cyan-400" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5 font-mono">
+                  <Building2 className="w-3.5 h-3.5 text-slate-600" />
                   Dealing With Supplier (1 At A Time)
                 </span>
-                <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
                   Active Partner
                 </span>
               </div>
@@ -1121,27 +1120,27 @@ export const SalesOfficerDashboard: React.FC = () => {
                   <select
                     value={selectedSupplierId || supplier?.id || ''}
                     onChange={(e) => handleSelectSupplier(Number(e.target.value))}
-                    className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-slate-800 text-white border border-indigo-400/40 focus:outline-none focus:ring-2 focus:ring-cyan-400 cursor-pointer"
+                    className="w-full px-3 py-1.5 text-xs font-bold rounded-xl bg-[#F4F6F8] text-slate-900 border border-[#C7D0DB] focus:outline-none focus:ring-2 focus:ring-slate-400 cursor-pointer"
                     title="Choose from which supplier to ask for stocks"
                   >
                     {suppliers.map((s) => (
-                      <option key={s.id} value={s.id} className="bg-slate-900 text-white">
+                      <option key={s.id} value={s.id} className="bg-white text-slate-900">
                         {s.business_name} ({s.district_name || 'Depot'})
                       </option>
                     ))}
                   </select>
                 </div>
               ) : (
-                <p className="font-bold text-sm text-white flex items-center gap-1.5 truncate">
+                <p className="font-bold text-sm text-slate-900 flex items-center gap-1.5 truncate">
                   {supplier?.business_name || officer?.supplier_name || 'Central Regional Supplier'}
                 </p>
               )}
 
-              <div className="flex items-center justify-between text-[11px] text-blue-200/80 pt-1 border-t border-white/10">
-                <span className="truncate" title={supplier?.depot_address}>
+              <div className="flex items-center justify-between text-[11px] text-slate-600 pt-1 border-t border-[#E6EBF1]">
+                <span className="truncate font-medium text-slate-600" title={supplier?.depot_address}>
                   📍 {supplier?.depot_address || 'Regional Logistics Hub'}
                 </span>
-                <span className="shrink-0 font-mono text-[10px] bg-indigo-500/30 text-indigo-200 px-2 py-0.5 rounded-full font-bold ml-2">
+                <span className="shrink-0 font-mono text-[10px] bg-[#E6EBF1] text-slate-900 px-2 py-0.5 rounded-full font-bold ml-2 border border-[#D7DEE8]">
                   Purchased: {supplierTotalCasesPurchased} cs
                 </span>
               </div>
@@ -1186,11 +1185,11 @@ export const SalesOfficerDashboard: React.FC = () => {
 
               {/* Progress Bar & Deducted Amount */}
               <div className="mt-4 space-y-1.5">
-                <div className="flex justify-between text-[11px] font-mono">
-                  <span className="text-indigo-200">
-                    Spent on Supplier Stock: <strong className="text-cyan-300">৳{Number(financialTarget?.amount_spent ?? 0).toLocaleString()}</strong>
+                <div className="flex items-center justify-between text-[11px] font-mono gap-1">
+                  <span className="text-indigo-200 truncate">
+                    Spent on Stock: <strong className="text-cyan-300 font-bold">৳{Number(financialTarget?.amount_spent ?? 0).toLocaleString()}</strong>
                   </span>
-                  <span className="font-bold text-cyan-300">
+                  <span className="font-bold text-cyan-300 whitespace-nowrap shrink-0">
                     {financialTarget?.progress_percentage ?? 0}% Achieved
                   </span>
                 </div>
@@ -1226,12 +1225,12 @@ export const SalesOfficerDashboard: React.FC = () => {
           <div className="p-5 rounded-3xl bg-gradient-to-br from-teal-950 via-slate-900 to-cyan-950 text-white border border-teal-500/30 shadow-xl relative overflow-hidden flex flex-col justify-between">
             <div className="absolute top-0 right-0 w-48 h-48 bg-teal-500/10 rounded-full blur-2xl pointer-events-none" />
             <div className="relative z-10">
-              <div className="flex items-center justify-between mb-3">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-teal-500/20 text-teal-200 border border-teal-400/30">
-                  <Truck className="w-3.5 h-3.5 text-teal-400" />
-                  Territory Distribution Volume
+              <div className="flex items-center justify-between gap-1.5 mb-3">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-teal-500/20 text-teal-200 border border-teal-400/30 whitespace-nowrap shrink-0">
+                  <Truck className="w-3.5 h-3.5 text-teal-400 shrink-0" />
+                  Distribution Volume
                 </span>
-                <span className="text-[10px] font-bold font-mono px-2.5 py-0.5 rounded-full bg-teal-500/30 text-teal-200 border border-teal-400/40">
+                <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded-full bg-teal-500/30 text-teal-200 border border-teal-400/40 whitespace-nowrap shrink-0">
                   TARGET PROGRESS
                 </span>
               </div>

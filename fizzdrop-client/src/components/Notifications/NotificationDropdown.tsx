@@ -186,6 +186,7 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
                 const isStockOffer = n.type === 'STOCK_OFFER_RECEIVED';
                 const isDirectDispatch = n.type === 'DIRECT_DISPATCH' || n.type === 'DIRECT_SUPPLY';
                 const isApproved = n.type === 'APPROVED';
+                const isPriceUpdated = n.type === 'PRICE_UPDATED' || n.type === 'DISTRICT_PRICING';
                 const isPartial = n.type === 'PARTIALLY_APPROVED';
                 const isRejected = n.type === 'REJECTED';
                 const isNewReq = n.type === 'NEW_REQUISITION';
@@ -213,6 +214,8 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
                           ? 'bg-purple-100 text-purple-700 border border-purple-200'
                           : isDirectDispatch
                           ? 'bg-purple-100 text-purple-700 border border-purple-200'
+                          : isPriceUpdated
+                          ? 'bg-teal-100 text-teal-700 border border-teal-200'
                           : isApproved
                           ? 'bg-emerald-100 text-emerald-700'
                           : isRejected
@@ -228,6 +231,8 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
                         <Zap className="w-4 h-4 text-purple-600" />
                       ) : isDirectDispatch ? (
                         <PackageCheck className="w-4 h-4 text-purple-600" />
+                      ) : isPriceUpdated ? (
+                        <Sparkles className="w-4 h-4 text-teal-600 animate-pulse" />
                       ) : isApproved ? (
                         <CheckCircle2 className="w-4 h-4" />
                       ) : isRejected ? (
