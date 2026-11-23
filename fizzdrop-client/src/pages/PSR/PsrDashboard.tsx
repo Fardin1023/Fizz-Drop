@@ -33,6 +33,7 @@ import {
   Boxes,
   ClipboardCheck,
   Eye,
+  Gift,
 } from 'lucide-react';
 
 export const formatOunces = (sizeVolume?: string): string => {
@@ -80,9 +81,9 @@ export default function PsrDashboard() {
   const { user, isPsr, loginAsPsr, logout } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const validTabs = ['outlets', 'orders', 'refunds', 'visits'];
+  const validTabs = ['outlets', 'orders', 'refunds', 'visits', 'offers'];
   const initialTab = (searchParams.get('tab') as any) || 'outlets';
-  const [activeTab, setActiveTab] = useState<'outlets' | 'orders' | 'refunds' | 'visits'>(
+  const [activeTab, setActiveTab] = useState<'outlets' | 'orders' | 'refunds' | 'visits' | 'offers'>(
     validTabs.includes(initialTab) ? initialTab : 'outlets'
   );
 
@@ -137,6 +138,13 @@ export default function PsrDashboard() {
   const [visitNotes, setVisitNotes] = useState<string>('');
   const [visitSubmitting, setVisitSubmitting] = useState<boolean>(false);
 
+  // Trade Scheme Offers State
+  const [tradeOffers, setTradeOffers] = useState<any[]>([]);
+  const [loadingOffers, setLoadingOffers] = useState<boolean>(false);
+  const [modalTradeOffers, setModalTradeOffers] = useState<any[]>([]);
+  const [pitchingOfferId, setPitchingOfferId] = useState<number | null>(null);
+  const [pitchSuccess, setPitchSuccess] = useState<string | null>(null);
+
   const paramPsrId = searchParams.get('psrId') ? Number(searchParams.get('psrId')) : null;
   const authPsrId = user?.pre_sales_officer?.id;
   const activePsrId = paramPsrId || authPsrId || data?.psr?.id || (allPsrs.length > 0 ? allPsrs[0].id : 9);
@@ -154,6 +162,21 @@ export default function PsrDashboard() {
     clearOldNotifications,
   } = useNotifications('PSR', activeUserId);
 
+  const fetchPsrOffers = useCallback(async (psrId: number) => {
+    setLoadingOffers(true);
+    try {
+      const res = await fetch(`http://localhost:8080/api/v1/trade-offers/psr/${psrId}`);
+      if (res.ok) {
+        const json = await res.json();
+        setTradeOffers(json.offers || []);
+      }
+    } catch (err) {
+      console.error('Error fetching PSR trade offers:', err);
+    } finally {
+      setLoadingOffers(false);
+    }
+  }, []);
+
   const loadDashboard = useCallback(async (overrideId?: number) => {
     const idToFetch = overrideId || activePsrId;
     if (!idToFetch) return;
@@ -165,12 +188,65 @@ export default function PsrDashboard() {
         const json = await res.json();
         setData(json);
       }
+      fetchPsrOffers(idToFetch);
     } catch (e) {
       console.error('Error fetching PSR dashboard:', e);
     } finally {
       setLoading(false);
     }
-  }, [activePsrId]);
+  }, [activePsrId, fetchPsrOffers]);
+
+  // Check matching trade schemes when taking order for an outlet
+  useEffect(() => {
+    if (!orderModalOutlet) {
+      setModalTradeOffers([]);
+      setPitchSuccess(null);
+      return;
+    }
+    const checkOffer = async () => {
+      try {
+        const outletId = orderModalOutlet.outlet_id;
+        let url = `http://localhost:8080/api/v1/trade-offers/check?outletId=${outletId}`;
+        if (selectedProductId) {
+          url += `&productId=${selectedProductId}`;
+        }
+        const res = await fetch(url);
+        if (res.ok) {
+          const json = await res.json();
+          setModalTradeOffers(json.schemes || []);
+        }
+      } catch (err) {
+        console.error('Error checking trade offers for outlet:', err);
+      }
+    };
+    checkOffer();
+  }, [orderModalOutlet, selectedProductId]);
+
+  const handlePitchOffer = async (offerId: number) => {
+    if (!orderModalOutlet) return;
+    setPitchingOfferId(offerId);
+    setPitchSuccess(null);
+    try {
+      const res = await fetch(`http://localhost:8080/api/v1/trade-offers/${offerId}/disclose-to-outlet/${orderModalOutlet.outlet_id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          psr_id: data?.psr?.id || activePsrId,
+          psr_name: data?.psr?.name || 'Pre-Sales Officer (PSR)',
+        }),
+      });
+      if (res.ok) {
+        setPitchSuccess('Offer disclosed to outlet! They have received an instant notification and can now view this offer.');
+        setModalTradeOffers((prev) =>
+          prev.map((o) => (o.id === offerId ? { ...o, is_disclosed: true } : o))
+        );
+      }
+    } catch (err) {
+      console.error('Error pitching offer:', err);
+    } finally {
+      setPitchingOfferId(null);
+    }
+  };
 
   // Fetch all PSRs for quick demo switcher
   useEffect(() => {
@@ -365,6 +441,24 @@ export default function PsrDashboard() {
 
       const resJson = await res.json();
       if (!res.ok) throw new Error(resJson.error || resJson.message || 'Failed to place order');
+
+      // If there are undisclosed trade offers for this product, disclose & notify the outlet
+      if (modalTradeOffers.length > 0) {
+        for (const mo of modalTradeOffers) {
+          if (!mo.is_disclosed) {
+            try {
+              await fetch(`http://localhost:8080/api/v1/trade-offers/${mo.id}/disclose-to-outlet/${orderModalOutlet.outlet_id}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  psr_id: data?.psr?.id || activePsrId,
+                  psr_name: data?.psr?.name || 'Pre-Sales Officer (PSR)',
+                }),
+              });
+            } catch (ignored) {}
+          }
+        }
+      }
 
       setActionSuccess(`Order ${resJson.order_code} recorded and sent to Sales Officer!`);
       // Broadcast event for realtime update across tabs
@@ -765,6 +859,17 @@ export default function PsrDashboard() {
               <Clock className="h-4 w-4" />
               Route Visit Logs ({data?.visits?.length || 0})
             </button>
+            <button
+              onClick={() => handleTabChange('offers')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
+                activeTab === 'offers'
+                  ? 'bg-[#0F172A] text-white shadow-xs border border-[#0F172A]'
+                  : 'bg-[#f7fbff] text-[#334155] hover:bg-[#d6ecff] hover:text-[#0F172A] border border-[#c4dde9]'
+              }`}
+            >
+              <Gift className="h-4 w-4 text-amber-500" />
+              Trade Offers ({tradeOffers.length})
+            </button>
           </div>
 
           {activeTab === 'outlets' && (
@@ -1068,7 +1173,14 @@ export default function PsrDashboard() {
                             {ord.outlet_name}
                           </td>
                           <td className="p-3">
-                            <span className="font-semibold text-[#0F172A]">{ord.product_name}</span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-semibold text-[#0F172A]">{ord.product_name}</span>
+                              {Boolean(ord.is_trade_package || (ord.product_name && ord.product_name.includes('Package'))) && (
+                                <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md text-[10px] font-black bg-gradient-to-r from-amber-100 to-amber-200 text-amber-900 border border-amber-300 shadow-2xs">
+                                  🎁 Unified Scheme Package
+                                </span>
+                              )}
+                            </div>
                             <div className="text-[10px] text-[#475569] font-mono flex items-center gap-1 mt-0.5" title={`Fulfillment Supplier: ${ord.supplier_name || data?.psr?.supplier_name || 'Regional Logistics Hub'}`}>
                               <Truck className="w-2.5 h-2.5 text-[#334155]" />
                               <span className="truncate max-w-[150px]">{ord.supplier_name || data?.psr?.supplier_name || 'Regional Logistics Hub'}</span>
@@ -1296,6 +1408,99 @@ export default function PsrDashboard() {
           </div>
         )}
 
+        {/* Tab 5: Territory Trade Offers */}
+        {activeTab === 'offers' && (
+          <div className="bg-[#f7fbff] border border-[#c4dde9] rounded-2xl p-6 shadow-xs space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#c4dde9] pb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-bold text-[#0F172A]">Territory Promotional Schemes & Free Stocks</h3>
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#0F172A] text-white">
+                    Field Pitch Guide
+                  </span>
+                </div>
+                <p className="text-xs text-[#475569] mt-1">
+                  Active bonus stock trade schemes applicable to outlets along {data?.sub_route}. Inform outlets during your store visits or pitch them directly when taking orders to unlock bonus stock and trigger notifications.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => activePsrId && fetchPsrOffers(activePsrId)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-[#c4dde9] text-xs font-bold text-[#334155] hover:bg-[#e8f4ff] cursor-pointer self-start sm:self-auto"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loadingOffers ? 'animate-spin' : ''}`} />
+                <span>Refresh Schemes</span>
+              </button>
+            </div>
+
+            {loadingOffers ? (
+              <div className="text-center py-12">
+                <RefreshCw className="w-8 h-8 text-[#0F172A] animate-spin mx-auto mb-2" />
+                <p className="text-xs text-[#475569]">Loading territory schemes...</p>
+              </div>
+            ) : tradeOffers.length === 0 ? (
+              <div className="text-center py-12 border border-dashed border-[#c4dde9] rounded-2xl bg-white/50">
+                <Gift className="w-10 h-10 text-[#64748B] mx-auto mb-2" />
+                <h4 className="text-sm font-bold text-[#0F172A]">No Active Trade Offers in Route District</h4>
+                <p className="text-xs text-[#475569] mt-1 max-w-sm mx-auto">
+                  There are currently no active manufacturer trade promotions assigned to your territory.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {tradeOffers.map((offer: any) => (
+                  <div
+                    key={offer.id}
+                    className="p-5 rounded-2xl bg-white border border-[#c4dde9] shadow-xs hover:shadow-md transition space-y-3.5 flex flex-col justify-between"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md bg-[#e8f4ff] text-[#0F172A] border border-[#c4dde9]">
+                          <MapPin className="w-3 h-3 text-[#334155]" />
+                          {offer.district_name} District
+                        </span>
+                        {offer.free_item_type === 'MERCHANDISE' ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-100 text-purple-800 border border-purple-200">
+                            🎁 Merchandise Gift
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                            Active Scheme
+                          </span>
+                        )}
+                      </div>
+                      <h4 className="text-sm font-bold text-[#0F172A]">{offer.title}</h4>
+                      <p className="text-xs text-[#475569] mt-1 leading-relaxed">{offer.description}</p>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-[#f7fbff] border border-[#c4dde9] space-y-2 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[#475569] font-medium">Buy Requirement:</span>
+                        <span className="font-bold text-[#0F172A]">
+                          {offer.buy_quantity_cases} Cases of {offer.buy_product_name}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between pt-1 border-t border-[#c4dde9]">
+                        <span className={`font-bold ${offer.free_item_type === 'MERCHANDISE' ? 'text-purple-700' : 'text-emerald-700'}`}>
+                          {offer.free_item_type === 'MERCHANDISE' ? '🎁 Free Merchandise Reward:' : 'Free Bonus Stock:'}
+                        </span>
+                        <span className={`font-black ${offer.free_item_type === 'MERCHANDISE' ? 'text-purple-700' : 'text-emerald-700'}`}>
+                          +{offer.free_quantity_cases} {offer.free_item_type === 'MERCHANDISE' ? 'Unit(s)' : 'Case(s)'} of {offer.free_product_name} (৳0.00)
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-[#475569]">
+                      <span>Field Instruction:</span>
+                      <span className="font-bold text-[#0F172A]">Pitch during shop order entry</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
       </main>
 
       {/* MODAL: TAKE OUTLET ORDER */}
@@ -1365,6 +1570,81 @@ export default function PsrDashboard() {
                   ))}
                 </select>
               </div>
+
+              {/* Promotional Trade Offer Pitch Callout */}
+              {modalTradeOffers.length > 0 && (
+                <div className="p-3.5 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-xs font-black text-amber-950">
+                      <Gift className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span>Territory Trade Scheme Available</span>
+                    </div>
+                    <span className="text-[10px] uppercase font-extrabold px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 border border-amber-300">
+                      Extra Bonus Stock
+                    </span>
+                  </div>
+
+                  {modalTradeOffers.map((mo: any) => (
+                    <div
+                      key={mo.id}
+                      className="p-3 rounded-lg bg-white/95 border border-amber-200 space-y-2 text-xs shadow-xs"
+                    >
+                      <div className="font-bold text-slate-900 leading-tight">{mo.title}</div>
+                      <div className="p-2 rounded bg-amber-50/60 border border-amber-100 flex items-center justify-between gap-2 text-[11px]">
+                        <div>
+                          <span className="font-semibold text-slate-700">Qualifying Rule: </span>
+                          <span className="font-bold text-blue-900">Buy {mo.buy_quantity_cases} Cases</span> of {mo.buy_product_name}
+                        </div>
+                        <div className="text-right">
+                          <span className={`font-bold ${mo.free_item_type === 'MERCHANDISE' ? 'text-purple-800' : 'text-emerald-800'}`}>
+                            +{mo.free_quantity_cases} {mo.free_item_type === 'MERCHANDISE' ? 'Free Gift Unit(s)' : 'Free Case(s)'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1 gap-2 flex-wrap">
+                        {mo.is_disclosed ? (
+                          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-800 bg-emerald-100/80 px-2.5 py-1 rounded-md border border-emerald-300">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                            Pitched to Outlet (Visible on their Offers page)
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handlePitchOffer(mo.id)}
+                            disabled={pitchingOfferId === mo.id}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-xs transition cursor-pointer"
+                          >
+                            <Sparkles className="w-3.5 h-3.5 text-yellow-200" />
+                            <span>
+                              {pitchingOfferId === mo.id
+                                ? 'Notifying Outlet...'
+                                : 'Tell Outlet About Offer (Pitch & Notify)'}
+                            </span>
+                          </button>
+                        )}
+
+                        {quantity >= mo.buy_quantity_cases && (
+                          <span className={`text-[11px] font-black px-2.5 py-1 rounded-md shadow-2xs border ${
+                            mo.free_item_type === 'MERCHANDISE'
+                              ? 'text-purple-800 bg-purple-50 border-purple-300'
+                              : 'text-emerald-800 bg-emerald-50 border-emerald-300'
+                          }`}>
+                            🎉 Qualifies for {Math.floor(quantity / mo.buy_quantity_cases) * mo.free_quantity_cases} FREE {mo.free_item_type === 'MERCHANDISE' ? 'Merchandise Gift(s)' : 'Bonus Case(s)'}!
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+
+                  {pitchSuccess && (
+                    <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-300 text-emerald-800 text-[11px] font-medium flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>{pitchSuccess}</span>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-3">
                 <div>

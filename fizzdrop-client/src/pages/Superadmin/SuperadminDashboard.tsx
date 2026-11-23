@@ -22,6 +22,7 @@ import {
   Store,
   Truck,
   Navigation,
+  Gift,
 } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { getNotificationDestination } from '../../utils/notificationRouter';
@@ -29,6 +30,7 @@ import { useNotifications } from '../../hooks/useNotifications';
 import { NotificationDropdown } from '../../components/Notifications/NotificationDropdown';
 import { NotificationPopup } from '../../components/Notifications/NotificationPopup';
 import superadminLogo from '../../assets/img/superadmin-logo.jpg';
+import { SuperadminSidebarNav, type SuperadminTab } from './SuperadminSidebarNav';
 
 // Code-split dynamic tabs with React.lazy to minimize initial JavaScript parse time and boost Lighthouse performance
 const SuperadminProductCatalog = lazy(() =>
@@ -36,6 +38,12 @@ const SuperadminProductCatalog = lazy(() =>
 );
 const SuperadminMerchandiseCatalog = lazy(() =>
   import('./SuperadminMerchandiseCatalog').then((m) => ({ default: m.SuperadminMerchandiseCatalog }))
+);
+const SuperadminOffersManagement = lazy(() =>
+  import('./SuperadminOffersManagement').then((m) => ({ default: m.SuperadminOffersManagement }))
+);
+const SuperadminFreeStockManagement = lazy(() =>
+  import('./SuperadminFreeStockManagement').then((m) => ({ default: m.SuperadminFreeStockManagement }))
 );
 const SuperadminRequisitionsHub = lazy(() =>
   import('./SuperadminRequisitionsHub').then((m) => ({ default: m.SuperadminRequisitionsHub }))
@@ -91,9 +99,9 @@ export const SuperadminDashboard: React.FC = () => {
   const { user, isSuperadmin, isAuthenticated, logout, isLoading } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const validTabs = ['products', 'merchandise', 'requisitions', 'suppliers', 'sales-officers', 'psr-officers', 'deliveries', 'fleet-tracker', 'logs', 'tables', 'outlets', 'inventory', 'query'];
+  const validTabs: SuperadminTab[] = ['products', 'merchandise', 'offers', 'free-stocks', 'requisitions', 'suppliers', 'sales-officers', 'psr-officers', 'deliveries', 'fleet-tracker', 'logs', 'tables', 'outlets', 'inventory', 'query'];
   const initialTab = (searchParams.get('tab') as any) || 'products';
-  const [activeTab, setActiveTab] = useState<'products' | 'merchandise' | 'requisitions' | 'suppliers' | 'sales-officers' | 'psr-officers' | 'deliveries' | 'fleet-tracker' | 'logs' | 'tables' | 'outlets' | 'inventory' | 'query'>(
+  const [activeTab, setActiveTab] = useState<SuperadminTab>(
     validTabs.includes(initialTab) ? initialTab : 'products'
   );
 
@@ -193,6 +201,24 @@ export const SuperadminDashboard: React.FC = () => {
       icon: Sparkles,
       gradient: 'from-amber-500 via-rose-500 to-indigo-600',
       badge: 'Lifestyle',
+    },
+    {
+      id: 'offers' as const,
+      label: 'District Trade Schemes & Offers',
+      shortLabel: 'Trade Offers',
+      desc: 'Free bonus stock offers for individual districts',
+      icon: Gift,
+      gradient: 'from-emerald-600 via-teal-600 to-cyan-600',
+      badge: 'Extra Stock',
+    },
+    {
+      id: 'free-stocks' as const,
+      label: 'Free Stocks & Subsidy Ledger',
+      shortLabel: 'Free Stocks',
+      desc: 'Track free bonus stocks offered, supplied & valuations',
+      icon: Boxes,
+      gradient: 'from-amber-600 via-orange-600 to-rose-600',
+      badge: 'Subsidy',
     },
     {
       id: 'requisitions' as const,
@@ -409,55 +435,30 @@ export const SuperadminDashboard: React.FC = () => {
             </div>
           </div>
         </div>
-
-        {/* Attached Horizontal Navigation Navbar */}
-        <div className="border-t border-[#D9CBB8] bg-[#F2E6D5]/80 px-4 sm:px-6 lg:px-8 py-1.5">
-          <div className="max-w-7xl mx-auto">
-            <nav className="flex flex-wrap items-center gap-1.5 py-0.5" aria-label="Operations Navigation">
-              {navSections.map((item) => {
-                const isActive = activeTab === item.id;
-                const Icon = item.icon;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => setActiveTab(item.id)}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer border shrink-0 ${
-                      isActive
-                        ? 'bg-[#B8CBBE] text-[#101B14] border-[#9EB4A4] shadow-xs font-bold'
-                        : 'bg-[#FFF9F0] text-[#2C251F] border-[#D9CBB8] hover:bg-[#CFE0D2] hover:text-[#101B14]'
-                    }`}
-                    title={item.label}
-                  >
-                    <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-[#101B14]' : 'text-[#4E463E]'}`} />
-                    <span>{item.shortLabel}</span>
-                    {item.badge && (
-                      <span
-                        className={`text-[9px] font-mono px-1.5 py-0.2 rounded-md uppercase font-bold shrink-0 border ${
-                          isActive
-                            ? 'bg-[#FFF9F0] text-[#101B14] border-[#9EB4A4]'
-                            : item.badgeHighlight
-                            ? 'bg-[#CFE0D2] text-[#122018] border-[#B8CBBE] animate-pulse font-extrabold'
-                            : 'bg-[#F2E6D5] text-[#535E56] border-[#D9CBB8]'
-                        }`}
-                      >
-                        {item.badge}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
-        </div>
       </header>
 
-      {/* Main Responsive Layout: Dynamic Content Canvas */}
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 mt-2.5 sm:mt-3 flex-1 w-full min-w-0">
-        {/* Dynamic Main Content Workspace */}
-        <main className="w-full min-w-0" id="superadmin-main-content" aria-label="Main Operations Workspace">
-          <Suspense fallback={<TabLoadingSkeleton />}>
-            {activeTab === 'products' && <SuperadminProductCatalog />}
+      {/* Main Responsive Layout: Left Dual-Tone Navbar + Dynamic Workspace Canvas */}
+      <div className="max-w-[1720px] mx-auto px-3 sm:px-6 lg:px-8 py-5 flex-1 w-full min-w-0">
+        <div className="flex flex-col lg:flex-row gap-6 items-start">
+          {/* Superadmin Dual-Tone Floating/Fixed Navigation Rail */}
+          <div className="sticky top-20 shrink-0 self-start">
+            <SuperadminSidebarNav
+              activeTab={activeTab}
+              onTabChange={handleTabChange}
+              userEmail={user?.email}
+              unreadCount={unreadCount}
+              onOpenDbConfig={() => setIsDbConfigOpen(true)}
+              isDbConnected={dbStatus?.connected}
+            />
+          </div>
+
+          {/* Dynamic Main Content Workspace */}
+          <main className="flex-1 w-full min-w-0" id="superadmin-main-content" aria-label="Main Operations Workspace">
+            <Suspense fallback={<TabLoadingSkeleton />}>
+              {activeTab === 'products' && <SuperadminProductCatalog />}
             {activeTab === 'merchandise' && <SuperadminMerchandiseCatalog />}
+            {activeTab === 'offers' && <SuperadminOffersManagement />}
+            {activeTab === 'free-stocks' && <SuperadminFreeStockManagement />}
             {activeTab === 'requisitions' && <SuperadminRequisitionsHub />}
             {activeTab === 'suppliers' && <SuperadminSupplierManagement />}
             {activeTab === 'sales-officers' && <SuperadminSalesOfficerManagement />}
@@ -475,6 +476,7 @@ export const SuperadminDashboard: React.FC = () => {
             )}
           </Suspense>
         </main>
+        </div>
       </div>
 
       {/* Database Connection Config Modal */}

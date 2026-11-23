@@ -1096,6 +1096,46 @@ public class DeliveryController {
                         );
                     } catch (Exception ignored) {}
 
+                    // Also fulfill free bonus package items if any
+                    try {
+                        List<Map<String, Object>> freeItems = jdbcTemplate.queryForList(
+                            "SELECT free_product_id, free_quantity FROM outlet_requisitions " +
+                            "WHERE outlet_id = ? AND product_id = ? AND free_product_id IS NOT NULL AND free_quantity > 0 ORDER BY id DESC LIMIT 1",
+                            outletId, prodId
+                        );
+                        if (!freeItems.isEmpty()) {
+                            Long freePId = ((Number) freeItems.get(0).get("free_product_id")).longValue();
+                            int freeQ = ((Number) freeItems.get(0).get("free_quantity")).intValue();
+                            if (freePId > 0 && freeQ > 0) {
+                                List<Map<String, Object>> exFreeInv = jdbcTemplate.queryForList(
+                                    "SELECT stock_quantity FROM shop_inventory WHERE branch_id = ? AND product_id = ?",
+                                    outletId, freePId
+                                );
+                                if (exFreeInv.isEmpty()) {
+                                    jdbcTemplate.update(
+                                        "INSERT INTO shop_inventory (branch_id, product_id, stock_quantity, created_date, updated_date) VALUES (?, ?, ?, NOW(), NOW())",
+                                        outletId, freePId, freeQ
+                                    );
+                                } else {
+                                    jdbcTemplate.update(
+                                        "UPDATE shop_inventory SET stock_quantity = stock_quantity + ?, updated_date = NOW() WHERE branch_id = ? AND product_id = ?",
+                                        freeQ, outletId, freePId
+                                    );
+                                }
+                                Optional<SupplierProfile> spOpt = supplierProfileRepository.findById(supplierId);
+                                if (spOpt.isPresent() && spOpt.get().getPrimaryDistrictId() != null) {
+                                    Long distId = spOpt.get().getPrimaryDistrictId();
+                                    jdbcTemplate.update(
+                                        "UPDATE district_inventory SET current_stock = GREATEST(0, current_stock - ?), updated_at = NOW() WHERE district_id = ? AND product_id = ?",
+                                        freeQ, distId, freePId
+                                    );
+                                }
+                            }
+                        }
+                    } catch (Exception ex) {
+                        System.err.println("[DeliveryController] Note on free package delivery: " + ex.getMessage());
+                    }
+
                     // Deduct from supplier depot stock if supplied from depot
                     try {
                         Optional<SupplierProfile> spOpt = supplierProfileRepository.findById(supplierId);

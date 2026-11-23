@@ -938,6 +938,35 @@ public class PsrController {
             }
             inventoryRepository.save(inv);
 
+            // 4b. If this order is a unified trade offer package, also replenish the free bonus product stock!
+            try {
+                Long freeProductId = ord.get("free_product_id") != null ? Long.parseLong(ord.get("free_product_id").toString()) : null;
+                int freeQty = ord.get("free_quantity") != null ? Integer.parseInt(ord.get("free_quantity").toString()) : 0;
+                if (freeProductId != null && freeQty > 0) {
+                    // Deduct from supplier depot stock
+                    var freeDistInvOpt = districtInventoryRepository.findByDistrictIdAndProductId(districtId, freeProductId);
+                    if (freeDistInvOpt.isPresent()) {
+                        DistrictInventory fdi = freeDistInvOpt.get();
+                        fdi.setCurrentStock(Math.max(0, fdi.getCurrentStock() - freeQty));
+                        districtInventoryRepository.save(fdi);
+                    }
+                    // Replenish outlet shop_inventory with free bonus items
+                    Optional<ShopInventory> freeInvOpt = inventoryRepository.findByBranchIdAndProductId(outletId, freeProductId);
+                    ShopInventory freeInv;
+                    if (freeInvOpt.isPresent()) {
+                        freeInv = freeInvOpt.get();
+                        freeInv.setStockQuantity(freeInv.getStockQuantity() + freeQty);
+                        freeInv.setUpdatedDate(LocalDateTime.now());
+                    } else {
+                        freeInv = new ShopInventory(outletId, freeProductId, freeQty);
+                        freeInv.setUpdatedDate(LocalDateTime.now());
+                    }
+                    inventoryRepository.save(freeInv);
+                }
+            } catch (Exception ex) {
+                System.err.println("[soDispatchOrder] Note on free package stock fulfillment: " + ex.getMessage());
+            }
+
             // 5. Record Sales Officer Distribution (SO earns 0 profit; SO only achieves monthly target)
             Product prod = productRepository.findById(productId).orElse(null);
             BigDecimal costPrice = (prod != null && prod.getSupplierPrice() != null) ? prod.getSupplierPrice() : BigDecimal.valueOf(35);

@@ -11,6 +11,8 @@ import { SupplierStockSalesTracking } from './SupplierStockSalesTracking';
 import { SupplierDeliveryManagement } from './SupplierDeliveryManagement';
 import { SupplierWalletModal } from './SupplierWalletModal';
 import { SupplierPriceBoard } from './SupplierPriceBoard';
+import { SupplierOffersView } from './SupplierOffersView';
+import { SupplierSidebarNav, type SupplierTab } from './SupplierSidebarNav';
 import {
   Package,
   LogOut,
@@ -30,6 +32,7 @@ import {
   Wallet,
   Users,
   Tag,
+  Gift,
 } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { getNotificationDestination } from '../../utils/notificationRouter';
@@ -43,8 +46,8 @@ export const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = (searchParams.get('tab') as any) || 'outlet-requests';
-  const validTabs = ['outlet-requests', 'stock-sales-dispatch', 'price-board', 'delivery-fleet', 'request', 'history', 'outlets', 'profile', 'transactions'];
-  const [activeTab, setActiveTab] = useState<'outlet-requests' | 'stock-sales-dispatch' | 'price-board' | 'delivery-fleet' | 'request' | 'history' | 'outlets' | 'profile' | 'transactions'>(
+  const validTabs = ['outlet-requests', 'stock-sales-dispatch', 'price-board', 'offers', 'delivery-fleet', 'request', 'history', 'outlets', 'profile', 'transactions'];
+  const [activeTab, setActiveTab] = useState<'outlet-requests' | 'stock-sales-dispatch' | 'price-board' | 'offers' | 'delivery-fleet' | 'request' | 'history' | 'outlets' | 'profile' | 'transactions'>(
     validTabs.includes(initialTab) ? initialTab : 'outlet-requests'
   );
 
@@ -203,6 +206,16 @@ export const AdminDashboard: React.FC = () => {
       badge: 'Territory Rates',
     },
     {
+      id: 'offers' as const,
+      label: 'Territory Trade Schemes & Extra Stock',
+      shortLabel: 'Trade Schemes',
+      desc: 'Active promotional extra stock bundles for assigned districts',
+      icon: Gift,
+      gradient: 'from-emerald-600 via-teal-600 to-cyan-600',
+      badge: 'Extra Stock',
+      badgeHighlight: notifications.some((n) => n.type === 'OFFER_CREATED' && !n.is_read),
+    },
+    {
       id: 'delivery-fleet' as const,
       label: 'Vehicle Deliveries & Fleet Logistics',
       shortLabel: 'Vehicle Deliveries',
@@ -336,14 +349,6 @@ export const AdminDashboard: React.FC = () => {
                 onSelectNotification={handleNotificationClick}
                 isScrolled={true}
               />
-
-              <button
-                onClick={logout}
-                className="p-1 rounded-md text-[#4A5852] hover:text-[#7D2828] bg-[#EEF9FA] hover:bg-[#FADECF] border border-[#BFC8C5] transition-colors cursor-pointer"
-                title="Sign out of Supplier Portal"
-              >
-                <LogOut className="w-3.5 h-3.5 text-[#15221C]" />
-              </button>
             </div>
           </div>
         </div>
@@ -352,136 +357,17 @@ export const AdminDashboard: React.FC = () => {
       {/* Workspace Container with Animated Left Navbar */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-3.5 sm:mt-4 flex-1 w-full min-w-0 flex flex-col md:flex-row gap-4 sm:gap-6">
         
-        {/* Animated Expandable/Collapsible Left Sidebar */}
-        <aside
-          className={`shrink-0 transition-all duration-300 ease-in-out ${
-            isSidebarCollapsed ? 'w-full md:w-16' : 'w-full md:w-64'
-          }`}
-        >
-          <div className="bg-[#DEFDEF]/95 backdrop-blur-md rounded-2xl border border-[#BFC8C5] shadow-xs p-2 sm:p-2.5 sticky top-[58px] flex flex-col gap-1.5 transition-all">
-            
-            {/* Sidebar Header: Toggle button and section title */}
-            <div className="flex items-center justify-between px-2 py-1.5 border-b border-[#BFC8C5]">
-              {!isSidebarCollapsed ? (
-                <div className="flex items-center gap-2 min-w-0">
-                  <img
-                    src={supplierLogo}
-                    alt="Supplier Emblem"
-                    className="w-5 h-5 rounded-md object-cover shadow-2xs border border-[#BFC8C5] shrink-0"
-                  />
-                  <span className="text-[11px] font-bold text-[#15221C] tracking-wider uppercase truncate">
-                    Supplier Hub
-                  </span>
-                </div>
-              ) : (
-                <img
-                  src={supplierLogo}
-                  alt="Supplier"
-                  className="w-7 h-7 rounded-lg object-cover shadow-2xs mx-auto border border-[#BFC8C5]"
-                />
-              )}
-              <button
-                onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                className={`p-1 rounded-lg text-[#4A5852] hover:text-[#15221C] bg-[#EEF9FA] hover:bg-[#C8F1E8] border border-[#BFC8C5] transition-colors cursor-pointer ${
-                  isSidebarCollapsed ? 'mx-auto' : ''
-                }`}
-                title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              >
-                {isSidebarCollapsed ? <Menu className="w-4 h-4 text-[#15221C]" /> : <ChevronLeft className="w-4 h-4 text-[#15221C]" />}
-              </button>
-            </div>
-
-            {/* Navigation Items */}
-            <div className="flex flex-col gap-1 pt-1">
-              {navSections.map((item) => {
-                const isActive = activeTab === item.id;
-                const IconComponent = item.icon;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => handleTabChange(item.id)}
-                    title={isSidebarCollapsed ? `${item.label} - ${item.desc}` : undefined}
-                    className={`group relative flex items-center text-left transition-all duration-200 cursor-pointer rounded-xl ${
-                      isSidebarCollapsed
-                        ? 'p-2.5 justify-center'
-                        : 'px-3 py-2.5 gap-3'
-                    } ${
-                      isActive
-                        ? 'bg-[#FFE8BD] text-[#15221C] shadow-xs border border-[#BFC8C5] font-bold'
-                        : 'bg-[#EEF9FA] hover:bg-[#C8F1E8] text-[#384640] hover:text-[#15221C] border border-[#BFC8C5]'
-                    }`}
-                  >
-                    {/* Active Glowing Pill Indicator */}
-                    {isActive && (
-                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-[#15221C] rounded-r-full shadow-xs" />
-                    )}
-
-                    <div
-                      className={`p-1.5 rounded-lg shrink-0 transition-transform group-hover:scale-105 border border-[#BFC8C5] ${
-                        isActive
-                          ? 'bg-[#C8F1E8] text-[#15221C]'
-                          : 'bg-[#DEFDEF] text-[#15221C] group-hover:bg-[#FFE8BD]'
-                      }`}
-                    >
-                      <IconComponent className="w-4 h-4 text-[#15221C]" />
-                    </div>
-
-                    {!isSidebarCollapsed && (
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-1">
-                          <span
-                            className={`block text-xs font-bold truncate text-[#15221C]`}
-                          >
-                            {item.shortLabel}
-                          </span>
-                          {item.badge && (
-                            <span
-                              className={`text-[9px] font-mono px-1.5 py-0.2 rounded-md uppercase font-bold shrink-0 border border-[#BFC8C5] ${
-                                isActive
-                                  ? 'bg-[#C8F1E8] text-[#15221C]'
-                                  : item.badgeHighlight
-                                  ? 'bg-[#FADECF] text-[#7D2828] animate-pulse font-extrabold'
-                                  : 'bg-[#EEF9FA] text-[#4A5852]'
-                              }`}
-                            >
-                              {item.badge}
-                            </span>
-                          )}
-                        </div>
-                        <span
-                          className={`block text-[10px] truncate leading-tight mt-0.5 ${
-                            isActive ? 'text-[#1E2E27] font-medium' : 'text-[#4A5852] font-normal'
-                          }`}
-                        >
-                          {item.desc}
-                        </span>
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Sidebar Footer: Authority Info Card */}
-            {!isSidebarCollapsed && (
-              <div className="pt-2 mt-2 border-t border-[#BFC8C5] px-1">
-                <div className="p-2.5 rounded-xl bg-[#EEF9FA] border border-[#BFC8C5] flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-md bg-[#C8F1E8] border border-[#BFC8C5] text-[#15221C] flex items-center justify-center shrink-0">
-                    <ShieldCheck className="w-3.5 h-3.5 text-[#15221C]" />
-                  </div>
-                  <div className="min-w-0">
-                    <span className="block text-[10px] font-bold text-[#15221C] uppercase tracking-wider truncate">
-                      Superadmin Managed
-                    </span>
-                    <span className="block text-[9px] text-[#4A5852] truncate">
-                      Hard-copy verified profile
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </aside>
+        {/* Modern Jimmy Shergill Style Sleek Supplier Navbar */}
+        <SupplierSidebarNav
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+          userEmail={user?.email}
+          unreadCount={unreadCount}
+          offersBadgeCount={notifications.filter((n) => n.type === 'OFFER_CREATED' && !n.is_read).length}
+          walletBalance={walletBalance}
+          onOpenWallet={() => setIsWalletModalOpen(true)}
+          onLogout={logout}
+        />
 
         {/* Dynamic Main Content Workspace */}
         <main className="flex-1 min-w-0 w-full">
@@ -507,6 +393,16 @@ export const AdminDashboard: React.FC = () => {
           )}
           {activeTab === 'price-board' && (
             <SupplierPriceBoard
+              userId={searchParams.get('userId') ? Number(searchParams.get('userId')) : (user?.user_id || 4)}
+              supplierId={searchParams.get('supplierId') ? Number(searchParams.get('supplierId')) : undefined}
+              onRequestStock={(prodId) => {
+                setSelectedProductId(prodId);
+                setActiveTab('request');
+              }}
+            />
+          )}
+          {activeTab === 'offers' && (
+            <SupplierOffersView
               userId={searchParams.get('userId') ? Number(searchParams.get('userId')) : (user?.user_id || 4)}
               supplierId={searchParams.get('supplierId') ? Number(searchParams.get('supplierId')) : undefined}
               onRequestStock={(prodId) => {

@@ -23,6 +23,16 @@ export const getNotificationDestination = (
   // 1. REGIONAL SUPPLIER PORTAL (/admin)
   if (role === 'SUPPLIER') {
     if (
+      type.includes('OFFER') ||
+      type.includes('SCHEME') ||
+      title.includes('OFFER') ||
+      title.includes('SCHEME') ||
+      msg.includes('TRADE SCHEME') ||
+      msg.includes('TRADE OFFER')
+    ) {
+      return { path: '/admin', tab: 'offers', label: 'District Trade Schemes', fullUrl: '/admin?tab=offers' };
+    }
+    if (
       type.includes('PRICE') ||
       title.includes('PRICING') ||
       title.includes('PRICE') ||
@@ -161,6 +171,18 @@ export const getNotificationDestination = (
   // 3. PRE-SALES REPRESENTATIVE (PSR) PORTAL (/psr)
   if (role === 'PSR') {
     if (
+      type.includes('OFFER') ||
+      type.includes('SCHEME') ||
+      title.includes('OFFER') ||
+      title.includes('SCHEME') ||
+      msg.includes('TRADE SCHEME') ||
+      msg.includes('TRADE OFFER') ||
+      msg.includes('BONUS STOCK') ||
+      msg.includes('MERCHANDISE')
+    ) {
+      return { path: '/psr', tab: 'offers', label: 'Territory Trade Offers', fullUrl: '/psr?tab=offers' };
+    }
+    if (
       type.includes('REFUND') ||
       title.includes('REFUND') ||
       msg.includes('REFUND')
@@ -205,6 +227,16 @@ export const getNotificationDestination = (
 
   // 4. RETAIL OUTLET PORTAL (/outlet)
   if (role === 'OUTLET') {
+    if (
+      type.includes('OFFER') ||
+      type.includes('SCHEME') ||
+      title.includes('OFFER') ||
+      title.includes('SCHEME') ||
+      msg.includes('TRADE SCHEME') ||
+      msg.includes('TRADE OFFER')
+    ) {
+      return { path: '/outlet', tab: 'offers', label: 'Special Trade Schemes', fullUrl: '/outlet?tab=offers' };
+    }
     if (
       type.includes('DISPATCH') ||
       type.includes('DELIVERY') ||

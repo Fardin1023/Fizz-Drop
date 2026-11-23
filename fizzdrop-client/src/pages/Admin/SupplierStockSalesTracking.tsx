@@ -250,36 +250,31 @@ export const SupplierStockSalesTracking: React.FC<SupplierStockSalesTrackingProp
   }, [recentDispatches, searchTerm, selectedOfficerFilter]);
 
   return (
-    <div className="space-y-6 animate-fadeIn pb-12">
-      {/* Header Banner */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 p-6 sm:p-7 text-white shadow-xl">
-        <div className="absolute top-0 right-0 -mt-6 -mr-6 w-52 h-52 bg-white/10 rounded-full blur-2xl pointer-events-none" />
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 flex-wrap mb-2.5">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md text-blue-100 text-xs font-semibold border border-white/20">
-                <Boxes className="w-3.5 h-3.5 text-blue-300" />
-                <span>Superadmin Purchases & Field Fulfillment Ledger</span>
-              </div>
-              {currentSupplier?.business_name && (
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/25 backdrop-blur-md text-emerald-100 text-xs font-bold border border-emerald-400/30">
-                  <Warehouse className="w-3.5 h-3.5 text-emerald-300" />
-                  <span>Depot: {currentSupplier.business_name}</span>
-                </div>
-              )}
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-black font-oswald tracking-tight uppercase">
-              Superadmin Purchased Stock & Sales Tracking
+    <div className="space-y-3 animate-fadeIn pb-8">
+      {/* Header Banner - Ultra-Compact Single Row */}
+      <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 py-2 px-3 sm:px-4 text-white shadow-xs border border-white/10">
+        <div className="absolute top-0 right-0 -mt-6 -mr-6 w-36 h-36 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+        <div className="relative z-10 flex flex-wrap sm:flex-nowrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0 flex-wrap sm:flex-nowrap">
+            <h1 className="text-sm sm:text-base font-black font-oswald tracking-tight uppercase whitespace-nowrap">
+              Superadmin Stock Tracking
             </h1>
-            <p className="text-blue-100/90 text-xs sm:text-sm max-w-2xl mt-1 leading-relaxed">
-              Review stock amounts and product categories purchased from Superadmin, track wholesale sales to Sales Officers, and verify dispatches to retail outlets.
-            </p>
+            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/15 backdrop-blur-md text-blue-100 text-[10px] font-semibold border border-white/20 whitespace-nowrap">
+              <Boxes className="w-2.5 h-2.5 text-blue-300" />
+              <span>Purchases Ledger</span>
+            </div>
+            {currentSupplier?.business_name && (
+              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/25 backdrop-blur-md text-emerald-100 text-[10px] font-bold border border-emerald-400/30 truncate max-w-[180px]" title={currentSupplier.business_name}>
+                <Warehouse className="w-2.5 h-2.5 text-emerald-300 shrink-0" />
+                <span className="truncate">Depot: {currentSupplier.business_name}</span>
+              </div>
+            )}
           </div>
 
-          <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+          <div className="flex items-center gap-1.5 shrink-0 ml-auto">
             {allSuppliers && allSuppliers.length > 1 && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/20 hover:bg-white/25 border border-white/25 shadow-sm text-xs font-bold transition-all">
-                <Warehouse className="w-3.5 h-3.5 text-blue-200" />
+              <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/20 hover:bg-white/25 border border-white/25 text-[11px] font-bold transition-all">
+                <Warehouse className="w-3 h-3 text-blue-200" />
                 <select
                   value={selectedSupplierId || (currentSupplier?.id ?? '')}
                   onChange={(e) => {
@@ -287,7 +282,7 @@ export const SupplierStockSalesTracking: React.FC<SupplierStockSalesTrackingProp
                     setSelectedSupplierId(val);
                     fetchData(val);
                   }}
-                  className="bg-transparent text-white font-bold text-xs outline-none cursor-pointer pr-1 [&>option]:text-gray-900"
+                  className="bg-transparent text-white font-bold text-[11px] outline-none cursor-pointer pr-1 [&>option]:text-gray-900 max-w-[130px] truncate"
                   title="Switch Supplier Hub / Depot"
                 >
                   {allSuppliers.map((sup: any) => (
@@ -301,18 +296,18 @@ export const SupplierStockSalesTracking: React.FC<SupplierStockSalesTrackingProp
             <button
               onClick={() => fetchData()}
               disabled={loading}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 text-white text-xs font-bold transition-all border border-white/25 shadow-sm cursor-pointer"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/15 hover:bg-white/25 active:scale-95 text-white text-[11px] font-bold transition-all border border-white/25 shadow-2xs cursor-pointer whitespace-nowrap"
               title="Refresh tracking data"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
               <span>Refresh</span>
             </button>
             {onNavigateToRequisitions && (
               <button
                 onClick={onNavigateToRequisitions}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white text-xs font-bold transition-all shadow-md cursor-pointer"
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white text-[11px] font-bold transition-all shadow-2xs cursor-pointer whitespace-nowrap"
               >
-                <Store className="w-3.5 h-3.5" />
+                <Store className="w-3 h-3" />
                 <span>Area Demands</span>
               </button>
             )}
@@ -321,124 +316,124 @@ export const SupplierStockSalesTracking: React.FC<SupplierStockSalesTrackingProp
       </div>
 
       {/* Primary KPI Metrics Grid (5 Key Operational Indicators) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
         {/* Card 0: Stock Purchased from Superadmin */}
-        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-indigo-200/90 shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow bg-gradient-to-br from-white to-indigo-50/40">
+        <div className="bg-white rounded-2xl p-3 sm:p-3.5 border border-indigo-200/90 shadow-xs relative overflow-hidden group hover:shadow-sm transition-shadow bg-gradient-to-br from-white to-indigo-50/40">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-900">
+            <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-indigo-900">
               From Superadmin
             </span>
-            <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-200 flex items-center justify-center">
-              <Warehouse className="w-4 h-4" />
+            <div className="w-7 h-7 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-200 flex items-center justify-center">
+              <Warehouse className="w-3.5 h-3.5" />
             </div>
           </div>
-          <div className="mt-2.5">
-            <div className="font-oswald text-2xl font-black text-indigo-950 tracking-tight">
-              {(summary.total_purchased_from_superadmin_cases || 0).toLocaleString()} <span className="text-xs font-sans text-indigo-600 font-bold uppercase">Cases</span>
+          <div className="mt-1.5">
+            <div className="font-oswald text-xl sm:text-2xl font-black text-indigo-950 tracking-tight">
+              {(summary.total_purchased_from_superadmin_cases || 0).toLocaleString()} <span className="text-[10px] font-sans text-indigo-600 font-bold uppercase">Cases</span>
             </div>
-            <div className="text-xs font-semibold text-indigo-700 mt-1 flex items-center gap-1 font-mono">
+            <div className="text-xs font-semibold text-indigo-700 mt-0.5 flex items-center gap-1 font-mono">
               <BadgeDollarSign className="w-3.5 h-3.5 text-indigo-600" />
               <span>৳{Number(summary.total_purchased_from_superadmin_value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
-            <p className="text-[10px] text-indigo-800/80 mt-1.5 font-medium">
+            <p className="text-[10px] text-indigo-800/80 mt-1 font-medium truncate">
               {summary.categories_count || categoryBreakdown.length} Categories • {summary.current_total_depot_stock || 0} in Depot
             </p>
           </div>
         </div>
 
         {/* Card 1: Total Sold to Sales Officers */}
-        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
+        <div className="bg-white rounded-2xl p-3 sm:p-3.5 border border-slate-200/90 shadow-xs relative overflow-hidden group hover:shadow-sm transition-shadow">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500">
               Sold to SOs
             </span>
-            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-              <PackageCheck className="w-4 h-4" />
+            <div className="w-7 h-7 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+              <PackageCheck className="w-3.5 h-3.5" />
             </div>
           </div>
-          <div className="mt-2.5">
-            <div className="font-oswald text-2xl font-black text-slate-900 tracking-tight">
-              {summary.total_sold_units.toLocaleString()} <span className="text-xs font-sans text-slate-500 font-bold uppercase">Cases</span>
+          <div className="mt-1.5">
+            <div className="font-oswald text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+              {summary.total_sold_units.toLocaleString()} <span className="text-[10px] font-sans text-slate-500 font-bold uppercase">Cases</span>
             </div>
-            <div className="text-xs font-semibold text-blue-700 mt-1 flex items-center gap-1 font-mono">
+            <div className="text-xs font-semibold text-blue-700 mt-0.5 flex items-center gap-1 font-mono">
               <BadgeDollarSign className="w-3.5 h-3.5 text-blue-600" />
               <span>৳{Number(summary.total_sold_value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
-            <p className="text-[10px] text-slate-400 mt-1.5">
+            <p className="text-[10px] text-slate-400 mt-1 truncate">
               Wholesale sold to Sales Officers
             </p>
           </div>
         </div>
 
         {/* Card 2: Dispatched to Outlets */}
-        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-emerald-200/90 shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow bg-gradient-to-br from-white to-emerald-50/30">
+        <div className="bg-white rounded-2xl p-3 sm:p-3.5 border border-emerald-200/90 shadow-xs relative overflow-hidden group hover:shadow-sm transition-shadow bg-gradient-to-br from-white to-emerald-50/30">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800">
+            <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-emerald-800">
               Dispatched Outlets
             </span>
-            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center">
-              <Truck className="w-4 h-4" />
+            <div className="w-7 h-7 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center">
+              <Truck className="w-3.5 h-3.5" />
             </div>
           </div>
-          <div className="mt-2.5">
-            <div className="font-oswald text-2xl font-black text-emerald-900 tracking-tight">
-              {summary.total_dispatched_units.toLocaleString()} <span className="text-xs font-sans text-emerald-600 font-bold uppercase">Cases</span>
+          <div className="mt-1.5">
+            <div className="font-oswald text-xl sm:text-2xl font-black text-emerald-900 tracking-tight">
+              {summary.total_dispatched_units.toLocaleString()} <span className="text-[10px] font-sans text-emerald-600 font-bold uppercase">Cases</span>
             </div>
-            <div className="text-xs font-semibold text-emerald-700 mt-1 flex items-center gap-1 font-mono">
+            <div className="text-xs font-semibold text-emerald-700 mt-0.5 flex items-center gap-1 font-mono">
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
               <span>৳{Number(summary.total_dispatched_value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
-            <p className="text-[10px] text-emerald-700/80 mt-1.5">
+            <p className="text-[10px] text-emerald-700/80 mt-1 truncate">
               Replenished on retail shelves
             </p>
           </div>
         </div>
 
         {/* Card 3: Pending / In Custody Buffer */}
-        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-amber-200/90 shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow bg-gradient-to-br from-white to-amber-50/30">
+        <div className="bg-white rounded-2xl p-3 sm:p-3.5 border border-amber-200/90 shadow-xs relative overflow-hidden group hover:shadow-sm transition-shadow bg-gradient-to-br from-white to-amber-50/30">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800">
+            <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-amber-800">
               Pending Dispatch
             </span>
-            <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center">
-              <Clock className="w-4 h-4" />
+            <div className="w-7 h-7 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center">
+              <Clock className="w-3.5 h-3.5" />
             </div>
           </div>
-          <div className="mt-2.5">
-            <div className="font-oswald text-2xl font-black text-amber-900 tracking-tight">
-              {summary.pending_outlet_dispatch_units.toLocaleString()} <span className="text-xs font-sans text-amber-600 font-bold uppercase">Cases</span>
+          <div className="mt-1.5">
+            <div className="font-oswald text-xl sm:text-2xl font-black text-amber-900 tracking-tight">
+              {summary.pending_outlet_dispatch_units.toLocaleString()} <span className="text-[10px] font-sans text-amber-600 font-bold uppercase">Cases</span>
             </div>
-            <div className="text-xs font-semibold text-amber-700 mt-1 flex items-center gap-1">
+            <div className="text-xs font-semibold text-amber-700 mt-0.5 flex items-center gap-1">
               <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
               <span>In territory buffer</span>
             </div>
-            <p className="text-[10px] text-amber-700/80 mt-1.5">
+            <p className="text-[10px] text-amber-700/80 mt-1 truncate">
               Awaiting outlet delivery
             </p>
           </div>
         </div>
 
         {/* Card 4: Outlet Fulfillment Rate */}
-        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-purple-200/90 shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow bg-gradient-to-br from-white to-purple-50/30">
+        <div className="bg-white rounded-2xl p-3 sm:p-3.5 border border-purple-200/90 shadow-xs relative overflow-hidden group hover:shadow-sm transition-shadow bg-gradient-to-br from-white to-purple-50/30">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-purple-800">
+            <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-purple-800">
               Fulfillment Ratio
             </span>
-            <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 border border-purple-200 flex items-center justify-center">
-              <TrendingUp className="w-4 h-4" />
+            <div className="w-7 h-7 rounded-xl bg-purple-50 text-purple-600 border border-purple-200 flex items-center justify-center">
+              <TrendingUp className="w-3.5 h-3.5" />
             </div>
           </div>
-          <div className="mt-2.5">
-            <div className="font-oswald text-2xl font-black text-purple-900 tracking-tight">
+          <div className="mt-1.5">
+            <div className="font-oswald text-xl sm:text-2xl font-black text-purple-900 tracking-tight">
               {summary.fulfillment_rate_pct.toFixed(1)}%
             </div>
-            <div className="w-full bg-purple-100 rounded-full h-1.5 mt-2 overflow-hidden">
+            <div className="w-full bg-purple-100 rounded-full h-1.5 mt-1.5 overflow-hidden">
               <div
                 className="bg-purple-600 h-1.5 rounded-full transition-all duration-500"
                 style={{ width: `${Math.min(100, summary.fulfillment_rate_pct)}%` }}
               />
             </div>
-            <p className="text-[10px] text-purple-700/80 mt-1.5">
+            <p className="text-[10px] text-purple-700/80 mt-1 truncate">
               Sold stock delivered to outlets
             </p>
           </div>
@@ -446,7 +441,7 @@ export const SupplierStockSalesTracking: React.FC<SupplierStockSalesTrackingProp
       </div>
 
       {/* Navigation Sub-Tabs & Filtering Controls */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-3.5 flex flex-col md:flex-row items-center justify-between gap-3">
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-2.5 sm:p-3 flex flex-col md:flex-row items-center justify-between gap-2.5">
         {/* Tab Switcher */}
         <div className="flex items-center gap-1.5 p-1 bg-slate-100/90 rounded-xl w-full md:w-auto overflow-x-auto">
           <button
@@ -528,15 +523,15 @@ export const SupplierStockSalesTracking: React.FC<SupplierStockSalesTrackingProp
       {/* VIEW TAB 0: Superadmin Purchased Stock & Categories */}
       {viewTab === 'superadmin-purchases' && (
         <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
-          <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="px-3.5 py-2.5 sm:px-4 sm:py-3 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
               <div className="flex items-center gap-2">
-                <Warehouse className="w-5 h-5 text-indigo-600" />
-                <h2 className="text-base font-bold text-slate-900 font-oswald tracking-tight uppercase">
+                <Warehouse className="w-4 h-4 text-indigo-600" />
+                <h2 className="text-sm sm:text-base font-bold text-slate-900 font-oswald tracking-tight uppercase">
                   Superadmin Stock Purchases & Category Inventory
                 </h2>
               </div>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-[11px] text-slate-500 mt-0.5">
                 Overview of beverage stock amounts and categories purchased from Superadmin central warehouse into your regional depot.
               </p>
             </div>
@@ -544,13 +539,13 @@ export const SupplierStockSalesTracking: React.FC<SupplierStockSalesTrackingProp
               {onRequestStock && (
                 <button
                   onClick={() => onRequestStock()}
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+                  className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
                 >
                   <PackagePlus className="w-3.5 h-3.5" />
                   <span>Request More Stock</span>
                 </button>
               )}
-              <span className="text-xs font-mono font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-lg">
+              <span className="text-[11px] font-mono font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-lg">
                 {filteredSuperadminPurchased.length} SKUs Listed
               </span>
             </div>
@@ -558,13 +553,13 @@ export const SupplierStockSalesTracking: React.FC<SupplierStockSalesTrackingProp
 
           {/* Category Filter Chips Bar */}
           {categoryBreakdown.length > 0 && (
-            <div className="px-4 py-3 bg-slate-50/70 border-b border-slate-100 flex items-center gap-2 overflow-x-auto">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1 flex items-center gap-1">
-                <Tag className="w-3 h-3 text-slate-400" /> Category:
+            <div className="px-3.5 py-2 bg-slate-50/70 border-b border-slate-100 flex items-center gap-1.5 overflow-x-auto">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1 flex items-center gap-1">
+                <Tag className="w-2.5 h-2.5 text-slate-400" /> Category:
               </span>
               <button
                 onClick={() => setSelectedCategoryFilter('ALL')}
-                className={`px-3 py-1 rounded-full text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                className={`px-2.5 py-0.5 rounded-full text-xs font-bold transition-all shrink-0 cursor-pointer ${
                   selectedCategoryFilter === 'ALL'
                     ? 'bg-indigo-600 text-white shadow-xs'
                     : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'

@@ -35,11 +35,13 @@ import {
   Banknote,
   Smartphone,
   X,
+  Gift,
 } from 'lucide-react';
 import logoImg from '../../assets/img/fizzdrop-logo.png';
 import { OutletSaleModal, type OutletProductItem } from './OutletSaleModal';
 import { OutletAdjustStockModal } from './OutletAdjustStockModal';
 import { OutletRequisitionModal } from './OutletRequisitionModal';
+import { OutletOffersView } from './OutletOffersView';
 import { SaleReceiptModal, type ReceiptData } from './SaleReceiptModal';
 import { useNotifications } from '../../hooks/useNotifications';
 import { NotificationPopup } from '../../components/Notifications/NotificationPopup';
@@ -50,9 +52,9 @@ export const OutletDashboard: React.FC = () => {
   const { user, outlet: authOutlet, isAuthenticated, isOutlet, loginAsOutlet, logout, isLoading } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const validTabs = ['inventory', 'pos', 'request', 'deliveries', 'ledger', 'profile'];
+  const validTabs = ['inventory', 'pos', 'offers', 'request', 'deliveries', 'ledger', 'profile'];
   const initialTab = (searchParams.get('tab') as any) || 'inventory';
-  const [activeTab, setActiveTab] = useState<'inventory' | 'pos' | 'request' | 'deliveries' | 'ledger' | 'profile'>(
+  const [activeTab, setActiveTab] = useState<'inventory' | 'pos' | 'offers' | 'request' | 'deliveries' | 'ledger' | 'profile'>(
     validTabs.includes(initialTab) ? initialTab : 'inventory'
   );
 
@@ -601,6 +603,16 @@ export const OutletDashboard: React.FC = () => {
       badge: 'Counter',
     },
     {
+      id: 'offers' as const,
+      label: 'Special Trade Schemes & Free Stock',
+      shortLabel: 'Trade Offers',
+      desc: 'Buy bulk cases & receive free extra water/soda stock',
+      icon: Gift,
+      gradient: 'from-amber-500 via-orange-500 to-emerald-600',
+      badge: 'Free Stock',
+      badgeHighlight: notifications.some((n) => (n.type === 'OFFER_CREATED' || (n.title && n.title.includes('Offer'))) && !n.is_read),
+    },
+    {
       id: 'request' as const,
       label: 'Request Stock Requisition',
       shortLabel: 'Order Restock',
@@ -821,6 +833,13 @@ export const OutletDashboard: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleTabChange('offers')}
+              className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition-all cursor-pointer active:scale-95"
+            >
+              <Gift className="w-3.5 h-3.5 text-white" />
+              <span>Special Offers</span>
+            </button>
             <button
               onClick={() => {
                 if (products.length > 0) setSelectedProductIdForReq(products[0].product_id);
@@ -1364,6 +1383,19 @@ export const OutletDashboard: React.FC = () => {
                   </div>
                 </div>
               </div>
+            )}
+
+            {/* TAB: SPECIAL TRADE SCHEMES & OFFERS */}
+            {activeTab === 'offers' && (
+              <OutletOffersView
+                outletId={activeOutletId}
+                outletDistrictId={outlet?.district_id || 1}
+                outletName={outlet?.outlet_name || 'Retail Outlet'}
+                onOrderSuccess={() => {
+                  fetchDashboardData(true);
+                }}
+                onNavigateToDeliveries={() => handleTabChange('deliveries')}
+              />
             )}
 
             {/* TAB 3: REQUEST STOCK REQUISITION */}

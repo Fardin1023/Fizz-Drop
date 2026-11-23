@@ -259,7 +259,7 @@ public class InventoryController {
 
         if (!isUnrequestedDirectSupply) {
             try {
-                List<Map<String, Object>> rRows = jdbcTemplate.queryForList("SELECT requisition_code, sales_officer_id, unit_price FROM outlet_requisitions WHERE id = ?", req.getRequisitionId());
+                List<Map<String, Object>> rRows = jdbcTemplate.queryForList("SELECT requisition_code, sales_officer_id, unit_price, free_product_id, free_quantity FROM outlet_requisitions WHERE id = ?", req.getRequisitionId());
                 BigDecimal finalUnitPrice = product.getOutletPrice() != null ? product.getOutletPrice() : (product.getBasePrice() != null ? product.getBasePrice() : BigDecimal.ZERO);
                 if (!rRows.isEmpty()) {
                     if (rRows.get(0).get("requisition_code") != null) {
@@ -293,6 +293,36 @@ public class InventoryController {
                     );
                 } catch (Exception ex) {
                     System.err.println("[InventoryController] Failed to update psr_orders status: " + ex.getMessage());
+                }
+
+                // If unified trade package, also fulfill free bonus product
+                if (!rRows.isEmpty() && rRows.get(0).get("free_product_id") != null && rRows.get(0).get("free_quantity") != null) {
+                    try {
+                        Long freePId = ((Number) rRows.get(0).get("free_product_id")).longValue();
+                        int freeQ = ((Number) rRows.get(0).get("free_quantity")).intValue();
+                        if (freePId > 0 && freeQ > 0) {
+                            Long distIdForFree = (outlet != null && outlet.getDistrictId() != null) ? outlet.getDistrictId() : (sp != null ? sp.getPrimaryDistrictId() : 1L);
+                            if (distIdForFree != null) {
+                                districtInventoryRepository.findByDistrictIdAndProductId(distIdForFree, freePId).ifPresent(di -> {
+                                    di.setCurrentStock(Math.max(0, di.getCurrentStock() - freeQ));
+                                    districtInventoryRepository.save(di);
+                                });
+                            }
+                            Optional<ShopInventory> freeInvOpt = inventoryRepository.findByBranchIdAndProductId(outlet.getOutletId(), freePId);
+                            ShopInventory freeInv;
+                            if (freeInvOpt.isPresent()) {
+                                freeInv = freeInvOpt.get();
+                                freeInv.setStockQuantity(freeInv.getStockQuantity() + freeQ);
+                                freeInv.setUpdatedDate(LocalDateTime.now());
+                            } else {
+                                freeInv = new ShopInventory(outlet.getOutletId(), freePId, freeQ);
+                                freeInv.setUpdatedDate(LocalDateTime.now());
+                            }
+                            inventoryRepository.save(freeInv);
+                        }
+                    } catch (Exception ex) {
+                        System.err.println("[InventoryController] Free stock supply note: " + ex.getMessage());
+                    }
                 }
             } catch (Exception ignored) {}
         } else {

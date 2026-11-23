@@ -187,6 +187,13 @@ public class SalesOfficerController {
             Long districtId = supplier.getPrimaryDistrictId();
             if (payload.get("district_id") != null) {
                 districtId = Long.parseLong(payload.get("district_id").toString());
+            } else if (city != null) {
+                for (District d : districtRepository.findAll()) {
+                    if (isSameDistrict(d.getName(), city)) {
+                        districtId = d.getId();
+                        break;
+                    }
+                }
             }
 
             // Provision User Account for Sales Officer Login
@@ -315,7 +322,16 @@ public class SalesOfficerController {
                 so.setSupplierId(supId);
                 so.setCity(city);
                 so.setAssignedArea(area);
-                so.setDistrictId(supplier.getPrimaryDistrictId());
+                Long resolvedDistrictId = supplier.getPrimaryDistrictId();
+                if (city != null) {
+                    for (District d : districtRepository.findAll()) {
+                        if (isSameDistrict(d.getName(), city)) {
+                            resolvedDistrictId = d.getId();
+                            break;
+                        }
+                    }
+                }
+                so.setDistrictId(resolvedDistrictId);
             }
 
             if (payload.containsKey("allocated_supplier_ids") || payload.containsKey("allocatedSupplierIds")) {
@@ -332,6 +348,30 @@ public class SalesOfficerController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ApiResponse.fail("Failed to update Sales Officer: " + e.getMessage()));
         }
+    }
+
+    private String normalizeDistrictKey(String str) {
+        if (str == null) return "";
+        String s = str.trim().toLowerCase().replaceAll("[^a-z0-9]", "");
+        if (s.contains("cumilla") || s.contains("comilla") || s.contains("com")) return "cumilla";
+        if (s.contains("chattogram") || s.contains("chittagong") || s.contains("ctg")) return "chittagong";
+        if (s.contains("barishal") || s.contains("barisal") || s.contains("bar")) return "barishal";
+        if (s.contains("jashore") || s.contains("jessore") || s.contains("jas")) return "jashore";
+        if (s.contains("bogura") || s.contains("bogra") || s.contains("bog")) return "bogura";
+        if (s.contains("coxsbazar") || s.contains("coxbazar") || s.contains("cox")) return "coxsbazar";
+        if (s.contains("bbaria") || s.contains("brahmanbaria")) return "brahmanbaria";
+        return s;
+    }
+
+    private boolean isSameDistrict(String dist1, String dist2) {
+        if (dist1 == null || dist2 == null) return false;
+        String s1 = dist1.trim().toLowerCase();
+        String s2 = dist2.trim().toLowerCase();
+        if (s1.equals(s2)) return true;
+        String k1 = normalizeDistrictKey(dist1);
+        String k2 = normalizeDistrictKey(dist2);
+        if (!k1.isEmpty() && k1.equals(k2)) return true;
+        return false;
     }
 
     /**
