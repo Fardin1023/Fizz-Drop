@@ -140,6 +140,21 @@ export const SuperadminPsrManagement: React.FC = () => {
 
   useEffect(() => {
     fetchData();
+
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel('fizzdrop_realtime_events');
+      channel.onmessage = (event) => {
+        const t = event.data?.type;
+        if (t === 'NEW_PSR_ORDER' || t === 'NEW_PSR_REFUND' || t === 'SO_ORDER_APPROVED' || t === 'PSR_ASSIGNED' || t === 'PSR_CREATED') {
+          fetchData();
+        }
+      };
+    } catch (e) {}
+
+    return () => {
+      if (channel) channel.close();
+    };
   }, []);
 
   const openCreateModal = () => {

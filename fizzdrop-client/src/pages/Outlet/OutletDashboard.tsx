@@ -391,6 +391,19 @@ export const OutletDashboard: React.FC = () => {
             code: offerCodeOrId,
             outlet_id: outlet?.outlet_id || activeOutletId,
           });
+          if (action === 'ACCEPT') {
+            const psrId = preSalesOfficer?.id || outlet?.assigned_psr_id;
+            ch.postMessage({
+              type: 'OUTLET_ORDER_TO_PSR',
+              recipientRole: 'PSR',
+              recipientUserId: psrId ? 200 + psrId : undefined,
+              referenceId: psrId,
+              title: `Outlet ${outlet?.outlet_name || 'Store'} Accepted Stock Offer`,
+              message: `Outlet ${outlet?.outlet_name || 'Store'} accepted stock offer ${offerCodeOrId}. Restock consignment added to route dispatches.`,
+              referenceCode: String(offerCodeOrId),
+              outlet_id: outlet?.outlet_id || activeOutletId,
+            });
+          }
           ch.close();
         } catch {}
         await fetchDashboardData(outlet?.outlet_id || activeOutletId, true);

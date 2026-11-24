@@ -38,6 +38,10 @@ public class RequisitionProcessingService {
     @org.springframework.beans.factory.annotation.Value("${stripe.publishable.key:}")
     private String stripePublishableKey;
 
+    private static List<District> cachedDistricts = null;
+    private static long lastDistrictFetch = 0;
+    private static final long DISTRICT_CACHE_MS = 300000; // 5 minutes
+
     public RequisitionProcessingService(DistrictRepository districtRepository,
                                         SupplierProfileRepository supplierProfileRepository,
                                         DistrictInventoryRepository districtInventoryRepository,
@@ -104,76 +108,9 @@ public class RequisitionProcessingService {
             districtRepository.saveAll(toSave);
         }
 
-        // 2. Auto-initialize profiles for multiple distinct regional suppliers if not present
+        // 2. Supplier Profiles: Clean start without seed data per testing requirements
         District dhaka = districtRepository.findByNameIgnoreCase("Dhaka").orElse(null);
         Long dhakaDistId = (dhaka != null) ? dhaka.getId() : 1L;
-
-        // Ensure central supplier user exists in Users table
-        Optional<User> centralUserOpt = userRepository.findByEmail("central.supplier@fizzdrop.com");
-        Long centralUserId = centralUserOpt.map(User::getUserId).orElse(1L);
-        if (centralUserOpt.isEmpty()) {
-            User savedCentral = userRepository.save(new User(3L, 1L, "central.supplier@fizzdrop.com", "supplier123"));
-            centralUserId = savedCentral.getUserId();
-        }
-
-        // Supplier: Dhaka Division Hub
-        if (supplierProfileRepository.count() == 0) {
-            District gazipur = districtRepository.findByNameIgnoreCase("Gazipur").orElse(null);
-            District narayanganj = districtRepository.findByNameIgnoreCase("Narayanganj").orElse(null);
-            String covered = dhakaDistId + (gazipur != null ? "," + gazipur.getId() : "") + (narayanganj != null ? "," + narayanganj.getId() : "");
-
-            SupplierProfile dhakaProf = new SupplierProfile(
-                    centralUserId,
-                    "Dhaka Metropolitan & Central Beverage Logistics Hub",
-                    dhakaDistId,
-                    "Road 11, Plot 42, Gulshan-1 Logistics Depot, Dhaka",
-                    "+8801700112233"
-            );
-            dhakaProf.setDivisionName("Dhaka");
-            dhakaProf.setCoveredDistrictIds(covered);
-            dhakaProf.setTradeLicenseNumber("TRD-DHK-2026-9812");
-            dhakaProf.setIsVerified(true);
-            dhakaProf.setDefaultPaymentMethod("STRIPE_CARD");
-            dhakaProf.setBankName(null);
-            dhakaProf.setBankAccountNumber(null);
-            dhakaProf.setBankAccountName(null);
-            dhakaProf.setMobileBankingNumber("+8801700112233");
-            // Set guaranteed initial working capital of 100,000.00 so wallet NEVER starts at 0
-            dhakaProf.setWalletBalance(new java.math.BigDecimal("100000.00"));
-            dhakaProf.setAllocatedAreas("{\"Dhaka\":[\"Gulshan\",\"Banani\",\"Uttara\",\"Dhanmondi\",\"Mirpur\"],\"Gazipur\":[\"Tongi\",\"Joydebpur\"],\"Narayanganj\":[\"Chashara\",\"Siddhirganj\"]}");
-            supplierProfileRepository.saveAndFlush(dhakaProf);
-        } else {
-            SupplierProfile p = supplierProfileRepository.findAll().get(0);
-            boolean needSave = false;
-            if (p.getUserId() == null || !p.getUserId().equals(centralUserId)) {
-                p.setUserId(centralUserId);
-                needSave = true;
-            }
-            if (p.getDivisionName() == null || p.getDivisionName().trim().isEmpty()) {
-                p.setDivisionName("Dhaka");
-                needSave = true;
-            }
-            if (p.getCoveredDistrictIds() == null || p.getCoveredDistrictIds().trim().isEmpty()) {
-                p.setCoveredDistrictIds(String.valueOf(p.getPrimaryDistrictId() != null ? p.getPrimaryDistrictId() : dhakaDistId));
-                needSave = true;
-            }
-            if (p.getAllocatedAreas() == null || p.getAllocatedAreas().trim().isEmpty()) {
-                p.setAllocatedAreas("{\"Dhaka\":[\"Gulshan\",\"Banani\",\"Uttara\",\"Dhanmondi\",\"Mirpur\"],\"Gazipur\":[\"Tongi\",\"Joydebpur\"],\"Narayanganj\":[\"Chashara\",\"Siddhirganj\"]}");
-                needSave = true;
-            }
-            // CRITICAL PERSISTENCE: Ensure wallet_balance is NEVER reset to 0 or null on restarts.
-            // If it was null or 0, initialize with working capital of 100,000.00; if already positive, strictly preserve it!
-            if (p.getWalletBalance() == null || p.getWalletBalance().compareTo(java.math.BigDecimal.ZERO) <= 0) {
-                p.setWalletBalance(new java.math.BigDecimal("100000.00"));
-                needSave = true;
-            }
-            if (needSave) {
-                supplierProfileRepository.saveAndFlush(p);
-                try {
-                    jdbcTemplate.update("UPDATE supplier_profiles SET wallet_balance = ?, updated_at = NOW() WHERE id = ?", p.getWalletBalance(), p.getId());
-                } catch (Exception ignored) {}
-            }
-        }
 
         // 3. Seed initial district inventory for active products in Dhaka if empty
         if (districtInventoryRepository.count() == 0 && dhaka != null) {
@@ -236,12 +173,19 @@ public class RequisitionProcessingService {
     }
 
     public List<District> getAllDistricts() {
-        return districtRepository.findAllByOrderByDivisionAscNameAsc();
+        long now = System.currentTimeMillis();
+        if (cachedDistricts != null && (now - lastDistrictFetch) < DISTRICT_CACHE_MS) {
+            return cachedDistricts;
+        }
+        cachedDistricts = districtRepository.findAllByOrderByDivisionAscNameAsc();
+        lastDistrictFetch = now;
+        return cachedDistricts;
     }
 
     public List<SupplierProfile> getAllSupplierProfiles() {
         List<SupplierProfile> all = supplierProfileRepository.findAll();
-        Map<Long, District> distMap = districtRepository.findAll().stream()
+        List<District> dists = getAllDistricts();
+        Map<Long, District> distMap = dists.stream()
                 .collect(Collectors.toMap(District::getId, d -> d, (a, b) -> a));
         Map<Long, User> userMap = userRepository.findAll().stream()
                 .collect(Collectors.toMap(User::getUserId, u -> u, (a, b) -> a));

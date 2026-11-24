@@ -460,6 +460,32 @@ public class DataInitializer {
                 jdbcTemplate.execute("UPDATE sales_officers so JOIN area_sales_managers asm ON so.district_id = asm.district_id SET so.asm_id = asm.id WHERE so.asm_id IS NULL");
             } catch (Exception ignored) {}
 
+            // Seed initial retail sales in outlet_sales if empty
+            try {
+                jdbcTemplate.execute(
+                    "CREATE TABLE IF NOT EXISTS outlet_sales (" +
+                    "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
+                    "sale_code VARCHAR(100) NOT NULL, " +
+                    "outlet_id BIGINT NOT NULL, " +
+                    "product_id BIGINT NOT NULL, " +
+                    "product_name VARCHAR(150), " +
+                    "quantity INT NOT NULL, " +
+                    "unit_price DECIMAL(10,2) NOT NULL, " +
+                    "total_amount DECIMAL(12,2) NOT NULL, " +
+                    "payment_method VARCHAR(50) DEFAULT 'Cash', " +
+                    "customer_notes TEXT, " +
+                    "sale_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, " +
+                    "INDEX idx_os_outlet (outlet_id), " +
+                    "INDEX idx_os_prod (product_id), " +
+                    "INDEX idx_os_date (sale_date)" +
+                    ")"
+                );
+
+                // Table created cleanly; zero seed data so outlets can be tested from scratch
+            } catch (Exception e) {
+                System.err.println("[DataInitializer] outlet_sales check/seed error: " + e.getMessage());
+            }
+
             // Pre-Sales Officers and Outlets are cleanly created and assigned by the Superadmin and Sales Officers.
         };
     }

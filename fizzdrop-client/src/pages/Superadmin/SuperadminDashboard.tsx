@@ -156,7 +156,19 @@ export const SuperadminDashboard: React.FC = () => {
   useEffect(() => {
     fetchTelemetry();
     const interval = setInterval(fetchTelemetry, 30000);
-    return () => clearInterval(interval);
+
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel('fizzdrop_realtime_events');
+      channel.onmessage = () => {
+        fetchTelemetry();
+      };
+    } catch (e) {}
+
+    return () => {
+      clearInterval(interval);
+      if (channel) channel.close();
+    };
   }, []);
 
   if (isLoading) {

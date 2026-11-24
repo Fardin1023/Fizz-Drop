@@ -538,6 +538,7 @@ export const SalesOfficerDashboard: React.FC = () => {
         body: JSON.stringify({
           sales_officer_id: officer?.id,
           supplier_id: targetSupplierId,
+          order_code: ord.requisition_code || ord.order_code,
         }),
       });
       const data = await res.json();
@@ -1627,37 +1628,44 @@ export const SalesOfficerDashboard: React.FC = () => {
             </div>
 
             {/* Live OpenStreetMap Component */}
-            {fleetDispatches.length === 0 ? (
-              <div className="bg-white rounded-3xl border border-slate-200/90 p-12 text-center shadow-xs">
-                <div className="w-16 h-16 rounded-3xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-4 border border-blue-100 shadow-sm">
-                  <Truck className="w-8 h-8 text-blue-500" />
-                </div>
-                <h4 className="font-oswald text-xl font-bold uppercase tracking-wide text-slate-900">
-                  No Active Delivery Dispatches Found
-                </h4>
-                <p className="text-slate-500 text-xs mt-1.5 max-w-md mx-auto">
-                  When your Central Wholesale Supplier ({supplier?.business_name || 'Supplier'}) assigns a vehicle delivery team and dispatches stock to your sub-routes, live GPS tracking and OpenStreetMap progression will display here automatically.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => officer?.id && fetchFleetDispatches(officer.id)}
-                  className="mt-5 inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
-                >
-                  <RefreshCw className={`w-4 h-4 ${loadingFleet ? 'animate-spin' : ''}`} />
-                  <span>Check for Fleet Trips</span>
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <DeliveryFleetMap
-                  dispatches={fleetDispatches}
-                  selectedDispatchId={selectedFleetDispatch?.id}
-                  onSelectDispatch={(disp) => setSelectedFleetDispatch(disp)}
-                  height="560px"
-                />
+            <div className="space-y-4">
+              <DeliveryFleetMap
+                dispatches={fleetDispatches}
+                selectedDispatchId={selectedFleetDispatch?.id}
+                onSelectDispatch={(disp) => setSelectedFleetDispatch(disp)}
+                allowedOutlets={filteredOutlets.length > 0 ? filteredOutlets : outlets}
+                currentSalesOfficer={officer}
+                height="560px"
+              />
 
-                {/* Selected Trip Details & Stop Progression Manifest */}
-                {selectedFleetDispatch && (
+              {fleetDispatches.length === 0 && (
+                <div className="bg-white rounded-3xl border border-slate-200/90 p-6 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 text-left">
+                    <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
+                      <Truck className="w-6 h-6 text-blue-500" />
+                    </div>
+                    <div>
+                      <h4 className="font-oswald text-base font-bold uppercase tracking-wide text-slate-900">
+                        Standby Delivery Status • {officer?.assigned_area || 'Territory'} Zone
+                      </h4>
+                      <p className="text-slate-500 text-xs mt-0.5">
+                        Your {officer?.assigned_area || 'territory'} area hub and {(filteredOutlets.length > 0 ? filteredOutlets : outlets).length} assigned retail outlets are active on OpenStreetMap. When delivery consignments are dispatched from Central Wholesale ({supplier?.business_name || 'Wholesale Supplier'}), live moving vehicles will stream across your sub-routes.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => officer?.id && fetchFleetDispatches(officer.id)}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-md transition-all shrink-0 cursor-pointer"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${loadingFleet ? 'animate-spin' : ''}`} />
+                    <span>Check for Fleet Trips</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Selected Trip Details & Stop Progression Manifest */}
+              {selectedFleetDispatch && (
                   <div className="rounded-3xl bg-white border border-slate-200/90 p-5 shadow-xs space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
                       <div className="flex items-center gap-3">
@@ -1752,7 +1760,6 @@ export const SalesOfficerDashboard: React.FC = () => {
                   </div>
                 )}
               </div>
-            )}
           </div>
         )}
 

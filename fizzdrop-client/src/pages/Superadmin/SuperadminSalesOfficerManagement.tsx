@@ -113,6 +113,27 @@ export const SuperadminSalesOfficerManagement: React.FC = () => {
 
   useEffect(() => {
     fetchData();
+
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel('fizzdrop_realtime_events');
+      channel.onmessage = (event) => {
+        const t = event.data?.type;
+        if (
+          t === 'SO_CREATED' ||
+          t === 'SO_ORDER_APPROVED' ||
+          t === 'SO_STOCK_REQUEST_FOR_OUTLET' ||
+          t === 'SALES_OFFICER_PURCHASE_CONFIRMED' ||
+          t === 'SO_STOCK_DELIVERY_CONFIRMED'
+        ) {
+          fetchData();
+        }
+      };
+    } catch (e) {}
+
+    return () => {
+      if (channel) channel.close();
+    };
   }, []);
 
   // Selected supplier object for form dropdowns

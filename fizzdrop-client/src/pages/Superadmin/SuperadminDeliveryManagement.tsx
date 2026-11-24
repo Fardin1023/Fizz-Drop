@@ -233,13 +233,14 @@ export const SuperadminDeliveryManagement: React.FC<SuperadminDeliveryManagement
   // Cascading Available Suppliers
   const cascadingSuppliers = useMemo(() => {
     return suppliers.filter((sup) => {
+      if (selectedSupplierId && sup.id !== selectedSupplierId) return false;
       if (selectedDistrictId && sup.primary_district_id !== selectedDistrictId) return false;
       if (selectedRsmObj && sup.division_name) {
         if (sup.division_name.toLowerCase() !== selectedRsmObj.division.toLowerCase()) return false;
       }
       return true;
     });
-  }, [suppliers, selectedDistrictId, selectedRsmObj]);
+  }, [suppliers, selectedSupplierId, selectedDistrictId, selectedRsmObj]);
 
   // Cascading Available Vehicles / Delivery Teams
   const cascadingVehicles = useMemo(() => {

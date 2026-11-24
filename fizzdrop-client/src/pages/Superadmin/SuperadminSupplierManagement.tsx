@@ -256,6 +256,27 @@ export const SuperadminSupplierManagement: React.FC = () => {
 
   useEffect(() => {
     fetchData();
+
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel('fizzdrop_realtime_events');
+      channel.onmessage = (event) => {
+        const t = event.data?.type;
+        if (
+          t === 'SUPPLIER_CREATED' ||
+          t === 'SUPPLIER_UPDATED' ||
+          t === 'SUPPLIER_WALLET_UPDATED' ||
+          t === 'REQUISITION_ACTION' ||
+          t === 'PRICE_UPDATED'
+        ) {
+          fetchData();
+        }
+      };
+    } catch (e) {}
+
+    return () => {
+      if (channel) channel.close();
+    };
   }, []);
 
   // Group districts by division

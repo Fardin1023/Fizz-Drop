@@ -19,6 +19,8 @@ import {
   Truck,
   ClipboardList,
   Building,
+  Building2,
+  Check,
   Home,
   ChevronLeft,
   Menu,
@@ -67,7 +69,7 @@ export const AdminDashboard: React.FC = () => {
     if (!n) return;
     if (n.id) markAsRead(n.id);
     const dest = getNotificationDestination(n, 'SUPPLIER');
-    if (dest.path === '/admin' && validTabs.includes(dest.tab)) {
+    if ((dest.path === '/admin' || dest.path === '/supplier') && validTabs.includes(dest.tab)) {
       handleTabChange(dest.tab);
     } else {
       navigate(dest.fullUrl);
@@ -412,7 +414,10 @@ export const AdminDashboard: React.FC = () => {
             />
           )}
           {activeTab === 'delivery-fleet' && (
-            <SupplierDeliveryManagement userId={user?.user_id || 4} />
+            <SupplierDeliveryManagement
+              userId={searchParams.get('userId') ? Number(searchParams.get('userId')) : (user?.user_id || 4)}
+              supplierId={searchParams.get('supplierId') ? Number(searchParams.get('supplierId')) : undefined}
+            />
           )}
           {activeTab === 'request' && (
             <SupplierRequestStock

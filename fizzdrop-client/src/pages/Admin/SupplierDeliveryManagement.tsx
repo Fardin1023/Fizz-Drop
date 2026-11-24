@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import DeliveryFleetMap from '../../components/Map/DeliveryFleetMap';
 import {
   Truck,
@@ -20,6 +21,7 @@ import {
   Boxes,
   Store,
   Calendar,
+  Building2,
 } from 'lucide-react';
 
 export interface DeliveryTeam {
@@ -121,9 +123,19 @@ export interface VehicleDispatch {
 
 interface SupplierDeliveryManagementProps {
   userId?: number;
+  supplierId?: number;
 }
 
-export const SupplierDeliveryManagement: React.FC<SupplierDeliveryManagementProps> = ({ userId = 4 }) => {
+export const SupplierDeliveryManagement: React.FC<SupplierDeliveryManagementProps> = ({
+  userId = 4,
+  supplierId,
+}) => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlSupplierId = searchParams.get('supplierId') ? Number(searchParams.get('supplierId')) : undefined;
+  const [activeSupplierId, setActiveSupplierId] = useState<number | undefined>(supplierId || urlSupplierId || undefined);
+  const [currentSupplier, setCurrentSupplier] = useState<any>(null);
+  const [allSuppliers, setAllSuppliers] = useState<any[]>([]);
+
   const [activeSubTab, setActiveSubTab] = useState<'dispatches' | 'new-dispatch' | 'teams'>('dispatches');
   const [loading, setLoading] = useState<boolean>(true);
   const [actionLoading, setActionLoading] = useState<boolean>(false);
@@ -163,26 +175,61 @@ export const SupplierDeliveryManagement: React.FC<SupplierDeliveryManagementProp
     max_capacity_cases: 250,
   });
 
-  const fetchData = async () => {
+  const fetchData = async (overrideSupId?: number) => {
     setLoading(true);
     setErrorMsg(null);
     try {
-      // 1. Fetch Delivery Teams
-      const resTeams = await fetch(`http://localhost:8080/api/v1/delivery/teams?userId=${userId}`);
+      const targetSupId = overrideSupId !== undefined ? overrideSupId : activeSupplierId;
+
+      // 1. Fetch Supplier Profile Info & All Suppliers list
+      const infoUrl = targetSupId
+        ? `http://localhost:8080/api/inventory/supplier/sold-vs-dispatched?userId=${userId}&supplierId=${targetSupId}`
+        : `http://localhost:8080/api/inventory/supplier/sold-vs-dispatched?userId=${userId}`;
+      try {
+        const resInfo = await fetch(infoUrl);
+        if (resInfo.ok) {
+          const dInfo = await resInfo.json();
+          if (dInfo.supplier_info) {
+            setCurrentSupplier(dInfo.supplier_info);
+            if (!activeSupplierId && dInfo.supplier_info.id) {
+              setActiveSupplierId(dInfo.supplier_info.id);
+            }
+          }
+          if (Array.isArray(dInfo.all_suppliers)) {
+            setAllSuppliers(dInfo.all_suppliers);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to fetch supplier info', e);
+      }
+
+      const effectiveSupId = targetSupId || currentSupplier?.id;
+
+      // 2. Fetch Delivery Teams
+      const teamsUrl = effectiveSupId
+        ? `http://localhost:8080/api/v1/delivery/teams?userId=${userId}&supplierId=${effectiveSupId}`
+        : `http://localhost:8080/api/v1/delivery/teams?userId=${userId}`;
+      const resTeams = await fetch(teamsUrl);
       if (resTeams.ok) {
         const data = await resTeams.json();
         setTeams(Array.isArray(data) ? data : []);
       }
 
-      // 2. Fetch Vehicle Dispatches
-      const resDisp = await fetch(`http://localhost:8080/api/v1/delivery/dispatches?userId=${userId}`);
+      // 3. Fetch Vehicle Dispatches
+      const dispUrl = effectiveSupId
+        ? `http://localhost:8080/api/v1/delivery/dispatches?userId=${userId}&supplierId=${effectiveSupId}`
+        : `http://localhost:8080/api/v1/delivery/dispatches?userId=${userId}`;
+      const resDisp = await fetch(dispUrl);
       if (resDisp.ok) {
         const data = await resDisp.json();
         setDispatches(Array.isArray(data) ? data : []);
       }
 
-      // 3. Fetch Subroutes & Outlets with Demands
-      const resRoutes = await fetch(`http://localhost:8080/api/v1/delivery/subroutes?userId=${userId}`);
+      // 4. Fetch Subroutes & Outlets with Demands
+      const subUrl = effectiveSupId
+        ? `http://localhost:8080/api/v1/delivery/subroutes?userId=${userId}&supplierId=${effectiveSupId}`
+        : `http://localhost:8080/api/v1/delivery/subroutes?userId=${userId}`;
+      const resRoutes = await fetch(subUrl);
       if (resRoutes.ok) {
         const data = await resRoutes.json();
         setSubroutes(Array.isArray(data) ? data : []);
@@ -193,6 +240,37 @@ export const SupplierDeliveryManagement: React.FC<SupplierDeliveryManagementProp
       setLoading(false);
     }
   };
+
+  const handleSwitchSupplier = (newSupId: number) => {
+    setActiveSupplierId(newSupId);
+    setExpandedTripId(null);
+    const p = new URLSearchParams(window.location.search);
+    p.set('supplierId', String(newSupId));
+    window.history.replaceState({}, '', `${window.location.pathname}?${p.toString()}`);
+    try {
+      window.dispatchEvent(new CustomEvent('fizzdrop_supplier_changed', { detail: { supplierId: newSupId } }));
+    } catch (e) {}
+    fetchData(newSupId);
+  };
+
+  useEffect(() => {
+    const handleSupplierEvent = (e: any) => {
+      const supId = e.detail?.supplierId;
+      if (supId && supId !== activeSupplierId) {
+        setActiveSupplierId(supId);
+        fetchData(supId);
+      }
+    };
+    window.addEventListener('fizzdrop_supplier_changed', handleSupplierEvent);
+    return () => window.removeEventListener('fizzdrop_supplier_changed', handleSupplierEvent);
+  }, [activeSupplierId]);
+
+  useEffect(() => {
+    if (supplierId && supplierId !== activeSupplierId) {
+      setActiveSupplierId(supplierId);
+      fetchData(supplierId);
+    }
+  }, [supplierId]);
 
   useEffect(() => {
     fetchData();
@@ -381,6 +459,44 @@ export const SupplierDeliveryManagement: React.FC<SupplierDeliveryManagementProp
 
   return (
     <div className="space-y-6">
+      {/* 0. Dedicated Supplier Profile Switcher Bar */}
+      {allSuppliers.length > 0 && (
+        <div className="bg-[#DEFDEF] border border-[#15221C]/20 rounded-2xl p-2 sm:p-2.5 shadow-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 shrink-0">
+              <Building2 className="w-3.5 h-3.5 text-[#15221C]" />
+              <span className="font-oswald uppercase font-black text-xs tracking-wider text-[#15221C] whitespace-nowrap">
+                SUPPLIER PROFILE:
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {allSuppliers.map((s) => {
+                const isSelected = (activeSupplierId || currentSupplier?.id) === s.id;
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => handleSwitchSupplier(s.id)}
+                    className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      isSelected
+                        ? 'bg-[#FFE8BD] text-[#15221C] border border-[#15221C] shadow-xs ring-1 ring-[#15221C]/20 font-black'
+                        : 'bg-white/80 hover:bg-white text-[#2C4A3E] border border-[#15221C]/20 hover:border-[#15221C]/40'
+                    }`}
+                  >
+                    <Building2 className="w-3 h-3 shrink-0" />
+                    <span>{s.business_name}</span>
+                    <span className="text-[10px] opacity-75 font-normal">
+                      ({s.division_name || 'District'})
+                    </span>
+                    {isSelected && <CheckCircle2 className="w-3 h-3 text-[#15221C]" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top Banner & Header */}
       <div className="bg-white p-5 rounded-3xl border border-slate-200/90 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -552,14 +668,13 @@ export const SupplierDeliveryManagement: React.FC<SupplierDeliveryManagementProp
       {activeSubTab === 'dispatches' && (
         <div className="space-y-4">
           {/* Live OpenStreetMap Telemetry for Supplier's Delivery Fleet */}
-          {dispatches.length > 0 && (
-            <DeliveryFleetMap
-              dispatches={dispatches}
-              selectedDispatchId={expandedTripId}
-              onSelectDispatch={(disp) => setExpandedTripId(disp.id)}
-              height="520px"
-            />
-          )}
+          <DeliveryFleetMap
+            dispatches={dispatches}
+            selectedDispatchId={expandedTripId}
+            onSelectDispatch={(disp) => setExpandedTripId(disp.id)}
+            currentSupplier={currentSupplier}
+            height="520px"
+          />
 
           {dispatches.length === 0 ? (
             <div className="p-12 text-center bg-white rounded-3xl border border-dashed border-slate-200">

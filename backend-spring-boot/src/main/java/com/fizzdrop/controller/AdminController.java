@@ -61,12 +61,17 @@ public class AdminController {
         long totalProducts = productRepository.count();
         long totalBranches = outletRepository.count();
 
-        // Calculate low stock items (< 20)
+        // Calculate low stock items (< 20) via single aggregated query
+        Map<Long, Integer> stockByProduct = new HashMap<>();
+        try {
+            jdbcTemplate.query("SELECT product_id, COALESCE(SUM(stock_quantity), 0) as total_qty FROM shop_inventory GROUP BY product_id",
+                    (rs) -> {
+                        stockByProduct.put(rs.getLong("product_id"), rs.getInt("total_qty"));
+                    });
+        } catch (Exception ignored) {}
+
         long lowStockCount = productRepository.findAll().stream()
-                .filter(p -> {
-                    Integer stock = inventoryRepository.getTotalStockByProductId(p.getProductId());
-                    return stock == null || stock < 20;
-                })
+                .filter(p -> stockByProduct.getOrDefault(p.getProductId(), 0) < 20)
                 .count();
 
         stats.put("totalProducts", totalProducts);
@@ -361,10 +366,10 @@ public class AdminController {
                 "SELECT r.outlet_id, " +
                 "COALESCE(SUM(COALESCE(r.total_amount, r.quantity * COALESCE(r.unit_price, p.outlet_price, 0))), 0) AS rev, " +
                 "COALESCE(SUM(r.quantity * COALESCE(p.supplier_price, p.base_price, 0)), 0) AS cogs, " +
-                "COALESCE(SUM(COALESCE(r.total_amount, r.quantity * COALESCE(r.unit_price, p.outlet_price, 0)) - (r.quantity * COALESCE(p.supplier_price, p.base_price, 0))), 0) AS profit " +
+                "COALESCE(SUM(GREATEST(0.0, COALESCE(r.total_amount, r.quantity * COALESCE(r.unit_price, p.outlet_price, 0)) - (r.quantity * COALESCE(p.supplier_price, p.base_price, 0)))), 0) AS profit " +
                 "FROM outlet_requisitions r " +
                 "JOIN products p ON r.product_id = p.product_id " +
-                "WHERE r.status = 'COMPLETED' GROUP BY r.outlet_id"
+                "WHERE r.status IN ('COMPLETED', 'DISPATCHED') GROUP BY r.outlet_id"
             );
             for (Map<String, Object> row : pnlGroupRows) {
                 if (row.get("outlet_id") != null) {
@@ -374,14 +379,21 @@ public class AdminController {
         } catch (Exception ignored) {}
 
         Map<Long, Double> txRevBySupplier = new HashMap<>();
+        Map<Long, Double> txProfitBySupplier = new HashMap<>();
         try {
             List<Map<String, Object>> txRows = jdbcTemplate.queryForList(
-                "SELECT supplier_id, COALESCE(SUM(amount), 0) AS total_tx_rev " +
-                "FROM supplier_transactions WHERE type = 'OUTLET_SALE' AND status = 'COMPLETED' GROUP BY supplier_id"
+                "SELECT supplier_id, " +
+                "COALESCE(SUM(amount), 0) AS total_tx_rev, " +
+                "COALESCE(SUM(CASE WHEN type = 'OUTLET_SALE' THEN amount " +
+                "                  WHEN type = 'SO_BUFFER_SALE' THEN amount * 0.15 " +
+                "                  ELSE amount * 0.15 END), 0) AS total_profit " +
+                "FROM supplier_transactions WHERE type IN ('OUTLET_SALE', 'SO_BUFFER_SALE', 'WHOLESALE_SALE') AND status = 'COMPLETED' GROUP BY supplier_id"
             );
             for (Map<String, Object> row : txRows) {
                 if (row.get("supplier_id") != null) {
-                    txRevBySupplier.put(((Number) row.get("supplier_id")).longValue(), ((Number) row.getOrDefault("total_tx_rev", 0.0)).doubleValue());
+                    Long sId = ((Number) row.get("supplier_id")).longValue();
+                    txRevBySupplier.put(sId, ((Number) row.getOrDefault("total_tx_rev", 0.0)).doubleValue());
+                    txProfitBySupplier.put(sId, ((Number) row.getOrDefault("total_profit", 0.0)).doubleValue());
                 }
             }
         } catch (Exception ignored) {}
@@ -466,8 +478,19 @@ public class AdminController {
             }
 
             Double txRev = txRevBySupplier.get(sp.getId());
-            if (txRev != null && txRev > 0 && spWholesaleRevenue == 0) {
-                spWholesaleRevenue = txRev;
+            Double txProfit = txProfitBySupplier.get(sp.getId());
+            if (txRev != null && txRev > 0) {
+                if (spWholesaleRevenue < txRev) {
+                    spWholesaleRevenue = txRev;
+                }
+            }
+            if (txProfit != null && txProfit > 0) {
+                if (spWholesaleGrossProfit < txProfit) {
+                    spWholesaleGrossProfit = txProfit;
+                }
+            }
+            if (spWholesaleGrossProfit <= 0.0 && spWholesaleRevenue > 0.0) {
+                spWholesaleGrossProfit = spWholesaleRevenue * 0.15;
             }
 
             double spMarginPct = spWholesaleRevenue > 0 ? (spWholesaleGrossProfit / spWholesaleRevenue) * 100.0 : 0.0;
@@ -705,7 +728,17 @@ public class AdminController {
         } catch (Exception ignored) {}
 
         // 4. Supplier Commercial Transactions & Profit Logs
-        StringBuilder txnQuery = new StringBuilder("SELECT t.id, t.transaction_code, t.supplier_id, t.outlet_id, t.type, t.entry_type, t.amount, t.payment_method, t.reference_code, t.description, t.created_at, sp.business_name AS supplier_name, sp.division_name, o.outlet_name FROM supplier_transactions t LEFT JOIN supplier_profiles sp ON t.supplier_id = sp.id LEFT JOIN outlets o ON t.outlet_id = o.outlet_id WHERE 1=1");
+        StringBuilder txnQuery = new StringBuilder(
+            "SELECT t.id, t.transaction_code, t.supplier_id, t.type, t.entry_type, t.amount, t.payment_method, t.reference_code, t.description, t.status, t.created_at, " +
+            "sp.business_name AS supplier_name, sp.division_name, " +
+            "COALESCE(oreq.outlet_id, 0) AS outlet_id, " +
+            "COALESCE(o.outlet_name, '') AS outlet_name " +
+            "FROM supplier_transactions t " +
+            "LEFT JOIN supplier_profiles sp ON t.supplier_id = sp.id " +
+            "LEFT JOIN outlet_requisitions oreq ON t.reference_code = oreq.requisition_code " +
+            "LEFT JOIN outlets o ON oreq.outlet_id = o.outlet_id " +
+            "WHERE 1=1"
+        );
         List<Object> tParams = new ArrayList<>();
 
         if (supplierId != null) {
@@ -713,8 +746,9 @@ public class AdminController {
             tParams.add(supplierId);
         }
         if (outletId != null) {
-            txnQuery.append(" AND t.outlet_id = ?");
+            txnQuery.append(" AND (oreq.outlet_id = ? OR t.description LIKE ?)");
             tParams.add(outletId);
+            tParams.add("%" + outletId + "%");
         }
         if (startDate != null && !startDate.trim().isEmpty()) {
             txnQuery.append(" AND DATE(t.created_at) >= ?");
@@ -734,32 +768,53 @@ public class AdminController {
             List<Map<String, Object>> rawTxns = jdbcTemplate.queryForList(txnQuery.toString(), tParams.toArray());
             for (Map<String, Object> rt : rawTxns) {
                 Map<String, Object> tMap = new HashMap<>(rt);
-                String type = String.valueOf(rt.get("type"));
+                String type = String.valueOf(rt.get("type")).toUpperCase();
                 double amount = ((Number) rt.getOrDefault("amount", 0.0)).doubleValue();
+                double profit = 0.0;
 
                 if ("OUTLET_SALE".equalsIgnoreCase(type)) {
-                    grandSupplierRevenue += amount;
-                    // Supplier profit is (outlet_price - supplier_price)
-                    double profit = amount * (1.0 - (1.0 / 1.15)); // Approx 15% wholesale markup
+                    profit = amount;
+                    double rev = amount * 3.5;
                     String desc = String.valueOf(rt.get("description"));
-                    if (desc.contains("Profit: +৳")) {
+                    if (desc.contains("Profit credited: +৳")) {
                         try {
-                            String sub = desc.substring(desc.indexOf("Profit: +৳") + 10);
-                            int end = sub.indexOf(")");
-                            if (end > 0) profit = Double.parseDouble(sub.substring(0, end).trim());
+                            String sub = desc.substring(desc.indexOf("Profit credited: +৳") + 19);
+                            profit = Double.parseDouble(sub.trim());
                         } catch (Exception ignored) {}
                     }
+                    grandSupplierRevenue += rev;
+                    grandSupplierProfit += profit;
+                    tMap.put("supplier_profit_earned", profit);
+                } else if ("SO_BUFFER_SALE".equalsIgnoreCase(type)) {
+                    grandSupplierRevenue += amount;
+                    profit = amount * 0.15;
+                    grandSupplierProfit += profit;
+                    tMap.put("supplier_profit_earned", profit);
+                } else if ("WHOLESALE_SALE".equalsIgnoreCase(type) || "OUTLET_SALE_PROFIT".equalsIgnoreCase(type)) {
+                    grandSupplierRevenue += amount;
+                    profit = amount * 0.15;
                     grandSupplierProfit += profit;
                     tMap.put("supplier_profit_earned", profit);
                 }
                 tMap.put("transaction_id", rt.get("id"));
                 tMap.put("transaction_type", rt.get("type"));
                 tMap.put("transaction_date", rt.get("created_at"));
-                tMap.put("profit_amount", tMap.getOrDefault("supplier_profit_earned", 0.0));
+                tMap.put("profit_amount", profit);
                 tMap.put("balance_after", rt.getOrDefault("balance_after", 0.0));
                 supplierTxnLogs.add(tMap);
             }
-        } catch (Exception ignored) {}
+        } catch (Exception ex) {
+            System.err.println("[Commercial Logs] supplierTxnLogs query error: " + ex.getMessage());
+        }
+
+        double sumSuppliersRev = supplierList.stream().mapToDouble(s -> ((Number) s.getOrDefault("wholesale_revenue", 0.0)).doubleValue()).sum();
+        double sumSuppliersProfit = supplierList.stream().mapToDouble(s -> ((Number) s.getOrDefault("wholesale_gross_profit", 0.0)).doubleValue()).sum();
+        if (grandSupplierRevenue < sumSuppliersRev) {
+            grandSupplierRevenue = sumSuppliersRev;
+        }
+        if (grandSupplierProfit < sumSuppliersProfit) {
+            grandSupplierProfit = sumSuppliersProfit;
+        }
 
         // 5. Outlet Requisitions & Dispatches
         StringBuilder reqQuery = new StringBuilder("SELECT r.id, r.requisition_code, r.outlet_id, r.product_id, r.product_name, r.quantity, r.unit_price, r.total_amount, r.urgency, r.status, r.outlet_remarks, r.admin_supplier_notes, r.created_date, o.outlet_name, o.location_address FROM outlet_requisitions r LEFT JOIN outlets o ON r.outlet_id = o.outlet_id WHERE 1=1");

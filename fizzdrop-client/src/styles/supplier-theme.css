@@ -351,6 +351,33 @@
   stroke: #0F1A15 !important;
 }
 
+/* Pastel Gold Selected Chips & Buttons */
+.supplier-theme button.bg-\[\#FFE8BD\],
+.supplier-theme button[class*="bg-[#FFE8BD]"] {
+  background-color: #FFE8BD !important;
+  color: #15221C !important;
+  border-color: #15221C !important;
+}
+
+.supplier-theme button.bg-\[\#FFE8BD\] *,
+.supplier-theme button[class*="bg-[#FFE8BD]"] * {
+  color: #15221C !important;
+  stroke: #15221C !important;
+}
+
+.supplier-theme button.bg-\[\#FFE8BD\]:hover,
+.supplier-theme button[class*="bg-[#FFE8BD]"]:hover {
+  background-color: #FADECF !important;
+  color: #15221C !important;
+  border-color: #15221C !important;
+}
+
+.supplier-theme button.bg-\[\#FFE8BD\]:hover *,
+.supplier-theme button[class*="bg-[#FFE8BD]"]:hover * {
+  color: #15221C !important;
+  stroke: #15221C !important;
+}
+
 /* Active Filter Chips & Tabs */
 .supplier-theme button.active,
 .supplier-theme button[aria-selected="true"],

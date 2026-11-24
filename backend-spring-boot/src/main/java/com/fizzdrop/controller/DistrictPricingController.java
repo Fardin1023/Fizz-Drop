@@ -32,6 +32,15 @@ public class DistrictPricingController {
     private final OutletRepository outletRepository;
     private final AppNotificationRepository notificationRepository;
 
+    private static List<Map<String, Object>> cachedDistrictsOverview = null;
+    private static long lastOverviewFetch = 0;
+    private static final long OVERVIEW_CACHE_MS = 60000; // 60 seconds
+
+    public static synchronized void invalidatePricingCache() {
+        cachedDistrictsOverview = null;
+        lastOverviewFetch = 0;
+    }
+
     public DistrictPricingController(DistrictProductPricingRepository pricingRepository,
                                      DistrictRepository districtRepository,
                                      ProductRepository productRepository,
@@ -90,6 +99,11 @@ public class DistrictPricingController {
      */
     @GetMapping("/districts")
     public ResponseEntity<List<Map<String, Object>>> getDistrictsPricingOverview() {
+        long now = System.currentTimeMillis();
+        if (cachedDistrictsOverview != null && (now - lastOverviewFetch) < OVERVIEW_CACHE_MS) {
+            return ResponseEntity.ok(cachedDistrictsOverview);
+        }
+
         List<District> districts = districtRepository.findAll();
         districts.sort(Comparator.comparing(District::getId));
 
@@ -112,6 +126,8 @@ public class DistrictPricingController {
             result.add(map);
         }
 
+        cachedDistrictsOverview = result;
+        lastOverviewFetch = now;
         return ResponseEntity.ok(result);
     }
 
@@ -269,6 +285,7 @@ public class DistrictPricingController {
         }
 
         ProductController.invalidateCatalogCache();
+        invalidatePricingCache();
 
         List<SupplierProfile> targetSuppliers = supplierProfileRepository.findAll().stream()
                 .filter(s -> (s.getPrimaryDistrictId() != null && s.getPrimaryDistrictId().equals(districtId)) ||
@@ -323,6 +340,8 @@ public class DistrictPricingController {
             outNotif.setReferenceId(districtId);
             notificationRepository.save(outNotif);
         } catch (Exception ignored) {}
+
+        invalidatePricingCache();
 
         return ResponseEntity.ok(Map.of(
                 "success", true,
@@ -394,6 +413,7 @@ public class DistrictPricingController {
         }
 
         ProductController.invalidateCatalogCache();
+        invalidatePricingCache();
 
         return ResponseEntity.ok(Map.of(
                 "success", true,

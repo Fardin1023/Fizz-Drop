@@ -34,6 +34,7 @@ import {
   ClipboardCheck,
   Eye,
   Gift,
+  X,
 } from 'lucide-react';
 
 export const formatOunces = (sizeVolume?: string): string => {
@@ -132,6 +133,23 @@ export default function PsrDashboard() {
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
+  // Small animated alert state for Request to SO action
+  const [requestAlert, setRequestAlert] = useState<{
+    type: 'success' | 'error';
+    title: string;
+    message: string;
+    orderCode?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (requestAlert) {
+      const timer = setTimeout(() => {
+        setRequestAlert(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [requestAlert]);
+
   // Shop Visit & Inventory Audit Modal State
   const [visitModalOutlet, setVisitModalOutlet] = useState<any | null>(null);
   const [visitType, setVisitType] = useState<string>('STOCK_AUDIT');
@@ -148,7 +166,7 @@ export default function PsrDashboard() {
   const paramPsrId = searchParams.get('psrId') ? Number(searchParams.get('psrId')) : null;
   const authPsrId = user?.pre_sales_officer?.id;
   const activePsrId = paramPsrId || authPsrId || data?.psr?.id || (allPsrs.length > 0 ? allPsrs[0].id : 9);
-  const activeUserId = data?.psr?.user_id || user?.user_id || (activePsrId ? 200 + activePsrId : 209);
+  const activeUserId = data?.psr?.user_id || (user?.role === 'PSR' ? user?.user_id : undefined) || (activePsrId ? 200 + activePsrId : 209);
 
   // Notifications
   const {
@@ -359,10 +377,19 @@ export default function PsrDashboard() {
         bc.close();
       } catch (ignored) {}
 
-      alert(`Order ${order.order_code} requested to Sales Officer! Your Sales Officer has received the notification.`);
+      setRequestAlert({
+        type: 'success',
+        title: 'Request Sent to Sales Officer',
+        message: `Order ${order.order_code} (${order.product_name || 'Stock'} · ${order.quantity} cs) requested to Sales Officer! Your SO has received the real-time notification.`,
+        orderCode: order.order_code,
+      });
       loadDashboard();
     } catch (err: any) {
-      alert(err.message || 'Failed to submit order');
+      setRequestAlert({
+        type: 'error',
+        title: 'Request to SO Failed',
+        message: err.message || 'Failed to submit order to Sales Officer',
+      });
     } finally {
       setSubmittingToSoId(null);
     }
@@ -579,7 +606,11 @@ export default function PsrDashboard() {
           channel.close();
         } catch (err) {}
 
-        alert('All pending draft orders have been submitted to your Sales Officer!');
+        setRequestAlert({
+          type: 'success',
+          title: 'Batch Orders Submitted',
+          message: 'All pending draft orders have been submitted to your Sales Officer for approval!',
+        });
         loadDashboard();
       }
     } catch (err) {
@@ -607,6 +638,63 @@ export default function PsrDashboard() {
   return (
     <div className="psr-theme psr-portal-page min-h-screen bg-[#e8f4ff] text-[#0F172A] flex flex-col font-sans transition-colors">
       <NotificationPopup notification={popupNotification} onDismiss={dismissPopup} onAction={handleNotificationClick} />
+
+      {/* Small Animated Pop-up Alert for Request to SO */}
+      {requestAlert && (
+        <div className="fixed top-20 right-4 sm:right-8 z-[200] max-w-sm sm:max-w-md w-full animate-in fade-in slide-in-from-top-4 duration-300 pointer-events-auto">
+          <div
+            className={`p-4 rounded-2xl border-2 shadow-2xl backdrop-blur-xl flex items-start gap-3.5 transition-all ${
+              requestAlert.type === 'success'
+                ? 'bg-[#DEFDEF] border-[#15221C] text-[#15221C]'
+                : 'bg-[#FADECF] border-[#7D2828] text-[#7D2828]'
+            }`}
+          >
+            <div
+              className={`p-2 rounded-xl shrink-0 ${
+                requestAlert.type === 'success' ? 'bg-[#C8F1E8] text-[#15221C]' : 'bg-[#F8C8B8] text-[#7D2828]'
+              }`}
+            >
+              {requestAlert.type === 'success' ? (
+                <div className="relative flex items-center justify-center">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <Send className="w-5 h-5 text-[#15221C] relative z-10" />
+                </div>
+              ) : (
+                <AlertCircle className="w-5 h-5 text-red-700" />
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-oswald uppercase font-black text-sm tracking-wide text-[#15221C]">
+                  {requestAlert.title}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setRequestAlert(null)}
+                  className="text-[#4A5852] hover:text-[#15221C] p-0.5 rounded cursor-pointer transition-colors"
+                  title="Dismiss alert"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <p className="text-xs font-medium text-[#1E2E27] mt-1 leading-relaxed">
+                {requestAlert.message}
+              </p>
+              {requestAlert.orderCode && (
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded-md bg-[#FFE8BD] text-[#15221C] border border-[#15221C] text-[10px] font-mono font-bold">
+                    Ref: {requestAlert.orderCode}
+                  </span>
+                  <span className="text-[10px] text-emerald-800 font-bold flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" />
+                    Notification delivered to SO
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Top Navigation Bar */}
       <header className="sticky top-0 z-40 bg-[#f7fbff]/95 backdrop-blur-md border-b border-[#c4dde9] px-4 sm:px-6 py-3 shadow-xs">

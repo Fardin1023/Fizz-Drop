@@ -537,6 +537,11 @@ public class SalesOfficerController {
             );
         } catch (Exception ignored) {}
 
+        Map<Long, DistrictProductPricing> pricingMap = new HashMap<>();
+        try {
+            districtProductPricingRepository.findByDistrictId(districtId).forEach(dp -> pricingMap.put(dp.getProductId(), dp));
+        } catch (Exception ignored) {}
+
         for (Product p : products) {
             Map<String, Object> pm = new HashMap<>();
             pm.put("product_id", p.getProductId());
@@ -544,11 +549,11 @@ public class SalesOfficerController {
             pm.put("flavor_variant", p.getFlavorVariant());
             pm.put("category", p.getCategory());
             pm.put("sku", p.getSku());
-            Optional<DistrictProductPricing> dpp = districtProductPricingRepository.findByDistrictIdAndProductId(districtId, p.getProductId());
-            pm.put("base_price", dpp.map(DistrictProductPricing::getSupplierPrice).orElse(p.getBasePrice()));
-            pm.put("supplier_price", dpp.map(DistrictProductPricing::getSupplierPrice).orElse(p.getSupplierPrice()));
-            pm.put("outlet_price", dpp.map(DistrictProductPricing::getOutletPrice).orElse(p.getOutletPrice()));
-            pm.put("retail_price", dpp.map(DistrictProductPricing::getRetailPrice).orElse(p.getRetailPrice()));
+            DistrictProductPricing dpp = pricingMap.get(p.getProductId());
+            pm.put("base_price", dpp != null && dpp.getSupplierPrice() != null ? dpp.getSupplierPrice() : p.getBasePrice());
+            pm.put("supplier_price", dpp != null && dpp.getSupplierPrice() != null ? dpp.getSupplierPrice() : p.getSupplierPrice());
+            pm.put("outlet_price", dpp != null && dpp.getOutletPrice() != null ? dpp.getOutletPrice() : p.getOutletPrice());
+            pm.put("retail_price", dpp != null && dpp.getRetailPrice() != null ? dpp.getRetailPrice() : p.getRetailPrice());
             pm.put("image_url", p.getImageUrl());
 
             // District buffer stock

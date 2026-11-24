@@ -82,6 +82,29 @@ export const OutletRequisitionModal: React.FC<OutletRequisitionModalProps> = ({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to submit requisition');
 
+      // Realtime broadcast notification to Pre-Sales Officer (PSR)
+      try {
+        const bc = new BroadcastChannel('fizzdrop_realtime_events');
+        const psrId = data.psr_id || preSalesOfficer?.id;
+        const psrUserId = data.psr_user_id || (psrId ? 200 + psrId : undefined);
+        const prodLabel = data.product_name || `${currentProduct?.brand || 'Beverage'} ${currentProduct?.flavor_variant || ''}`;
+        bc.postMessage({
+          type: 'OUTLET_ORDER_TO_PSR',
+          recipientRole: 'PSR',
+          recipientUserId: psrUserId,
+          referenceId: psrId,
+          referenceCode: data.requisition_code,
+          title: `New Restock Order from ${outletName}`,
+          message: `Outlet ${outletName} placed an order for ${qty} cases of ${prodLabel} (${urgency} Priority).`,
+          outlet_id: outletId,
+          outlet_name: outletName,
+          quantity: qty,
+          product_name: prodLabel,
+          urgency,
+        });
+        bc.close();
+      } catch (err) {}
+
       setSuccessMsg(data.message || 'Order placed with Route Pre-Sales Officer!');
       setTimeout(() => {
         if (onSubmitted) onSubmitted();

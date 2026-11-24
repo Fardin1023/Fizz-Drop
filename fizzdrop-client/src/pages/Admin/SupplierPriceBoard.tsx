@@ -182,6 +182,30 @@ export const SupplierPriceBoard: React.FC<SupplierPriceBoardProps> = ({
 
   // Real-time listener for price updates
   useEffect(() => {
+    if (supplierId && supplierId !== activeSupplierId) {
+      setActiveSupplierId(supplierId);
+      setSelectedDistrictId(null);
+      setIsMultiDistrictView(false);
+      fetchPriceBoard(undefined, supplierId, false);
+    }
+  }, [supplierId]);
+
+  useEffect(() => {
+    const handleSupplierEvent = (e: any) => {
+      const supId = e.detail?.supplierId;
+      if (supId && supId !== activeSupplierId) {
+        setActiveSupplierId(supId);
+        setSelectedDistrictId(null);
+        setIsMultiDistrictView(false);
+        fetchPriceBoard(undefined, supId, false);
+      }
+    };
+    window.addEventListener('fizzdrop_supplier_changed', handleSupplierEvent);
+    return () => window.removeEventListener('fizzdrop_supplier_changed', handleSupplierEvent);
+  }, [activeSupplierId]);
+
+  // Real-time listener for price updates
+  useEffect(() => {
     let bc: BroadcastChannel | null = null;
     try {
       bc = new BroadcastChannel('fizzdrop_realtime_events');
@@ -301,7 +325,7 @@ export const SupplierPriceBoard: React.FC<SupplierPriceBoardProps> = ({
   }
 
   return (
-    <div className="supplier-theme space-y-6 pb-12">
+    <div className="supplier-theme space-y-2.5 pb-8">
       {/* Live Auto-Update Toast */}
       {updateAlert && (
         <div className="fixed top-24 right-4 sm:right-8 z-[140] animate-bounce">
@@ -321,16 +345,16 @@ export const SupplierPriceBoard: React.FC<SupplierPriceBoardProps> = ({
         </div>
       )}
 
-      {/* Supplier Switcher (Available when multiple suppliers exist or for superadmin) */}
+      {/* Compact Supplier Switcher */}
       {allSuppliers.length > 1 && (
-        <div className="bg-[#DEFDEF] rounded-2xl p-4 border border-[#BFC8C5] shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-[#15221C]" />
-            <span className="text-xs font-black uppercase tracking-wide text-[#15221C]">
-              Managing Supplier Profile:
+        <div className="bg-[#DEFDEF] rounded-xl px-3.5 py-1.5 border border-[#BFC8C5] shadow-2xs flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Building2 className="w-3.5 h-3.5 text-[#15221C]" />
+            <span className="text-[11px] font-black uppercase tracking-wider text-[#15221C]">
+              Supplier Profile:
             </span>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 flex-wrap">
             {allSuppliers.map((s) => {
               const isSelected = activeSupplierId === s.id;
               return (
@@ -338,16 +362,18 @@ export const SupplierPriceBoard: React.FC<SupplierPriceBoardProps> = ({
                   key={s.id}
                   type="button"
                   onClick={() => handleSelectSupplier(s.id)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer border ${
                     isSelected
-                      ? 'bg-[#15221C] text-white border-[#15221C] shadow-xs'
-                      : 'bg-white text-[#15221C] border-[#BFC8C5] hover:bg-[#C8F1E8]'
+                      ? 'bg-[#FFE8BD] text-[#15221C] border-2 border-[#15221C] shadow-2xs font-black hover:bg-[#FADECF]'
+                      : 'bg-white text-[#15221C] border border-[#BFC8C5] hover:bg-[#C8F1E8] hover:border-[#15221C]/50'
                   }`}
                 >
-                  {s.business_name}
-                  <span className="ml-1.5 text-[10px] opacity-80 font-mono">
+                  <Building2 className={`w-3 h-3 shrink-0 ${isSelected ? 'text-[#15221C]' : 'text-[#4A5852]'}`} />
+                  <span>{s.business_name}</span>
+                  <span className={`text-[9px] font-mono font-medium ${isSelected ? 'text-[#15221C]/80' : 'text-[#4A5852]'}`}>
                     ({s.district_name || 'Territory'})
                   </span>
+                  {isSelected && <Check className="w-3 h-3 text-[#15221C] stroke-[3] ml-0.5" />}
                 </button>
               );
             })}
@@ -355,121 +381,77 @@ export const SupplierPriceBoard: React.FC<SupplierPriceBoardProps> = ({
         </div>
       )}
 
-      {/* Hero Header Banner strictly styled in Supplier theme */}
-      <div className="bg-[#DEFDEF] rounded-2xl p-5 sm:p-6 border border-[#BFC8C5] shadow-xs relative overflow-hidden">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#FFE8BD] text-[#15221C] text-xs font-black border border-[#BFC8C5] shadow-xs">
-                <Tag className="w-3.5 h-3.5 text-[#15221C]" />
-                TERRITORY PRICE BOARD
-              </span>
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-[#C8F1E8] text-[#15221C] text-xs font-mono font-bold border border-[#BFC8C5]">
-                📍 {currentDistrictName} District
-              </span>
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-[#EEF9FA] text-[#384640] text-xs font-medium border border-[#BFC8C5]">
-                Division: {currentDivisionName}
-              </span>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#DEFDEF] text-[#15221C] text-[11px] font-bold border border-[#BFC8C5]">
-                <ShieldAlert className="w-3.5 h-3.5 text-emerald-800" />
-                {assignedDistricts.length} Assigned Districts Under Contract
-              </span>
-            </div>
-
-            <h1 className="text-xl sm:text-2xl font-black text-[#15221C] tracking-tight uppercase">
-              {currentDistrictName} District Official Price Board
-            </h1>
-            <p className="text-xs sm:text-sm text-[#4A5852] max-w-3xl leading-relaxed">
-              Official multi-echelon commercial pricing allotted for your regional depot in{' '}
-              <strong>{currentDistrictName} District</strong>. All wholesale stock orders from
-              Superadmin and dispatches to Sales Officers & Outlets within {currentDistrictName} strictly
-              execute at these approved rates.
-            </p>
-          </div>
-
-          {/* Action & Sync Controls */}
-          <div className="flex flex-col sm:flex-row lg:flex-col items-start lg:items-end gap-2.5 shrink-0">
-            <div className="flex items-center gap-2">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-600"></span>
-              </span>
-              <span className="text-[11px] font-mono font-bold text-[#15221C]">
-                LIVE AUTO-SYNC: ON
-              </span>
-            </div>
-            <div className="text-[10px] font-mono text-[#4A5852]">
-              Synced: {lastSyncTime.toLocaleTimeString()}
-            </div>
-            <button
-              onClick={() => fetchPriceBoard(undefined, undefined, false)}
-              disabled={isRefreshing}
-              className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-[#FFE8BD] hover:bg-[#FADECF] text-[#15221C] text-xs font-bold border border-[#BFC8C5] shadow-xs transition-all cursor-pointer"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-              <span>{isRefreshing ? 'Refreshing Rates...' : 'Refresh Board'}</span>
-            </button>
-          </div>
+      {/* Ultra-Compact Hero Header Banner strictly styled in Supplier theme */}
+      <div className="bg-[#DEFDEF] rounded-xl px-4 py-2 border border-[#BFC8C5] shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[#FFE8BD] text-[#15221C] text-[10px] font-black border border-[#BFC8C5] shadow-2xs shrink-0">
+            <Tag className="w-3 h-3 text-[#15221C]" />
+            PRICE BOARD
+          </span>
+          <h1 className="text-sm sm:text-base font-black text-[#15221C] tracking-tight uppercase font-oswald shrink-0">
+            {currentDistrictName} Official Rates
+          </h1>
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[#C8F1E8] text-[#15221C] text-[10px] font-mono font-bold border border-[#BFC8C5] shrink-0">
+            📍 {currentDistrictName} ({currentDivisionName})
+          </span>
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white/70 text-[#15221C] text-[10px] font-bold border border-[#BFC8C5] shrink-0">
+            <ShieldAlert className="w-3 h-3 text-emerald-800" />
+            {assignedDistricts.length} Districts
+          </span>
+          <span className="text-[11px] text-[#4A5852] truncate hidden xl:inline">
+            • Depot: <span className="font-mono text-[#15221C] font-semibold">{boardData?.depot_address || 'Regional Depot'}</span>
+          </span>
         </div>
 
-        {/* Territory Details Notice */}
-        <div className="mt-4 pt-3 border-t border-[#BFC8C5]/70 flex flex-wrap items-center justify-between text-xs text-[#384640] gap-2">
-          <div className="flex items-center gap-2">
-            <Building className="w-4 h-4 text-[#15221C]" />
-            <span>
-              Allotted Supplier:{' '}
-              <strong className="text-[#15221C]">
-                {boardData?.business_name || 'Regional Supplier Ltd.'}
-              </strong>
+        {/* Action & Sync Controls */}
+        <div className="flex items-center gap-2 shrink-0 self-start md:self-auto">
+          <div className="flex items-center gap-1.5 text-[10px] font-mono text-[#4A5852]">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600"></span>
             </span>
-            <span className="text-[#BFC8C5]">•</span>
-            <span>
-              Depot:{' '}
-              <span className="font-mono text-[#15221C]">
-                {boardData?.depot_address || 'Regional Territory Depot'}
-              </span>
-            </span>
+            <span>{lastSyncTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
           </div>
-          <div className="text-[11px] text-[#4A5852] font-semibold">
-            * Select any of your assigned districts below to inspect that territory's official rates.
-          </div>
+          <button
+            onClick={() => fetchPriceBoard(undefined, undefined, false)}
+            disabled={isRefreshing}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#FFE8BD] hover:bg-[#FADECF] text-[#15221C] text-xs font-bold border border-[#BFC8C5] shadow-2xs transition-all cursor-pointer"
+          >
+            <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <span>{isRefreshing ? 'Syncing...' : 'Refresh'}</span>
+          </button>
         </div>
       </div>
 
       {/* Assigned Districts Territory Switcher Bar */}
       {assignedDistricts.length > 0 && (
-        <div className="bg-[#DEFDEF] rounded-2xl p-4 sm:p-5 border-2 border-[#15221C]/20 shadow-sm space-y-3">
+        <div className="bg-[#DEFDEF] rounded-xl px-3.5 py-2 border border-[#BFC8C5] shadow-2xs space-y-1.5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-[#15221C]" />
-              <h2 className="text-xs sm:text-sm font-black uppercase text-[#15221C] tracking-wide">
-                Assigned Districts for {boardData?.business_name} ({assignedDistricts.length} Districts)
+            <div className="flex items-center gap-1.5">
+              <MapPin className="w-3.5 h-3.5 text-[#15221C]" />
+              <h2 className="text-xs font-black uppercase text-[#15221C] tracking-wide">
+                Assigned Districts ({assignedDistricts.length})
               </h2>
             </div>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setIsMultiDistrictView(!isMultiDistrictView)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
                   isMultiDistrictView
-                    ? 'bg-[#15221C] text-white border-[#15221C] shadow-xs'
-                    : 'bg-white text-[#15221C] border-[#BFC8C5] hover:bg-[#C8F1E8]'
+                    ? 'bg-[#FFE8BD] text-[#15221C] border-2 border-[#15221C] shadow-xs font-black hover:bg-[#FADECF]'
+                    : 'bg-white text-[#15221C] border border-[#BFC8C5] hover:bg-[#C8F1E8] hover:border-[#15221C]/50'
                 }`}
               >
-                <TableProperties className="w-3.5 h-3.5" />
+                <TableProperties className="w-3 h-3" />
                 <span>
-                  {isMultiDistrictView ? 'Exit District Matrix' : 'Compare All Districts (Matrix)'}
+                  {isMultiDistrictView ? 'Exit Matrix' : 'Compare All Districts (Matrix)'}
                 </span>
               </button>
             </div>
           </div>
 
-          <p className="text-[11px] text-[#4A5852]">
-            Superadmin assigns specific product pricing per district. Click any district below to
-            view the updated prices for that particular district:
-          </p>
-
-          <div className="flex items-center gap-2 flex-wrap pt-1">
+          <div className="flex items-center gap-1.5 flex-wrap">
             {assignedDistricts.map((dist) => {
               const isSelected = !isMultiDistrictView && selectedDistrictId === dist.id;
               return (
@@ -477,16 +459,16 @@ export const SupplierPriceBoard: React.FC<SupplierPriceBoardProps> = ({
                   key={dist.id}
                   type="button"
                   onClick={() => handleSelectDistrict(dist.id)}
-                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
                     isSelected
-                      ? 'bg-[#FFE8BD] text-[#15221C] border-2 border-[#15221C] shadow-md scale-105'
-                      : 'bg-white text-[#15221C] border-[#BFC8C5] hover:bg-[#C8F1E8] hover:border-[#15221C]'
+                      ? 'bg-[#FFE8BD] text-[#15221C] border-2 border-[#15221C] shadow-2xs'
+                      : 'bg-white text-[#15221C] border border-[#BFC8C5] hover:bg-[#C8F1E8] hover:border-[#15221C]'
                   }`}
                 >
-                  <MapPin className={`w-3.5 h-3.5 ${isSelected ? 'text-[#15221C]' : 'text-slate-400'}`} />
+                  <MapPin className={`w-3 h-3 ${isSelected ? 'text-[#15221C]' : 'text-slate-400'}`} />
                   <span>{dist.name}</span>
                   {dist.is_primary && (
-                    <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-md bg-[#C8F1E8] text-[#15221C] font-bold">
+                    <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-[#C8F1E8] text-[#15221C] font-bold">
                       ★ Primary
                     </span>
                   )}
@@ -499,67 +481,67 @@ export const SupplierPriceBoard: React.FC<SupplierPriceBoardProps> = ({
       )}
 
       {/* 4 Summary Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
         {/* Metric 1: Total SKUs */}
-        <div className="bg-[#DEFDEF] rounded-2xl p-4 border border-[#BFC8C5] shadow-xs flex items-center justify-between">
-          <div className="space-y-1">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#4A5852]">
+        <div className="bg-[#DEFDEF] rounded-xl p-3 border border-[#BFC8C5] shadow-2xs flex items-center justify-between">
+          <div className="space-y-0.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[#4A5852]">
               Priced SKUs in {currentDistrictName}
             </span>
-            <div className="text-2xl font-black text-[#15221C]">
+            <div className="text-xl font-black text-[#15221C]">
               {stats.totalProducts} <span className="text-xs font-normal text-[#4A5852]">SKUs</span>
             </div>
             <span className="text-[10px] text-emerald-800 font-bold block">
               100% Territory Coverage
             </span>
           </div>
-          <div className="p-3 rounded-xl bg-[#C8F1E8] border border-[#BFC8C5] text-[#15221C]">
-            <Package className="w-6 h-6" />
+          <div className="p-2 rounded-lg bg-[#C8F1E8] border border-[#BFC8C5] text-[#15221C]">
+            <Package className="w-5 h-5" />
           </div>
         </div>
 
         {/* Metric 2: Average Inbound Buy Cost */}
-        <div className="bg-[#DEFDEF] rounded-2xl p-4 border border-[#BFC8C5] shadow-xs flex items-center justify-between">
-          <div className="space-y-1">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#4A5852]">
+        <div className="bg-[#DEFDEF] rounded-xl p-3 border border-[#BFC8C5] shadow-2xs flex items-center justify-between">
+          <div className="space-y-0.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[#4A5852]">
               Your Buy Rate ({currentDistrictName})
             </span>
-            <div className="text-2xl font-black text-[#15221C]">৳{stats.avgBuyPrice.toFixed(2)}</div>
+            <div className="text-xl font-black text-[#15221C]">৳{stats.avgBuyPrice.toFixed(2)}</div>
             <span className="text-[10px] text-[#4A5852] block">Cost from Superadmin HQ</span>
           </div>
-          <div className="p-3 rounded-xl bg-[#FFE8BD] border border-[#BFC8C5] text-[#15221C]">
-            <Coins className="w-6 h-6" />
+          <div className="p-2 rounded-lg bg-[#FFE8BD] border border-[#BFC8C5] text-[#15221C]">
+            <Coins className="w-5 h-5" />
           </div>
         </div>
 
         {/* Metric 3: Average Wholesale Sell Price */}
-        <div className="bg-[#DEFDEF] rounded-2xl p-4 border border-[#BFC8C5] shadow-xs flex items-center justify-between">
-          <div className="space-y-1">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#4A5852]">
+        <div className="bg-[#DEFDEF] rounded-xl p-3 border border-[#BFC8C5] shadow-2xs flex items-center justify-between">
+          <div className="space-y-0.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[#4A5852]">
               Your Sell Rate ({currentDistrictName})
             </span>
-            <div className="text-2xl font-black text-[#15221C]">
+            <div className="text-xl font-black text-[#15221C]">
               ৳{stats.avgOutletPrice.toFixed(2)}
             </div>
             <span className="text-[10px] text-[#4A5852] block">Supply to Outlets & SOs</span>
           </div>
-          <div className="p-3 rounded-xl bg-[#C8F1E8] border border-[#BFC8C5] text-[#15221C]">
-            <Store className="w-6 h-6" />
+          <div className="p-2 rounded-lg bg-[#C8F1E8] border border-[#BFC8C5] text-[#15221C]">
+            <Store className="w-5 h-5" />
           </div>
         </div>
 
         {/* Metric 4: Average Profit Margin */}
-        <div className="bg-[#DEFDEF] rounded-2xl p-4 border border-[#BFC8C5] shadow-xs flex items-center justify-between">
-          <div className="space-y-1">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#4A5852]">
+        <div className="bg-[#DEFDEF] rounded-xl p-3 border border-[#BFC8C5] shadow-2xs flex items-center justify-between">
+          <div className="space-y-0.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[#4A5852]">
               Gross Margin ({currentDistrictName})
             </span>
-            <div className="text-2xl font-black text-emerald-800">
+            <div className="text-xl font-black text-emerald-800">
               +{stats.avgMarginPercent.toFixed(1)}%
             </div>
             <span className="text-[10px] text-[#4A5852] block">Average Spread per Case</span>
           </div>
-          <div className="p-3 rounded-xl bg-[#FADECF] border border-[#BFC8C5] text-[#7D2828]">
+          <div className="p-2 rounded-lg bg-[#FADECF] border border-[#BFC8C5] text-[#7D2828]">
             <TrendingUp className="w-6 h-6" />
           </div>
         </div>

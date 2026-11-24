@@ -109,6 +109,29 @@ interface DeliveryFleetMapProps {
   availableDistricts?: DistrictOption[];
   suppliers?: any[];
   divisionName?: string;
+  currentSupplier?: any;
+  currentSalesOfficer?: any;
+}
+
+// Helper to resolve coordinates for a Sales Officer's assigned territory area
+export function resolveSalesOfficerCoordinates(officer: any): [number, number] {
+  if (!officer) return [23.7925, 90.4125];
+  const area = (officer.assigned_area || '').toLowerCase();
+  const city = (officer.city || '').toLowerCase();
+
+  if (area.includes('uttara')) return [23.8759, 90.3995];
+  if (area.includes('banani')) return [23.7937, 90.4043];
+  if (area.includes('dhanmondi')) return [23.7461, 90.3742];
+  if (area.includes('mirpur')) return [23.8067, 90.3644];
+  if (area.includes('mohakhali')) return [23.7780, 90.4030];
+  if (area.includes('tejgaon')) return [23.7635, 90.3965];
+  if (area.includes('badda')) return [23.7845, 90.4260];
+  if (area.includes('epz')) return [23.4285, 91.1712];
+  if (area.includes('kandirpar') || city.includes('comilla') || city.includes('cumilla')) return [23.4607, 91.1809];
+  if (city.includes('chittagong') || city.includes('chattogram') || area.includes('agrabad')) return [22.3275, 91.8122];
+  if (area.includes('kalurghat')) return [22.3850, 91.8750];
+
+  return [23.7925, 90.4125]; // Default Gulshan
 }
 
 // 64 Bangladesh Districts Geo-Centroids & Depot Terminals
@@ -305,8 +328,14 @@ const VEHICLE_THEMES = [
 ];
 
 // Deterministic geo-hash for stable outlet coordinates
-function getOutletCoordinates(outletId: number, index: number, subRoute: string, vehicleIndex = 0): [number, number] {
-  const base = resolveDepotCoordinates(subRoute, 0);
+function getOutletCoordinates(
+  outletId: number,
+  index: number,
+  subRoute: string,
+  vehicleIndex = 0,
+  customBaseCoords?: [number, number]
+): [number, number] {
+  const base = customBaseCoords || resolveDepotCoordinates(subRoute, 0);
   const angle = ((outletId * 137.5 + index * 53 + vehicleIndex * 40) % 360) * (Math.PI / 180);
   const distance = 0.0065 + ((outletId % 5) * 0.0035);
   const lat = base[0] + Math.cos(angle) * distance;
@@ -463,10 +492,19 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
   availableDistricts,
   suppliers,
   divisionName,
+  currentSupplier,
+  currentSalesOfficer,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
+
+  // Scoped supplier for dedicated supplier portal map views
+  const effectiveSupplier = useMemo(() => {
+    if (currentSupplier) return currentSupplier;
+    if (suppliers && suppliers.length === 1) return suppliers[0];
+    return null;
+  }, [currentSupplier, suppliers]);
 
   // Map of truck marker instances keyed by vehicle registration
   const truckMarkersMapRef = useRef<Map<string, L.Marker>>(new Map());
@@ -507,7 +545,92 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
   const districtDepots: SupplierDepotInfo[] = useMemo(() => {
     const list: SupplierDepotInfo[] = [];
 
-    // If districts list is provided (e.g. from RSM's ASMs)
+    // Priority 1: Scoped to Sales Officer view
+    // "in their map only their areas and the nearby outlets should be visible . for vehicle tracking obviously as well"
+    if (currentSalesOfficer) {
+      const soCoords = resolveSalesOfficerCoordinates(currentSalesOfficer);
+      const soArea = currentSalesOfficer.assigned_area || 'Territory';
+      const soCity = currentSalesOfficer.city || 'District';
+      const supName = currentSalesOfficer.supplier_name || 'Central Regional Supplier';
+
+      list.push({
+        districtId: currentSalesOfficer.district_id || 1,
+        districtName: soCity,
+        division: currentSalesOfficer.division || soCity,
+        supplierId: currentSalesOfficer.supplier_id,
+        supplierName: `${supName} (${soArea} Depot Hub)`,
+        tradeLicense: `SO-HUB-${currentSalesOfficer.id}`,
+        depotAddress: `${soArea} Logistics Supply Base, ${soCity}`,
+        phone: currentSalesOfficer.phone || '+8801700000000',
+        coords: soCoords,
+        isPrimaryHub: true,
+        isRegisteredSupplier: true,
+        coveredDistricts: [soCity],
+        asmName: currentSalesOfficer.name,
+        asmCode: `SO-${currentSalesOfficer.id}`,
+      });
+      return list;
+    }
+
+    // Priority 2: Scoped to a specific supplier (Supplier Portal or single supplier filter)
+    // "they should see their own depot location, because they are seeing the fleet of their own district and own depot. not other suppliers depot and location."
+    if (effectiveSupplier) {
+      const supName = (effectiveSupplier.business_name || '').toLowerCase();
+      let coords: [number, number];
+      let distName = effectiveSupplier.district_name || effectiveSupplier.primary_district_name || 'Dhaka';
+      let division = effectiveSupplier.division_name || 'Dhaka';
+      let depotAddr = effectiveSupplier.depot_address || 'Regional Logistics Depot';
+
+      if (supName.includes('karnafuli') || effectiveSupplier.id === 37) {
+        coords = [22.3850, 91.8750]; // Kalurghat Heavy Industrial Area, Chittagong
+        distName = 'Chittagong';
+        division = 'Chittagong';
+        depotAddr = effectiveSupplier.depot_address || 'Plot B-12, Kalurghat Heavy Industrial Area, Mohara, Chandgaon, Chattogram-4208, Bangladesh';
+      } else if (supName.includes('meghna') || effectiveSupplier.id === 39) {
+        coords = [23.4607, 91.1809]; // Kandirpar / Kotbari, Comilla
+        distName = 'Comilla';
+        division = 'Chittagong';
+        depotAddr = effectiveSupplier.depot_address || 'Plot 22, Kotbari Road, Kandirpar Commercial Zone, Cumilla-3500, Bangladesh';
+      } else if (supName.includes('padma') || effectiveSupplier.id === 38) {
+        coords = [23.7635, 90.3965]; // Tejgaon I/A, Dhaka
+        distName = 'Dhaka';
+        division = 'Dhaka';
+        depotAddr = effectiveSupplier.depot_address || 'Plot 14/B, Road 04, Tejgaon I/A, Dhaka-1208';
+      } else if (supName.includes('dhaka metropolitan') || effectiveSupplier.id === 1) {
+        coords = [23.7925, 90.4125]; // Gulshan-1, Dhaka
+        distName = 'Dhaka';
+        division = 'Dhaka';
+        depotAddr = effectiveSupplier.depot_address || 'Road 11, Plot 42, Gulshan-1 Logistics Depot, Dhaka';
+      } else {
+        const baseGeo = BANGLADESH_DISTRICT_DEPOTS[distName] || {
+          lat: 23.7925,
+          lng: 90.4125,
+          defaultAddress: depotAddr,
+        };
+        coords = [baseGeo.lat, baseGeo.lng];
+      }
+
+      list.push({
+        districtId: effectiveSupplier.primary_district_id || effectiveSupplier.district_id || 1,
+        districtName: distName,
+        division: division,
+        supplierId: effectiveSupplier.id,
+        supplierName: effectiveSupplier.business_name,
+        tradeLicense: effectiveSupplier.trade_license_number || `REG-SUP-${effectiveSupplier.id || '2026'}`,
+        depotAddress: depotAddr,
+        phone: effectiveSupplier.phone_number || effectiveSupplier.contact_phone || '+8801819000000',
+        coords,
+        isPrimaryHub: true,
+        isRegisteredSupplier: true,
+        coveredDistricts: effectiveSupplier.assigned_districts
+          ? effectiveSupplier.assigned_districts.map((d: any) => d.name || d)
+          : [distName],
+      });
+
+      return list;
+    }
+
+    // Priority 2: If districts list is provided (e.g. from RSM's ASMs)
     if (availableDistricts && availableDistricts.length > 0) {
       availableDistricts.forEach((dist) => {
         // 1. Direct primary supplier for this district
@@ -592,12 +715,15 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
     }
 
     return list;
-  }, [availableDistricts, suppliers]);
+  }, [availableDistricts, suppliers, effectiveSupplier, currentSalesOfficer]);
 
   const selectedDepot = useMemo(() => {
+    if ((currentSalesOfficer || effectiveSupplier) && districtDepots.length > 0) {
+      return districtDepots[0];
+    }
     if (!internalDistrictId) return null;
     return districtDepots.find((d) => d.districtId === internalDistrictId) || null;
-  }, [internalDistrictId, districtDepots]);
+  }, [internalDistrictId, districtDepots, effectiveSupplier, currentSalesOfficer]);
 
   // Live metrics of focused vehicle for HUD
   const [focusedTelemetry, setFocusedTelemetry] = useState<{
@@ -635,30 +761,65 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
 
   // Outlets to display when orders are completed or in standby
   const outletsToDisplay = useMemo(() => {
+    let list: any[] = [];
     if (allowedOutlets && allowedOutlets.length > 0) {
-      return allowedOutlets;
-    }
-    if (registeredOutlets.length > 0) {
-      return registeredOutlets;
-    }
-    const list: any[] = [];
-    const seen = new Set<number>();
-    dispatches.forEach((d) => {
-      (d.items || []).forEach((it) => {
-        if (it.outlet_id && !seen.has(it.outlet_id)) {
-          seen.add(it.outlet_id);
-          list.push({
-            id: it.outlet_id,
-            outlet_name: it.outlet_name,
-            branch_name: (it as any).branch_name,
-            location_address: it.outlet_address || (it as any).location_address,
-            sub_route: d.sub_route,
-          });
-        }
+      list = allowedOutlets;
+    } else if (registeredOutlets.length > 0) {
+      list = registeredOutlets;
+    } else {
+      const seen = new Set<number>();
+      dispatches.forEach((d) => {
+        (d.items || []).forEach((it) => {
+          if (it.outlet_id && !seen.has(it.outlet_id)) {
+            seen.add(it.outlet_id);
+            list.push({
+              id: it.outlet_id,
+              outlet_name: it.outlet_name,
+              branch_name: (it as any).branch_name,
+              location_address: it.outlet_address || (it as any).location_address,
+              sub_route: d.sub_route,
+            });
+          }
+        });
       });
-    });
+    }
+
+    if (currentSalesOfficer) {
+      if (allowedOutlets && allowedOutlets.length > 0) {
+        return allowedOutlets;
+      }
+      const soArea = (currentSalesOfficer.assigned_area || '').toLowerCase();
+      const soCity = (currentSalesOfficer.city || '').toLowerCase();
+      return list.filter((o: any) => {
+        const oArea = (o.area || '').toLowerCase();
+        const oAddr = ((o.location_address || '') + ' ' + (o.sub_route || '')).toLowerCase();
+        if (soArea && (oArea.includes(soArea) || oAddr.includes(soArea))) return true;
+        if (soCity && oAddr.includes(soCity)) return true;
+        return false;
+      });
+    }
+
+    if (effectiveSupplier) {
+      const targetDistId = effectiveSupplier.primary_district_id || effectiveSupplier.district_id;
+      const targetDistName = (effectiveSupplier.district_name || effectiveSupplier.primary_district_name || '').toLowerCase();
+      const supAssignedIds = (effectiveSupplier.assigned_districts || []).map((d: any) => d.id || d);
+      return list.filter((o: any) => {
+        if (targetDistId && o.district_id === targetDistId) return true;
+        if (targetDistName && (o.district_name || '').toLowerCase() === targetDistName) return true;
+        if (supAssignedIds.length > 0 && supAssignedIds.includes(o.district_id)) return true;
+        const loc = ((o.location_address || '') + ' ' + (o.sub_route || '') + ' ' + (o.area || '')).toLowerCase();
+        if (effectiveSupplier.division_name === 'Chittagong' || targetDistName.includes('chittagong') || targetDistName.includes('comilla')) {
+          if (targetDistName.includes('comilla') || effectiveSupplier.id === 39) {
+            return loc.includes('comilla') || loc.includes('cumilla') || loc.includes('kandirpar') || loc.includes('kotbari');
+          }
+          return loc.includes('chittagong') || loc.includes('chattogram') || loc.includes('kalurghat') || loc.includes('chandgaon') || loc.includes('agrabad');
+        }
+        return loc.includes('dhaka') || loc.includes('gulshan') || loc.includes('banani') || loc.includes('tejgaon') || loc.includes('dhanmondi') || loc.includes('uttara') || loc.includes('mirpur');
+      });
+    }
+
     return list;
-  }, [registeredOutlets, dispatches]);
+  }, [registeredOutlets, dispatches, allowedOutlets, effectiveSupplier, currentSalesOfficer]);
 
   // 1. Group dispatches so all distinct active vehicles appear on the single map
   const activeVehicles = useMemo(() => {
@@ -704,7 +865,17 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
 
     return activeVehicles.map((disp, vIdx) => {
       const color = VEHICLE_THEMES[vIdx % VEHICLE_THEMES.length];
-      const depotCoords = resolveDepotCoordinates(disp.sub_route, vIdx);
+      const baseDepot = (currentSalesOfficer && districtDepots[0])
+        ? districtDepots[0].coords
+        : ((effectiveSupplier && districtDepots[0])
+          ? districtDepots[0].coords
+          : resolveDepotCoordinates(disp.sub_route, vIdx));
+      const depotCoords: [number, number] = ((currentSalesOfficer || effectiveSupplier) && districtDepots[0])
+        ? [
+            baseDepot[0] + Math.cos(vIdx * 70 * Math.PI / 180) * 0.0018 * vIdx,
+            baseDepot[1] + Math.sin(vIdx * 70 * Math.PI / 180) * 0.0018 * vIdx,
+          ]
+        : resolveDepotCoordinates(disp.sub_route, vIdx);
 
       // Group unique outlets
       const uniqueOutlets: {
@@ -771,7 +942,9 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
       }[] = [
         {
           type: 'DEPOT',
-          name: `Depot Hub (${disp.team_name || 'Fleet'})`,
+          name: (effectiveSupplier && districtDepots[0])
+            ? `${districtDepots[0].supplierName} Depot Hub`
+            : `Depot Hub (${disp.team_name || 'Fleet'})`,
           coords: depotCoords,
           status: 'DEPOT',
         },
@@ -786,7 +959,7 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
         waypoints.push({
           type: 'OUTLET',
           name: cleanName,
-          coords: getOutletCoordinates(out.outlet_id, idx, disp.sub_route, vIdx),
+          coords: getOutletCoordinates(out.outlet_id, idx, disp.sub_route, vIdx, baseDepot),
           status: out.status,
           stopNumber: stopNum,
           outletId: out.outlet_id,
@@ -987,6 +1160,15 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
 
       // Auto-fit map to show selected depot or all depots & outlets
       try {
+        if ((effectiveSupplier || currentSalesOfficer) && districtDepots.length > 0) {
+          const targetDepot = districtDepots[0];
+          if (allCoords.length > 1) {
+            map.fitBounds(L.latLngBounds(allCoords), { padding: [50, 50], maxZoom: 15 });
+          } else {
+            map.setView(targetDepot.coords, 14);
+          }
+          return;
+        }
         if (internalDistrictId) {
           const matchDepot = districtDepots.find((d) => d.districtId === internalDistrictId);
           if (matchDepot) {
@@ -1331,6 +1513,17 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
     });
 
     // Auto-fit all routes onto single unified map view or fly to selected district depot
+    if ((effectiveSupplier || currentSalesOfficer) && districtDepots.length > 0) {
+      if (allRouteCoordinates.length > 1) {
+        try {
+          const bounds = L.latLngBounds(allRouteCoordinates);
+          map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+        } catch (e) {}
+      } else {
+        map.setView(districtDepots[0].coords, 14);
+      }
+      return;
+    }
     if (internalDistrictId) {
       const matchDepot = districtDepots.find((d) => d.districtId === internalDistrictId);
       if (matchDepot) {
@@ -1344,7 +1537,7 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
         map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
       } catch (e) {}
     }
-  }, [mergedVehiclesData, focusedVehicleReg, isTestingMotion, internalDistrictId, districtDepots]);
+  }, [mergedVehiclesData, focusedVehicleReg, isTestingMotion, internalDistrictId, districtDepots, effectiveSupplier, currentSalesOfficer]);
 
   // 3. Live Fluid Movement Engine Along Real Street Waypoints
   useEffect(() => {
@@ -1425,7 +1618,9 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
   const handleFitAllFleet = () => {
     if (!mapInstanceRef.current) return;
     if (!hasActiveOrders) {
-      const depotCoord = resolveDepotCoordinates('Central Sub-Route', 0);
+      const depotCoord = currentSalesOfficer
+        ? resolveSalesOfficerCoordinates(currentSalesOfficer)
+        : resolveDepotCoordinates('Central Sub-Route', 0);
       const allCoords: [number, number][] = [depotCoord];
       outletsToDisplay.forEach((outlet, idx) => {
         const outletId = outlet.id || outlet.outlet_id || (idx + 1);
@@ -1457,7 +1652,11 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <h3 className="font-oswald text-lg font-bold uppercase tracking-wide text-slate-900">
-                Live OpenStreetMap Fleet Telemetry
+                {currentSalesOfficer
+                  ? `${currentSalesOfficer.name || 'Sales Officer'} • ${currentSalesOfficer.assigned_area || ''} Fleet & Outlets`
+                  : effectiveSupplier
+                    ? `${effectiveSupplier.business_name} • Fleet & Depot Telemetry`
+                    : 'Live OpenStreetMap Fleet Telemetry'}
               </h3>
               <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-mono flex items-center gap-1 ${
                 hasActiveOrders
@@ -1465,21 +1664,45 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
                   : 'bg-slate-100 text-slate-700 border border-slate-200'
               }`}>
                 <span className={`w-2 h-2 rounded-full ${hasActiveOrders ? 'bg-emerald-500 animate-ping' : 'bg-slate-400'}`} />
-                {hasActiveOrders ? 'LIVE GPS SYNC' : 'ORDERS COMPLETED • DEPOT & OUTLETS VIEW'}
+                {hasActiveOrders
+                  ? 'LIVE GPS SYNC'
+                  : (currentSalesOfficer
+                      ? 'TERRITORY ACTIVE • NEARBY OUTLETS'
+                      : (effectiveSupplier ? 'DEPOT READY • OUTLETS STANDBY' : 'ORDERS COMPLETED • DEPOT & OUTLETS VIEW'))}
               </span>
             </div>
             <p className="text-xs text-slate-500">
-              {hasActiveOrders
-                ? 'Real-time route telemetry and checkpoint progression along sub-routes powered by OpenStreetMap API.'
-                : 'All delivery orders are completed. Delivery routes cleared; displaying central depot hub and retail outlet locations.'}
+              {currentSalesOfficer
+                ? `Monitoring delivery fleet, assigned ${currentSalesOfficer.assigned_area || ''} area depot and nearby retail outlets (${outletsToDisplay.length} in jurisdiction).`
+                : effectiveSupplier
+                  ? `Monitoring delivery fleet and logistics fulfillment for ${districtDepots[0]?.districtName || 'Regional'} depot: ${districtDepots[0]?.depotAddress || ''}`
+                  : (hasActiveOrders
+                      ? 'Real-time route telemetry and checkpoint progression along sub-routes powered by OpenStreetMap API.'
+                      : 'All delivery orders are completed. Delivery routes cleared; displaying central depot hub and retail outlet locations.')}
             </p>
           </div>
         </div>
 
         {/* Multi-Vehicle Merged Fleet Selector Tabs & District Depot Switcher */}
         <div className="flex flex-wrap items-center gap-2 overflow-x-auto pb-1 lg:pb-0">
-          {/* District Depot Switcher Dropdown */}
-          {availableDistricts && availableDistricts.length > 0 && (
+          {/* Sales Officer Scoped Territory Badge */}
+          {currentSalesOfficer && (
+            <div className="px-3 py-1.5 rounded-xl bg-slate-900 border border-cyan-500/50 text-cyan-300 font-mono text-xs font-bold flex items-center gap-2 shadow-xs">
+              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+              <span>📍 {currentSalesOfficer.assigned_area || 'Area'} Territory ({currentSalesOfficer.city || 'Jurisdiction'})</span>
+            </div>
+          )}
+
+          {/* Supplier Scoped Depot Badge */}
+          {effectiveSupplier && !currentSalesOfficer && districtDepots[0] && (
+            <div className="px-3 py-1.5 rounded-xl bg-slate-900 border border-amber-500/50 text-amber-300 font-mono text-xs font-bold flex items-center gap-2 shadow-xs">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+              <span>🏭 {districtDepots[0].districtName} Depot Hub</span>
+            </div>
+          )}
+
+          {/* District Depot Switcher Dropdown (Only when in multi-district admin views) */}
+          {!effectiveSupplier && !currentSalesOfficer && availableDistricts && availableDistricts.length > 0 && (
             <div className="relative">
               <select
                 value={internalDistrictId ?? ''}

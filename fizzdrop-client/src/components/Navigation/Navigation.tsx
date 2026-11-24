@@ -54,7 +54,7 @@ const Navigation: React.FC<NavigationProps> = ({
 
             {/* Supplier Portal Link (Products Only) */}
             <Link
-              to="/admin"
+              to="/supplier"
               className="px-2.5 py-1 rounded-xl bg-[#EDF7F7] border border-[#DCE8E9] text-[#1A282A] hover:bg-[#9BD8DA]/30 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-xs"
             >
               <ShieldCheck className="w-3.5 h-3.5 text-[#1A282A]" />
@@ -222,7 +222,7 @@ const Navigation: React.FC<NavigationProps> = ({
             🏪 Outlet Portal (Store POS & Stock)
           </Link>
           <Link
-            to="/admin"
+            to="/supplier"
             onClick={() => setMobileMenuOpen(false)}
             className="block text-sm font-bold text-indigo-600 dark:text-indigo-400 py-1"
           >

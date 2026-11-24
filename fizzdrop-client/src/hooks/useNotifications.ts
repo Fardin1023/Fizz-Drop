@@ -168,6 +168,8 @@ export const useNotifications = (
             payload.recipientUserId === userId ||
             payload.recipientUserId === userId + 1000 ||
             payload.recipientUserId === userId - 1000 ||
+            payload.recipientUserId === userId + 200 ||
+            payload.recipientUserId === userId - 200 ||
             payload.referenceId === userId;
 
           if (matchesTarget) {

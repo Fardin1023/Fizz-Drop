@@ -24,6 +24,10 @@ public class OutletController {
     private final SupplierProfileRepository supplierProfileRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    private static List<District> cachedDistricts = null;
+    private static long lastDistrictFetch = 0;
+    private static final long DISTRICT_CACHE_MS = 300000; // 5 minutes
+
     public OutletController(OutletRepository outletRepository,
                             DistrictRepository districtRepository,
                             SupplierProfileRepository supplierProfileRepository) {
@@ -148,7 +152,15 @@ public class OutletController {
                                                       @RequestParam(required = false) String city,
                                                       @RequestParam(required = false) String area) {
         List<Outlet> all = outletRepository.findAll();
-        List<District> districts = districtRepository.findAll();
+        
+        long now = System.currentTimeMillis();
+        List<District> districts = cachedDistricts;
+        if (districts == null || (now - lastDistrictFetch) > DISTRICT_CACHE_MS) {
+            districts = districtRepository.findAll();
+            cachedDistricts = districts;
+            lastDistrictFetch = now;
+        }
+
         Map<Long, District> districtMap = new HashMap<>();
         for (District d : districts) {
             districtMap.put(d.getId(), d);

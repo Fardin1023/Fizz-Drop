@@ -704,6 +704,17 @@ public class InventoryController {
                     .filter(p -> p.getAssignedArea() != null && p.getAssignedArea().equalsIgnoreCase(outlet.getArea()))
                     .findFirst().orElse(null);
         }
+        if (assignedPsr == null && outlet.getDistrictId() != null) {
+            assignedPsr = psrRepository.findAll().stream()
+                    .filter(p -> {
+                        if (p.getSalesOfficerId() != null) {
+                            SalesOfficer so = salesOfficerRepository.findById(p.getSalesOfficerId()).orElse(null);
+                            if (so != null && outlet.getDistrictId().equals(so.getDistrictId())) return true;
+                        }
+                        return false;
+                    })
+                    .findFirst().orElse(null);
+        }
         if (assignedPsr == null) {
             List<PreSalesOfficer> allPsrs = psrRepository.findAll();
             if (!allPsrs.isEmpty()) {
@@ -928,6 +939,17 @@ public class InventoryController {
                     .filter(p -> p.getAssignedArea() != null && p.getAssignedArea().equalsIgnoreCase(outlet.getArea()))
                     .findFirst().orElse(null);
         }
+        if (assignedPsr == null && outlet.getDistrictId() != null) {
+            assignedPsr = psrRepository.findAll().stream()
+                    .filter(p -> {
+                        if (p.getSalesOfficerId() != null) {
+                            SalesOfficer so = salesOfficerRepository.findById(p.getSalesOfficerId()).orElse(null);
+                            if (so != null && outlet.getDistrictId().equals(so.getDistrictId())) return true;
+                        }
+                        return false;
+                    })
+                    .findFirst().orElse(null);
+        }
         if (assignedPsr == null) {
             List<PreSalesOfficer> allPsrs = psrRepository.findAll();
             if (!allPsrs.isEmpty()) {
@@ -989,7 +1011,7 @@ public class InventoryController {
                 psrNotif.setMessage("Outlet " + outlet.getOutletName() + " on route " + subRoute + " placed an order for " + qty + " cases of " + prodName + " (৳" + totalAmount + ").");
                 psrNotif.setType("OUTLET_ORDER_TO_PSR");
                 psrNotif.setReferenceCode(reqCode);
-                psrNotif.setReferenceId(outletId);
+                psrNotif.setReferenceId(assignedPsr.getId());
                 notificationRepository.save(psrNotif);
             } catch (Exception ignored) {}
         }
@@ -1004,6 +1026,8 @@ public class InventoryController {
         res.put("urgency", urgency);
         res.put("psr_name", psrName);
         res.put("psr_code", assignedPsr != null ? assignedPsr.getPsrCode() : null);
+        res.put("psr_id", psrId);
+        res.put("psr_user_id", assignedPsr != null ? (assignedPsr.getUserId() != null ? assignedPsr.getUserId() : (200L + assignedPsr.getId())) : 209L);
         res.put("sub_route", subRoute);
 
         return ResponseEntity.ok(res);
@@ -1171,6 +1195,10 @@ public class InventoryController {
             return ResponseEntity.ok(Collections.emptyList());
         }
 
+        if (list.isEmpty()) {
+            return ResponseEntity.ok(Collections.emptyList());
+        }
+
         List<DistrictInventory> allDistInvs = districtInventoryRepository.findAll();
         Map<String, Integer> distStockMap = new HashMap<>();
         for (DistrictInventory di : allDistInvs) {
@@ -1178,12 +1206,36 @@ public class InventoryController {
         }
 
         final Long currentSpId = (sp != null) ? sp.getId() : null;
+        List<SalesOfficer> allSalesOfficers = salesOfficerRepository.findAll();
+        Map<Long, SalesOfficer> soByIdMap = allSalesOfficers.stream()
+                .collect(Collectors.toMap(SalesOfficer::getId, s -> s, (a, b) -> a));
+
         List<SalesOfficer> officers = (currentSpId != null)
-                ? salesOfficerRepository.findAll().stream()
+                ? allSalesOfficers.stream()
                     .filter(so -> (so.getSupplierId() != null && so.getSupplierId().equals(currentSpId))
                             || (so.getAllocatedSupplierIds() != null && Arrays.asList(so.getAllocatedSupplierIds().split(",")).contains(String.valueOf(currentSpId))))
                     .collect(Collectors.toList())
                 : Collections.emptyList();
+
+        Map<Long, Integer> purchasedByProduct = new HashMap<>();
+        Map<Long, Integer> soldByProduct = new HashMap<>();
+        if (sp != null && !sp.getId().equals(1L)) {
+            try {
+                jdbcTemplate.query(
+                    "SELECT sri.product_id, COALESCE(SUM(CASE WHEN sri.approved_quantity > 0 THEN sri.approved_quantity ELSE sri.requested_quantity END), 0) as qty " +
+                    "FROM stock_requisition_items sri JOIN stock_requisitions sr ON sri.requisition_id = sr.id " +
+                    "WHERE sr.supplier_id = ? AND sr.status IN ('APPROVED', 'COMPLETED', 'DISPATCHED') GROUP BY sri.product_id",
+                    rs -> { purchasedByProduct.put(rs.getLong("product_id"), rs.getInt("qty")); },
+                    sp.getId()
+                );
+                jdbcTemplate.query(
+                    "SELECT product_id, COALESCE(SUM(quantity), 0) as qty FROM outlet_requisitions " +
+                    "WHERE supplier_id = ? AND status IN ('DISPATCHED', 'FULFILLED', 'DELIVERED', 'COMPLETED') GROUP BY product_id",
+                    rs -> { soldByProduct.put(rs.getLong("product_id"), rs.getInt("qty")); },
+                    sp.getId()
+                );
+            } catch (Exception ignored) {}
+        }
 
         List<Map<String, Object>> response = new ArrayList<>();
         for (Map<String, Object> row : list) {
@@ -1200,27 +1252,8 @@ public class InventoryController {
                     availableStock += distStockMap.getOrDefault(distId + "_" + prodId, 0);
                 }
             } else if (sp != null) {
-                int purchased = 0;
-                try {
-                    Integer pCases = jdbcTemplate.queryForObject(
-                        "SELECT COALESCE(SUM(CASE WHEN approved_quantity > 0 THEN approved_quantity ELSE requested_quantity END), 0) " +
-                        "FROM stock_requisition_items sri JOIN stock_requisitions sr ON sri.requisition_id = sr.id " +
-                        "WHERE sr.supplier_id = ? AND sri.product_id = ? AND sr.status IN ('APPROVED', 'COMPLETED', 'DISPATCHED')",
-                        Integer.class, sp.getId(), prodId
-                    );
-                    purchased = (pCases != null) ? pCases : 0;
-                } catch (Exception ignored) {}
-
-                int sold = 0;
-                try {
-                    Integer sCases = jdbcTemplate.queryForObject(
-                        "SELECT COALESCE(SUM(quantity), 0) FROM outlet_requisitions " +
-                        "WHERE supplier_id = ? AND product_id = ? AND status IN ('DISPATCHED', 'FULFILLED', 'DELIVERED', 'COMPLETED')",
-                        Integer.class, sp.getId(), prodId
-                    );
-                    sold = (sCases != null) ? sCases : 0;
-                } catch (Exception ignored) {}
-
+                int purchased = purchasedByProduct.getOrDefault(prodId, 0);
+                int sold = soldByProduct.getOrDefault(prodId, 0);
                 availableStock = Math.max(0, purchased - sold);
             }
             map.put("supplier_available_stock", availableStock);
@@ -1229,7 +1262,7 @@ public class InventoryController {
             Long existingSoId = row.get("sales_officer_id") != null ? ((Number) row.get("sales_officer_id")).longValue() : null;
             SalesOfficer matchedSO = null;
             if (existingSoId != null) {
-                matchedSO = salesOfficerRepository.findById(existingSoId).orElse(null);
+                matchedSO = soByIdMap.get(existingSoId);
             }
             if (matchedSO == null) {
                 String oArea = row.get("area") != null ? row.get("area").toString().toLowerCase().trim() : "";

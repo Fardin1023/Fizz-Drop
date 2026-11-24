@@ -1889,6 +1889,32 @@ public class DeliveryController {
             supNotif.setReferenceCode(reqCode);
             supNotif.setReferenceId(matchedDispatchId);
             notificationRepository.save(supNotif);
+
+            // Also notify the assigned PSR when stock offer is accepted
+            if (isAccept) {
+                try {
+                    List<Map<String, Object>> psrLookup = jdbcTemplate.queryForList(
+                        "SELECT p.id, p.user_id, p.name FROM pre_sales_representatives p " +
+                        "JOIN outlets o ON (o.assigned_psr_id = p.id OR (o.assigned_psr_id IS NULL AND o.district_id = p.district_id)) " +
+                        "WHERE o.id = ? LIMIT 1",
+                        outletId
+                    );
+                    if (!psrLookup.isEmpty()) {
+                        Map<String, Object> psrMap = psrLookup.get(0);
+                        Long pId = ((Number) psrMap.get("id")).longValue();
+                        Long pUserId = psrMap.get("user_id") != null ? ((Number) psrMap.get("user_id")).longValue() : (200L + pId);
+                        AppNotification psrNotif = new AppNotification();
+                        psrNotif.setRecipientRole("PSR");
+                        psrNotif.setRecipientUserId(pUserId);
+                        psrNotif.setTitle("Stock Offer Accepted by " + outletName);
+                        psrNotif.setMessage(outletName + " accepted " + cases + " cases of " + prodName + " from delivery consignment (" + reqCode + ").");
+                        psrNotif.setType("STOCK_OFFER_ACCEPTED");
+                        psrNotif.setReferenceCode(reqCode);
+                        psrNotif.setReferenceId(pId);
+                        notificationRepository.save(psrNotif);
+                    }
+                } catch (Exception ignored) {}
+            }
         } catch (Exception ignored) {}
 
         // 5. Mark the outlet's notification as read

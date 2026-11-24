@@ -20,9 +20,10 @@ function App() {
   const [outlets, setOutlets] = useState<{ branchId: string | number; branchName: string }[]>([]);
   const location = useLocation();
 
-  // Hide the customer navigation bar on Admin, Superadmin, Outlet, Sales Officer, PSR and Delivery Team portals
+  // Hide the customer navigation bar on Admin, Supplier, Superadmin, Outlet, Sales Officer, PSR and Delivery Team portals
   const isAdminOrSuperadmin =
     location.pathname.startsWith('/admin') ||
+    location.pathname.startsWith('/supplier') ||
     location.pathname.startsWith('/superadmin') ||
     location.pathname.startsWith('/outlet') ||
     location.pathname.startsWith('/sales-officer') ||
@@ -105,6 +106,14 @@ function App() {
             />
             <Route
               path="/admin/*"
+              element={<AdminDashboard />}
+            />
+            <Route
+              path="/supplier"
+              element={<AdminDashboard />}
+            />
+            <Route
+              path="/supplier/*"
               element={<AdminDashboard />}
             />
             <Route

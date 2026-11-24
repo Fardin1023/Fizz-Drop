@@ -760,9 +760,59 @@ public class PsrController {
         try {
             List<Map<String, Object>> ordList = jdbcTemplate.queryForList("SELECT * FROM psr_orders WHERE id = ?", id);
             if (ordList.isEmpty()) {
+                // 1. Try finding in psr_orders by order_code if provided in request
+                if (req != null && req.get("order_code") != null) {
+                    ordList = jdbcTemplate.queryForList("SELECT * FROM psr_orders WHERE order_code = ?", req.get("order_code").toString().trim());
+                }
+            }
+            if (ordList.isEmpty()) {
+                // 2. Fallback: check if id matches an outlet_requisitions record (e.g. from SO requisitions list)
+                List<Map<String, Object>> reqList = jdbcTemplate.queryForList("SELECT * FROM outlet_requisitions WHERE id = ?", id);
+                if (reqList.isEmpty() && req != null && req.get("order_code") != null) {
+                    reqList = jdbcTemplate.queryForList("SELECT * FROM outlet_requisitions WHERE requisition_code = ?", req.get("order_code").toString().trim());
+                }
+                if (!reqList.isEmpty()) {
+                    Map<String, Object> reqRow = reqList.get(0);
+                    String code = reqRow.get("requisition_code") != null ? reqRow.get("requisition_code").toString() : "REQ-" + id;
+                    Long oId = reqRow.get("outlet_id") != null ? Long.parseLong(reqRow.get("outlet_id").toString()) : 1L;
+                    Outlet out = outletRepository.findById(oId).orElse(null);
+                    String oName = out != null ? ((out.getFranchiseName() != null ? out.getFranchiseName() : "") + " " + (out.getBranchName() != null ? out.getBranchName() : "")).trim() : "Retail Outlet";
+                    Long pId = reqRow.get("product_id") != null ? Long.parseLong(reqRow.get("product_id").toString()) : 1L;
+                    Product p = productRepository.findById(pId).orElse(null);
+                    String pName = reqRow.get("product_name") != null ? reqRow.get("product_name").toString() : (p != null ? p.getBrand() : "Beverage Product");
+                    int qty = reqRow.get("quantity") != null ? Integer.parseInt(reqRow.get("quantity").toString()) : 1;
+                    BigDecimal uPrice = reqRow.get("unit_price") != null ? new BigDecimal(reqRow.get("unit_price").toString()) : BigDecimal.valueOf(42.50);
+                    BigDecimal tAmt = reqRow.get("total_amount") != null ? new BigDecimal(reqRow.get("total_amount").toString()) : uPrice.multiply(BigDecimal.valueOf(qty));
+                    Long resolvedSoId = reqRow.get("sales_officer_id") != null ? Long.parseLong(reqRow.get("sales_officer_id").toString()) : (req != null && req.get("sales_officer_id") != null ? Long.parseLong(req.get("sales_officer_id").toString()) : 1L);
+                    Long resolvedSupId = reqRow.get("supplier_id") != null ? Long.parseLong(reqRow.get("supplier_id").toString()) : (req != null && req.get("supplier_id") != null ? Long.parseLong(req.get("supplier_id").toString()) : 1L);
+
+                    List<PreSalesOfficer> soPsrs = psrRepository.findBySalesOfficerId(resolvedSoId);
+                    PreSalesOfficer resolvedPsr = !soPsrs.isEmpty() ? soPsrs.get(0) : null;
+                    Long resolvedPsrId = resolvedPsr != null ? resolvedPsr.getId() : 1L;
+                    String resolvedPsrName = resolvedPsr != null ? resolvedPsr.getName() : "Field PSR";
+
+                    SupplierProfile sp = supplierProfileRepository.findById(resolvedSupId).orElse(null);
+                    String supName = sp != null ? sp.getBusinessName() : "Central Supplier";
+
+                    List<Map<String, Object>> existingPo = jdbcTemplate.queryForList("SELECT * FROM psr_orders WHERE order_code = ?", code);
+                    if (existingPo.isEmpty()) {
+                        jdbcTemplate.update(
+                            "INSERT INTO psr_orders (order_code, psr_id, psr_name, sales_officer_id, outlet_id, outlet_name, sub_route, product_id, product_name, quantity, unit_price, total_amount, urgency, status, supplier_id, supplier_name, created_at, updated_at) " +
+                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'NORMAL', 'REQUESTED_FROM_SUPPLIER', ?, ?, NOW(), NOW())",
+                            code, resolvedPsrId, resolvedPsrName, resolvedSoId, oId, oName, (resolvedPsr != null && resolvedPsr.getSubRoute() != null ? resolvedPsr.getSubRoute() : "Main Sub-Route"),
+                            pId, pName, qty, uPrice, tAmt, resolvedSupId, supName
+                        );
+                        ordList = jdbcTemplate.queryForList("SELECT * FROM psr_orders WHERE order_code = ?", code);
+                    } else {
+                        ordList = existingPo;
+                    }
+                }
+            }
+            if (ordList.isEmpty()) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail("Order not found."));
             }
             Map<String, Object> ord = ordList.get(0);
+            Long actualOrderId = Long.parseLong(ord.get("id").toString());
             Long outletId = Long.parseLong(ord.get("outlet_id").toString());
             Long productId = Long.parseLong(ord.get("product_id").toString());
             int quantity = Integer.parseInt(ord.get("quantity").toString());
@@ -808,7 +858,7 @@ public class PsrController {
             // 1. Update order status to REQUESTED_FROM_SUPPLIER, binding with target supplier
             jdbcTemplate.update(
                     "UPDATE psr_orders SET status = 'REQUESTED_FROM_SUPPLIER', sales_officer_id = ?, supplier_id = ?, supplier_name = ?, updated_at = NOW() WHERE id = ?",
-                    soId, targetSupplierId, targetSupplierName, id
+                    soId, targetSupplierId, targetSupplierName, actualOrderId
             );
 
             // 2. Insert or update entry in outlet_requisitions (tagged with supplier_id)
@@ -1412,6 +1462,62 @@ public class PsrController {
             supplierProfileRepository.findAll().forEach(sp -> supplierNames.put(sp.getId(), sp.getBusinessName()));
         } catch (Exception ignored) {}
 
+        // --- BATCH QUERY OPTIMIZATION: 0 database queries inside the loop ---
+        Map<Long, Integer> outletCountByPsr = new HashMap<>();
+        Map<String, Integer> outletCountByRoute = new HashMap<>();
+        try {
+            jdbcTemplate.query("SELECT assigned_psr_id, COUNT(*) as cnt FROM outlets WHERE assigned_psr_id IS NOT NULL GROUP BY assigned_psr_id",
+                    rs -> { outletCountByPsr.put(rs.getLong("assigned_psr_id"), rs.getInt("cnt")); });
+            jdbcTemplate.query("SELECT LOWER(TRIM(sub_route)) as route, COUNT(*) as cnt FROM outlets WHERE sub_route IS NOT NULL AND TRIM(sub_route) != '' GROUP BY LOWER(TRIM(sub_route))",
+                    rs -> { outletCountByRoute.put(rs.getString("route"), rs.getInt("cnt")); });
+        } catch (Exception ignored) {}
+
+        Map<Long, Integer> activeOrdersByPsr = new HashMap<>();
+        try {
+            jdbcTemplate.query("SELECT psr_id, COUNT(*) as cnt FROM psr_orders WHERE status IN ('SUBMITTED_TO_SO', 'DRAFT') GROUP BY psr_id",
+                    rs -> { activeOrdersByPsr.put(rs.getLong("psr_id"), rs.getInt("cnt")); });
+        } catch (Exception ignored) {}
+
+        Map<Long, Integer> pendingRefundsByPsr = new HashMap<>();
+        try {
+            jdbcTemplate.query("SELECT psr_id, COUNT(*) as cnt FROM psr_refund_requests WHERE status = 'SUBMITTED_TO_SO' GROUP BY psr_id",
+                    rs -> { pendingRefundsByPsr.put(rs.getLong("psr_id"), rs.getInt("cnt")); });
+        } catch (Exception ignored) {}
+
+        Map<Long, Integer> totalAchievedByPsr = new HashMap<>();
+        Map<String, Integer> achievedByPsrProduct = new HashMap<>();
+        Map<String, Integer> achievedByPsrCatBrand = new HashMap<>();
+        Map<String, Integer> achievedByPsrCat = new HashMap<>();
+        Map<String, Integer> achievedByPsrBrand = new HashMap<>();
+
+        try {
+            jdbcTemplate.query(
+                    "SELECT o.psr_id, o.product_id, LOWER(COALESCE(p.category, '')) as cat, LOWER(COALESCE(p.brand, '')) as br, COALESCE(SUM(o.quantity), 0) as qty " +
+                    "FROM psr_orders o LEFT JOIN products p ON o.product_id = p.product_id " +
+                    "WHERE o.status != 'CANCELLED' " +
+                    "GROUP BY o.psr_id, o.product_id, LOWER(COALESCE(p.category, '')), LOWER(COALESCE(p.brand, ''))",
+                    rs -> {
+                        long psrId = rs.getLong("psr_id");
+                        long prodId = rs.getLong("product_id");
+                        String cat = rs.getString("cat");
+                        String br = rs.getString("br");
+                        int qty = rs.getInt("qty");
+
+                        totalAchievedByPsr.merge(psrId, qty, Integer::sum);
+                        achievedByPsrProduct.merge(psrId + "_" + prodId, qty, Integer::sum);
+                        if (!cat.isEmpty() && !br.isEmpty()) {
+                            achievedByPsrCatBrand.merge(psrId + "_" + cat + "_" + br, qty, Integer::sum);
+                        }
+                        if (!cat.isEmpty()) {
+                            achievedByPsrCat.merge(psrId + "_" + cat, qty, Integer::sum);
+                        }
+                        if (!br.isEmpty()) {
+                            achievedByPsrBrand.merge(psrId + "_" + br, qty, Integer::sum);
+                        }
+                    }
+            );
+        } catch (Exception ignored) {}
+
         for (PreSalesOfficer psr : psrs) {
             if (psr.getSalesOfficerId() != null && soMap.containsKey(psr.getSalesOfficerId())) {
                 SalesOfficer so = soMap.get(psr.getSalesOfficerId());
@@ -1426,117 +1532,67 @@ public class PsrController {
             }
             psr.setSupplierName(supplierNames.getOrDefault(psr.getSupplierId(), "Dhaka Metropolitan & Central Beverage Logistics Hub"));
 
-            try {
-                Integer outletCount = jdbcTemplate.queryForObject(
-                        "SELECT COUNT(*) FROM outlets WHERE assigned_psr_id = ? OR sub_route = ?",
-                        Integer.class,
-                        psr.getId(), psr.getSubRoute()
-                );
-                psr.setOutletCount(outletCount != null ? outletCount : 0);
-            } catch (Exception ignored) {
-                psr.setOutletCount(0);
+            // Instant in-memory lookups
+            int oCnt = outletCountByPsr.getOrDefault(psr.getId(), 0);
+            if (oCnt == 0 && psr.getSubRoute() != null) {
+                oCnt = outletCountByRoute.getOrDefault(psr.getSubRoute().trim().toLowerCase(), 0);
             }
-
-            try {
-                Integer activeOrd = jdbcTemplate.queryForObject(
-                        "SELECT COUNT(*) FROM psr_orders WHERE psr_id = ? AND status IN ('SUBMITTED_TO_SO', 'DRAFT')",
-                        Integer.class,
-                        psr.getId()
-                );
-                psr.setActiveOrdersCount(activeOrd != null ? activeOrd : 0);
-            } catch (Exception ignored) {
-                psr.setActiveOrdersCount(0);
-            }
-
-            try {
-                Integer pendingRef = jdbcTemplate.queryForObject(
-                        "SELECT COUNT(*) FROM psr_refund_requests WHERE psr_id = ? AND status = 'SUBMITTED_TO_SO'",
-                        Integer.class,
-                        psr.getId()
-                );
-                psr.setPendingRefundsCount(pendingRef != null ? pendingRef : 0);
-            } catch (Exception ignored) {
-                psr.setPendingRefundsCount(0);
-            }
+            psr.setOutletCount(oCnt);
+            psr.setActiveOrdersCount(activeOrdersByPsr.getOrDefault(psr.getId(), 0));
+            psr.setPendingRefundsCount(pendingRefundsByPsr.getOrDefault(psr.getId(), 0));
 
             // Calculate achieved target cases (supports multiple categories & brands)
-            try {
-                int totalAchieved = 0;
-                boolean hasMultiTargets = false;
+            int totalAchieved = 0;
+            boolean hasMultiTargets = false;
 
-                if (psr.getTargetsJson() != null && !psr.getTargetsJson().trim().isEmpty()) {
-                    try {
-                        List<Map<String, Object>> targetsList = objectMapper.readValue(
-                                psr.getTargetsJson(),
-                                new TypeReference<List<Map<String, Object>>>() {}
-                        );
-                        if (targetsList != null && !targetsList.isEmpty()) {
-                            hasMultiTargets = true;
-                            for (Map<String, Object> t : targetsList) {
-                                Long prodId = t.containsKey("product_id") && t.get("product_id") != null && !t.get("product_id").toString().isEmpty()
-                                        ? Long.parseLong(t.get("product_id").toString()) : null;
-                                String cat = t.containsKey("category") && t.get("category") != null ? t.get("category").toString().trim() : null;
-                                String brand = t.containsKey("brand") && t.get("brand") != null ? t.get("brand").toString().trim() : null;
+            if (psr.getTargetsJson() != null && !psr.getTargetsJson().trim().isEmpty()) {
+                try {
+                    List<Map<String, Object>> targetsList = objectMapper.readValue(
+                            psr.getTargetsJson(),
+                            new TypeReference<List<Map<String, Object>>>() {}
+                    );
+                    if (targetsList != null && !targetsList.isEmpty()) {
+                        hasMultiTargets = true;
+                        for (Map<String, Object> t : targetsList) {
+                            Long prodId = t.containsKey("product_id") && t.get("product_id") != null && !t.get("product_id").toString().isEmpty()
+                                    ? Long.parseLong(t.get("product_id").toString()) : null;
+                            String cat = t.containsKey("category") && t.get("category") != null ? t.get("category").toString().trim().toLowerCase() : null;
+                            String brand = t.containsKey("brand") && t.get("brand") != null ? t.get("brand").toString().trim().toLowerCase() : null;
 
-                                Integer tAchieved = 0;
-                                if (prodId != null && prodId > 0) {
-                                    tAchieved = jdbcTemplate.queryForObject(
-                                            "SELECT COALESCE(SUM(quantity), 0) FROM psr_orders WHERE psr_id = ? AND product_id = ? AND status != 'CANCELLED'",
-                                            Integer.class, psr.getId(), prodId
-                                    );
-                                } else if (cat != null && !cat.isEmpty() && brand != null && !brand.isEmpty()) {
-                                    tAchieved = jdbcTemplate.queryForObject(
-                                            "SELECT COALESCE(SUM(o.quantity), 0) FROM psr_orders o JOIN products p ON o.product_id = p.product_id WHERE o.psr_id = ? AND LOWER(p.category) = LOWER(?) AND LOWER(p.brand) = LOWER(?) AND o.status != 'CANCELLED'",
-                                            Integer.class, psr.getId(), cat, brand
-                                    );
-                                } else if (cat != null && !cat.isEmpty()) {
-                                    tAchieved = jdbcTemplate.queryForObject(
-                                            "SELECT COALESCE(SUM(o.quantity), 0) FROM psr_orders o JOIN products p ON o.product_id = p.product_id WHERE o.psr_id = ? AND LOWER(p.category) = LOWER(?) AND o.status != 'CANCELLED'",
-                                            Integer.class, psr.getId(), cat
-                                    );
-                                } else if (brand != null && !brand.isEmpty()) {
-                                    tAchieved = jdbcTemplate.queryForObject(
-                                            "SELECT COALESCE(SUM(o.quantity), 0) FROM psr_orders o JOIN products p ON o.product_id = p.product_id WHERE o.psr_id = ? AND LOWER(p.brand) = LOWER(?) AND o.status != 'CANCELLED'",
-                                            Integer.class, psr.getId(), brand
-                                    );
-                                }
-
-                                int itemAchieved = (tAchieved != null ? tAchieved : 0);
-                                t.put("achieved_cases", itemAchieved);
-                                int tTarget = t.containsKey("target_cases") && t.get("target_cases") != null ? Integer.parseInt(t.get("target_cases").toString()) : 0;
-                                int tPct = tTarget > 0 ? Math.min(100, Math.round((itemAchieved * 100.0f) / tTarget)) : 0;
-                                t.put("achievement_percentage", tPct);
-                                totalAchieved += itemAchieved;
+                            Integer tAchieved = 0;
+                            if (prodId != null && prodId > 0) {
+                                tAchieved = achievedByPsrProduct.getOrDefault(psr.getId() + "_" + prodId, 0);
+                            } else if (cat != null && !cat.isEmpty() && brand != null && !brand.isEmpty()) {
+                                tAchieved = achievedByPsrCatBrand.getOrDefault(psr.getId() + "_" + cat + "_" + brand, 0);
+                            } else if (cat != null && !cat.isEmpty()) {
+                                tAchieved = achievedByPsrCat.getOrDefault(psr.getId() + "_" + cat, 0);
+                            } else if (brand != null && !brand.isEmpty()) {
+                                tAchieved = achievedByPsrBrand.getOrDefault(psr.getId() + "_" + brand, 0);
                             }
-                            psr.setTargets(targetsList);
+
+                            int itemAchieved = (tAchieved != null ? tAchieved : 0);
+                            t.put("achieved_cases", itemAchieved);
+                            int tTarget = t.containsKey("target_cases") && t.get("target_cases") != null ? Integer.parseInt(t.get("target_cases").toString()) : 0;
+                            int tPct = tTarget > 0 ? Math.min(100, Math.round((itemAchieved * 100.0f) / tTarget)) : 0;
+                            t.put("achievement_percentage", tPct);
+                            totalAchieved += itemAchieved;
                         }
-                    } catch (Exception e) {
-                        psr.setTargets(Collections.emptyList());
+                        psr.setTargets(targetsList);
                     }
+                } catch (Exception e) {
+                    psr.setTargets(Collections.emptyList());
                 }
-
-                if (!hasMultiTargets) {
-                    Integer achieved = 0;
-                    if (psr.getTargetProductId() != null && psr.getTargetProductId() > 0) {
-                        achieved = jdbcTemplate.queryForObject(
-                                "SELECT COALESCE(SUM(quantity), 0) FROM psr_orders WHERE psr_id = ? AND product_id = ? AND status != 'CANCELLED'",
-                                Integer.class,
-                                psr.getId(), psr.getTargetProductId()
-                        );
-                    } else {
-                        achieved = jdbcTemplate.queryForObject(
-                                "SELECT COALESCE(SUM(quantity), 0) FROM psr_orders WHERE psr_id = ? AND status != 'CANCELLED'",
-                                Integer.class,
-                                psr.getId()
-                        );
-                    }
-                    totalAchieved = (achieved != null ? achieved : 0);
-                }
-
-                psr.setAchievedCases(totalAchieved);
-            } catch (Exception ignored) {
-                psr.setAchievedCases(0);
             }
+
+            if (!hasMultiTargets) {
+                if (psr.getTargetProductId() != null && psr.getTargetProductId() > 0) {
+                    totalAchieved = achievedByPsrProduct.getOrDefault(psr.getId() + "_" + psr.getTargetProductId(), 0);
+                } else {
+                    totalAchieved = totalAchievedByPsr.getOrDefault(psr.getId(), 0);
+                }
+            }
+
+            psr.setAchievedCases(totalAchieved);
         }
     }
 

@@ -938,9 +938,17 @@ export const SuperadminCommercialLogs: React.FC = () => {
     const total_shelf_stock_units = filteredLedger.reduce((acc, row) => acc + (Number(row.current_shelf_stock) || 0), 0);
 
     const total_supplier_gross_profit = filteredSupplierTxns.reduce((acc, txn) => {
-      const type = String(txn.transaction_type || txn.type || '');
-      if (type.toUpperCase() === 'OUTLET_SALE') {
+      const type = String(txn.transaction_type || txn.type || '').toUpperCase();
+      if (type === 'OUTLET_SALE' || type === 'SO_BUFFER_SALE' || type === 'WHOLESALE_SALE') {
         return acc + (Number(txn.profit_amount ?? txn.supplier_profit_earned) || 0);
+      }
+      return acc;
+    }, 0);
+
+    const total_wholesale_revenue = filteredSupplierTxns.reduce((acc, txn) => {
+      const type = String(txn.transaction_type || txn.type || '').toUpperCase();
+      if (type === 'SO_BUFFER_SALE' || type === 'OUTLET_SALE' || type === 'WHOLESALE_SALE') {
+        return acc + (Number(txn.amount) || 0);
       }
       return acc;
     }, 0);
@@ -954,7 +962,7 @@ export const SuperadminCommercialLogs: React.FC = () => {
     return {
       total_retail_revenue: total_retail_revenue || (summary?.total_retail_revenue ?? 0),
       total_outlet_gross_profit: total_outlet_gross_profit || (summary?.total_outlet_gross_profit ?? 0),
-      total_wholesale_revenue: summary?.total_wholesale_revenue ?? 0,
+      total_wholesale_revenue: total_wholesale_revenue || (summary?.total_wholesale_revenue ?? 0),
       total_supplier_gross_profit: total_supplier_gross_profit || (summary?.total_supplier_gross_profit ?? 0),
       total_units_sold: total_units_sold || (summary?.total_units_sold ?? 0),
       total_shelf_stock_units: total_shelf_stock_units || (summary?.total_shelf_stock_units ?? 0),
@@ -1269,8 +1277,8 @@ export const SuperadminCommercialLogs: React.FC = () => {
           <div className="text-xl font-black text-slate-900 tracking-tight font-oswald">
             ৳{computedSummary ? computedSummary.total_supplier_gross_profit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
           </div>
-          <div className="flex items-center gap-1 mt-1 text-[10px] text-slate-500">
-            <Users className="w-3 h-3 text-indigo-500 shrink-0" />
+          <div className="flex items-center justify-between mt-1 text-[10px] text-slate-500 font-medium">
+            <span className="text-indigo-600 font-bold">৳{formatMoney(computedSummary?.total_wholesale_revenue ?? 0)} rev</span>
             <span>Across {computedSummary?.active_suppliers_count ?? suppliers.length} suppliers</span>
           </div>
         </div>
