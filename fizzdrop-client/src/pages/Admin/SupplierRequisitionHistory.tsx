@@ -113,6 +113,68 @@ export const SupplierRequisitionHistory: React.FC<SupplierRequisitionHistoryProp
   const [returnTicket, setReturnTicket] = useState<RequisitionRecord | null>(null);
   const [selectedDispatch, setSelectedDispatch] = useState<OutletDispatchRecord | null>(null);
 
+  const normalizeDispatch = (od: any): OutletDispatchRecord => {
+    if (!od) return {} as any;
+    const reqCode = (od.requisition_code ?? od.REQUISITION_CODE ?? od.order_code ?? od.ORDER_CODE ?? od.code ?? `DSP-${od.id ?? od.ID ?? '0'}`).toString();
+    return {
+      id: Number(od.id ?? od.ID ?? 0),
+      requisition_code: reqCode,
+      outlet_id: od.outlet_id ?? od.OUTLET_ID,
+      outlet_name: (od.outlet_name ?? od.OUTLET_NAME ?? '').toString(),
+      branch_name: (od.branch_name ?? od.BRANCH_NAME ?? '').toString(),
+      area: (od.area ?? od.AREA ?? '').toString(),
+      franchise_name: (od.franchise_name ?? od.FRANCHISE_NAME ?? '').toString(),
+      product_id: od.product_id ?? od.PRODUCT_ID,
+      product_name: (od.product_name ?? od.PRODUCT_NAME ?? '').toString(),
+      category: (od.category ?? od.CATEGORY ?? '').toString(),
+      quantity: Number(od.quantity ?? od.QUANTITY ?? 0),
+      unit_price: Number(od.unit_price ?? od.UNIT_PRICE ?? 0),
+      total_amount: Number(od.total_amount ?? od.TOTAL_AMOUNT ?? 0),
+      status: (od.status ?? od.STATUS ?? 'PENDING').toString().toUpperCase(),
+      urgency: (od.urgency ?? od.URGENCY ?? 'NORMAL').toString().toUpperCase(),
+      is_so_purchase: Boolean(od.is_so_purchase ?? od.IS_SO_PURCHASE),
+      sales_officer_name: (od.sales_officer_name ?? od.SALES_OFFICER_NAME ?? '').toString(),
+      sales_officer_code: (od.sales_officer_code ?? od.SALES_OFFICER_CODE ?? '').toString(),
+      outlet_remarks: (od.outlet_remarks ?? od.OUTLET_REMARKS ?? '').toString(),
+      created_date: od.created_date ?? od.CREATED_DATE,
+      updated_date: od.updated_date ?? od.UPDATED_DATE,
+    };
+  };
+
+  const normalizeRequisition = (r: any): RequisitionRecord => {
+    if (!r) return {} as any;
+    const reqCode = (r.requisition_code ?? r.REQUISITION_CODE ?? `REQ-${r.id ?? r.ID ?? '0'}`).toString();
+    return {
+      id: Number(r.id ?? r.ID ?? 0),
+      requisition_code: reqCode,
+      supplier_id: Number(r.supplier_id ?? r.SUPPLIER_ID ?? 0),
+      supplier_name: (r.supplier_name ?? r.SUPPLIER_NAME ?? '').toString(),
+      district_id: Number(r.district_id ?? r.DISTRICT_ID ?? 0),
+      district_name: (r.district_name ?? r.DISTRICT_NAME ?? '').toString(),
+      division_name: (r.division_name ?? r.DIVISION_NAME ?? '').toString(),
+      depot_address: (r.depot_address ?? r.DEPOT_ADDRESS ?? '').toString(),
+      phone_number: (r.phone_number ?? r.PHONE_NUMBER ?? '').toString(),
+      trade_license_number: (r.trade_license_number ?? r.TRADE_LICENSE_NUMBER ?? '').toString(),
+      status: (r.status ?? r.STATUS ?? 'PENDING').toString().toUpperCase(),
+      urgency: (r.urgency ?? r.URGENCY ?? 'NORMAL').toString().toUpperCase(),
+      payment_method: (r.payment_method ?? r.PAYMENT_METHOD ?? '').toString(),
+      payment_status: (r.payment_status ?? r.PAYMENT_STATUS ?? '').toString(),
+      payment_reference: (r.payment_reference ?? r.PAYMENT_REFERENCE ?? '').toString(),
+      invoice_number: (r.invoice_number ?? r.INVOICE_NUMBER ?? '').toString(),
+      total_amount: Number(r.total_amount ?? r.TOTAL_AMOUNT ?? 0),
+      fulfilled_amount: Number(r.fulfilled_amount ?? r.FULFILLED_AMOUNT ?? 0),
+      refund_amount: Number(r.refund_amount ?? r.REFUND_AMOUNT ?? 0),
+      due_amount: Number(r.due_amount ?? r.DUE_AMOUNT ?? 0),
+      supplier_remarks: (r.supplier_remarks ?? r.SUPPLIER_REMARKS ?? '').toString(),
+      admin_remarks: (r.admin_remarks ?? r.ADMIN_REMARKS ?? '').toString(),
+      created_at: r.created_at ?? r.CREATED_AT ?? '',
+      updated_at: r.updated_at ?? r.UPDATED_AT ?? '',
+      items: r.items ?? r.ITEMS ?? [],
+      total_requested_cases: Number(r.total_requested_cases ?? r.TOTAL_REQUESTED_CASES ?? 0),
+      total_approved_cases: Number(r.total_approved_cases ?? r.TOTAL_APPROVED_CASES ?? 0),
+    };
+  };
+
   const fetchRequisitions = async () => {
     try {
       const res = await fetch(`http://localhost:8080/api/v1/supplier/requisitions?userId=${user?.user_id || 4}`, {
@@ -120,7 +182,7 @@ export const SupplierRequisitionHistory: React.FC<SupplierRequisitionHistoryProp
       });
       if (res.ok) {
         const data = await res.json();
-        setRequisitions(Array.isArray(data) ? data : []);
+        setRequisitions(Array.isArray(data) ? data.map(normalizeRequisition) : []);
       }
     } catch (err) {
       console.error('Error fetching requisitions:', err);
@@ -134,7 +196,7 @@ export const SupplierRequisitionHistory: React.FC<SupplierRequisitionHistoryProp
       });
       if (res.ok) {
         const data = await res.json();
-        setOutletDispatches(Array.isArray(data) ? data : []);
+        setOutletDispatches(Array.isArray(data) ? data.map(normalizeDispatch) : []);
       }
     } catch (err) {
       console.error('Error fetching outlet dispatches:', err);
@@ -245,29 +307,38 @@ export const SupplierRequisitionHistory: React.FC<SupplierRequisitionHistoryProp
   };
 
   const filtered = requisitions.filter((r) => {
-    const term = search.toLowerCase();
-    const matchesSearch =
-      r.requisition_code.toLowerCase().includes(term) ||
-      (r.district_name || '').toLowerCase().includes(term) ||
-      (r.supplier_remarks || '').toLowerCase().includes(term);
-    const matchesStatus = statusFilter === 'ALL' || r.status.toUpperCase() === statusFilter.toUpperCase();
+    const term = (search || '').toLowerCase();
+    const reqCode = (r?.requisition_code || '').toLowerCase();
+    const distName = (r?.district_name || '').toLowerCase();
+    const supRemarks = (r?.supplier_remarks || '').toLowerCase();
+    const matchesSearch = reqCode.includes(term) || distName.includes(term) || supRemarks.includes(term);
+    const rStatus = (r?.status || '').toUpperCase();
+    const matchesStatus = statusFilter === 'ALL' || rStatus === statusFilter.toUpperCase();
     return matchesSearch && matchesStatus;
   });
 
   const filteredDispatches = outletDispatches.filter((od) => {
-    const term = search.toLowerCase();
+    const term = (search || '').toLowerCase();
+    const reqCode = (od?.requisition_code || '').toLowerCase();
+    const outletName = (od?.outlet_name || '').toLowerCase();
+    const branchName = (od?.branch_name || '').toLowerCase();
+    const area = (od?.area || '').toLowerCase();
+    const prodName = (od?.product_name || '').toLowerCase();
+    const soName = (od?.sales_officer_name || '').toLowerCase();
     const matchesSearch =
-      od.requisition_code.toLowerCase().includes(term) ||
-      (od.outlet_name || '').toLowerCase().includes(term) ||
-      (od.branch_name || '').toLowerCase().includes(term) ||
-      (od.area || '').toLowerCase().includes(term) ||
-      (od.product_name || '').toLowerCase().includes(term) ||
-      (od.sales_officer_name || '').toLowerCase().includes(term);
+      reqCode.includes(term) ||
+      outletName.includes(term) ||
+      branchName.includes(term) ||
+      area.includes(term) ||
+      prodName.includes(term) ||
+      soName.includes(term);
+    const odStatus = (od?.status || '').toUpperCase();
+    const targetStatus = (statusFilter || '').toUpperCase();
     const matchesStatus =
-      statusFilter === 'ALL' ||
-      (statusFilter === 'DISPATCHED' && (od.status === 'DISPATCHED' || od.status === 'COMPLETED')) ||
-      (statusFilter === 'PENDING' && od.status === 'PENDING') ||
-      od.status.toUpperCase() === statusFilter.toUpperCase();
+      targetStatus === 'ALL' ||
+      (targetStatus === 'DISPATCHED' && (odStatus === 'DISPATCHED' || odStatus === 'COMPLETED' || odStatus === 'DELIVERED')) ||
+      (targetStatus === 'PENDING' && odStatus === 'PENDING') ||
+      odStatus === targetStatus;
     return matchesSearch && matchesStatus;
   });
 
@@ -560,7 +631,7 @@ export const SupplierRequisitionHistory: React.FC<SupplierRequisitionHistoryProp
                         {req.requisition_code}
                       </span>
                       <span className="text-[10px] text-slate-400 font-mono">
-                        {req.invoice_number || `INV-${req.requisition_code.replace('REQ-', '')}`}
+                        {req.invoice_number || `INV-${(req.requisition_code || '').replace('REQ-', '')}`}
                       </span>
                     </td>
 

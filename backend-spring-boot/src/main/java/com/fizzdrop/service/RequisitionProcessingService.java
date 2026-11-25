@@ -287,24 +287,8 @@ public class RequisitionProcessingService {
             return profile;
         }
 
-        // Fallback only if table is completely empty
-        District dhaka = districtRepository.findByNameIgnoreCase("Dhaka").orElse(null);
-        Long defaultDistrictId = (dhaka != null) ? dhaka.getId() : 1L;
-        SupplierProfile newProf = new SupplierProfile(
-                userId != null ? userId : 1L,
-                "Dhaka Metropolitan & Central Beverage Logistics Hub",
-                defaultDistrictId,
-                "Road 11, Plot 42, Gulshan-1 Logistics Depot, Dhaka",
-                "+8801700112233"
-        );
-        newProf.setDivisionName("Dhaka");
-        newProf.setCoveredDistrictIds("1,2,3");
-        newProf.setTradeLicenseNumber("TRD-DHK-2026-9812");
-        newProf.setIsVerified(true);
-        newProf.setWalletBalance(new java.math.BigDecimal("100000.00"));
-        SupplierProfile saved = supplierProfileRepository.save(newProf);
-        enrichProfile(saved);
-        return saved;
+        // Table is empty - do not seed mock data so testing starts from clean slate
+        return null;
     }
 
     @Transactional
@@ -461,15 +445,22 @@ public class RequisitionProcessingService {
                     ? dto.getPassword().trim() 
                     : "Password123!");
             newUser.setRoleId(3L); // Supplier role
-            newUser.setBranchId(1L);
+            newUser.setBranchId(null);
             newUser.setCreatedDate(LocalDateTime.now());
             newUser.setUpdatedDate(LocalDateTime.now());
             return userRepository.save(newUser);
         });
 
+        if (user.getRoleId() == null || !user.getRoleId().equals(3L)) {
+            user.setRoleId(3L);
+        }
+        user.setBranchId(null);
+
         if (dto.getPassword() != null && !dto.getPassword().trim().isEmpty()) {
             user.setPasswordHash(dto.getPassword().trim());
             user.setUpdatedDate(LocalDateTime.now());
+            userRepository.save(user);
+        } else {
             userRepository.save(user);
         }
 

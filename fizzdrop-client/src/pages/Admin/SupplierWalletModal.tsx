@@ -164,6 +164,14 @@ export const SupplierWalletModal: React.FC<SupplierWalletModalProps> = ({
 
       if (ok && data && typeof data === 'object') {
         setWalletData(data);
+        if (data.wallet_balance !== undefined) {
+          const bal = Number(data.wallet_balance);
+          localStorage.setItem('fizzdrop_supplier_wallet', bal.toString());
+          if (onWalletUpdated) {
+            onWalletUpdated(bal);
+          }
+          window.dispatchEvent(new CustomEvent('fizzdrop_wallet_updated', { detail: { balance: bal } }));
+        }
         setBankName(data.bank_name || '');
         setBankAccountNumber(data.bank_account_number || '');
         setBankAccountName(data.bank_account_name || '');
@@ -242,9 +250,11 @@ export const SupplierWalletModal: React.FC<SupplierWalletModalProps> = ({
       setSuccessMsg(`৳${numAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} successfully added to your Commercial Wallet!`);
       const newBalance = Number(result.wallet_balance !== undefined ? result.wallet_balance : ((walletData?.wallet_balance || initialBalance || 0) + numAmount));
       setWalletData((prev) => prev ? { ...prev, wallet_balance: newBalance } : { supplier_id: supplierId || 1, business_name: '', wallet_balance: newBalance });
+      localStorage.setItem('fizzdrop_supplier_wallet', newBalance.toString());
       if (onWalletUpdated) {
         onWalletUpdated(newBalance);
       }
+      window.dispatchEvent(new CustomEvent('fizzdrop_wallet_updated', { detail: { balance: newBalance } }));
       setTimeout(() => {
         fetchWallet();
       }, 500);
@@ -299,6 +309,16 @@ export const SupplierWalletModal: React.FC<SupplierWalletModalProps> = ({
     }
   };
 
+  const handleModalClose = () => {
+    if (walletData && walletData.wallet_balance !== undefined) {
+      const bal = Number(walletData.wallet_balance);
+      localStorage.setItem('fizzdrop_supplier_wallet', bal.toString());
+      if (onWalletUpdated) onWalletUpdated(bal);
+      window.dispatchEvent(new CustomEvent('fizzdrop_wallet_updated', { detail: { balance: bal } }));
+    }
+    onClose();
+  };
+
   if (!isOpen) return null;
 
   const currentBalance = Number(walletData?.wallet_balance !== undefined ? walletData.wallet_balance : (initialBalance || 0));
@@ -309,7 +329,7 @@ export const SupplierWalletModal: React.FC<SupplierWalletModalProps> = ({
         {/* Modal Header */}
         <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 relative">
           <button
-            onClick={onClose}
+            onClick={handleModalClose}
             className="absolute top-5 right-5 p-2 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-colors"
           >
             <X className="w-5 h-5" />
@@ -617,7 +637,7 @@ export const SupplierWalletModal: React.FC<SupplierWalletModalProps> = ({
               <div className="pt-2 flex justify-end gap-3">
                 <button
                   type="button"
-                  onClick={onClose}
+                  onClick={handleModalClose}
                   className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition"
                 >
                   Cancel
@@ -729,7 +749,7 @@ export const SupplierWalletModal: React.FC<SupplierWalletModalProps> = ({
               <div className="pt-2 flex justify-end gap-3">
                 <button
                   type="button"
-                  onClick={onClose}
+                  onClick={handleModalClose}
                   className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition"
                 >
                   Close
@@ -977,7 +997,9 @@ export const SupplierWalletModal: React.FC<SupplierWalletModalProps> = ({
           const newBal = Number(data.wallet_balance !== undefined ? data.wallet_balance : ((walletData?.wallet_balance || initialBalance || 0) + numAmount));
           setSuccessMsg(`৳${numAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} successfully added to your Commercial Wallet via Stripe!`);
           setWalletData((prev) => prev ? { ...prev, wallet_balance: newBal } : { supplier_id: supplierId || 1, business_name: '', wallet_balance: newBal });
+          localStorage.setItem('fizzdrop_supplier_wallet', newBal.toString());
           if (onWalletUpdated) onWalletUpdated(newBal);
+          window.dispatchEvent(new CustomEvent('fizzdrop_wallet_updated', { detail: { balance: newBal } }));
           setTimeout(() => {
             fetchWallet();
           }, 600);

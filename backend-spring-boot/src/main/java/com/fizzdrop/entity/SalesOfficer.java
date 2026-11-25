@@ -48,7 +48,8 @@ public class SalesOfficer {
     @Column(name = "status", nullable = false, length = 30)
     private String status = "ACTIVE";
 
-    @Column(name = "notes", columnDefinition = "TEXT")
+    @Lob
+    @Column(name = "notes")
     private String notes;
 
     @Column(name = "monthly_target", nullable = false)

@@ -54,12 +54,13 @@ public class MerchandiseProduct {
     @JsonAlias({"stock_quantity", "stockQuantity", "stock", "total_stock"})
     private Integer stockQuantity = 0;
 
-    @Column(name = "description", columnDefinition = "TEXT")
+    @Lob
+    @Column(name = "description")
     @JsonProperty("description")
     private String description;
 
     @Lob
-    @Column(name = "image_url", columnDefinition = "LONGTEXT")
+    @Column(name = "image_url")
     @JsonProperty("image_url")
     @JsonAlias({"image_url", "imageUrl", "image"})
     private String imageUrl;

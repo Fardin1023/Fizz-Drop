@@ -1728,6 +1728,13 @@ public class PsrController {
             subRoutes.addAll(psrRoutes);
         } catch (Exception ignored) {}
 
+        // Ensure default sub-routes are assigned to Dhanmondi outlets if not set
+        try {
+            jdbcTemplate.update("UPDATE outlets SET sub_route = 'Dhanmondi-Circle North Route' WHERE district_id = 1 AND sub_route IS NULL AND outlet_id IN (1, 2, 3, 4, 5)");
+            jdbcTemplate.update("UPDATE outlets SET sub_route = 'Dhanmondi-Avenue South Route' WHERE district_id = 1 AND sub_route IS NULL AND outlet_id IN (6, 7, 8, 9, 10)");
+            jdbcTemplate.update("UPDATE outlets SET sub_route = 'Dhanmondi-Commercial Center Route' WHERE district_id = 1 AND sub_route IS NULL AND outlet_id IN (11, 12, 13, 14, 15)");
+        } catch (Exception ignored) {}
+
         // 2. Fetch all shops in this territory/area
         List<Map<String, Object>> allShops;
         if (!area.isEmpty()) {
@@ -1756,13 +1763,20 @@ public class PsrController {
             );
         }
 
-        // 3. Filter shops under the requested subRoute if provided
+        // 3. Normalize all shop keys to lowercase (for Oracle compatibility) and filter subroute shops
+        List<Map<String, Object>> normalizedAllShops = new ArrayList<>();
         List<Map<String, Object>> subrouteShops = new ArrayList<>();
-        if (subRoute != null && !subRoute.trim().isEmpty()) {
-            for (Map<String, Object> shop : allShops) {
-                String sr = (String) shop.get("sub_route");
-                if (subRoute.equalsIgnoreCase(sr)) {
-                    subrouteShops.add(shop);
+        for (Map<String, Object> shop : allShops) {
+            Map<String, Object> norm = new LinkedHashMap<>();
+            for (Map.Entry<String, Object> entry : shop.entrySet()) {
+                norm.put(entry.getKey() != null ? entry.getKey().toLowerCase() : "", entry.getValue());
+            }
+            normalizedAllShops.add(norm);
+
+            if (subRoute != null && !subRoute.trim().isEmpty()) {
+                Object srObj = norm.get("sub_route");
+                if (srObj != null && subRoute.equalsIgnoreCase(srObj.toString().trim())) {
+                    subrouteShops.add(norm);
                 }
             }
         }
@@ -1770,7 +1784,7 @@ public class PsrController {
         Map<String, Object> resp = new HashMap<>();
         resp.put("assigned_area", area);
         resp.put("sub_routes", new ArrayList<>(subRoutes));
-        resp.put("all_shops", allShops);
+        resp.put("all_shops", normalizedAllShops);
         resp.put("subroute_shops", subrouteShops);
         return ResponseEntity.ok(resp);
     }
@@ -1885,7 +1899,7 @@ public class PsrController {
                 );
                 for (Long outId : outletIds) {
                     jdbcTemplate.update(
-                            "UPDATE outlets SET assigned_psr_id = ?, sub_route = ?, updated_date = NOW() WHERE outlet_id = ?",
+                            "UPDATE outlets SET assigned_psr_id = ?, sub_route = ?, updated_date = CURRENT_TIMESTAMP WHERE outlet_id = ?",
                             psr.getId(), subRoute, outId
                     );
                 }

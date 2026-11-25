@@ -58,7 +58,7 @@ public class SupplierTransaction {
     private String paymentMethod;
 
     @Lob
-    @Column(name = "description", columnDefinition = "TEXT")
+    @Column(name = "description")
     @JsonProperty("description")
     private String description;
 

@@ -60,12 +60,16 @@ interface SupplierRequestStockProps {
   onRequisitionSubmitted?: (requisitionCode: string) => void;
   onNavigateToSettings?: () => void;
   initialProductId?: number;
+  walletBalanceProp?: number;
+  onWalletUpdated?: (newBalance: number) => void;
 }
 
 export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
   onRequisitionSubmitted,
   onNavigateToSettings,
   initialProductId,
+  walletBalanceProp,
+  onWalletUpdated: propOnWalletUpdated,
 }) => {
   const { token, user } = useAuth();
   const [profile, setProfile] = useState<any>(null);
@@ -103,6 +107,55 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
   const [isWalletModalOpen, setIsWalletModalOpen] = useState<boolean>(false);
   const [isStripeModalOpen, setIsStripeModalOpen] = useState<boolean>(false);
   const [pendingStripeReq, setPendingStripeReq] = useState<any>(null);
+
+  const refreshWallet = async () => {
+    try {
+      const res = await fetch(`http://localhost:8080/api/v1/supplier/wallet?userId=${user?.user_id || 4}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.wallet_balance !== undefined) {
+          const bal = Number(data.wallet_balance);
+          setWalletBalance(bal);
+          localStorage.setItem('fizzdrop_supplier_wallet', bal.toString());
+          if (propOnWalletUpdated) propOnWalletUpdated(bal);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to refresh wallet in SupplierRequestStock:', e);
+    }
+  };
+
+  useEffect(() => {
+    if (walletBalanceProp !== undefined) {
+      setWalletBalance(walletBalanceProp);
+    }
+  }, [walletBalanceProp]);
+
+  useEffect(() => {
+    const handleWalletUpdated = (e: any) => {
+      if (e.detail?.balance !== undefined) {
+        setWalletBalance(Number(e.detail.balance));
+      } else {
+        refreshWallet();
+      }
+    };
+    window.addEventListener('fizzdrop_wallet_updated', handleWalletUpdated);
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'fizzdrop_supplier_wallet' && e.newValue) {
+        const val = parseFloat(e.newValue);
+        if (!isNaN(val)) setWalletBalance(val);
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      window.removeEventListener('fizzdrop_wallet_updated', handleWalletUpdated);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, []);
 
   const fetchData = async () => {
     setLoading(true);
@@ -264,6 +317,7 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
       const remainingBal = Math.max(0, walletBalance - grandTotal);
       setWalletBalance(remainingBal);
       localStorage.setItem('fizzdrop_supplier_wallet', remainingBal.toString());
+      window.dispatchEvent(new CustomEvent('fizzdrop_wallet_updated', { detail: { balance: remainingBal } }));
       setQuantities({});
       setRemarks('');
       setUrgency('NORMAL');
@@ -713,7 +767,10 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
                 </div>
                 <button
                   type="button"
-                  onClick={() => setIsWalletModalOpen(true)}
+                  onClick={() => {
+                    refreshWallet();
+                    setIsWalletModalOpen(true);
+                  }}
                   className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition cursor-pointer shadow-2xs"
                 >
                   + Top Up
@@ -859,7 +916,10 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
       {/* Commercial Wallet & Top-up Modal */}
       <SupplierWalletModal
         isOpen={isWalletModalOpen}
-        onClose={() => setIsWalletModalOpen(false)}
+        onClose={() => {
+          setIsWalletModalOpen(false);
+          refreshWallet();
+        }}
         initialBalance={walletBalance}
         supplierId={profile?.id || 1}
         userId={user?.user_id}
@@ -867,6 +927,8 @@ export const SupplierRequestStock: React.FC<SupplierRequestStockProps> = ({
         onWalletUpdated={(newBal) => {
           setWalletBalance(newBal);
           localStorage.setItem('fizzdrop_supplier_wallet', newBal.toString());
+          if (propOnWalletUpdated) propOnWalletUpdated(newBal);
+          window.dispatchEvent(new CustomEvent('fizzdrop_wallet_updated', { detail: { balance: newBal } }));
         }}
       />
 

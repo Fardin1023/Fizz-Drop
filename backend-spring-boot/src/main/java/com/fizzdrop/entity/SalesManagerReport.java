@@ -64,15 +64,18 @@ public class SalesManagerReport {
     @JsonProperty("active_orders_count")
     private Integer activeOrdersCount = 0;
 
-    @Column(name = "product_demands_json", columnDefinition = "TEXT")
+    @Lob
+    @Column(name = "product_demands_json")
     @JsonProperty("product_demands_json")
     private String productDemandsJson;
 
-    @Column(name = "so_activities_json", columnDefinition = "TEXT")
+    @Lob
+    @Column(name = "so_activities_json")
     @JsonProperty("so_activities_json")
     private String soActivitiesJson;
 
-    @Column(name = "notes", columnDefinition = "TEXT")
+    @Lob
+    @Column(name = "notes")
     private String notes;
 
     @Column(name = "status", nullable = false, length = 50)

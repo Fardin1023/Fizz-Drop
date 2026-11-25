@@ -96,7 +96,10 @@ export const AdminDashboard: React.FC = () => {
   const fetchWallet = async () => {
     try {
       const targetUserId = user?.user_id || 4;
-      const res = await fetch(`http://localhost:8080/api/v1/supplier/wallet?userId=${targetUserId}`);
+      const token = localStorage.getItem('fizzdrop_token');
+      const res = await fetch(`http://localhost:8080/api/v1/supplier/wallet?userId=${targetUserId}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       if (res.ok) {
         const text = await res.text();
         try {
@@ -117,9 +120,18 @@ export const AdminDashboard: React.FC = () => {
 
   useEffect(() => {
     fetchWallet();
-  }, [user]);
+  }, [user, activeTab]);
 
   useEffect(() => {
+    const handleWalletUpdated = (e: any) => {
+      if (e.detail?.balance !== undefined) {
+        setWalletBalance(Number(e.detail.balance));
+      } else {
+        fetchWallet();
+      }
+    };
+    window.addEventListener('fizzdrop_wallet_updated', handleWalletUpdated);
+
     const handleStorage = (e: StorageEvent) => {
       if (e.key === 'fizzdrop_supplier_wallet_refresh') {
         fetchWallet();
@@ -149,6 +161,7 @@ export const AdminDashboard: React.FC = () => {
     } catch (ignored) {}
 
     return () => {
+      window.removeEventListener('fizzdrop_wallet_updated', handleWalletUpdated);
       window.removeEventListener('storage', handleStorage);
       if (channel) channel.close();
     };
@@ -323,7 +336,10 @@ export const AdminDashboard: React.FC = () => {
 
               {/* Supplier Commercial Wallet Pill */}
               <button
-                onClick={() => setIsWalletModalOpen(true)}
+                onClick={() => {
+                  fetchWallet();
+                  setIsWalletModalOpen(true);
+                }}
                 className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#FFE8BD] hover:bg-[#FADECF] border border-[#BFC8C5] text-[#15221C] font-bold text-xs transition-all cursor-pointer shadow-2xs group"
                 title="Manage Commercial Wallet, Banking Accounts & Top-up"
               >
@@ -422,8 +438,14 @@ export const AdminDashboard: React.FC = () => {
           {activeTab === 'request' && (
             <SupplierRequestStock
               initialProductId={selectedProductId}
+              walletBalanceProp={walletBalance}
+              onWalletUpdated={(newBal) => {
+                setWalletBalance(newBal);
+                localStorage.setItem('fizzdrop_supplier_wallet', newBal.toString());
+              }}
               onRequisitionSubmitted={() => {
                 setSelectedProductId(undefined);
+                fetchWallet();
                 setActiveTab('history');
               }}
               onNavigateToSettings={() => setActiveTab('profile')}
@@ -455,7 +477,10 @@ export const AdminDashboard: React.FC = () => {
       {/* Commercial Digital Wallet & Top-up Modal */}
       <SupplierWalletModal
         isOpen={isWalletModalOpen}
-        onClose={() => setIsWalletModalOpen(false)}
+        onClose={() => {
+          setIsWalletModalOpen(false);
+          fetchWallet();
+        }}
         initialBalance={walletBalance}
         userId={user?.user_id}
         onWalletUpdated={(newBal) => {

@@ -39,13 +39,13 @@ public class StockRequisition {
     private String urgency = "NORMAL"; // LOW, NORMAL, CRITICAL
 
     @Lob
-    @Column(name = "supplier_remarks", columnDefinition = "TEXT")
+    @Column(name = "supplier_remarks")
     @JsonProperty("supplier_remarks")
     @JsonAlias({"supplier_remarks", "supplierRemarks"})
     private String supplierRemarks;
 
     @Lob
-    @Column(name = "admin_remarks", columnDefinition = "TEXT")
+    @Column(name = "admin_remarks")
     @JsonProperty("admin_remarks")
     @JsonAlias({"admin_remarks", "adminRemarks"})
     private String adminRemarks;

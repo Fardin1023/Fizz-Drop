@@ -457,7 +457,7 @@ public class DataInitializer {
 
             // Map Sales Officers to their district ASM
             try {
-                jdbcTemplate.execute("UPDATE sales_officers so JOIN area_sales_managers asm ON so.district_id = asm.district_id SET so.asm_id = asm.id WHERE so.asm_id IS NULL");
+                jdbcTemplate.execute("UPDATE sales_officers SET asm_id = (SELECT asm.id FROM area_sales_managers asm WHERE asm.district_id = sales_officers.district_id) WHERE asm_id IS NULL");
             } catch (Exception ignored) {}
 
             // Seed initial retail sales in outlet_sales if empty

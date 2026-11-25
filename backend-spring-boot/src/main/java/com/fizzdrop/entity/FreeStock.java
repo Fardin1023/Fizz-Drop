@@ -97,7 +97,7 @@ public class FreeStock {
     private String status = "ACTIVE"; // ACTIVE, DEPLETED, EXPIRED
 
     @Lob
-    @Column(name = "notes", columnDefinition = "TEXT")
+    @Column(name = "notes")
     @JsonProperty("notes")
     private String notes;
 

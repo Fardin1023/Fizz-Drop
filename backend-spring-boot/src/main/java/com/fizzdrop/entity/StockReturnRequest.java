@@ -56,13 +56,13 @@ public class StockReturnRequest {
     private String reasonCategory; // "DAMAGED_IN_TRANSIT", "DEFECTIVE_SEAL", "WRONG_VARIANT", "NEAR_EXPIRY", "EXCESS_STOCK", "OTHER"
 
     @Lob
-    @Column(name = "reason_details", columnDefinition = "TEXT", nullable = false)
+    @Column(name = "reason_details", nullable = false)
     @JsonProperty("reason_details")
     @JsonAlias({"reason_details", "reasonDetails"})
     private String reasonDetails;
 
     @Lob
-    @Column(name = "admin_remarks", columnDefinition = "TEXT")
+    @Column(name = "admin_remarks")
     @JsonProperty("admin_remarks")
     @JsonAlias({"admin_remarks", "adminRemarks"})
     private String adminRemarks;

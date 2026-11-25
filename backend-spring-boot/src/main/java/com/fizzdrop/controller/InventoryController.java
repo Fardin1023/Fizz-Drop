@@ -1176,6 +1176,7 @@ public class InventoryController {
         List<Map<String, Object>> list;
         try {
             Long currentSupplierId = (sp != null) ? sp.getId() : -1L;
+            String supIdStr = "%" + currentSupplierId + "%";
             list = jdbcTemplate.queryForList(
                 "SELECT r.id, r.requisition_code, r.outlet_id, r.product_id, r.product_name, " +
                 "COALESCE(p.category, 'Beverages') AS category, " +
@@ -1186,18 +1187,43 @@ public class InventoryController {
                 "LEFT JOIN products p ON r.product_id = p.product_id " +
                 "LEFT JOIN psr_orders po ON r.requisition_code = po.order_code " +
                 "WHERE (COALESCE(r.supplier_id, po.supplier_id) = ? OR (r.supplier_id IS NULL AND po.supplier_id IS NULL AND r.sales_officer_id IN (" +
-                "    SELECT so.id FROM sales_officers so WHERE so.supplier_id = ? OR FIND_IN_SET(?, so.allocated_supplier_ids) > 0" +
+                "    SELECT so.id FROM sales_officers so WHERE so.supplier_id = ? OR so.allocated_supplier_ids LIKE ?" +
                 "))) " +
-                "ORDER BY r.created_date DESC LIMIT 100",
-                currentSupplierId, currentSupplierId, String.valueOf(currentSupplierId)
+                "ORDER BY r.created_date DESC FETCH FIRST 100 ROWS ONLY",
+                currentSupplierId, currentSupplierId, supIdStr
             );
         } catch (Exception e) {
-            return ResponseEntity.ok(Collections.emptyList());
+            try {
+                Long currentSupplierId = (sp != null) ? sp.getId() : -1L;
+                list = jdbcTemplate.queryForList(
+                    "SELECT r.id, r.requisition_code, r.outlet_id, r.product_id, r.product_name, " +
+                    "COALESCE(p.category, 'Beverages') AS category, " +
+                    "r.quantity, r.unit_price, r.total_amount, r.urgency, r.status, r.sales_officer_id, r.outlet_remarks, r.created_date, r.updated_date, " +
+                    "o.outlet_name, o.franchise_name, o.branch_name, o.city, o.area, o.sub_route, o.location_address, o.contact_phone, o.district_id " +
+                    "FROM outlet_requisitions r " +
+                    "LEFT JOIN outlets o ON r.outlet_id = o.outlet_id " +
+                    "LEFT JOIN products p ON r.product_id = p.product_id " +
+                    "LEFT JOIN psr_orders po ON r.requisition_code = po.order_code " +
+                    "ORDER BY r.created_date DESC FETCH FIRST 100 ROWS ONLY"
+                );
+            } catch (Exception ex) {
+                return ResponseEntity.ok(Collections.emptyList());
+            }
         }
 
         if (list.isEmpty()) {
             return ResponseEntity.ok(Collections.emptyList());
         }
+
+        List<Map<String, Object>> normalizedRawList = new ArrayList<>();
+        for (Map<String, Object> rawRow : list) {
+            Map<String, Object> norm = new LinkedHashMap<>();
+            for (Map.Entry<String, Object> e : rawRow.entrySet()) {
+                norm.put(e.getKey() != null ? e.getKey().toLowerCase() : "", e.getValue());
+            }
+            normalizedRawList.add(norm);
+        }
+        list = normalizedRawList;
 
         List<DistrictInventory> allDistInvs = districtInventoryRepository.findAll();
         Map<String, Integer> distStockMap = new HashMap<>();
@@ -1240,7 +1266,7 @@ public class InventoryController {
         List<Map<String, Object>> response = new ArrayList<>();
         for (Map<String, Object> row : list) {
             Map<String, Object> map = new HashMap<>(row);
-            Long prodId = ((Number) row.get("product_id")).longValue();
+            Long prodId = row.get("product_id") != null ? ((Number) row.get("product_id")).longValue() : 0L;
             String reqCode = row.get("requisition_code") != null ? row.get("requisition_code").toString() : "";
             boolean isSoPurchase = reqCode.startsWith("SO-REQ-") || row.get("outlet_id") == null;
             map.put("is_so_purchase", isSoPurchase);
@@ -1307,7 +1333,7 @@ public class InventoryController {
             map.put("so_purchased_stock", soPurchasedStock);
             map.put("so_has_purchased", soHasPurchased);
 
-            int reqQty = ((Number) row.get("quantity")).intValue();
+            int reqQty = row.get("quantity") != null ? ((Number) row.get("quantity")).intValue() : 0;
 
             // The supplier can dispatch products when either depot stock is available or SO has purchased buffer stock
             if (isSoPurchase) {

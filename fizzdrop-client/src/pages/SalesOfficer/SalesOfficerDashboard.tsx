@@ -683,15 +683,17 @@ export const SalesOfficerDashboard: React.FC = () => {
       if (res.ok) {
         const data = await res.json();
         setAvailableSubRoutes(data.sub_routes || []);
-        setAllAreaShops(data.all_shops || []);
-        setSubRouteShops(data.subroute_shops || []);
+        const rawAll = (data.all_shops || []).map(normalizeShopItem).filter((s: any) => s && s.outlet_id > 0);
+        const rawSub = (data.subroute_shops || []).map(normalizeShopItem).filter((s: any) => s && s.outlet_id > 0);
+        setAllAreaShops(rawAll);
+        setSubRouteShops(rawSub);
 
-        const preSelected = (data.all_shops || [])
+        const preSelected = rawAll
           .filter((s: any) => s.assigned_psr_id === psr.id)
           .map((s: any) => s.outlet_id);
 
-        if (preSelected.length === 0 && data.subroute_shops && data.subroute_shops.length > 0) {
-          setAllotSelectedOutletIds(data.subroute_shops.map((s: any) => s.outlet_id));
+        if (preSelected.length === 0 && rawSub.length > 0) {
+          setAllotSelectedOutletIds(rawSub.map((s: any) => s.outlet_id));
         } else {
           setAllotSelectedOutletIds(preSelected);
         }
@@ -701,6 +703,41 @@ export const SalesOfficerDashboard: React.FC = () => {
     } finally {
       setAllotLoadingShops(false);
     }
+  };
+
+  const normalizeShopItem = (s: any) => {
+    if (!s) return null;
+    const rawId = s.outlet_id ?? s.OUTLET_ID;
+    const outlet_id = rawId ? Number(rawId) : 0;
+    const franchise_name = (s.franchise_name ?? s.FRANCHISE_NAME ?? '').trim();
+    const branch_name = (s.branch_name ?? s.BRANCH_NAME ?? s.outlet_name ?? s.OUTLET_NAME ?? '').trim();
+    const outlet_name = (s.outlet_name ?? s.OUTLET_NAME ?? branch_name).trim();
+    const address = (s.address ?? s.ADDRESS ?? s.location_address ?? s.LOCATION_ADDRESS ?? 'Address on file').trim();
+    const sub_route = (s.sub_route ?? s.SUB_ROUTE ?? '').trim();
+    const assigned_psr_id = s.assigned_psr_id ?? s.ASSIGNED_PSR_ID ?? null;
+    return {
+      ...s,
+      outlet_id,
+      franchise_name,
+      branch_name: branch_name || outlet_name || (outlet_id ? `Shop #${outlet_id}` : 'Store Outlet'),
+      outlet_name: outlet_name || branch_name || (outlet_id ? `Shop #${outlet_id}` : 'Store Outlet'),
+      address,
+      sub_route,
+      assigned_psr_id,
+    };
+  };
+
+  const getShopDisplayName = (shop: any) => {
+    if (!shop) return '';
+    const brand = (shop.franchise_name ?? shop.FRANCHISE_NAME ?? '').trim();
+    const branch = (shop.branch_name ?? shop.BRANCH_NAME ?? shop.outlet_name ?? shop.OUTLET_NAME ?? '').trim();
+    if (brand && branch && !branch.toLowerCase().includes(brand.toLowerCase())) {
+      return `${brand} — ${branch}`;
+    }
+    if (branch) return branch;
+    if (brand) return brand;
+    const id = shop.outlet_id ?? shop.OUTLET_ID;
+    return id ? `Shop #${id}` : 'Store Outlet';
   };
 
   const handleSubRouteChange = async (selectedRoute: string) => {
@@ -715,11 +752,12 @@ export const SalesOfficerDashboard: React.FC = () => {
       const res = await fetch(`http://localhost:8080/api/v1/psr/subroute-shops?salesOfficerId=${soId}&subRoute=${encodeURIComponent(selectedRoute)}`);
       if (res.ok) {
         const data = await res.json();
-        setSubRouteShops(data.subroute_shops || []);
+        const rawSub = (data.subroute_shops || []).map(normalizeShopItem).filter((s: any) => s && s.outlet_id > 0);
+        setSubRouteShops(rawSub);
         // Automatically check shops that belong to this sub-route
-        if (data.subroute_shops && data.subroute_shops.length > 0) {
-          const ids = data.subroute_shops.map((s: any) => s.outlet_id);
-          setAllotSelectedOutletIds((prev) => Array.from(new Set([...prev, ...ids])));
+        if (rawSub.length > 0) {
+          const ids = rawSub.map((s: any) => s.outlet_id);
+          setAllotSelectedOutletIds((prev) => Array.from(new Set([...prev.filter(Boolean), ...ids])));
         }
       }
     } catch (err) {
@@ -738,9 +776,11 @@ export const SalesOfficerDashboard: React.FC = () => {
   };
 
   const toggleOutletAllotment = (outletId: number) => {
-    setAllotSelectedOutletIds((prev) =>
-      prev.includes(outletId) ? prev.filter((id) => id !== outletId) : [...prev, outletId]
-    );
+    if (!outletId) return;
+    setAllotSelectedOutletIds((prev) => {
+      const cleanPrev = prev.filter((id) => typeof id === 'number' && id > 0);
+      return cleanPrev.includes(outletId) ? cleanPrev.filter((id) => id !== outletId) : [...cleanPrev, outletId];
+    });
   };
 
   const handleAllotSubmit = async (e: React.FormEvent) => {
@@ -3630,7 +3670,10 @@ export const SalesOfficerDashboard: React.FC = () => {
                       type="button"
                       onClick={() => {
                         const targetList = subRouteShops.length > 0 ? subRouteShops : allAreaShops;
-                        setAllotSelectedOutletIds(targetList.map((s: any) => s.outlet_id));
+                        const ids = targetList
+                          .map((s: any) => s.outlet_id ?? s.OUTLET_ID)
+                          .filter((id: any) => typeof id === 'number' && id > 0);
+                        setAllotSelectedOutletIds(ids);
                       }}
                       className="px-2 py-0.5 rounded bg-orange-50 text-orange-700 font-bold hover:bg-orange-100 transition cursor-pointer"
                     >
@@ -3660,10 +3703,13 @@ export const SalesOfficerDashboard: React.FC = () => {
                   {subRouteShops.length > 0 && (
                     <optgroup label={`📍 Shops Under '${allotSubRoute}' (${subRouteShops.length})`}>
                       {subRouteShops.map((shop) => {
-                        const isSelected = allotSelectedOutletIds.includes(shop.outlet_id);
+                        const sId = shop.outlet_id ?? shop.OUTLET_ID;
+                        const isSelected = allotSelectedOutletIds.includes(sId);
+                        const displayName = getShopDisplayName(shop);
+                        const addressText = shop.address || shop.ADDRESS || 'Address on file';
                         return (
-                          <option key={`sub-${shop.outlet_id}`} value={shop.outlet_id}>
-                            {isSelected ? '✓ ' : '+ '} {shop.franchise_name || ''} {shop.branch_name || shop.outlet_name} — {shop.address}
+                          <option key={`sub-${sId}`} value={sId}>
+                            {isSelected ? '✓ ' : '+ '} {displayName} — {addressText}
                           </option>
                         );
                       })}
@@ -3671,12 +3717,18 @@ export const SalesOfficerDashboard: React.FC = () => {
                   )}
                   <optgroup label={`🏢 Other Shops in ${officer?.assigned_area || 'Territory'} (${allAreaShops.length})`}>
                     {allAreaShops
-                      .filter((shop) => !subRouteShops.some((s) => s.outlet_id === shop.outlet_id))
+                      .filter((shop) => {
+                        const sId = shop.outlet_id ?? shop.OUTLET_ID;
+                        return !subRouteShops.some((s) => (s.outlet_id ?? s.OUTLET_ID) === sId);
+                      })
                       .map((shop) => {
-                        const isSelected = allotSelectedOutletIds.includes(shop.outlet_id);
+                        const sId = shop.outlet_id ?? shop.OUTLET_ID;
+                        const isSelected = allotSelectedOutletIds.includes(sId);
+                        const displayName = getShopDisplayName(shop);
+                        const addressText = shop.address || shop.ADDRESS || 'Address on file';
                         return (
-                          <option key={`area-${shop.outlet_id}`} value={shop.outlet_id}>
-                            {isSelected ? '✓ ' : '+ '} {shop.franchise_name || ''} {shop.branch_name || shop.outlet_name} — {shop.address}
+                          <option key={`area-${sId}`} value={sId}>
+                            {isSelected ? '✓ ' : '+ '} {displayName} — {addressText}
                           </option>
                         );
                       })}
@@ -3693,10 +3745,13 @@ export const SalesOfficerDashboard: React.FC = () => {
                     <>
                       {/* Sub-route shops shown first */}
                       {subRouteShops.map((shop) => {
-                        const isSelected = allotSelectedOutletIds.includes(shop.outlet_id);
+                        const sId = shop.outlet_id ?? shop.OUTLET_ID;
+                        const isSelected = allotSelectedOutletIds.includes(sId);
+                        const displayName = getShopDisplayName(shop);
+                        const addressText = shop.address || shop.ADDRESS || 'Address on file';
                         return (
                           <label
-                            key={shop.outlet_id}
+                            key={`sub-chk-${sId}`}
                             className={`pt-1.5 first:pt-0 flex items-start gap-2.5 p-2 rounded-lg cursor-pointer transition ${
                               isSelected ? 'bg-orange-50/90 border border-orange-200' : 'hover:bg-white'
                             }`}
@@ -3704,20 +3759,19 @@ export const SalesOfficerDashboard: React.FC = () => {
                             <input
                               type="checkbox"
                               checked={isSelected}
-                              onChange={() => toggleOutletAllotment(shop.outlet_id)}
+                              onChange={() => toggleOutletAllotment(sId)}
                               className="mt-0.5 rounded text-orange-600 focus:ring-orange-500 cursor-pointer"
                             />
                             <div className="flex-1 min-w-0 text-xs">
                               <div className="flex items-center justify-between gap-1">
                                 <span className="font-bold text-slate-900 truncate">
-                                  {shop.franchise_name ? `${shop.franchise_name} — ` : ''}
-                                  {shop.branch_name || shop.outlet_name}
+                                  {displayName}
                                 </span>
                                 <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold bg-orange-100 text-orange-800 shrink-0">
                                   Sub-Route Shop
                                 </span>
                               </div>
-                              <p className="text-[11px] text-slate-500 truncate mt-0.5">{shop.address}</p>
+                              <p className="text-[11px] text-slate-500 truncate mt-0.5">{addressText}</p>
                             </div>
                           </label>
                         );
@@ -3725,12 +3779,18 @@ export const SalesOfficerDashboard: React.FC = () => {
 
                       {/* Other area shops */}
                       {allAreaShops
-                        .filter((shop) => !subRouteShops.some((s) => s.outlet_id === shop.outlet_id))
+                        .filter((shop) => {
+                          const sId = shop.outlet_id ?? shop.OUTLET_ID;
+                          return !subRouteShops.some((s) => (s.outlet_id ?? s.OUTLET_ID) === sId);
+                        })
                         .map((shop) => {
-                          const isSelected = allotSelectedOutletIds.includes(shop.outlet_id);
+                          const sId = shop.outlet_id ?? shop.OUTLET_ID;
+                          const isSelected = allotSelectedOutletIds.includes(sId);
+                          const displayName = getShopDisplayName(shop);
+                          const addressText = shop.address || shop.ADDRESS || 'Address on file';
                           return (
                             <label
-                              key={shop.outlet_id}
+                              key={`area-chk-${sId}`}
                               className={`pt-1.5 flex items-start gap-2.5 p-2 rounded-lg cursor-pointer transition ${
                                 isSelected ? 'bg-orange-50/90 border border-orange-200' : 'hover:bg-white'
                               }`}
@@ -3738,20 +3798,19 @@ export const SalesOfficerDashboard: React.FC = () => {
                               <input
                                 type="checkbox"
                                 checked={isSelected}
-                                onChange={() => toggleOutletAllotment(shop.outlet_id)}
+                                onChange={() => toggleOutletAllotment(sId)}
                                 className="mt-0.5 rounded text-orange-600 focus:ring-orange-500 cursor-pointer"
                               />
                               <div className="flex-1 min-w-0 text-xs">
                                 <div className="flex items-center justify-between gap-1">
                                   <span className="font-bold text-slate-900 truncate">
-                                    {shop.franchise_name ? `${shop.franchise_name} — ` : ''}
-                                    {shop.branch_name || shop.outlet_name}
+                                    {displayName}
                                   </span>
                                   <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-semibold bg-slate-100 text-slate-600 shrink-0">
                                     Area Shop
                                   </span>
                                 </div>
-                                <p className="text-[11px] text-slate-500 truncate mt-0.5">{shop.address}</p>
+                                <p className="text-[11px] text-slate-500 truncate mt-0.5">{addressText}</p>
                               </div>
                             </label>
                           );

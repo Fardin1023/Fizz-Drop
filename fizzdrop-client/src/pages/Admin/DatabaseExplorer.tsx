@@ -315,8 +315,10 @@ export const DatabaseExplorer: React.FC<DatabaseExplorerProps> = ({ onOpenQueryW
               if (countData.results && countData.results.length > 0) {
                 const total =
                   countData.results[0].total ??
+                  countData.results[0].TOTAL ??
                   countData.results[0]['COUNT(*)'] ??
                   countData.results[0]['count(*)'] ??
+                  Object.values(countData.results[0])[0] ??
                   0;
                 setTotalRows(Number(total));
               } else {
@@ -662,7 +664,7 @@ export const DatabaseExplorer: React.FC<DatabaseExplorerProps> = ({ onOpenQueryW
                     </span>
                   </div>
                   <span className="font-mono text-[10px] text-slate-500 block mt-1">
-                    Live Engine: Aiven Cloud MySQL 8.4.11 • InnoDB • UTF8MB4
+                    Live Engine: Oracle Database 23ai Free • High-Throughput Hikari Pool
                   </span>
                 </div>
 
@@ -954,8 +956,8 @@ export const DatabaseExplorer: React.FC<DatabaseExplorerProps> = ({ onOpenQueryW
                     Complete Database Dictionary ({tables.length} tables)
                   </span>
                 </div>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 font-bold">
-                  Aiven Cloud
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">
+                  Oracle 23ai
                 </span>
               </div>
               <p className="text-[11px] text-slate-500">

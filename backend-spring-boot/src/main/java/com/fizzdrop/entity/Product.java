@@ -71,7 +71,7 @@ public class Product {
     private LocalDate expiryDate;
 
     @Lob
-    @Column(name = "image_url", columnDefinition = "LONGTEXT")
+    @Column(name = "image_url")
     @JsonProperty("image_url")
     @JsonAlias({"image_url", "imageUrl"})
     private String imageUrl;

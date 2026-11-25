@@ -50,7 +50,8 @@ public class PreSalesOfficer {
     @Column(name = "status", nullable = false, length = 30)
     private String status = "ACTIVE";
 
-    @Column(name = "notes", columnDefinition = "TEXT")
+    @Lob
+    @Column(name = "notes")
     private String notes;
 
     @Column(name = "user_id")
@@ -78,7 +79,8 @@ public class PreSalesOfficer {
     @JsonAlias({"target_notes", "targetNotes"})
     private String targetNotes;
 
-    @Column(name = "targets_json", columnDefinition = "TEXT")
+    @Lob
+    @Column(name = "targets_json")
     @JsonProperty("targets_json")
     @JsonAlias({"targets_json", "targetsJson"})
     private String targetsJson;

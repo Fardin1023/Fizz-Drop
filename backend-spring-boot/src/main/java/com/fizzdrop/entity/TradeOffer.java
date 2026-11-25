@@ -68,7 +68,7 @@ public class TradeOffer {
     private String freeItemType = "BEVERAGE"; // "BEVERAGE" or "MERCHANDISE"
 
     @Lob
-    @Column(name = "description", columnDefinition = "TEXT")
+    @Column(name = "description")
     @JsonProperty("description")
     private String description;
 

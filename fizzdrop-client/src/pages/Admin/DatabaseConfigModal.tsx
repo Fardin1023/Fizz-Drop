@@ -21,6 +21,8 @@ export const DatabaseConfigModal: React.FC<DatabaseConfigModalProps> = ({
   const [testing, setTesting] = useState(false);
   const [feedback, setFeedback] = useState<{ success: boolean; msg: string } | null>(null);
 
+  const isOracle = dbStatus?.active_engine?.toLowerCase().includes('oracle') || dbStatus?.engine?.toLowerCase().includes('oracle');
+
   const fetchStatus = async () => {
     try {
       const res = await fetch('http://localhost:8080/api/db/status');
@@ -52,11 +54,11 @@ export const DatabaseConfigModal: React.FC<DatabaseConfigModalProps> = ({
     setFeedback(null);
 
     try {
-      // Test direct SQL ping
+      // Test direct SQL ping (compatible with Oracle and MySQL)
       const res = await fetch('http://localhost:8080/api/db/query', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sql: 'SELECT 1 AS ping;' }),
+        body: JSON.stringify({ sql: 'SELECT 1 AS ping FROM DUAL' }),
       });
 
       const data = await res.json();
@@ -184,13 +186,13 @@ export const DatabaseConfigModal: React.FC<DatabaseConfigModalProps> = ({
 
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                MySQL Password
+                {isOracle ? 'Oracle Password' : 'MySQL Password'}
               </label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter MySQL password"
+                placeholder={isOracle ? 'Enter Oracle password (e.g. FizzDrop123#)' : 'Enter MySQL password'}
                 className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:border-cyan-500 focus:bg-white text-xs text-slate-900 font-mono outline-none placeholder-slate-400"
               />
             </div>

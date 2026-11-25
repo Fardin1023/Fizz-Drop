@@ -28,7 +28,7 @@ public class AppNotification {
     private String title;
 
     @Lob
-    @Column(name = "message", columnDefinition = "TEXT")
+    @Column(name = "message")
     @JsonProperty("message")
     private String message;
 

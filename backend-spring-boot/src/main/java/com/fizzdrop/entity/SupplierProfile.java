@@ -37,7 +37,7 @@ public class SupplierProfile {
     private Long primaryDistrictId;
 
     @Lob
-    @Column(name = "depot_address", columnDefinition = "TEXT")
+    @Column(name = "depot_address")
     @JsonProperty("depot_address")
     @JsonAlias({"depot_address", "depotAddress"})
     private String depotAddress;
@@ -72,7 +72,7 @@ public class SupplierProfile {
     @JsonAlias({"mobile_banking_number", "mobileBankingNumber"})
     private String mobileBankingNumber;
 
-    @Column(name = "wallet_balance", precision = 15, scale = 2, columnDefinition = "DECIMAL(15,2) DEFAULT 0.00")
+    @Column(name = "wallet_balance", precision = 15, scale = 2)
     @JsonProperty("wallet_balance")
     @JsonAlias({"wallet_balance", "walletBalance"})
     private BigDecimal walletBalance = BigDecimal.ZERO;
@@ -101,7 +101,7 @@ public class SupplierProfile {
     private String coveredDistrictIds;
 
     @Lob
-    @Column(name = "allocated_areas", columnDefinition = "TEXT")
+    @Column(name = "allocated_areas")
     @JsonProperty("allocated_areas")
     @JsonAlias({"allocated_areas", "allocatedAreas"})
     private String allocatedAreas;
@@ -112,7 +112,7 @@ public class SupplierProfile {
     private String vatRegistrationNo;
 
     @Lob
-    @Column(name = "application_document", columnDefinition = "LONGTEXT")
+    @Column(name = "application_document")
     @JsonProperty("application_document")
     @JsonAlias({"application_document", "applicationDocument"})
     private String applicationDocument;
@@ -128,7 +128,7 @@ public class SupplierProfile {
     private String applicationDocType;
 
     @Lob
-    @Column(name = "trade_license_document", columnDefinition = "LONGTEXT")
+    @Column(name = "trade_license_document")
     @JsonProperty("trade_license_document")
     @JsonAlias({"trade_license_document", "tradeLicenseDocument"})
     private String tradeLicenseDocument;
@@ -144,7 +144,7 @@ public class SupplierProfile {
     private String tradeLicenseDocType;
 
     @Lob
-    @Column(name = "tin_document", columnDefinition = "LONGTEXT")
+    @Column(name = "tin_document")
     @JsonProperty("tin_document")
     @JsonAlias({"tin_document", "tinDocument"})
     private String tinDocument;
@@ -160,7 +160,7 @@ public class SupplierProfile {
     private String tinDocType;
 
     @Lob
-    @Column(name = "bin_document", columnDefinition = "LONGTEXT")
+    @Column(name = "bin_document")
     @JsonProperty("bin_document")
     @JsonAlias({"bin_document", "binDocument"})
     private String binDocument;
@@ -176,7 +176,7 @@ public class SupplierProfile {
     private String binDocType;
 
     @Lob
-    @Column(name = "tds_vds_document", columnDefinition = "LONGTEXT")
+    @Column(name = "tds_vds_document")
     @JsonProperty("tds_vds_document")
     @JsonAlias({"tds_vds_document", "tdsVdsDocument"})
     private String tdsVdsDocument;

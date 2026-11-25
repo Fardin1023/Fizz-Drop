@@ -318,10 +318,10 @@ export const SuperadminDashboard: React.FC = () => {
       id: 'tables' as const,
       label: 'Database Entity Explorer',
       shortLabel: 'Entity Explorer',
-      desc: 'Aiven Cloud tables, schemas & records',
+      desc: 'Oracle Database 23ai tables, schemas & records',
       icon: Database,
       gradient: 'from-amber-600 via-orange-600 to-red-600',
-      badge: 'Aiven Cloud',
+      badge: 'Oracle 23ai',
     },
     {
       id: 'query' as const,
@@ -360,7 +360,7 @@ export const SuperadminDashboard: React.FC = () => {
           <div className="flex items-center gap-2 min-w-0">
             <Crown className="w-4 h-4 text-[#122018] shrink-0 animate-pulse" />
             <span className="font-semibold text-[#122018] truncate">
-              You are logged in as <strong className="text-[#0A140F] underline decoration-[#122018]/40">Superadmin</strong>. Master authority over catalog, Aiven Cloud database, and regional supplier allotments.
+              You are logged in as <strong className="text-[#0A140F] underline decoration-[#122018]/40">Superadmin</strong>. Master authority over catalog, Oracle Database, and regional supplier allotments.
             </span>
           </div>
           <Link
@@ -422,7 +422,13 @@ export const SuperadminDashboard: React.FC = () => {
                 title="Configure Database Connection"
               >
                 <span className={`w-1.5 h-1.5 rounded-full ${dbStatus?.connected ? 'bg-[#122018]' : 'bg-[#7A634B]'}`} />
-                <span>{dbStatus?.connected ? 'AIVEN: CONNECTED' : 'CONFIG DB'}</span>
+                <span>
+                  {dbStatus?.active_engine?.toLowerCase().includes('oracle')
+                    ? 'ORACLE: CONNECTED'
+                    : dbStatus?.connected
+                    ? 'AIVEN: CONNECTED'
+                    : 'CONFIG DB'}
+                </span>
                 <Settings className="w-3 h-3 opacity-80" />
               </button>
 

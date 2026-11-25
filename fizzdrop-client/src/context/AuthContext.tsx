@@ -134,20 +134,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         Boolean(data.pre_sales_officer || data.psr || u.pre_sales_officer)
       );
 
+      const isSupplier = (
+        u.role_id === 3 ||
+        u.roleId === 3 ||
+        (u.role_name || u.role || '').toLowerCase().includes('supplier') ||
+        (u.email || '').toLowerCase().includes('supplier')
+      );
+
       const isOutlet = (
-        u.role_id === 2 ||
-        u.roleId === 2 ||
-        (u.role_name || u.role || '').toLowerCase().includes('outlet') ||
-        Boolean(data.outlet || u.outlet)
+        !isSupplier && !isSuper && !isSalesOfficer && !isPsr && (
+          u.role_id === 2 ||
+          u.roleId === 2 ||
+          (u.role_name || u.role || '').toLowerCase().includes('outlet') ||
+          Boolean(data.outlet || u.outlet)
+        )
       );
 
       const normalizedUser: User = {
-        user_id: u.user_id ?? u.userId ?? (isSuper ? 99 : (isSalesOfficer ? 6 : (isPsr ? 7 : 4))),
+        user_id: u.user_id ?? u.userId ?? (isSuper ? 99 : (isSalesOfficer ? 6 : (isPsr ? 7 : (isOutlet ? 2 : 21)))),
         email: u.email,
         role_id: isSuper ? 4 : (isSalesOfficer ? 6 : (isPsr ? 7 : (isOutlet ? 2 : 3))),
         role_name: isSuper ? 'Superadmin' : (isSalesOfficer ? 'SalesOfficer' : (isPsr ? 'PreSalesOfficer' : (isOutlet ? 'Outlet' : 'Supplier'))),
-        branch_id: u.branch_id ?? u.branchId ?? (isOutlet ? 2 : null),
-        outlet: data.outlet || u.outlet,
+        branch_id: isOutlet ? (u.branch_id ?? u.branchId ?? 2) : null,
+        outlet: isOutlet ? (data.outlet || u.outlet) : undefined,
         sales_officer: data.sales_officer || u.sales_officer,
         pre_sales_officer: data.pre_sales_officer || data.psr || u.pre_sales_officer,
       };
@@ -325,13 +334,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       user?.email?.toLowerCase().includes('superadmin')
   );
 
-  const isOutlet = Boolean(
-    user?.role_id === 2 ||
-      user?.role_name?.toLowerCase().includes('outlet') ||
-      user?.email?.toLowerCase().includes('outlet') ||
-      Boolean(user?.outlet)
-  );
-
   const isSalesOfficer = Boolean(
     user?.role_id === 6 ||
       user?.role_name?.toLowerCase().includes('officer') ||
@@ -352,7 +354,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       user?.role_name?.toLowerCase().includes('supplier') ||
       user?.email?.toLowerCase().includes('supplier')) &&
       !isSalesOfficer &&
-      !isOutlet &&
+      !isSuperadmin &&
+      !isPsr
+  );
+
+  const isOutlet = Boolean(
+    (user?.role_id === 2 ||
+      user?.role_name?.toLowerCase().includes('outlet') ||
+      Boolean(user?.outlet)) &&
+      !isSupplier &&
+      !isSalesOfficer &&
+      !isSuperadmin &&
       !isPsr
   );
 

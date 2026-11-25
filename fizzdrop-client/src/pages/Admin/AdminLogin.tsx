@@ -66,6 +66,11 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onSuccess, requiredRole = 'any'
 
     if (res.success) {
       if (onSuccess) onSuccess();
+      if (email.toLowerCase().includes('superadmin')) {
+        navigate('/superadmin');
+      } else {
+        navigate('/supplier');
+      }
     } else {
       setError(res.error || 'Authentication failed. Please verify credentials.');
     }
@@ -76,9 +81,10 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onSuccess, requiredRole = 'any'
     setLoading(true);
     const res = await loginAsSuperadmin();
     setLoading(false);
-    if (res.success && onSuccess) {
-      onSuccess();
-    } else if (!res.success) {
+    if (res.success) {
+      if (onSuccess) onSuccess();
+      navigate('/superadmin');
+    } else {
       setError(res.error || 'Failed to authenticate Superadmin');
     }
   };
@@ -88,9 +94,10 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onSuccess, requiredRole = 'any'
     setLoading(true);
     const res = await loginAsSupplier();
     setLoading(false);
-    if (res.success && onSuccess) {
-      onSuccess();
-    } else if (!res.success) {
+    if (res.success) {
+      if (onSuccess) onSuccess();
+      navigate('/supplier');
+    } else {
       setError(res.error || 'Failed to authenticate Supplier');
     }
   };
@@ -244,17 +251,25 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onSuccess, requiredRole = 'any'
                         type="button"
                         onClick={async () => {
                           setEmail(supEmail);
-                          setPassword('Password123!');
+                          setPassword('Supplier123!');
                           setError(null);
                           setLoading(true);
-                          const res = await login(supEmail, 'Password123!');
+                          const res = await login(supEmail, 'Supplier123!');
                           setLoading(false);
-                          if (res.success && onSuccess) onSuccess();
-                          else if (!res.success) {
-                            // Try Supplier123!
-                            const res2 = await login(supEmail, 'Supplier123!');
-                            if (res2.success && onSuccess) onSuccess();
-                            else if (!res2.success) setError(res2.error || 'Failed to authenticate');
+                          if (res.success) {
+                            if (onSuccess) onSuccess();
+                            navigate('/supplier');
+                          } else {
+                            // Try Password123!
+                            setLoading(true);
+                            const res2 = await login(supEmail, 'Password123!');
+                            setLoading(false);
+                            if (res2.success) {
+                              if (onSuccess) onSuccess();
+                              navigate('/supplier');
+                            } else {
+                              setError(res2.error || 'Failed to authenticate Supplier');
+                            }
                           }
                         }}
                         disabled={loading}

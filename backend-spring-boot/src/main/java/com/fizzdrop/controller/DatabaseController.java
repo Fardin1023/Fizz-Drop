@@ -39,11 +39,19 @@ public class DatabaseController {
         Map<String, Object> status = new HashMap<>();
         try (Connection conn = dataSource.getConnection()) {
             DatabaseMetaData meta = conn.getMetaData();
+            String prodName = meta.getDatabaseProductName();
+            boolean isOracle = prodName != null && prodName.toLowerCase().contains("oracle");
+
             status.put("connected", true);
-            status.put("active_engine", meta.getDatabaseProductName() + " " + meta.getDatabaseProductVersion());
+            status.put("active_engine", prodName + " " + meta.getDatabaseProductVersion());
+            status.put("engine", isOracle ? "Oracle Database 23ai" : prodName);
             status.put("active_url", meta.getURL());
             status.put("active_user", meta.getUserName());
             status.put("active_driver", meta.getDriverName());
+            status.put("host", "localhost");
+            status.put("port", isOracle ? "1521" : "3306");
+            status.put("user", meta.getUserName());
+            status.put("database", isOracle ? "FREEPDB1" : "fizzdrop_db");
 
             // Test Local MySQL
             Map<String, Object> localStatus = new HashMap<>();
@@ -97,7 +105,8 @@ public class DatabaseController {
                     String tableName = rs.getString("TABLE_NAME");
                     // Exclude internal H2 metadata tables
                     if (tableName != null && !tableName.equalsIgnoreCase("branches")) {
-                        if ("PUBLIC".equalsIgnoreCase(schema) || schema == null || schema.isEmpty()) {
+                        String currentUsername = meta.getUserName();
+                        if ("PUBLIC".equalsIgnoreCase(schema) || schema == null || schema.isEmpty() || (currentUsername != null && currentUsername.equalsIgnoreCase(schema))) {
                             tables.add(tableName.toLowerCase());
                         }
                     }
@@ -126,9 +135,104 @@ public class DatabaseController {
         }
 
         try {
-            String lower = sql.toLowerCase();
-            if (lower.startsWith("select") || lower.startsWith("show") || lower.startsWith("describe") || lower.startsWith("desc")) {
-                List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql);
+            String cleanSql = sql.trim();
+            while (cleanSql.endsWith(";")) {
+                cleanSql = cleanSql.substring(0, cleanSql.length() - 1).trim();
+            }
+            String lower = cleanSql.toLowerCase();
+
+            // Handle DESCRIBE / DESC via DatabaseMetaData or Oracle Data Dictionary
+            if (lower.startsWith("describe ") || lower.startsWith("desc ")) {
+                String tableName = cleanSql.replaceAll("(?i)^(describe|desc)\\s+", "").replace("`", "").trim();
+                List<Map<String, Object>> colRows = new ArrayList<>();
+                try (Connection conn = dataSource.getConnection()) {
+                    DatabaseMetaData meta = conn.getMetaData();
+                    String prod = meta.getDatabaseProductName();
+                    boolean isOracle = prod != null && prod.toLowerCase().contains("oracle");
+
+                    if (isOracle) {
+                        String sqlCols = "SELECT column_name, data_type, data_length, data_precision, data_scale, nullable, identity_column " +
+                                         "FROM user_tab_cols WHERE table_name = UPPER(?) ORDER BY column_id";
+                        try (java.sql.PreparedStatement ps = conn.prepareStatement(sqlCols)) {
+                            ps.setString(1, tableName);
+                            try (ResultSet rs = ps.executeQuery()) {
+                                while (rs.next()) {
+                                    String cName = rs.getString("COLUMN_NAME");
+                                    String dType = rs.getString("DATA_TYPE");
+                                    int dLen = rs.getInt("DATA_LENGTH");
+                                    int dPrec = rs.getInt("DATA_PRECISION");
+                                    int dScale = rs.getInt("DATA_SCALE");
+                                    String isNull = rs.getString("NULLABLE");
+                                    String isIdent = rs.getString("IDENTITY_COLUMN");
+
+                                    String formattedType = dType;
+                                    if ("VARCHAR2".equalsIgnoreCase(dType) || "CHAR".equalsIgnoreCase(dType)) {
+                                        formattedType += "(" + dLen + ")";
+                                    } else if ("NUMBER".equalsIgnoreCase(dType) && dPrec > 0) {
+                                        formattedType += "(" + dPrec + (dScale > 0 ? "," + dScale : "") + ")";
+                                    }
+
+                                    Map<String, Object> colMap = new LinkedHashMap<>();
+                                    colMap.put("Field", cName.toLowerCase());
+                                    colMap.put("Type", formattedType);
+                                    colMap.put("Null", "Y".equalsIgnoreCase(isNull) ? "YES" : "NO");
+                                    colMap.put("Key", "YES".equalsIgnoreCase(isIdent) || "id".equalsIgnoreCase(cName) ? "PRI" : "");
+                                    colMap.put("Default", "");
+                                    colMap.put("Extra", "YES".equalsIgnoreCase(isIdent) ? "auto_increment" : "");
+                                    colRows.add(colMap);
+                                }
+                            }
+                        }
+                    } else {
+                        try (java.sql.Statement st = conn.createStatement();
+                             ResultSet rs = st.executeQuery("DESCRIBE `" + tableName + "`")) {
+                            while (rs.next()) {
+                                Map<String, Object> colMap = new LinkedHashMap<>();
+                                colMap.put("Field", rs.getString(1));
+                                colMap.put("Type", rs.getString(2));
+                                colMap.put("Null", rs.getString(3));
+                                colMap.put("Key", rs.getString(4));
+                                colMap.put("Default", rs.getString(5));
+                                colMap.put("Extra", rs.getString(6));
+                                colRows.add(colMap);
+                            }
+                        }
+                    }
+                }
+
+                long duration = System.currentTimeMillis() - startTime;
+                response.put("success", true);
+                response.put("results", colRows);
+                response.put("rowCount", colRows.size());
+                response.put("executionTimeMs", duration);
+                response.put("sql", sql);
+                return ResponseEntity.ok(response);
+            }
+
+            // Handle SHOW TABLES for universal database support
+            if (lower.equals("show tables") || lower.startsWith("show tables")) {
+                List<Map<String, Object>> tableRows = new ArrayList<>();
+                try (Connection conn = dataSource.getConnection()) {
+                    DatabaseMetaData meta = conn.getMetaData();
+                    try (ResultSet rs = meta.getTables(null, meta.getUserName(), "%", new String[]{"TABLE"})) {
+                        while (rs.next()) {
+                            Map<String, Object> tr = new HashMap<>();
+                            tr.put("Tables_in_database", rs.getString("TABLE_NAME"));
+                            tableRows.add(tr);
+                        }
+                    }
+                }
+                long duration = System.currentTimeMillis() - startTime;
+                response.put("success", true);
+                response.put("results", tableRows);
+                response.put("rowCount", tableRows.size());
+                response.put("executionTimeMs", duration);
+                response.put("sql", sql);
+                return ResponseEntity.ok(response);
+            }
+
+            if (lower.startsWith("select") || lower.startsWith("show")) {
+                List<Map<String, Object>> rows = jdbcTemplate.queryForList(cleanSql);
                 long duration = System.currentTimeMillis() - startTime;
                 
                 response.put("success", true);
@@ -138,7 +242,7 @@ public class DatabaseController {
                 response.put("sql", sql);
                 return ResponseEntity.ok(response);
             } else {
-                int affectedRows = jdbcTemplate.update(sql);
+                int affectedRows = jdbcTemplate.update(cleanSql);
                 long duration = System.currentTimeMillis() - startTime;
 
                 response.put("success", true);

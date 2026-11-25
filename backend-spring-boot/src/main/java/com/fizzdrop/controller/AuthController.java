@@ -128,7 +128,7 @@ public class AuthController {
             Long roleId = isSuper ? 4L : (isSalesOfficer ? 6L : (isOutlet ? 2L : 3L));
             String roleName = isSuper ? "Superadmin" : (isSalesOfficer ? "SalesOfficer" : (isOutlet ? "Outlet" : "Supplier"));
             String token = "jwt-" + (isSalesOfficer ? "so-" : (isOutlet ? "outlet-" : "")) + u.getUserId() + "-" + UUID.randomUUID();
-            AuthResponse res = new AuthResponse(token, u.getUserId(), u.getEmail(), roleId, roleName, u.getBranchId() != null ? u.getBranchId() : 1L);
+            AuthResponse res = new AuthResponse(token, u.getUserId(), u.getEmail(), roleId, roleName, isOutlet ? (u.getBranchId() != null ? u.getBranchId() : 1L) : null);
 
             if (isSalesOfficer) {
                 salesOfficerRepository.findByUserId(u.getUserId())
@@ -137,7 +137,7 @@ public class AuthController {
                             supplierProfileRepository.findById(so.getSupplierId()).ifPresent(sup -> so.setSupplierName(sup.getBusinessName()));
                             res.setSalesOfficer(so);
                         });
-            } else if (u.getBranchId() != null) {
+            } else if (isOutlet && u.getBranchId() != null) {
                 outletRepository.findById(u.getBranchId()).ifPresent(res::setOutlet);
             }
             return ResponseEntity.ok(Map.of("success", true, "token", res.getToken(), "user", res));
@@ -403,10 +403,10 @@ public class AuthController {
                         boolean isSalesOfficer = (u.getRoleId() != null && u.getRoleId() == 6L) || u.getEmail().contains(".so@") || u.getEmail().contains("officer");
                         Long roleId = isSuper ? 4L : (isSalesOfficer ? 6L : (isOutlet ? 2L : 3L));
                         String roleName = isSuper ? "Superadmin" : (isSalesOfficer ? "SalesOfficer" : (isOutlet ? "Outlet" : "Supplier"));
-                        AuthResponse res = new AuthResponse(token, u.getUserId(), u.getEmail(), roleId, roleName, u.getBranchId() != null ? u.getBranchId() : 1L);
+                        AuthResponse res = new AuthResponse(token, u.getUserId(), u.getEmail(), roleId, roleName, isOutlet ? (u.getBranchId() != null ? u.getBranchId() : 1L) : null);
                         if (isSalesOfficer) {
                             salesOfficerRepository.findByUserId(u.getUserId()).ifPresent(res::setSalesOfficer);
-                        } else if (u.getBranchId() != null) {
+                        } else if (isOutlet && u.getBranchId() != null) {
                             outletRepository.findById(u.getBranchId()).ifPresent(res::setOutlet);
                         }
                         return ResponseEntity.ok(res);
