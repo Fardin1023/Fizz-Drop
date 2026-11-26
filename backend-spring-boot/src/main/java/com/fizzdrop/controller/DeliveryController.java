@@ -239,7 +239,20 @@ public class DeliveryController {
             sId, teamName, regNo, vehicleType, driverName, driverPhone, members, maxCapacity
         );
 
-        Long newId = jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+        Long newId = null;
+        try {
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT id FROM supplier_delivery_teams WHERE supplier_id = ? AND vehicle_registration_no = ? ORDER BY id DESC",
+                sId, regNo
+            );
+            if (!rows.isEmpty() && rows.get(0).get("id") != null) {
+                newId = ((Number) rows.get(0).get("id")).longValue();
+            }
+        } catch (Exception ex) {
+            try {
+                newId = jdbcTemplate.queryForObject("SELECT MAX(id) FROM supplier_delivery_teams WHERE supplier_id = ?", Long.class, sId);
+            } catch (Exception ignored) {}
+        }
         return ResponseEntity.ok(Map.of(
             "success", true,
             "message", "Delivery team '" + teamName + "' created successfully with vehicle registration " + regNo + "!",
@@ -294,8 +307,36 @@ public class DeliveryController {
 
     @DeleteMapping("/teams/{id}")
     public ResponseEntity<?> deleteDeliveryTeam(@PathVariable Long id) {
-        jdbcTemplate.update("DELETE FROM supplier_delivery_teams WHERE id = ?", id);
-        return ResponseEntity.ok(Map.of("success", true, "message", "Delivery team removed successfully."));
+        try {
+            List<Map<String, Object>> teamRows = jdbcTemplate.queryForList(
+                "SELECT id, team_name, status FROM supplier_delivery_teams WHERE id = ?", id
+            );
+            if (teamRows.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
+                    "success", false,
+                    "message", "Delivery team not found."
+                ));
+            }
+
+            String status = (String) teamRows.get(0).get("status");
+            if ("ON_DELIVERY".equalsIgnoreCase(status)) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                    "success", false,
+                    "message", "Cannot delete delivery team while it is actively on delivery. Complete or cancel active trips first."
+                ));
+            }
+
+            jdbcTemplate.update("DELETE FROM supplier_delivery_teams WHERE id = ?", id);
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Delivery team '" + teamRows.get(0).get("team_name") + "' deleted successfully from database."
+            ));
+        } catch (Exception ex) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                "success", false,
+                "message", "Failed to delete delivery team: " + ex.getMessage()
+            ));
+        }
     }
 
     // ==========================================
@@ -533,8 +574,18 @@ public class DeliveryController {
 
         Long newDispatchId = null;
         try {
-            newDispatchId = jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
-        } catch (Exception ignored) {}
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT id FROM supplier_delivery_dispatches WHERE dispatch_code = ?",
+                dispatchCode
+            );
+            if (!rows.isEmpty() && rows.get(0).get("id") != null) {
+                newDispatchId = ((Number) rows.get(0).get("id")).longValue();
+            }
+        } catch (Exception ex) {
+            try {
+                newDispatchId = jdbcTemplate.queryForObject("SELECT MAX(id) FROM supplier_delivery_dispatches WHERE supplier_id = ?", Long.class, sId);
+            } catch (Exception ignored) {}
+        }
 
         // Update team status to ON_DELIVERY
         jdbcTemplate.update("UPDATE supplier_delivery_teams SET status = 'ON_DELIVERY', updated_at = NOW() WHERE id = ?", teamId);
@@ -849,6 +900,52 @@ public class DeliveryController {
         ));
     }
 
+    @PutMapping("/dispatches/{id}/stop-ride")
+    public ResponseEntity<?> stopDeliveryRide(@PathVariable Long id) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+            "SELECT d.*, t.vehicle_registration_no, t.driver_name " +
+            "FROM supplier_delivery_dispatches d " +
+            "LEFT JOIN supplier_delivery_teams t ON d.delivery_team_id = t.id " +
+            "WHERE d.id = ?", id
+        );
+        if (rows.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail("Dispatch trip not found."));
+        }
+        Map<String, Object> trip = rows.get(0);
+        String regNo = (String) trip.getOrDefault("vehicle_registration_no", "FLEET");
+        String driver = (String) trip.getOrDefault("driver_name", "Driver");
+        Long supplierId = ((Number) trip.get("supplier_id")).longValue();
+
+        jdbcTemplate.update(
+            "UPDATE supplier_delivery_dispatches SET status = 'DELIVERING', updated_at = NOW() WHERE id = ?",
+            id
+        );
+
+        // Notify Supplier in real time
+        try {
+            AppNotification notif = new AppNotification();
+            notif.setRecipientRole("SUPPLIER");
+            notif.setRecipientUserId(supplierId);
+            notif.setTitle("Vehicle Arrived at Outlet (" + regNo + ")");
+            notif.setMessage("Driver " + driver + " stopped the ride upon reaching destination outlet. Delivery handoff in progress.");
+            notif.setType("FLEET_RIDE_STOPPED");
+            notif.setReferenceCode((String) trip.get("dispatch_code"));
+            notif.setReferenceId(id);
+            notificationRepository.save(notif);
+        } catch (Exception ignored) {}
+
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "status", "DELIVERING",
+            "message", "Ride stopped! Vehicle arrived at outlet destination. Delivery confirmation is now enabled."
+        ));
+    }
+
+    @PutMapping("/dispatches/{id}/resume-ride")
+    public ResponseEntity<?> resumeDeliveryRide(@PathVariable Long id) {
+        return startDeliveryRide(id);
+    }
+
     @PostMapping("/dispatches/{id}/confirm-outlet-delivery")
     public ResponseEntity<?> confirmOutletDelivery(
             @PathVariable Long id,
@@ -987,7 +1084,7 @@ public class DeliveryController {
         } else {
             // Find most recent active trip for this outlet
             candidateTrips = jdbcTemplate.queryForList(
-                "SELECT * FROM supplier_delivery_dispatches WHERE status IN ('DISPATCHED', 'BOARDED', 'IN_TRANSIT', 'DELIVERED') ORDER BY id DESC"
+                "SELECT * FROM supplier_delivery_dispatches WHERE status IN ('DISPATCHED', 'BOARDED', 'IN_TRANSIT', 'DELIVERING', 'DELIVERED') ORDER BY id DESC"
             );
         }
 
@@ -1561,7 +1658,11 @@ public class DeliveryController {
         BigDecimal unitPrice = BigDecimal.valueOf(42.0);
 
         for (Map<String, Object> it : items) {
-            if ("CANCELLED".equalsIgnoreCase(String.valueOf(it.get("stop_status")))
+            String st = String.valueOf(it.get("stop_status"));
+            String ost = String.valueOf(it.get("offer_status"));
+            if ("CANCELLED".equalsIgnoreCase(st)
+                    || "OFFER_DENIED".equalsIgnoreCase(st)
+                    || "DENIED".equalsIgnoreCase(ost)
                     || Boolean.TRUE.equals(it.get("is_cancelled"))) {
                 sourceItem = it;
                 prodId = it.get("product_id") != null ? Long.parseLong(it.get("product_id").toString()) : null;
@@ -1596,7 +1697,10 @@ public class DeliveryController {
                 "VALUES (?, ?, ?, ?, ?, ?, ?, 'DIRECT_SUPPLY', 'OFFER_PENDING', ?, ?, ?, NOW(), NOW())",
                 newReqCode, targetOutletId, prodId, prodName, casesToOffer, unitPrice, totalAmt, memo, driverNotes, supplierId
             );
-            List<Map<String, Object>> lastId = jdbcTemplate.queryForList("SELECT LAST_INSERT_ID() as id");
+            List<Map<String, Object>> lastId = jdbcTemplate.queryForList(
+                "SELECT id FROM outlet_requisitions WHERE requisition_code = ?",
+                newReqCode
+            );
             if (!lastId.isEmpty() && lastId.get(0).get("id") != null) {
                 newReqId = ((Number) lastId.get(0).get("id")).longValue();
             }
@@ -1609,19 +1713,25 @@ public class DeliveryController {
             sourceItem.put("reallocated_to_outlet_id", targetOutletId);
             sourceItem.put("reallocated_to_outlet_name", targetOutletName);
             sourceItem.put("reallocated_at", LocalDateTime.now().toString());
+            // If the source item was previously OFFER_DENIED, re-mark as REALLOCATED to allow clean chaining
+            if ("OFFER_DENIED".equalsIgnoreCase(String.valueOf(sourceItem.get("stop_status")))) {
+                sourceItem.put("stop_status", "REALLOCATED");
+            }
         }
 
         boolean targetExists = false;
         for (Map<String, Object> it : items) {
             Long oid = it.get("outlet_id") != null ? Long.parseLong(it.get("outlet_id").toString()) : -1L;
-            if (oid.equals(targetOutletId) && !"CANCELLED".equalsIgnoreCase(String.valueOf(it.get("stop_status")))) {
-                int curAssigned = it.get("assigned_cases") != null ? Integer.parseInt(it.get("assigned_cases").toString()) : 0;
-                it.put("assigned_cases", curAssigned + casesToOffer);
+            if (oid.equals(targetOutletId) && !"CANCELLED".equalsIgnoreCase(String.valueOf(it.get("stop_status"))) && !"OFFER_DENIED".equalsIgnoreCase(String.valueOf(it.get("stop_status")))) {
+                // An active order already exists for this outlet. Attach pending offer so when accepted, stock count increases.
+                it.put("pending_extra_cases", casesToOffer);
                 it.put("offered_cases", casesToOffer);
+                it.put("offered_product_id", prodId);
+                it.put("offered_product_name", prodName);
                 it.put("offered_from_vehicle", true);
                 it.put("offer_status", "PENDING");
-                it.put("requisition_id", newReqId);
-                it.put("requisition_code", newReqCode);
+                it.put("offer_requisition_id", newReqId);
+                it.put("offer_requisition_code", newReqCode);
                 targetExists = true;
                 break;
             }
@@ -1735,10 +1845,23 @@ public class DeliveryController {
         }
         String cleanCode = code.trim();
 
-        List<Map<String, Object>> reqRows = jdbcTemplate.queryForList(
-            "SELECT * FROM outlet_requisitions WHERE requisition_code = ? OR CAST(id AS CHAR) = ? LIMIT 1",
-            cleanCode, cleanCode
-        );
+        List<Map<String, Object>> reqRows;
+        Long numericId = null;
+        try {
+            numericId = Long.parseLong(cleanCode);
+        } catch (Exception ignored) {}
+
+        if (numericId != null) {
+            reqRows = jdbcTemplate.queryForList(
+                "SELECT * FROM outlet_requisitions WHERE requisition_code = ? OR id = ? LIMIT 1",
+                cleanCode, numericId
+            );
+        } else {
+            reqRows = jdbcTemplate.queryForList(
+                "SELECT * FROM outlet_requisitions WHERE requisition_code = ? LIMIT 1",
+                cleanCode
+            );
+        }
 
         if (reqRows.isEmpty()) {
             // Also check dispatches for an item with this code or requisition_id
@@ -1773,17 +1896,14 @@ public class DeliveryController {
 
         // 1. Update outlet_requisitions
         if (reqId != null) {
-            if (isAccept) {
-                jdbcTemplate.update(
-                    "UPDATE outlet_requisitions SET status = 'IN_TRANSIT', admin_supplier_notes = CONCAT(COALESCE(admin_supplier_notes, ''), ' [ACCEPTED BY OUTLET]'), updated_date = NOW() WHERE id = ?",
-                    reqId
-                );
-            } else {
-                jdbcTemplate.update(
-                    "UPDATE outlet_requisitions SET status = 'DENIED', admin_supplier_notes = CONCAT(COALESCE(admin_supplier_notes, ''), ' [DENIED BY OUTLET]'), updated_date = NOW() WHERE id = ?",
-                    reqId
-                );
-            }
+            String curNotes = req.get("admin_supplier_notes") != null ? req.get("admin_supplier_notes").toString() : "";
+            String appendMsg = isAccept ? "[ACCEPTED BY OUTLET]" : "[DENIED BY OUTLET]";
+            String finalNotes = (curNotes.isEmpty() ? "" : curNotes + " ") + appendMsg;
+            String newStatus = isAccept ? "IN_TRANSIT" : "DENIED";
+            jdbcTemplate.update(
+                "UPDATE outlet_requisitions SET status = ?, admin_supplier_notes = ?, updated_date = CURRENT_TIMESTAMP WHERE id = ?",
+                newStatus, finalNotes, reqId
+            );
         }
 
         // 2. Update dispatch items_json and recalculate active stops
@@ -1820,32 +1940,51 @@ public class DeliveryController {
                         boolean match = false;
                         if (it.get("requisition_code") != null && it.get("requisition_code").toString().equalsIgnoreCase(reqCode)) match = true;
                         if (reqId != null && it.get("requisition_id") != null && it.get("requisition_id").toString().equals(String.valueOf(reqId))) match = true;
+                        if (it.get("offer_requisition_code") != null && it.get("offer_requisition_code").toString().equalsIgnoreCase(reqCode)) match = true;
+                        if (reqId != null && it.get("offer_requisition_id") != null && it.get("offer_requisition_id").toString().equals(String.valueOf(reqId))) match = true;
                         if (outletId != null && outletId.equals(it.get("outlet_id")) && Boolean.TRUE.equals(it.get("is_offered_stock"))) match = true;
 
                         if (match) {
                             if (isAccept) {
                                 it.put("offer_status", "ACCEPTED");
                                 it.put("stop_status", "ASSIGNED");
+                                // Increase stock count of Order 2
+                                if (it.containsKey("pending_extra_cases") && it.get("pending_extra_cases") != null) {
+                                    int extra = Integer.parseInt(it.get("pending_extra_cases").toString());
+                                    int curAssigned = it.get("assigned_cases") != null ? Integer.parseInt(it.get("assigned_cases").toString()) : 0;
+                                    it.put("assigned_cases", curAssigned + extra);
+                                    it.put("demanded_cases", curAssigned + extra);
+                                    it.remove("pending_extra_cases");
+                                }
                             } else {
                                 it.put("offer_status", "DENIED");
-                                it.put("stop_status", "OFFER_DENIED");
-                                it.put("denied_at", LocalDateTime.now().toString());
+                                it.remove("pending_extra_cases");
+                                if (Boolean.TRUE.equals(it.get("is_offered_stock"))) {
+                                    it.put("stop_status", "OFFER_DENIED");
+                                    it.put("denied_at", LocalDateTime.now().toString());
+                                } else {
+                                    // Preserve existing active order
+                                    it.put("stop_status", "ASSIGNED");
+                                }
                             }
                         }
                     }
 
                     Set<Object> activeOutlets = new HashSet<>();
+                    int recalcTotalCases = 0;
                     for (Map<String, Object> it : items) {
                         String st = String.valueOf(it.get("stop_status"));
                         if (!"CANCELLED".equalsIgnoreCase(st) && !"OFFER_DENIED".equalsIgnoreCase(st)) {
                             activeOutlets.add(it.get("outlet_id"));
+                            int c = it.get("assigned_cases") != null ? Integer.parseInt(it.get("assigned_cases").toString()) : 0;
+                            recalcTotalCases += c;
                         }
                     }
 
                     String updatedJson = objectMapper.writeValueAsString(items);
                     jdbcTemplate.update(
-                        "UPDATE supplier_delivery_dispatches SET items_json = ?, total_outlets = ?, updated_at = NOW() WHERE id = ?",
-                        updatedJson, activeOutlets.size(), dId
+                        "UPDATE supplier_delivery_dispatches SET items_json = ?, total_cases = ?, total_outlets = ?, updated_at = NOW() WHERE id = ?",
+                        updatedJson, recalcTotalCases, activeOutlets.size(), dId
                     );
                 } catch (Exception ex) {
                     System.err.println("[DeliveryController] Error updating dispatch on offer response: " + ex.getMessage());
@@ -1941,7 +2080,7 @@ public class DeliveryController {
             "FROM supplier_delivery_dispatches d " +
             "LEFT JOIN supplier_delivery_teams t ON d.delivery_team_id = t.id " +
             "LEFT JOIN supplier_profiles s ON d.supplier_id = s.id " +
-            "WHERE d.status IN ('DISPATCHED', 'BOARDED', 'IN_TRANSIT', 'DELIVERED', 'COMPLETED', 'CANCELLED') " +
+            "WHERE d.status IN ('DISPATCHED', 'BOARDED', 'IN_TRANSIT', 'DELIVERING', 'DELIVERED', 'COMPLETED', 'CANCELLED') " +
             "ORDER BY d.dispatched_at DESC LIMIT 30"
         );
 

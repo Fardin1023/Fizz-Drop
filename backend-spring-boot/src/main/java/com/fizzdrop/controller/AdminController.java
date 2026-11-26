@@ -29,7 +29,12 @@ public class AdminController {
 
     private static Map<String, Object> cachedCommercialLogs = null;
     private static long lastCommercialLogsFetch = 0;
-    private static final long COMMERCIAL_CACHE_MS = 20000;
+    private static final long COMMERCIAL_CACHE_MS = 60000;
+
+    public static void invalidateCommercialLogsCache() {
+        cachedCommercialLogs = null;
+        lastCommercialLogsFetch = 0;
+    }
 
     public AdminController(ProductRepository productRepository,
                            OutletRepository outletRepository,
@@ -660,7 +665,7 @@ public class AdminController {
                 row.put("packaging", p.getPackaging());
                 row.put("size_volume", p.getSizeVolume());
                 row.put("category", p.getCategory());
-                row.put("image_url", p.getImageUrl());
+                row.put("image_url", "");
 
                 // Commercial Pricing Hierarchy
                 row.put("supplier_buy_rate", buyRate);
@@ -939,7 +944,7 @@ public class AdminController {
                 "SELECT " +
                 "  sr.supplier_id, " +
                 "  p.product_id, " +
-                "  CONCAT(p.brand, ' ', p.flavor_variant) AS product_name, " +
+                "  (p.brand || ' ' || p.flavor_variant) AS product_name, " +
                 "  p.sku, " +
                 "  p.brand, " +
                 "  p.flavor_variant, " +
@@ -981,6 +986,22 @@ public class AdminController {
             System.err.println("[Commercial Logs] Failed to query all supplier stocks: " + ex.getMessage());
         }
 
+        // Lightweight product options without heavy base64 strings
+        List<Map<String, Object>> productSummaries = allProducts.stream().map(p -> {
+            Map<String, Object> pm = new HashMap<>();
+            pm.put("product_id", p.getProductId());
+            pm.put("brand", p.getBrand());
+            pm.put("flavor_variant", p.getFlavorVariant());
+            pm.put("sku", p.getSku());
+            pm.put("retail_price", p.getRetailPrice());
+            pm.put("outlet_price", p.getOutletPrice());
+            pm.put("supplier_price", p.getSupplierPrice());
+            pm.put("packaging", p.getPackaging());
+            pm.put("size_volume", p.getSizeVolume());
+            pm.put("category", p.getCategory());
+            return pm;
+        }).collect(Collectors.toList());
+
         Map<String, Object> response = new HashMap<>();
         response.put("summary", summary);
         response.put("suppliers", supplierList);
@@ -988,7 +1009,7 @@ public class AdminController {
         response.put("psrs", enrichedPsrs);
         response.put("psr_orders", psrOrdersList);
         response.put("outlets", enrichedOutlets);
-        response.put("products", allProducts);
+        response.put("products", productSummaries);
         response.put("outlet_product_ledger", outletProductLedger);
         response.put("outlet_sales_logs", outletSalesLogs);
         response.put("supplier_transactions", supplierTxnLogs);

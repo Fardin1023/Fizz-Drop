@@ -118,21 +118,108 @@ export function resolveSalesOfficerCoordinates(officer: any): [number, number] {
   if (!officer) return [23.7925, 90.4125];
   const area = (officer.assigned_area || '').toLowerCase();
   const city = (officer.city || '').toLowerCase();
+  const distId = Number(officer.district_id || 0);
 
-  if (area.includes('uttara')) return [23.8759, 90.3995];
-  if (area.includes('banani')) return [23.7937, 90.4043];
-  if (area.includes('dhanmondi')) return [23.7461, 90.3742];
-  if (area.includes('mirpur')) return [23.8067, 90.3644];
-  if (area.includes('mohakhali')) return [23.7780, 90.4030];
-  if (area.includes('tejgaon')) return [23.7635, 90.3965];
-  if (area.includes('badda')) return [23.7845, 90.4260];
-  if (area.includes('epz')) return [23.4285, 91.1712];
-  if (area.includes('kandirpar') || city.includes('comilla') || city.includes('cumilla')) return [23.4607, 91.1809];
-  if (city.includes('chittagong') || city.includes('chattogram') || area.includes('agrabad')) return [22.3275, 91.8122];
-  if (area.includes('kalurghat')) return [22.3850, 91.8750];
+  if (distId === 16 || city.includes('comilla') || city.includes('cumilla') || area.includes('kandirpar') || area.includes('comilla sadar')) {
+    if (area.includes('kandirpar')) return [23.4607, 91.1809];
+    if (area.includes('epz')) return [23.4285, 91.1712];
+    if (area.includes('laksam')) return [23.2410, 91.1250];
+    return [23.4560, 91.1850]; // Comilla Sadar Centroid
+  }
+
+  if (distId === 1 || city.includes('dhaka')) {
+    if (area.includes('uttara')) return [23.8759, 90.3995];
+    if (area.includes('banani')) return [23.7937, 90.4043];
+    if (area.includes('dhanmondi')) return [23.7461, 90.3742];
+    if (area.includes('mohammadpur')) return [23.7658, 90.3584];
+    if (area.includes('mirpur')) return [23.8067, 90.3644];
+    if (area.includes('mohakhali')) return [23.7780, 90.4030];
+    if (area.includes('tejgaon')) return [23.7635, 90.3965];
+    if (area.includes('badda')) return [23.7845, 90.4260];
+    return [23.7925, 90.4125]; // Default Gulshan
+  }
+
+  if (distId === 14 || city.includes('chittagong') || city.includes('chattogram')) {
+    if (area.includes('kalurghat')) return [22.3850, 91.8750];
+    if (area.includes('agrabad')) return [22.3275, 91.8122];
+    return [22.3569, 91.7832];
+  }
+
+  const dName = DISTRICT_ID_TO_NAME[distId]?.name;
+  if (dName && BANGLADESH_DISTRICT_DEPOTS[dName]) {
+    return [BANGLADESH_DISTRICT_DEPOTS[dName].lat, BANGLADESH_DISTRICT_DEPOTS[dName].lng];
+  }
 
   return [23.7925, 90.4125]; // Default Gulshan
 }
+
+// 64 Bangladesh Districts ID to Name and Division Mapping
+export const DISTRICT_ID_TO_NAME: Record<number, { name: string; division: string }> = {
+  1: { name: 'Dhaka', division: 'Dhaka' },
+  2: { name: 'Gazipur', division: 'Dhaka' },
+  3: { name: 'Narayanganj', division: 'Dhaka' },
+  4: { name: 'Tangail', division: 'Dhaka' },
+  5: { name: 'Kishoreganj', division: 'Dhaka' },
+  6: { name: 'Manikganj', division: 'Dhaka' },
+  7: { name: 'Munshiganj', division: 'Dhaka' },
+  8: { name: 'Narsingdi', division: 'Dhaka' },
+  9: { name: 'Faridpur', division: 'Dhaka' },
+  10: { name: 'Gopalganj', division: 'Dhaka' },
+  11: { name: 'Madaripur', division: 'Dhaka' },
+  12: { name: 'Rajbari', division: 'Dhaka' },
+  13: { name: 'Shariatpur', division: 'Dhaka' },
+  14: { name: 'Chittagong', division: 'Chittagong' },
+  15: { name: "Cox's Bazar", division: 'Chittagong' },
+  16: { name: 'Comilla', division: 'Chittagong' },
+  17: { name: 'Feni', division: 'Chittagong' },
+  18: { name: 'Brahmanbaria', division: 'Chittagong' },
+  19: { name: 'Rangamati', division: 'Chittagong' },
+  20: { name: 'Khagrachhari', division: 'Chittagong' },
+  21: { name: 'Bandarban', division: 'Chittagong' },
+  22: { name: 'Noakhali', division: 'Chittagong' },
+  23: { name: 'Chandpur', division: 'Chittagong' },
+  24: { name: 'Lakshmipur', division: 'Chittagong' },
+  25: { name: 'Rajshahi', division: 'Rajshahi' },
+  26: { name: 'Bogra', division: 'Rajshahi' },
+  27: { name: 'Pabna', division: 'Rajshahi' },
+  28: { name: 'Sirajganj', division: 'Rajshahi' },
+  29: { name: 'Naogaon', division: 'Rajshahi' },
+  30: { name: 'Natore', division: 'Rajshahi' },
+  31: { name: 'Joypurhat', division: 'Rajshahi' },
+  32: { name: 'Chapainawabganj', division: 'Rajshahi' },
+  33: { name: 'Khulna', division: 'Khulna' },
+  34: { name: 'Jessore', division: 'Khulna' },
+  35: { name: 'Satkhira', division: 'Khulna' },
+  36: { name: 'Bagerhat', division: 'Khulna' },
+  37: { name: 'Kushtia', division: 'Khulna' },
+  38: { name: 'Jhenaidah', division: 'Khulna' },
+  39: { name: 'Chuadanga', division: 'Khulna' },
+  40: { name: 'Meherpur', division: 'Khulna' },
+  41: { name: 'Magura', division: 'Khulna' },
+  42: { name: 'Narail', division: 'Khulna' },
+  43: { name: 'Barisal', division: 'Barishal' },
+  44: { name: 'Bhola', division: 'Barishal' },
+  45: { name: 'Jhalokathi', division: 'Barishal' },
+  46: { name: 'Pirojpur', division: 'Barishal' },
+  47: { name: 'Barguna', division: 'Barishal' },
+  48: { name: 'Patuakhali', division: 'Barishal' },
+  49: { name: 'Sylhet', division: 'Sylhet' },
+  50: { name: 'Moulvibazar', division: 'Sylhet' },
+  51: { name: 'Habiganj', division: 'Sylhet' },
+  52: { name: 'Sunamganj', division: 'Sylhet' },
+  53: { name: 'Rangpur', division: 'Rangpur' },
+  54: { name: 'Dinajpur', division: 'Rangpur' },
+  55: { name: 'Gaibandha', division: 'Rangpur' },
+  56: { name: 'Kurigram', division: 'Rangpur' },
+  57: { name: 'Lalmonirhat', division: 'Rangpur' },
+  58: { name: 'Nilphamari', division: 'Rangpur' },
+  59: { name: 'Panchagarh', division: 'Rangpur' },
+  60: { name: 'Thakurgaon', division: 'Rangpur' },
+  61: { name: 'Mymensingh', division: 'Mymensingh' },
+  62: { name: 'Jamalpur', division: 'Mymensingh' },
+  63: { name: 'Netrokona', division: 'Mymensingh' },
+  64: { name: 'Sherpur', division: 'Mymensingh' },
+};
 
 // 64 Bangladesh Districts Geo-Centroids & Depot Terminals
 export const BANGLADESH_DISTRICT_DEPOTS: Record<string, { lat: number; lng: number; defaultAddress: string }> = {
@@ -327,7 +414,145 @@ const VEHICLE_THEMES = [
   },
 ];
 
-// Deterministic geo-hash for stable outlet coordinates
+// Helper to resolve coordinates for any outlet across all 64 districts of Bangladesh
+export function resolveOutletCoordinates(
+  outlet: any,
+  index = 0,
+  vehicleIndex = 0,
+  depotCoords?: [number, number]
+): [number, number] {
+  if (!outlet) return depotCoords || [23.7925, 90.4125];
+
+  // 1. If explicit valid GPS lat/lng are attached to the outlet record
+  const lat = Number(outlet.latitude ?? outlet.lat);
+  const lng = Number(outlet.longitude ?? outlet.lng);
+  if (!isNaN(lat) && !isNaN(lng) && lat > 20 && lat < 27 && lng > 88 && lng < 93) {
+    return [lat, lng];
+  }
+
+  const outletId = Number(outlet.id || outlet.outlet_id || index + 1);
+  const distId = Number(outlet.district_id || outlet.DISTRICT_ID || 0);
+  const distInfo = DISTRICT_ID_TO_NAME[distId];
+  const distName = (outlet.district_name || outlet.DISTRICT_NAME || distInfo?.name || '').trim().toLowerCase();
+  const city = (outlet.city || outlet.CITY || '').trim().toLowerCase();
+  const area = (outlet.area || outlet.AREA || '').trim().toLowerCase();
+  const address = (outlet.location_address || outlet.LOCATION_ADDRESS || outlet.address || '').trim().toLowerCase();
+  const subRoute = (outlet.sub_route || outlet.SUB_ROUTE || '').trim().toLowerCase();
+  const combined = `${area} ${city} ${distName} ${address} ${subRoute}`;
+
+  let base: [number, number] | null = null;
+
+  // --- COMILLA / CUMILLA DISTRICT (ID 16) ---
+  if (
+    distId === 16 ||
+    distName === 'comilla' ||
+    distName === 'cumilla' ||
+    city.includes('comilla') ||
+    city.includes('cumilla') ||
+    combined.includes('comilla') ||
+    combined.includes('cumilla')
+  ) {
+    if (combined.includes('kandirpar') || combined.includes('badurtola')) {
+      base = [23.4607, 91.1809]; // Kandirpar Central Commercial Zone
+    } else if (combined.includes('kotbari')) {
+      base = [23.4420, 91.1350]; // Kotbari Road
+    } else if (combined.includes('epz')) {
+      base = [23.4285, 91.1712]; // Comilla EPZ Area
+    } else if (combined.includes('laksam')) {
+      base = [23.2410, 91.1250]; // Laksam Junction
+    } else if (combined.includes('chawkbazar') || combined.includes('rajganj')) {
+      base = [23.4625, 91.1890]; // Chawkbazar / Rajganj
+    } else if (combined.includes('victoria') || combined.includes('shashangachha')) {
+      base = [23.4650, 91.1750]; // Victoria College Area
+    } else {
+      base = [23.4560, 91.1850]; // Comilla Sadar Centroid
+    }
+  }
+
+  // --- DHAKA DISTRICT (ID 1) ---
+  else if (
+    distId === 1 ||
+    distName === 'dhaka' ||
+    city.includes('dhaka') ||
+    combined.includes('dhaka')
+  ) {
+    if (combined.includes('dhanmondi')) {
+      base = [23.7461, 90.3742]; // Dhanmondi / Satmasjid Road
+    } else if (combined.includes('mohammadpur')) {
+      base = [23.7658, 90.3584]; // Mohammadpur Town Hall / Asad Ave
+    } else if (combined.includes('gulshan')) {
+      base = [23.7925, 90.4125]; // Gulshan 1 / 2
+    } else if (combined.includes('banani')) {
+      base = [23.7937, 90.4043]; // Banani Road 11
+    } else if (combined.includes('uttara')) {
+      base = [23.8759, 90.3995]; // Uttara Model Town
+    } else if (combined.includes('mirpur')) {
+      base = [23.8067, 90.3644]; // Mirpur 1 / 10
+    } else if (combined.includes('tejgaon')) {
+      base = [23.7635, 90.3965]; // Tejgaon Industrial Area
+    } else if (combined.includes('mohakhali')) {
+      base = [23.7780, 90.4030]; // Mohakhali DOHS
+    } else if (combined.includes('badda')) {
+      base = [23.7845, 90.4260]; // Badda / Merul
+    } else if (combined.includes('motijheel') || combined.includes('paltan')) {
+      base = [23.7330, 90.4172]; // Motijheel Commercial Area
+    } else if (combined.includes('old dhaka') || combined.includes('lalbagh') || combined.includes('wari')) {
+      base = [23.7150, 90.4070]; // Old Dhaka / Wari
+    } else {
+      base = [23.7500, 90.3900]; // Central Dhaka
+    }
+  }
+
+  // --- CHITTAGONG / CHATTOGRAM DISTRICT (ID 14) ---
+  else if (
+    distId === 14 ||
+    distName === 'chittagong' ||
+    distName === 'chattogram' ||
+    city.includes('chittagong') ||
+    city.includes('chattogram') ||
+    combined.includes('chattogram')
+  ) {
+    if (combined.includes('kalurghat')) {
+      base = [22.3850, 91.8750]; // Kalurghat Heavy I/A
+    } else if (combined.includes('agrabad')) {
+      base = [22.3275, 91.8122]; // Agrabad C/A
+    } else if (combined.includes('chandgaon')) {
+      base = [22.3800, 91.8500]; // Chandgaon
+    } else if (combined.includes('gec') || combined.includes('nasirabad')) {
+      base = [22.3590, 91.8210]; // GEC Circle
+    } else {
+      base = [22.3569, 91.7832]; // Chittagong Centroid
+    }
+  }
+
+  // --- ALL 64 BANGLADESH DISTRICTS CENTROIDS ---
+  else {
+    const matchedDistName =
+      distInfo?.name ||
+      Object.keys(BANGLADESH_DISTRICT_DEPOTS).find(
+        (k) => k.toLowerCase() === distName || combined.includes(k.toLowerCase())
+      );
+    if (matchedDistName && BANGLADESH_DISTRICT_DEPOTS[matchedDistName]) {
+      const geo = BANGLADESH_DISTRICT_DEPOTS[matchedDistName];
+      base = [geo.lat, geo.lng];
+    }
+  }
+
+  // Fallback to active depot coordinates or territory centroid
+  if (!base) {
+    base = depotCoords || [23.7925, 90.4078];
+  }
+
+  // Deterministic local street dispersal offset so shop pins spread cleanly along roadways
+  const angle = ((outletId * 137.5 + index * 53 + vehicleIndex * 40) % 360) * (Math.PI / 180);
+  const distance = 0.0032 + ((outletId % 7) * 0.0016);
+  const finalLat = base[0] + Math.cos(angle) * distance;
+  const finalLng = base[1] + Math.sin(angle) * distance;
+
+  return [finalLat, finalLng];
+}
+
+// Backwards-compatible wrapper
 function getOutletCoordinates(
   outletId: number,
   index: number,
@@ -335,12 +560,12 @@ function getOutletCoordinates(
   vehicleIndex = 0,
   customBaseCoords?: [number, number]
 ): [number, number] {
-  const base = customBaseCoords || resolveDepotCoordinates(subRoute, 0);
-  const angle = ((outletId * 137.5 + index * 53 + vehicleIndex * 40) % 360) * (Math.PI / 180);
-  const distance = 0.0065 + ((outletId % 5) * 0.0035);
-  const lat = base[0] + Math.cos(angle) * distance;
-  const lng = base[1] + Math.sin(angle) * distance;
-  return [lat, lng];
+  return resolveOutletCoordinates(
+    { outlet_id: outletId, sub_route: subRoute },
+    index,
+    vehicleIndex,
+    customBaseCoords
+  );
 }
 
 // Generate smooth road-like waypoints between stops for fluid truck motion
@@ -512,6 +737,10 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
   // Animation motion state per vehicle registration: { stepIndex, speed }
   const motionStateRef = useRef<Map<string, { stepIndex: number; speed: number; flightPath: [number, number][] }>>(new Map());
 
+  // Track last auto-fitted scope to prevent background polling or re-renders from resetting user zoom
+  const lastAutoFittedScopeRef = useRef<string | null>(null);
+  const userInteractedRef = useRef<boolean>(false);
+
   // Toggle for testing motion simulation
   const [isTestingMotion, setIsTestingMotion] = useState<boolean>(true);
 
@@ -528,13 +757,21 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
   useEffect(() => {
     if (selectedDistrictId !== undefined) {
       setInternalDistrictId(selectedDistrictId);
+      userInteractedRef.current = false;
+      lastAutoFittedScopeRef.current = null;
     }
   }, [selectedDistrictId]);
 
   const handleDistrictChange = (distId: number | null) => {
     setInternalDistrictId(distId);
+    userInteractedRef.current = false;
+    lastAutoFittedScopeRef.current = null;
     if (distId !== null) {
       setIsDepotCardMinimized(false);
+      const match = districtDepots.find((d) => d.districtId === distId);
+      if (match && mapInstanceRef.current) {
+        mapInstanceRef.current.flyTo(match.coords, 14, { animate: true, duration: 1.0 });
+      }
     }
     if (onSelectDistrict) {
       onSelectDistrict(distId);
@@ -573,34 +810,33 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
     }
 
     // Priority 2: Scoped to a specific supplier (Supplier Portal or single supplier filter)
-    // "they should see their own depot location, because they are seeing the fleet of their own district and own depot. not other suppliers depot and location."
     if (effectiveSupplier) {
       const supName = (effectiveSupplier.business_name || '').toLowerCase();
-      let coords: [number, number];
-      let distName = effectiveSupplier.district_name || effectiveSupplier.primary_district_name || 'Dhaka';
-      let division = effectiveSupplier.division_name || 'Dhaka';
+      const distId = Number(effectiveSupplier.primary_district_id || effectiveSupplier.district_id || 0);
+      const distInfo = DISTRICT_ID_TO_NAME[distId];
+      let distName = effectiveSupplier.district_name || effectiveSupplier.primary_district_name || distInfo?.name || 'Dhaka';
+      let division = effectiveSupplier.division_name || distInfo?.division || 'Dhaka';
       let depotAddr = effectiveSupplier.depot_address || 'Regional Logistics Depot';
+      let coords: [number, number];
 
-      if (supName.includes('karnafuli') || effectiveSupplier.id === 37) {
-        coords = [22.3850, 91.8750]; // Kalurghat Heavy Industrial Area, Chittagong
-        distName = 'Chittagong';
-        division = 'Chittagong';
-        depotAddr = effectiveSupplier.depot_address || 'Plot B-12, Kalurghat Heavy Industrial Area, Mohara, Chandgaon, Chattogram-4208, Bangladesh';
-      } else if (supName.includes('meghna') || effectiveSupplier.id === 39) {
+      if (distName.toLowerCase() === 'comilla' || distId === 16 || supName.includes('meghna')) {
         coords = [23.4607, 91.1809]; // Kandirpar / Kotbari, Comilla
         distName = 'Comilla';
         division = 'Chittagong';
-        depotAddr = effectiveSupplier.depot_address || 'Plot 22, Kotbari Road, Kandirpar Commercial Zone, Cumilla-3500, Bangladesh';
-      } else if (supName.includes('padma') || effectiveSupplier.id === 38) {
-        coords = [23.7635, 90.3965]; // Tejgaon I/A, Dhaka
+        depotAddr = effectiveSupplier.depot_address || 'Plot 22, Kotbari Road, Kandirpar Commercial Zone, Cumilla-3500';
+      } else if (distName.toLowerCase() === 'chittagong' || distId === 14 || supName.includes('karnafuli')) {
+        coords = [22.3850, 91.8750]; // Kalurghat Heavy Industrial Area, Chittagong
+        distName = 'Chittagong';
+        division = 'Chittagong';
+        depotAddr = effectiveSupplier.depot_address || 'Plot B-12, Kalurghat Heavy Industrial Area, Mohara, Chandgaon, Chattogram';
+      } else if (distName.toLowerCase() === 'dhaka' || distId === 1 || supName.includes('padma') || supName.includes('dhaka')) {
+        if (depotAddr.toLowerCase().includes('tejgaon') || supName.includes('padma')) {
+          coords = [23.7635, 90.3965]; // Tejgaon Industrial Area, Dhaka
+        } else {
+          coords = [23.7925, 90.4125]; // Gulshan-1, Dhaka
+        }
         distName = 'Dhaka';
         division = 'Dhaka';
-        depotAddr = effectiveSupplier.depot_address || 'Plot 14/B, Road 04, Tejgaon I/A, Dhaka-1208';
-      } else if (supName.includes('dhaka metropolitan') || effectiveSupplier.id === 1) {
-        coords = [23.7925, 90.4125]; // Gulshan-1, Dhaka
-        distName = 'Dhaka';
-        division = 'Dhaka';
-        depotAddr = effectiveSupplier.depot_address || 'Road 11, Plot 42, Gulshan-1 Logistics Depot, Dhaka';
       } else {
         const baseGeo = BANGLADESH_DISTRICT_DEPOTS[distName] || {
           lat: 23.7925,
@@ -611,7 +847,7 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
       }
 
       list.push({
-        districtId: effectiveSupplier.primary_district_id || effectiveSupplier.district_id || 1,
+        districtId: distId || 1,
         districtName: distName,
         division: division,
         supplierId: effectiveSupplier.id,
@@ -626,104 +862,80 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
           ? effectiveSupplier.assigned_districts.map((d: any) => d.name || d)
           : [distName],
       });
-
-      return list;
     }
 
-    // Priority 2: If districts list is provided (e.g. from RSM's ASMs)
-    if (availableDistricts && availableDistricts.length > 0) {
-      availableDistricts.forEach((dist) => {
-        // 1. Direct primary supplier for this district
-        const primarySup = (suppliers || []).find(
-          (s) => s.primary_district_id === dist.id || (s.district_name && s.district_name.toLowerCase() === dist.name.toLowerCase())
-        );
-        // 2. Covering supplier for this district
-        const coveringSup = !primarySup
-          ? (suppliers || []).find((s) => {
-              const cList = s.covered_district_ids_list || [];
-              return cList.includes(dist.id);
-            })
-          : null;
+    // Populate all other districts across Bangladesh so every district map is fully functional
+    const addedIds = new Set<number>(list.map((d) => d.districtId));
+    Object.entries(DISTRICT_ID_TO_NAME).forEach(([idStr, info]) => {
+      const dId = Number(idStr);
+      if (addedIds.has(dId)) return;
+      addedIds.add(dId);
 
-        const matchedSup = primarySup || coveringSup;
-        const baseGeo = BANGLADESH_DISTRICT_DEPOTS[dist.name] || {
-          lat: 23.7925,
-          lng: 90.4078,
-          defaultAddress: `${dist.name} District Beverage Logistics Yard, Bangladesh`,
-        };
+      const matchedSup = (suppliers || []).find(
+        (s) => s.primary_district_id === dId || (s.district_name && s.district_name.toLowerCase() === info.name.toLowerCase())
+      );
+      const matchedAsm = (availableDistricts || []).find((a) => a.id === dId);
 
-        let depotCoords: [number, number] = [baseGeo.lat, baseGeo.lng];
-        let depotAddress = baseGeo.defaultAddress;
+      const baseGeo = BANGLADESH_DISTRICT_DEPOTS[info.name] || {
+        lat: 23.7925,
+        lng: 90.4125,
+        defaultAddress: `${info.name} District Regional Beverage Yard, Bangladesh`,
+      };
 
-        if (matchedSup) {
-          depotAddress = matchedSup.depot_address || baseGeo.defaultAddress;
-          if (primarySup) {
-            if (dist.name === 'Dhaka') {
-              depotCoords = [23.7925, 90.4125];
-            } else if (dist.name === 'Chittagong') {
-              depotCoords = [22.3850, 91.8750];
-            }
-          }
-        }
+      let depotCoords: [number, number] = [baseGeo.lat, baseGeo.lng];
+      if (info.name === 'Comilla') depotCoords = [23.4607, 91.1809];
+      else if (info.name === 'Chittagong') depotCoords = [22.3850, 91.8750];
+      else if (info.name === 'Dhaka') depotCoords = [23.7635, 90.3965];
 
-        list.push({
-          districtId: dist.id,
-          districtName: dist.name,
-          division: dist.division,
-          supplierId: matchedSup?.id,
-          supplierName: matchedSup ? matchedSup.business_name : `${dist.name} Regional Beverage Logistics Hub`,
-          tradeLicense: matchedSup?.trade_license_number || `REG-${dist.name.toUpperCase().slice(0, 3)}-2026`,
-          depotAddress,
-          phone: matchedSup?.phone_number || dist.asmPhone || '+8801700000000',
-          coords: depotCoords,
-          isPrimaryHub: !!primarySup,
-          isRegisteredSupplier: !!matchedSup,
-          coveredDistricts: matchedSup?.assigned_districts
-            ? matchedSup.assigned_districts.map((d: any) => d.name || d)
-            : [dist.name],
-          asmName: dist.asmName,
-          asmCode: dist.asmCode,
-          asmPhone: dist.asmPhone,
-        });
+      list.push({
+        districtId: dId,
+        districtName: info.name,
+        division: info.division,
+        supplierId: matchedSup?.id,
+        supplierName: matchedSup ? matchedSup.business_name : `${info.name} Regional Beverage Logistics Hub`,
+        tradeLicense: matchedSup?.trade_license_number || `REG-${info.name.toUpperCase().slice(0, 3)}-2026`,
+        depotAddress: matchedSup?.depot_address || baseGeo.defaultAddress,
+        phone: matchedSup?.phone_number || matchedAsm?.asmPhone || '+880 1700-000000',
+        coords: depotCoords,
+        isPrimaryHub: !!matchedSup,
+        isRegisteredSupplier: !!matchedSup,
+        coveredDistricts: matchedSup?.assigned_districts
+          ? matchedSup.assigned_districts.map((d: any) => d.name || d)
+          : [info.name],
+        asmName: matchedAsm?.asmName,
+        asmCode: matchedAsm?.asmCode,
+        asmPhone: matchedAsm?.asmPhone,
       });
-      return list;
-    }
-
-    // Fallback if only suppliers are passed
-    if (suppliers && suppliers.length > 0) {
-      suppliers.forEach((s) => {
-        const geo = BANGLADESH_DISTRICT_DEPOTS[s.district_name] || {
-          lat: 23.7925,
-          lng: 90.4125,
-          defaultAddress: s.depot_address || 'Central Logistics Depot Hub',
-        };
-        list.push({
-          districtId: s.primary_district_id || 1,
-          districtName: s.district_name || 'Central District',
-          division: s.division_name || 'Dhaka',
-          supplierId: s.id,
-          supplierName: s.business_name,
-          tradeLicense: s.trade_license_number,
-          depotAddress: s.depot_address || geo.defaultAddress,
-          phone: s.phone_number || 'N/A',
-          coords: [geo.lat, geo.lng],
-          isPrimaryHub: true,
-          isRegisteredSupplier: true,
-          coveredDistricts: (s.assigned_districts || []).map((d: any) => d.name || d),
-        });
-      });
-    }
+    });
 
     return list;
   }, [availableDistricts, suppliers, effectiveSupplier, currentSalesOfficer]);
 
+  const allDistrictsList: DistrictOption[] = useMemo(() => {
+    return Object.entries(DISTRICT_ID_TO_NAME).map(([idStr, info]) => {
+      const id = Number(idStr);
+      const asm = (availableDistricts || []).find((a) => a.id === id);
+      return {
+        id,
+        name: info.name,
+        division: info.division,
+        asmName: asm?.asmName,
+        asmCode: asm?.asmCode,
+        asmPhone: asm?.asmPhone,
+      };
+    });
+  }, [availableDistricts]);
+
   const selectedDepot = useMemo(() => {
-    if ((currentSalesOfficer || effectiveSupplier) && districtDepots.length > 0) {
+    if (internalDistrictId) {
+      const match = districtDepots.find((d) => d.districtId === internalDistrictId);
+      if (match) return match;
+    }
+    if (districtDepots.length > 0) {
       return districtDepots[0];
     }
-    if (!internalDistrictId) return null;
-    return districtDepots.find((d) => d.districtId === internalDistrictId) || null;
-  }, [internalDistrictId, districtDepots, effectiveSupplier, currentSalesOfficer]);
+    return null;
+  }, [internalDistrictId, districtDepots]);
 
   // Live metrics of focused vehicle for HUD
   const [focusedTelemetry, setFocusedTelemetry] = useState<{
@@ -788,38 +1000,92 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
       if (allowedOutlets && allowedOutlets.length > 0) {
         return allowedOutlets;
       }
+      const soDistId = Number(currentSalesOfficer.district_id || 0);
       const soArea = (currentSalesOfficer.assigned_area || '').toLowerCase();
       const soCity = (currentSalesOfficer.city || '').toLowerCase();
       return list.filter((o: any) => {
-        const oArea = (o.area || '').toLowerCase();
-        const oAddr = ((o.location_address || '') + ' ' + (o.sub_route || '')).toLowerCase();
+        const oDistId = Number(o.district_id || o.DISTRICT_ID || 0);
+        if (soDistId > 0 && oDistId > 0 && oDistId !== soDistId) return false;
+        const oArea = (o.area || o.AREA || '').toLowerCase();
+        const oAddr = ((o.location_address || o.LOCATION_ADDRESS || '') + ' ' + (o.sub_route || o.SUB_ROUTE || '')).toLowerCase();
         if (soArea && (oArea.includes(soArea) || oAddr.includes(soArea))) return true;
-        if (soCity && oAddr.includes(soCity)) return true;
+        if (soCity && (oAddr.includes(soCity) || (o.city || '').toLowerCase().includes(soCity))) return true;
         return false;
       });
     }
 
-    if (effectiveSupplier) {
-      const targetDistId = effectiveSupplier.primary_district_id || effectiveSupplier.district_id;
-      const targetDistName = (effectiveSupplier.district_name || effectiveSupplier.primary_district_name || '').toLowerCase();
-      const supAssignedIds = (effectiveSupplier.assigned_districts || []).map((d: any) => d.id || d);
-      return list.filter((o: any) => {
-        if (targetDistId && o.district_id === targetDistId) return true;
-        if (targetDistName && (o.district_name || '').toLowerCase() === targetDistName) return true;
-        if (supAssignedIds.length > 0 && supAssignedIds.includes(o.district_id)) return true;
-        const loc = ((o.location_address || '') + ' ' + (o.sub_route || '') + ' ' + (o.area || '')).toLowerCase();
-        if (effectiveSupplier.division_name === 'Chittagong' || targetDistName.includes('chittagong') || targetDistName.includes('comilla')) {
-          if (targetDistName.includes('comilla') || effectiveSupplier.id === 39) {
-            return loc.includes('comilla') || loc.includes('cumilla') || loc.includes('kandirpar') || loc.includes('kotbari');
-          }
-          return loc.includes('chittagong') || loc.includes('chattogram') || loc.includes('kalurghat') || loc.includes('chandgaon') || loc.includes('agrabad');
+    const activeTargetDistId = internalDistrictId || (effectiveSupplier ? Number(effectiveSupplier.primary_district_id || effectiveSupplier.district_id || 0) : null);
+
+    if (activeTargetDistId || effectiveSupplier) {
+      const targetDistId = activeTargetDistId || Number(effectiveSupplier?.primary_district_id || effectiveSupplier?.district_id || 0);
+      const targetDistInfo = DISTRICT_ID_TO_NAME[targetDistId];
+      const targetDistName = (
+        targetDistInfo?.name ||
+        effectiveSupplier?.district_name ||
+        effectiveSupplier?.primary_district_name ||
+        ''
+      ).toLowerCase();
+      const targetDivision = (
+        targetDistInfo?.division ||
+        effectiveSupplier?.division_name ||
+        ''
+      ).toLowerCase();
+
+      // Collect all authorized/assigned district IDs for this supplier
+      const supAssignedIds = new Set<number>();
+      if (targetDistId > 0) supAssignedIds.add(targetDistId);
+      if (!internalDistrictId && effectiveSupplier) {
+        if (effectiveSupplier.covered_district_ids_list && Array.isArray(effectiveSupplier.covered_district_ids_list)) {
+          effectiveSupplier.covered_district_ids_list.forEach((id: any) => {
+            const num = Number(id);
+            if (!isNaN(num) && num > 0) supAssignedIds.add(num);
+          });
         }
-        return loc.includes('dhaka') || loc.includes('gulshan') || loc.includes('banani') || loc.includes('tejgaon') || loc.includes('dhanmondi') || loc.includes('uttara') || loc.includes('mirpur');
+        if (effectiveSupplier.covered_district_ids && typeof effectiveSupplier.covered_district_ids === 'string') {
+          effectiveSupplier.covered_district_ids.split(',').forEach((s: string) => {
+            const num = parseInt(s.trim(), 10);
+            if (!isNaN(num) && num > 0) supAssignedIds.add(num);
+          });
+        }
+        if (effectiveSupplier.assigned_districts && Array.isArray(effectiveSupplier.assigned_districts)) {
+          effectiveSupplier.assigned_districts.forEach((d: any) => {
+            const num = Number(d.id || d);
+            if (!isNaN(num) && num > 0) supAssignedIds.add(num);
+          });
+        }
+      }
+
+      return list.filter((o: any) => {
+        const oDistId = Number(o.district_id || o.DISTRICT_ID || 0);
+        const oDistName = (o.district_name || o.DISTRICT_NAME || DISTRICT_ID_TO_NAME[oDistId]?.name || '').toLowerCase();
+        const oCity = (o.city || o.CITY || '').toLowerCase();
+        const oArea = (o.area || o.AREA || '').toLowerCase();
+        const oAddr = ((o.location_address || o.LOCATION_ADDRESS || o.address || '') + ' ' + (o.sub_route || o.SUB_ROUTE || '')).toLowerCase();
+        const oDivision = (o.division_name || o.DIVISION_NAME || DISTRICT_ID_TO_NAME[oDistId]?.division || '').toLowerCase();
+
+        // 1. Strict district ID filter (prevents cross-district leakage)
+        if (supAssignedIds.size > 0 && oDistId > 0) {
+          return supAssignedIds.has(oDistId);
+        }
+
+        // 2. District name / City match
+        if (targetDistName) {
+          if (oDistName === targetDistName || oCity === targetDistName) return true;
+          if (oAddr.includes(targetDistName) || oArea.includes(targetDistName)) return true;
+          return false;
+        }
+
+        // 3. Division match (only if no specific district matched)
+        if (targetDivision && oDivision && !internalDistrictId) {
+          return oDivision === targetDivision;
+        }
+
+        return false;
       });
     }
 
     return list;
-  }, [registeredOutlets, dispatches, allowedOutlets, effectiveSupplier, currentSalesOfficer]);
+  }, [registeredOutlets, dispatches, allowedOutlets, effectiveSupplier, currentSalesOfficer, internalDistrictId]);
 
   // 1. Group dispatches so all distinct active vehicles appear on the single map
   const activeVehicles = useMemo(() => {
@@ -912,6 +1178,7 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
           else if (isOfferPending) status = 'OFFER_PENDING';
           else if (isOfferAccepted) status = 'OFFER_ACCEPTED';
 
+          const matchedRegistered = registeredOutlets.find((ro) => (ro.id || ro.outlet_id) === item.outlet_id) || {};
           uniqueOutlets.push({
             outlet_id: item.outlet_id,
             outlet_name: item.outlet_name,
@@ -922,6 +1189,7 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
             isOfferAccepted,
             isOfferPending,
             reallocatedToOutletId,
+            ...matchedRegistered,
           });
         }
       });
@@ -956,10 +1224,11 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
           .replace(/[ÔÇöâ€”?]/g, ' - ')
           .replace(/\s+-\s+/g, ' — ')
           .trim();
+        const coords = resolveOutletCoordinates(out, idx, vIdx, baseDepot);
         waypoints.push({
           type: 'OUTLET',
           name: cleanName,
-          coords: getOutletCoordinates(out.outlet_id, idx, disp.sub_route, vIdx, baseDepot),
+          coords,
           status: out.status,
           stopNumber: stopNum,
           outletId: out.outlet_id,
@@ -1017,10 +1286,22 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
     if (!mapContainerRef.current) return;
 
     if (!mapInstanceRef.current) {
+      const initialCenter: [number, number] = districtDepots[0]?.coords || [23.7925, 90.4078];
       const map = L.map(mapContainerRef.current, {
-        center: [23.7925, 90.4078],
+        center: initialCenter,
         zoom: 14,
-        zoomControl: true,
+        zoomControl: false,
+        scrollWheelZoom: true,
+        doubleClickZoom: true,
+        touchZoom: true,
+      });
+
+      // Place zoom controls in bottom-right corner to avoid overlapping top HUD cards
+      L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+      // Track manual user zoom / pan / move interactions to preserve zoom level
+      map.on('zoomstart movestart dragstart', () => {
+        userInteractedRef.current = true;
       });
 
       // OpenStreetMap Standard Tiles
@@ -1106,8 +1387,8 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
       // 2. Draw Registered Outlets
       outletsToDisplay.forEach((outlet, idx) => {
         const outletId = outlet.id || outlet.outlet_id || (idx + 1);
-        const subRoute = outlet.sub_route || 'Gulshan Sub-Route';
-        const coords = getOutletCoordinates(outletId, idx, subRoute, 0);
+        const subRoute = outlet.sub_route || '';
+        const coords = resolveOutletCoordinates(outlet, idx, 0, districtDepots[0]?.coords);
         allCoords.push(coords);
 
         const cleanName = (outlet.outlet_name || outlet.name || 'Retail Store')
@@ -1160,24 +1441,28 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
 
       // Auto-fit map to show selected depot or all depots & outlets
       try {
-        if ((effectiveSupplier || currentSalesOfficer) && districtDepots.length > 0) {
-          const targetDepot = districtDepots[0];
-          if (allCoords.length > 1) {
+        const activeDistKey = internalDistrictId || (effectiveSupplier?.primary_district_id || districtDepots[0]?.districtId || 1);
+        const scopeKey = `${effectiveSupplier?.id ?? 'none'}_${activeDistKey}_${currentSalesOfficer?.id ?? 'none'}_standby_${outletsToDisplay.length}`;
+        const isNewScope = lastAutoFittedScopeRef.current !== scopeKey;
+
+        // ONLY auto-fit bounds when scope changes or initially; NEVER during background polling or after user zoomed/dragged
+        if (isNewScope && !userInteractedRef.current) {
+          if ((effectiveSupplier || currentSalesOfficer) && districtDepots.length > 0) {
+            const targetDepot = districtDepots.find((d) => d.districtId === activeDistKey) || districtDepots[0];
+            if (allCoords.length > 1) {
+              map.fitBounds(L.latLngBounds(allCoords), { padding: [50, 50], maxZoom: 15 });
+            } else if (targetDepot) {
+              map.setView(targetDepot.coords, 14);
+            }
+          } else if (internalDistrictId) {
+            const matchDepot = districtDepots.find((d) => d.districtId === internalDistrictId);
+            if (matchDepot) {
+              map.flyTo(matchDepot.coords, 14, { animate: true, duration: 1.0 });
+            }
+          } else if (allCoords.length > 0) {
             map.fitBounds(L.latLngBounds(allCoords), { padding: [50, 50], maxZoom: 15 });
-          } else {
-            map.setView(targetDepot.coords, 14);
           }
-          return;
-        }
-        if (internalDistrictId) {
-          const matchDepot = districtDepots.find((d) => d.districtId === internalDistrictId);
-          if (matchDepot) {
-            map.flyTo(matchDepot.coords, 14, { animate: true, duration: 1.0 });
-            return;
-          }
-        }
-        if (allCoords.length > 0) {
-          map.fitBounds(L.latLngBounds(allCoords), { padding: [50, 50], maxZoom: 15 });
+          lastAutoFittedScopeRef.current = scopeKey;
         }
       } catch (e) {}
 
@@ -1514,13 +1799,25 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
 
     // Auto-fit all routes onto single unified map view or fly to selected district depot
     if ((effectiveSupplier || currentSalesOfficer) && districtDepots.length > 0) {
-      if (allRouteCoordinates.length > 1) {
-        try {
-          const bounds = L.latLngBounds(allRouteCoordinates);
-          map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
-        } catch (e) {}
-      } else {
-        map.setView(districtDepots[0].coords, 14);
+      const activeDistKey = internalDistrictId || (effectiveSupplier?.primary_district_id || districtDepots[0]?.districtId || 1);
+      const scopeKey = `${effectiveSupplier?.id ?? 'none'}_${activeDistKey}_${currentSalesOfficer?.id ?? 'none'}_active_${mergedVehiclesData.map((v) => v.regNo).join(',')}`;
+      const isNewScope = lastAutoFittedScopeRef.current !== scopeKey;
+
+      if (isNewScope && !userInteractedRef.current) {
+        if (allRouteCoordinates.length > 1) {
+          try {
+            const bounds = L.latLngBounds(allRouteCoordinates);
+            map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+          } catch (e) {}
+        } else if (districtDepots[0]) {
+          map.setView(districtDepots[0].coords, 14);
+        } else if (internalDistrictId) {
+          const matchDepot = districtDepots.find((d) => d.districtId === internalDistrictId);
+          if (matchDepot) {
+            map.flyTo(matchDepot.coords, 14, { animate: true, duration: 1.0 });
+          }
+        }
+        lastAutoFittedScopeRef.current = scopeKey;
       }
       return;
     }
@@ -1617,17 +1914,16 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
 
   const handleFitAllFleet = () => {
     if (!mapInstanceRef.current) return;
+    userInteractedRef.current = false;
+    lastAutoFittedScopeRef.current = null;
     if (!hasActiveOrders) {
-      const depotCoord = currentSalesOfficer
-        ? resolveSalesOfficerCoordinates(currentSalesOfficer)
-        : resolveDepotCoordinates('Central Sub-Route', 0);
-      const allCoords: [number, number][] = [depotCoord];
+      const activeDepot = selectedDepot || districtDepots[0];
+      const allCoords: [number, number][] = activeDepot ? [activeDepot.coords] : [];
       outletsToDisplay.forEach((outlet, idx) => {
-        const outletId = outlet.id || outlet.outlet_id || (idx + 1);
-        allCoords.push(getOutletCoordinates(outletId, idx, outlet.sub_route || 'Gulshan Sub-Route', 0));
+        allCoords.push(resolveOutletCoordinates(outlet, idx, 0, activeDepot?.coords));
       });
       if (allCoords.length > 0) {
-        mapInstanceRef.current.fitBounds(L.latLngBounds(allCoords), { padding: [50, 50], animate: true });
+        mapInstanceRef.current.fitBounds(L.latLngBounds(allCoords), { padding: [50, 50], animate: true, maxZoom: 15 });
       }
       return;
     }
@@ -1635,7 +1931,7 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
     const allCoords: [number, number][] = [];
     mergedVehiclesData.forEach((v) => v.rawCoords.forEach((c) => allCoords.push(c)));
     if (allCoords.length > 0) {
-      mapInstanceRef.current.fitBounds(L.latLngBounds(allCoords), { padding: [50, 50], animate: true });
+      mapInstanceRef.current.fitBounds(L.latLngBounds(allCoords), { padding: [50, 50], animate: true, maxZoom: 16 });
     }
   };
 
@@ -1675,7 +1971,7 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
               {currentSalesOfficer
                 ? `Monitoring delivery fleet, assigned ${currentSalesOfficer.assigned_area || ''} area depot and nearby retail outlets (${outletsToDisplay.length} in jurisdiction).`
                 : effectiveSupplier
-                  ? `Monitoring delivery fleet and logistics fulfillment for ${districtDepots[0]?.districtName || 'Regional'} depot: ${districtDepots[0]?.depotAddress || ''}`
+                  ? `Monitoring delivery fleet and logistics fulfillment for ${selectedDepot?.districtName || districtDepots[0]?.districtName || 'Regional'} depot: ${selectedDepot?.depotAddress || districtDepots[0]?.depotAddress || ''}`
                   : (hasActiveOrders
                       ? 'Real-time route telemetry and checkpoint progression along sub-routes powered by OpenStreetMap API.'
                       : 'All delivery orders are completed. Delivery routes cleared; displaying central depot hub and retail outlet locations.')}
@@ -1693,33 +1989,36 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
             </div>
           )}
 
-          {/* Supplier Scoped Depot Badge */}
-          {effectiveSupplier && !currentSalesOfficer && districtDepots[0] && (
-            <div className="px-3 py-1.5 rounded-xl bg-slate-900 border border-amber-500/50 text-amber-300 font-mono text-xs font-bold flex items-center gap-2 shadow-xs">
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-              <span>🏭 {districtDepots[0].districtName} Depot Hub</span>
-            </div>
-          )}
-
-          {/* District Depot Switcher Dropdown (Only when in multi-district admin views) */}
-          {!effectiveSupplier && !currentSalesOfficer && availableDistricts && availableDistricts.length > 0 && (
+          {/* 64-District Depot Switcher Dropdown */}
+          {!currentSalesOfficer && (
             <div className="relative">
               <select
-                value={internalDistrictId ?? ''}
+                value={internalDistrictId ?? (effectiveSupplier ? (districtDepots[0]?.districtId ?? '') : '')}
                 onChange={(e) => handleDistrictChange(e.target.value ? Number(e.target.value) : null)}
-                className="bg-slate-900 border border-slate-700 text-amber-300 font-mono text-xs font-bold rounded-xl px-3 py-1.5 pr-7 focus:ring-2 focus:ring-amber-500 focus:outline-none cursor-pointer appearance-none shadow-xs"
+                className="bg-slate-900 border border-amber-500/70 text-amber-300 font-mono text-xs font-bold rounded-xl px-3 py-1.5 pr-7 focus:ring-2 focus:ring-amber-500 focus:outline-none cursor-pointer appearance-none shadow-xs"
               >
-                <option value="">🏢 Switch District Depot: All ({availableDistricts.length} Districts)</option>
-                {availableDistricts.map((d) => {
-                  const match = districtDepots.find((dp) => dp.districtId === d.id);
+                {!effectiveSupplier && (
+                  <option value="">🏢 National Overview: All 64 Districts</option>
+                )}
+                {['Dhaka', 'Chittagong', 'Rajshahi', 'Khulna', 'Barishal', 'Sylhet', 'Rangpur', 'Mymensingh'].map((divName) => {
+                  const divDistricts = allDistrictsList.filter((d) => d.division.toLowerCase() === divName.toLowerCase());
+                  if (divDistricts.length === 0) return null;
                   return (
-                    <option key={d.id} value={d.id}>
-                      📍 {d.name} — {match ? match.supplierName.slice(0, 24) : `${d.name} Depot`}
-                    </option>
+                    <optgroup key={divName} label={`── ${divName.toUpperCase()} DIVISION ──`}>
+                      {divDistricts.map((d) => {
+                        const match = districtDepots.find((dp) => dp.districtId === d.id);
+                        const hasSup = match && match.isRegisteredSupplier;
+                        return (
+                          <option key={d.id} value={d.id}>
+                            📍 {d.name} {hasSup ? `★ [${match.supplierName.slice(0, 22)}]` : '— Regional Depot'}
+                          </option>
+                        );
+                      })}
+                    </optgroup>
                   );
                 })}
               </select>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <ChevronDown className="w-3.5 h-3.5 text-amber-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
           )}
 
@@ -1991,10 +2290,10 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => handleDistrictChange(null)}
+                onClick={() => handleDistrictChange(effectiveSupplier ? (districtDepots[0]?.districtId ?? 1) : null)}
                 className="text-[10px] font-bold px-2 py-1 rounded-lg transition cursor-pointer"
                 style={{ backgroundColor: '#1e293b', color: '#cbd5e1' }}
-                title="Reset to All Districts"
+                title="Reset District View"
               >
                 ✕
               </button>
@@ -2025,7 +2324,7 @@ export const DeliveryFleetMap: React.FC<DeliveryFleetMapProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleDistrictChange(null)}
+                    onClick={() => handleDistrictChange(effectiveSupplier ? (districtDepots[0]?.districtId ?? 1) : null)}
                     className="text-[10px] font-bold px-2 py-0.5 rounded-lg transition cursor-pointer"
                     style={{ backgroundColor: '#1e293b', color: '#cbd5e1' }}
                     title="Reset to All Districts"

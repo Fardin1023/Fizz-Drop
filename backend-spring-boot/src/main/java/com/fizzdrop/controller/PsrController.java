@@ -347,19 +347,22 @@ public class PsrController {
         int settledRefundsCount = 0;
 
         for (Map<String, Object> ord : orders) {
-            String st = (String) ord.get("status");
+            Object stObj = ord.get("status") != null ? ord.get("status") : ord.get("STATUS");
+            String st = stObj != null ? stObj.toString() : "";
             if ("SUBMITTED_TO_SO".equals(st) || "APPROVED_BY_SO".equals(st) || "DRAFT".equals(st)) {
                 activeOrdersCount++;
             }
-            if (ord.get("total_amount") != null) {
+            Object totObj = ord.get("total_amount") != null ? ord.get("total_amount") : ord.get("TOTAL_AMOUNT");
+            if (totObj != null) {
                 try {
-                    todayOrdersValue = todayOrdersValue.add(new BigDecimal(ord.get("total_amount").toString()));
+                    todayOrdersValue = todayOrdersValue.add(new BigDecimal(totObj.toString()));
                 } catch (Exception ignored) {}
             }
         }
 
         for (Map<String, Object> ref : refunds) {
-            String st = (String) ref.get("status");
+            Object stObj = ref.get("status") != null ? ref.get("status") : ref.get("STATUS");
+            String st = stObj != null ? stObj.toString() : "";
             if ("SUBMITTED_TO_SO".equals(st) || "PENDING".equals(st)) {
                 pendingRefundsCount++;
             } else if ("SETTLED".equals(st) || "APPROVED_BY_SO".equals(st)) {
@@ -1702,9 +1705,10 @@ public class PsrController {
             so = salesOfficerRepository.findById(salesOfficerId).orElse(null);
         }
 
-        String area = so != null && so.getAssignedArea() != null ? so.getAssignedArea() : "";
+        Long districtId = so != null ? so.getDistrictId() : null;
+        String area = so != null && so.getAssignedArea() != null ? so.getAssignedArea().trim() : "";
 
-        // 1. Gather all sub-routes in this territory
+        // 1. Gather all sub-routes strictly in this officer's assigned territory
         Set<String> subRoutes = new LinkedHashSet<>();
         if (!area.isEmpty()) {
             subRoutes.add(area + "-Circle North Route");
@@ -1712,55 +1716,68 @@ public class PsrController {
             subRoutes.add(area + "-Commercial Center Route");
             subRoutes.add(area + "-Retail Market Route");
         }
-        try {
-            List<String> outletRoutes = jdbcTemplate.queryForList(
-                    "SELECT DISTINCT sub_route FROM outlets WHERE sub_route IS NOT NULL AND sub_route != ''",
-                    String.class
-            );
-            subRoutes.addAll(outletRoutes);
-        } catch (Exception ignored) {}
+        if (districtId != null && !area.isEmpty()) {
+            try {
+                List<String> outletRoutes = jdbcTemplate.queryForList(
+                        "SELECT DISTINCT sub_route FROM outlets WHERE district_id = ? AND (LOWER(TRIM(area)) = LOWER(TRIM(?)) OR LOWER(location_address) LIKE LOWER(?)) AND sub_route IS NOT NULL AND sub_route != ''",
+                        String.class,
+                        districtId, area, "%" + area + "%"
+                );
+                subRoutes.addAll(outletRoutes);
+            } catch (Exception ignored) {}
 
-        try {
-            List<String> psrRoutes = jdbcTemplate.queryForList(
-                    "SELECT DISTINCT sub_route FROM pre_sales_officers WHERE sub_route IS NOT NULL AND sub_route != ''",
-                    String.class
-            );
-            subRoutes.addAll(psrRoutes);
-        } catch (Exception ignored) {}
+            try {
+                List<String> psrRoutes = jdbcTemplate.queryForList(
+                        "SELECT DISTINCT sub_route FROM pre_sales_officers WHERE sales_officer_id = ? AND sub_route IS NOT NULL AND sub_route != ''",
+                        String.class,
+                        so.getId()
+                );
+                subRoutes.addAll(psrRoutes);
+            } catch (Exception ignored) {}
+        } else if (!area.isEmpty()) {
+            try {
+                List<String> outletRoutes = jdbcTemplate.queryForList(
+                        "SELECT DISTINCT sub_route FROM outlets WHERE (LOWER(TRIM(area)) = LOWER(TRIM(?)) OR LOWER(location_address) LIKE LOWER(?)) AND sub_route IS NOT NULL AND sub_route != ''",
+                        String.class,
+                        area, "%" + area + "%"
+                );
+                subRoutes.addAll(outletRoutes);
+            } catch (Exception ignored) {}
+        }
 
-        // Ensure default sub-routes are assigned to Dhanmondi outlets if not set
-        try {
-            jdbcTemplate.update("UPDATE outlets SET sub_route = 'Dhanmondi-Circle North Route' WHERE district_id = 1 AND sub_route IS NULL AND outlet_id IN (1, 2, 3, 4, 5)");
-            jdbcTemplate.update("UPDATE outlets SET sub_route = 'Dhanmondi-Avenue South Route' WHERE district_id = 1 AND sub_route IS NULL AND outlet_id IN (6, 7, 8, 9, 10)");
-            jdbcTemplate.update("UPDATE outlets SET sub_route = 'Dhanmondi-Commercial Center Route' WHERE district_id = 1 AND sub_route IS NULL AND outlet_id IN (11, 12, 13, 14, 15)");
-        } catch (Exception ignored) {}
+        // Ensure default sub-routes are assigned to Dhanmondi outlets if not set (strictly for Dhanmondi SO)
+        if (districtId != null && districtId == 1L && "Dhanmondi".equalsIgnoreCase(area)) {
+            try {
+                jdbcTemplate.update("UPDATE outlets SET sub_route = 'Dhanmondi-Circle North Route' WHERE district_id = 1 AND sub_route IS NULL AND outlet_id IN (1, 2, 3, 4, 5)");
+                jdbcTemplate.update("UPDATE outlets SET sub_route = 'Dhanmondi-Avenue South Route' WHERE district_id = 1 AND sub_route IS NULL AND outlet_id IN (6, 7, 8, 9, 10)");
+                jdbcTemplate.update("UPDATE outlets SET sub_route = 'Dhanmondi-Commercial Center Route' WHERE district_id = 1 AND sub_route IS NULL AND outlet_id IN (11, 12, 13, 14, 15)");
+            } catch (Exception ignored) {}
+        }
 
-        // 2. Fetch all shops in this territory/area
+        // 2. Fetch all shops in this territory/area - STRICTLY scoped to SO's district and area
         List<Map<String, Object>> allShops;
-        if (!area.isEmpty()) {
+        if (districtId != null && !area.isEmpty()) {
             allShops = jdbcTemplate.queryForList(
                     "SELECT o.outlet_id, o.franchise_name, o.branch_name, o.outlet_name, o.location_address AS address, " +
-                    "o.contact_phone AS phone_number, o.district_id, o.sub_route, o.assigned_psr_id, " +
+                    "o.contact_phone AS phone_number, o.district_id, o.city, o.area, o.sub_route, o.assigned_psr_id, " +
                     "p.name AS assigned_psr_name, p.psr_code AS assigned_psr_code " +
                     "FROM outlets o LEFT JOIN pre_sales_officers p ON o.assigned_psr_id = p.id " +
-                    "WHERE o.location_address LIKE ? OR o.area LIKE ? OR o.sub_route IS NOT NULL ORDER BY o.outlet_id ASC",
-                    "%" + area + "%", "%" + area + "%"
+                    "WHERE o.district_id = ? AND (LOWER(TRIM(o.area)) = LOWER(TRIM(?)) OR LOWER(o.location_address) LIKE LOWER(?)) " +
+                    "ORDER BY o.outlet_id ASC",
+                    districtId, area, "%" + area + "%"
             );
-            if (allShops.isEmpty()) {
-                allShops = jdbcTemplate.queryForList(
-                        "SELECT o.outlet_id, o.franchise_name, o.branch_name, o.outlet_name, o.location_address AS address, " +
-                        "o.contact_phone AS phone_number, o.district_id, o.sub_route, o.assigned_psr_id, " +
-                        "p.name AS assigned_psr_name, p.psr_code AS assigned_psr_code " +
-                        "FROM outlets o LEFT JOIN pre_sales_officers p ON o.assigned_psr_id = p.id ORDER BY o.outlet_id ASC"
-                );
-            }
-        } else {
+        } else if (!area.isEmpty()) {
             allShops = jdbcTemplate.queryForList(
                     "SELECT o.outlet_id, o.franchise_name, o.branch_name, o.outlet_name, o.location_address AS address, " +
-                    "o.contact_phone AS phone_number, o.district_id, o.sub_route, o.assigned_psr_id, " +
+                    "o.contact_phone AS phone_number, o.district_id, o.city, o.area, o.sub_route, o.assigned_psr_id, " +
                     "p.name AS assigned_psr_name, p.psr_code AS assigned_psr_code " +
-                    "FROM outlets o LEFT JOIN pre_sales_officers p ON o.assigned_psr_id = p.id ORDER BY o.outlet_id ASC"
+                    "FROM outlets o LEFT JOIN pre_sales_officers p ON o.assigned_psr_id = p.id " +
+                    "WHERE LOWER(TRIM(o.area)) = LOWER(TRIM(?)) OR LOWER(o.location_address) LIKE LOWER(?) " +
+                    "ORDER BY o.outlet_id ASC",
+                    area, "%" + area + "%"
             );
+        } else {
+            allShops = Collections.emptyList();
         }
 
         // 3. Normalize all shop keys to lowercase (for Oracle compatibility) and filter subroute shops
@@ -1783,6 +1800,7 @@ public class PsrController {
 
         Map<String, Object> resp = new HashMap<>();
         resp.put("assigned_area", area);
+        resp.put("district_id", districtId);
         resp.put("sub_routes", new ArrayList<>(subRoutes));
         resp.put("all_shops", normalizedAllShops);
         resp.put("subroute_shops", subrouteShops);

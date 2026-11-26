@@ -385,7 +385,7 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           quantity: effectiveDispatchQty,
-          unit_price: fulfillPrice,
+          unit_price: fulfillModalReq.is_so_purchase ? Number(fulfillModalReq.unit_price || 35) : fulfillPrice,
           user_id: userId,
           sales_officer_id: fulfillModalReq.sales_officer_id,
           notes: fulfillNotes || `Dispatched to SO ${fulfillModalReq.sales_officer_name || ''} buffer`,
@@ -397,8 +397,8 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
         throw new Error(data.error || data.message || 'Failed to dispatch stock');
       }
 
-      // If price was adjusted, broadcast to Superadmin tabs
-      if (fulfillPrice > 0 && fulfillPrice !== fulfillModalReq.unit_price) {
+      // If price was adjusted for retail outlet orders, broadcast to Superadmin tabs
+      if (!fulfillModalReq.is_so_purchase && fulfillPrice > 0 && fulfillPrice !== fulfillModalReq.unit_price) {
         try {
           const channel = new BroadcastChannel('fizzdrop_realtime_events');
           channel.postMessage({
@@ -1560,8 +1560,13 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
                   {/* Wholesale Price */}
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
-                      <label className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-zinc-300">
-                        Wholesale Unit Price (৳ per Case)
+                      <label className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
+                        <span>Wholesale Unit Price (৳ per Case)</span>
+                        {fulfillModalReq.is_so_purchase && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                            Centrally Assigned
+                          </span>
+                        )}
                       </label>
                       <span className="text-xs text-slate-400">
                         Original: ৳{Number(fulfillModalReq.unit_price || 35).toFixed(2)}
@@ -1574,11 +1579,22 @@ export const SupplierOutletRequisitions: React.FC<SupplierOutletRequisitionsProp
                         step="0.50"
                         min="1"
                         value={fulfillPrice}
-                        onChange={(e) => setFulfillPrice(parseFloat(e.target.value) || 0)}
-                        className="w-full pl-8 pr-4 py-3 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-900 dark:text-white font-bold text-base focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                        onChange={(e) => !fulfillModalReq.is_so_purchase && setFulfillPrice(parseFloat(e.target.value) || 0)}
+                        readOnly={fulfillModalReq.is_so_purchase}
+                        disabled={fulfillModalReq.is_so_purchase}
+                        className={`w-full pl-8 pr-4 py-3 rounded-xl border border-slate-200 dark:border-zinc-700 font-bold text-base focus:outline-hidden ${
+                          fulfillModalReq.is_so_purchase
+                            ? 'bg-slate-100 dark:bg-zinc-800/80 text-slate-600 dark:text-zinc-300 cursor-not-allowed select-none'
+                            : 'bg-white dark:bg-zinc-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-500'
+                        }`}
                         required
                       />
                     </div>
+                    {fulfillModalReq.is_so_purchase && (
+                      <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-1 flex items-center gap-1 font-medium">
+                        <span>🔒 Wholesale rate is centrally assigned by Superadmin for this district and cannot be modified.</span>
+                      </p>
+                    )}
                   </div>
 
                   {/* Notes */}

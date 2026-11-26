@@ -47,22 +47,58 @@ export const extractFranchiseName = (
   return cleaned || outletName || 'Independent Outlet';
 };
 
+export const cleanBranchName = (
+  branchName?: string,
+  franchiseName?: string
+): string => {
+  if (!branchName) return '';
+  let b = branchName.trim();
+  if (franchiseName && franchiseName.trim()) {
+    const f = franchiseName.trim();
+    const escaped = f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`^${escaped}\\s*[–—\\-:]\\s*`, 'i');
+    b = b.replace(regex, '').trim();
+  }
+  return b;
+};
+
+export const cleanOutletDisplayName = (outlet?: {
+  outlet_name?: string;
+  franchise_name?: string;
+  branch_name?: string;
+  area?: string;
+}): string => {
+  if (!outlet) return 'Outlet Branch';
+  const f = extractFranchiseName(outlet.outlet_name, outlet.franchise_name);
+  const rawBranch = outlet.branch_name || (outlet.outlet_name && outlet.outlet_name.includes('—') ? outlet.outlet_name.split('—')[1] : '');
+  const b = cleanBranchName(rawBranch, f) || outlet.area || '';
+
+  if (f && f.toLowerCase() !== 'local shop' && f.toLowerCase() !== 'independent outlet') {
+    if (b) return `${f} — ${b}`;
+    return f;
+  }
+  
+  if (b) return b;
+  return outlet.outlet_name || 'Outlet Branch';
+};
+
 export const extractBranchName = (
   outletName: string = '',
   branchName?: string,
   area?: string,
   city?: string
 ): string => {
+  const franchise = extractFranchiseName(outletName);
   if (branchName && branchName.trim()) {
-    return branchName.trim();
+    return cleanBranchName(branchName, franchise);
   }
   if (outletName.includes('—')) {
     const p = outletName.split('—')[1].trim();
-    if (p) return p;
+    if (p) return cleanBranchName(p, franchise);
   }
   if (outletName.includes(' - ')) {
     const p = outletName.split(' - ')[1].trim();
-    if (p) return p;
+    if (p) return cleanBranchName(p, franchise);
   }
   if (area && area.trim()) {
     return `${area.trim()} Branch`;

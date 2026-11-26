@@ -290,11 +290,18 @@ mysql -u <username> -p < database/tests/04_test_suite.sql
 
 When constructing the ASP.NET Core backend:
 1. **Connection String**:
-   ```json
-   "ConnectionStrings": {
-     "FizzDropConnection": "Server=localhost;Port=3306;Database=fizzdrop_db;User Id=root;Password=YOUR_PASSWORD;CharSet=utf8mb4;"
-   }
-   ```
+   - **Oracle Database 23ai (Primary)**:
+     ```json
+     "ConnectionStrings": {
+       "FizzDropConnection": "Data Source=localhost:1521/FREEPDB1;User Id=FIZZDROP;Password=FizzDrop123#;"
+     }
+     ```
+   - **MySQL (Fallback)**:
+     ```json
+     "ConnectionStrings": {
+       "FizzDropConnection": "Server=localhost;Port=3306;Database=fizzdrop_db;User Id=root;Password=YOUR_PASSWORD;CharSet=utf8mb4;"
+     }
+     ```
 2. **Entity Framework Core / Dapper Models**:
    - Map `Shop_Inventory` with a composite key `.HasKey(si => new { si.BranchId, si.ProductId })`.
    - Implement audit interceptors or entity listeners to auto-fill `CreatedBy`, `CreatedDate`, `UpdatedBy`, and `UpdatedDate` from the current authenticated JWT claims (`HttpContext.User`).

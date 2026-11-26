@@ -95,18 +95,23 @@ public class TradeOfferController {
             } catch (Exception ignored) {}
 
             // Table to track offers pitched/disclosed to specific outlets by PSR
-            jdbcTemplate.execute(
-                "CREATE TABLE IF NOT EXISTS outlet_disclosed_offers (" +
-                "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
-                "outlet_id BIGINT NOT NULL, " +
-                "trade_offer_id BIGINT NOT NULL, " +
-                "psr_id BIGINT NULL, " +
-                "psr_name VARCHAR(150) NULL, " +
-                "disclosed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, " +
-                "UNIQUE KEY uq_outlet_offer (outlet_id, trade_offer_id), " +
-                "INDEX idx_disclosed_outlet (outlet_id)" +
-                ")"
-            );
+            try {
+                boolean isOracle = com.fizzdrop.config.DatabaseConfig.activeDbEngine != null && com.fizzdrop.config.DatabaseConfig.activeDbEngine.toLowerCase().contains("oracle");
+                if (!isOracle) {
+                    jdbcTemplate.execute(
+                        "CREATE TABLE IF NOT EXISTS outlet_disclosed_offers (" +
+                        "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
+                        "outlet_id BIGINT NOT NULL, " +
+                        "trade_offer_id BIGINT NOT NULL, " +
+                        "psr_id BIGINT NULL, " +
+                        "psr_name VARCHAR(150) NULL, " +
+                        "disclosed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, " +
+                        "UNIQUE KEY uq_outlet_offer (outlet_id, trade_offer_id), " +
+                        "INDEX idx_disclosed_outlet (outlet_id)" +
+                        ")"
+                    );
+                }
+            } catch (Exception ignored) {}
 
             // Ensure Cumilla / Comilla Sales Officer and Outlets are mapped to district 16 (Comilla)
             try {
@@ -558,7 +563,6 @@ public class TradeOfferController {
      * Records disclosure and sends an immediate AppNotification to the outlet!
      */
     @PostMapping("/{offerId}/disclose-to-outlet/{outletId}")
-    @Transactional
     public ResponseEntity<?> discloseOfferToOutlet(
             @PathVariable Long offerId,
             @PathVariable Long outletId,
@@ -586,23 +590,22 @@ public class TradeOfferController {
             }
         }
 
-        // 1. Record disclosed offer in outlet_disclosed_offers
+        // 1. Record disclosed offer in outlet_disclosed_offers using universal UPDATE + INSERT
         try {
-            jdbcTemplate.update(
-                "MERGE INTO outlet_disclosed_offers (outlet_id, trade_offer_id, psr_id, psr_name, disclosed_at) " +
-                "KEY (outlet_id, trade_offer_id) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)",
-                outletId, offerId, psrId, psrName
+            int updated = jdbcTemplate.update(
+                "UPDATE outlet_disclosed_offers SET psr_id = ?, psr_name = ?, offer_id = ?, trade_offer_id = ?, disclosed_at = CURRENT_TIMESTAMP " +
+                "WHERE outlet_id = ? AND (trade_offer_id = ? OR offer_id = ?)",
+                psrId, psrName, offerId, offerId, outletId, offerId, offerId
             );
-        } catch (Exception ex) {
-            try {
+            if (updated == 0) {
                 jdbcTemplate.update(
-                    "INSERT INTO outlet_disclosed_offers (outlet_id, trade_offer_id, psr_id, psr_name, disclosed_at) " +
-                    "VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP) ON DUPLICATE KEY UPDATE psr_name = VALUES(psr_name), disclosed_at = CURRENT_TIMESTAMP",
-                    outletId, offerId, psrId, psrName
+                    "INSERT INTO outlet_disclosed_offers (outlet_id, offer_id, trade_offer_id, psr_id, psr_name, disclosed_at) " +
+                    "VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
+                    outletId, offerId, offerId, psrId, psrName
                 );
-            } catch (Exception ex2) {
-                System.err.println("[discloseOfferToOutlet] Insert fallback note: " + ex2.getMessage());
             }
+        } catch (Exception ex) {
+            System.err.println("[discloseOfferToOutlet] Record disclosure note: " + ex.getMessage());
         }
 
         // 2. Dispatch real-time AppNotification to Outlet!

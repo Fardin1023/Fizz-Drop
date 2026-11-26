@@ -53,6 +53,21 @@ public class DatabaseController {
             status.put("user", meta.getUserName());
             status.put("database", isOracle ? "FREEPDB1" : "fizzdrop_db");
 
+            // Test Local Oracle 23ai
+            Map<String, Object> oracleStatus = new HashMap<>();
+            try {
+                Class.forName("oracle.jdbc.OracleDriver");
+                try (Connection oConn = java.sql.DriverManager.getConnection(com.fizzdrop.config.DatabaseConfig.localOracleUrl, com.fizzdrop.config.DatabaseConfig.localOracleUser, com.fizzdrop.config.DatabaseConfig.localOraclePass)) {
+                    oracleStatus.put("available", oConn.isValid(3));
+                    oracleStatus.put("url", "localhost:1521/FREEPDB1");
+                    oracleStatus.put("user", com.fizzdrop.config.DatabaseConfig.localOracleUser);
+                }
+            } catch (Exception ex) {
+                oracleStatus.put("available", false);
+                oracleStatus.put("error", ex.getMessage());
+            }
+            status.put("local_oracle", oracleStatus);
+
             // Test Local MySQL
             Map<String, Object> localStatus = new HashMap<>();
             try (Connection lConn = java.sql.DriverManager.getConnection(com.fizzdrop.config.DatabaseConfig.localDbUrl, com.fizzdrop.config.DatabaseConfig.localDbUser, com.fizzdrop.config.DatabaseConfig.localDbPass)) {

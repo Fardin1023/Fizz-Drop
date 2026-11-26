@@ -60,6 +60,18 @@ export const SqlQueryConsole: React.FC<SqlQueryConsoleProps> = ({
   const [querySource, setQuerySource] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [activeDb, setActiveDb] = useState('FREEPDB1');
+  const [dbEngine, setDbEngine] = useState('Oracle Database 23ai');
+
+  React.useEffect(() => {
+    fetch('http://localhost:8080/api/db/status')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.database) setActiveDb(data.database);
+        if (data.engine) setDbEngine(data.engine);
+      })
+      .catch(() => {});
+  }, []);
 
   const handleRunQuery = async () => {
     if (!query.trim()) return;
@@ -189,7 +201,7 @@ export const SqlQueryConsole: React.FC<SqlQueryConsoleProps> = ({
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 border border-emerald-500/20" />
             <span className="ml-2 font-mono text-xs font-bold text-blue-800 flex items-center gap-1.5">
               <Terminal className="w-3.5 h-3.5 text-blue-600" />
-              <span>fizzdrop_db // SQL Execution Terminal</span>
+              <span>{activeDb} // SQL Execution Terminal ({dbEngine})</span>
             </span>
           </div>
 
@@ -221,7 +233,7 @@ export const SqlQueryConsole: React.FC<SqlQueryConsoleProps> = ({
 
           <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-slate-200/60">
             <span className="text-[11px] font-mono text-slate-500 flex items-center gap-1.5">
-              <Database className="w-3 h-3 text-blue-600" /> Target Database: <strong className="text-blue-700">`fizzdrop_db`</strong>
+              <Database className="w-3 h-3 text-blue-600" /> Target Database: <strong className="text-blue-700">`{activeDb}`</strong>
             </span>
             <button
               onClick={handleRunQuery}

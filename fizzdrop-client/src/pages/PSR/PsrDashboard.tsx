@@ -165,8 +165,8 @@ export default function PsrDashboard() {
 
   const paramPsrId = searchParams.get('psrId') ? Number(searchParams.get('psrId')) : null;
   const authPsrId = user?.pre_sales_officer?.id;
-  const activePsrId = paramPsrId || authPsrId || data?.psr?.id || (allPsrs.length > 0 ? allPsrs[0].id : 9);
-  const activeUserId = data?.psr?.user_id || (user?.role === 'PSR' ? user?.user_id : undefined) || (activePsrId ? 200 + activePsrId : 209);
+  const activePsrId = paramPsrId || authPsrId || data?.psr?.id || (allPsrs.length > 0 ? allPsrs[0].id : 1);
+  const activeUserId = data?.psr?.user_id || ((user as any)?.role === 'PSR' ? (user as any)?.user_id : undefined) || (activePsrId ? 200 + activePsrId : 201);
 
   // Notifications
   const {
@@ -212,7 +212,7 @@ export default function PsrDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [activePsrId, fetchPsrOffers]);
+  }, [fetchPsrOffers]);
 
   // Check matching trade schemes when taking order for an outlet
   useEffect(() => {
@@ -266,26 +266,35 @@ export default function PsrDashboard() {
     }
   };
 
-  // Fetch all PSRs for quick demo switcher
+  // Fetch all PSRs and load active dashboard
   useEffect(() => {
-    fetch('http://localhost:8080/api/v1/psr/all')
-      .then((res) => res.json())
-      .then((resData) => {
-        if (Array.isArray(resData) && resData.length > 0) {
-          setAllPsrs(resData);
-          if (!paramPsrId && !authPsrId) {
-            loadDashboard(resData[0].id);
-          }
-        }
-      })
-      .catch(() => {});
-  }, []);
+    let isCancelled = false;
 
-  useEffect(() => {
-    if (paramPsrId && data?.psr?.id && paramPsrId !== data.psr.id) {
-      loadDashboard(paramPsrId);
-    }
-  }, [paramPsrId, data?.psr?.id, loadDashboard]);
+    const init = async () => {
+      try {
+        const res = await fetch('http://localhost:8080/api/v1/psr/all');
+        const resData = await res.json();
+        const psrList = Array.isArray(resData) ? resData : [];
+        if (!isCancelled) setAllPsrs(psrList);
+
+        const targetId = paramPsrId || authPsrId || (psrList.length > 0 ? psrList[0].id : 1);
+        if (!isCancelled) {
+          loadDashboard(targetId);
+        }
+      } catch (err) {
+        console.error('Error loading PSR data:', err);
+        if (!isCancelled) {
+          loadDashboard(paramPsrId || authPsrId || 1);
+        }
+      }
+    };
+
+    init();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [paramPsrId, authPsrId, loadDashboard]);
 
   const handleSwitchPsr = async (selectedId: number) => {
     const selected = allPsrs.find((p) => p.id === selectedId);
@@ -309,7 +318,11 @@ export default function PsrDashboard() {
     }, { replace: true });
 
     await loginAsPsr(selectedId, selected.email);
-    await loadDashboard(selectedId);
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/admin-login');
   };
 
   const [submittingToSoId, setSubmittingToSoId] = useState<number | null>(null);
@@ -383,7 +396,7 @@ export default function PsrDashboard() {
         message: `Order ${order.order_code} (${order.product_name || 'Stock'} · ${order.quantity} cs) requested to Sales Officer! Your SO has received the real-time notification.`,
         orderCode: order.order_code,
       });
-      loadDashboard();
+      loadDashboard(activePsrId);
     } catch (err: any) {
       setRequestAlert({
         type: 'error',
@@ -394,10 +407,6 @@ export default function PsrDashboard() {
       setSubmittingToSoId(null);
     }
   };
-
-  useEffect(() => {
-    loadDashboard();
-  }, [loadDashboard]);
 
   // Handle Log Shop Visit & Inventory Audit
   const handleLogVisit = async (proceedToOrder: boolean = false) => {
@@ -746,7 +755,7 @@ export default function PsrDashboard() {
             )}
 
             <button
-              onClick={() => { void loadDashboard(); }}
+              onClick={() => { void loadDashboard(activePsrId); }}
               className="p-2 rounded-xl text-[#334155] hover:text-[#0F172A] hover:bg-[#d6ecff] border border-transparent hover:border-[#c4dde9] transition cursor-pointer"
               title="Refresh Route Data"
             >
@@ -765,7 +774,7 @@ export default function PsrDashboard() {
             />
 
             <button
-              onClick={logout}
+              onClick={handleLogout}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-rose-700 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition cursor-pointer"
               title="Sign Out"
             >
@@ -778,7 +787,14 @@ export default function PsrDashboard() {
 
       {/* Main Workspace */}
       <main className="max-w-7xl mx-auto w-full p-4 sm:p-6 flex-1 flex flex-col gap-5">
-
+        {loading && !data ? (
+          <div className="py-32 flex flex-col items-center justify-center gap-3">
+            <RefreshCw className="h-9 w-9 text-[#0284c7] animate-spin" />
+            <h3 className="font-bold text-base text-[#0F172A]">Loading PSR Field Route & Outlets...</h3>
+            <p className="text-xs text-[#64748B]">Connecting to Pre-Sales logistics network</p>
+          </div>
+        ) : (
+          <>
         {/* Assigned Hierarchy Banner */}
         <div className="rounded-2xl bg-gradient-to-r from-[#d6ecff] via-[#e8f4ff] to-[#f7fbff] p-5 text-[#0F172A] border border-[#c4dde9] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -1110,18 +1126,41 @@ export default function PsrDashboard() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredOutlets.map((outlet) => {
-                  const outletTitle = `${outlet.franchise_name || 'Retail Outlet'} - ${outlet.branch_name || 'Branch'}`;
+                {filteredOutlets.map((outlet, idx) => {
+                  const outletId = outlet.outlet_id ?? outlet.OUTLET_ID;
+                  const franchiseName = outlet.franchise_name ?? outlet.FRANCHISE_NAME;
+                  const branchName = outlet.branch_name ?? outlet.BRANCH_NAME;
+                  const outletName = outlet.outlet_name ?? outlet.OUTLET_NAME;
+                  const address = outlet.address ?? outlet.ADDRESS ?? outlet.location_address ?? outlet.LOCATION_ADDRESS;
+                  const phoneNumber = outlet.phone_number ?? outlet.PHONE_NUMBER ?? outlet.contact_phone ?? outlet.CONTACT_PHONE;
+                  const subRoute = outlet.sub_route ?? outlet.SUB_ROUTE;
+                  const shelfStock = outlet.total_shelf_stock ?? outlet.TOTAL_SHELF_STOCK;
+
+                  const outletTitle = franchiseName && branchName
+                    ? `${franchiseName} – ${branchName}`
+                    : (outletName || franchiseName || branchName || `Outlet #${outletId}`);
+
+                  const normalizedOutlet = {
+                    ...outlet,
+                    outlet_id: outletId,
+                    franchise_name: franchiseName,
+                    branch_name: branchName,
+                    outlet_name: outletTitle,
+                    address,
+                    phone_number: phoneNumber,
+                    sub_route: subRoute,
+                    total_shelf_stock: shelfStock,
+                  };
                   return (
                     <div
-                      key={outlet.outlet_id}
+                      key={outletId || idx}
                       className="bg-[#f7fbff] border border-[#c4dde9] hover:border-[#b7c4cd] rounded-xl p-4 shadow-2xs hover:shadow-xs transition flex flex-col justify-between gap-3 group"
                     >
                       <div className="space-y-2">
                         <div className="flex items-start justify-between gap-2">
                           <div>
                             <span className="text-[10px] font-bold text-[#0284c7] uppercase tracking-wider">
-                              Outlet #{outlet.outlet_id}
+                              Outlet #{outletId}
                             </span>
                             <h3 className="font-bold text-[#0F172A] text-base group-hover:text-[#0284c7] transition">
                               {outletTitle}
@@ -1134,23 +1173,23 @@ export default function PsrDashboard() {
 
                         <p className="text-xs text-[#475569] flex items-start gap-1.5">
                           <MapPin className="h-3.5 w-3.5 text-[#64748B] shrink-0 mt-0.5" />
-                          <span>{outlet.address || 'Address on sub-route'}</span>
+                          <span>{address || 'Address on sub-route'}</span>
                         </p>
 
-                        {outlet.phone_number && (
+                        {phoneNumber && (
                           <p className="text-xs text-[#475569] flex items-center gap-1.5">
                             <Phone className="h-3.5 w-3.5 text-[#64748B]" />
-                            <span>{outlet.phone_number}</span>
+                            <span>{phoneNumber}</span>
                           </p>
                         )}
 
                         <div className="pt-1 flex items-center justify-between">
                           <span className="inline-block px-2 py-0.5 rounded text-[11px] bg-[#e8f4ff] border border-[#c4dde9] text-[#0F172A] font-medium">
-                            Route: {outlet.sub_route || data?.sub_route || 'Standard sub-route'}
+                            Route: {subRoute || data?.sub_route || 'Standard sub-route'}
                           </span>
-                          {outlet.total_shelf_stock !== undefined && (
+                          {shelfStock !== undefined && (
                             <span className="text-[11px] font-mono font-bold text-[#475569]">
-                              Shelf Stock: <strong className="text-[#0F172A]">{outlet.total_shelf_stock}</strong>
+                              Shelf Stock: <strong className="text-[#0F172A]">{shelfStock}</strong>
                             </span>
                           )}
                         </div>
@@ -1161,9 +1200,9 @@ export default function PsrDashboard() {
                         <button
                           type="button"
                           onClick={() => {
-                            setVisitModalOutlet(outlet);
+                            setVisitModalOutlet(normalizedOutlet);
                             setVisitType('STOCK_AUDIT');
-                            setVisitNotes(`Physical cooler & shelf stock audit at ${outlet.branch_name || outlet.outlet_name}`);
+                            setVisitNotes(`Physical cooler & shelf stock audit at ${outletTitle}`);
                           }}
                           className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-[#e8f4ff] hover:bg-[#d6ecff] text-[#0F172A] border border-[#c4dde9] hover:border-[#b7c4cd] transition cursor-pointer"
                           title="Visit store and inspect shelf stock"
@@ -1175,7 +1214,7 @@ export default function PsrDashboard() {
                         <button
                           type="button"
                           onClick={() => {
-                            setOrderModalOutlet(outlet);
+                            setOrderModalOutlet(normalizedOutlet);
                             if (data?.psr?.target_product_id) {
                               setSelectedProductId(String(data.psr.target_product_id));
                             } else if (data?.products?.[0]?.product_id) {
@@ -1191,7 +1230,7 @@ export default function PsrDashboard() {
                         <button
                           type="button"
                           onClick={() => {
-                            setRefundModalOutlet(outlet);
+                            setRefundModalOutlet(normalizedOutlet);
                             setSelectedProductId(data?.products?.[0]?.product_id ? String(data.products[0].product_id) : '');
                           }}
                           className="flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-bold bg-[#f7fbff] hover:bg-rose-50 text-rose-700 border border-[#c4dde9] hover:border-rose-300 transition cursor-pointer"
@@ -1248,12 +1287,13 @@ export default function PsrDashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#c4dde9]/60">
-                    {data.orders.map((ord: any) => {
+                    {data.orders.map((ord: any, idx: number) => {
+                      const ordId = ord.id ?? ord.ID ?? ord.order_code ?? ord.ORDER_CODE ?? idx;
                       const isSubmitted = ord.status === 'SUBMITTED_TO_SO' || ord.status === 'SUBMITTED_TO_PSR';
                       const isApproved = ord.status === 'APPROVED_BY_SO' || ord.status === 'REQUISITIONED_FROM_SUPPLIER';
                       const isDispatched = ord.status === 'DISPATCHED' || ord.status === 'DELIVERED';
                       return (
-                        <tr key={ord.id} className="hover:bg-[#d6ecff]/30 transition">
+                        <tr key={ordId} className="hover:bg-[#d6ecff]/30 transition">
                           <td className="p-3 font-mono font-bold text-[#0F172A]">
                             {ord.order_code}
                           </td>
@@ -1406,11 +1446,12 @@ export default function PsrDashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#c4dde9]/60">
-                    {data.refunds.map((ref: any) => {
+                    {data.refunds.map((ref: any, idx: number) => {
+                      const refId = ref.id ?? ref.ID ?? ref.refund_code ?? ref.REFUND_CODE ?? idx;
                       const isSettled = ref.status === 'SETTLED' || ref.status === 'APPROVED_BY_SO';
                       const isRejected = ref.status === 'REJECTED';
                       return (
-                        <tr key={ref.id} className="hover:bg-[#d6ecff]/30 transition">
+                        <tr key={refId} className="hover:bg-[#d6ecff]/30 transition">
                           <td className="p-3 font-mono font-bold text-[#0F172A]">
                             {ref.refund_code}
                           </td>
@@ -1472,9 +1513,9 @@ export default function PsrDashboard() {
               <p className="text-xs text-[#475569] italic py-6 text-center">No field visits logged today yet.</p>
             ) : (
               <div className="space-y-3">
-                {data.visits.map((v: any) => (
+                {data.visits.map((v: any, idx: number) => (
                   <div
-                    key={v.id}
+                    key={v.id ?? v.ID ?? idx}
                     className="p-3 rounded-xl border border-[#c4dde9] bg-[#e8f4ff] hover:bg-[#d6ecff]/40 flex items-start justify-between gap-3 text-xs transition"
                   >
                     <div className="space-y-1">
@@ -1588,7 +1629,8 @@ export default function PsrDashboard() {
             )}
           </div>
         )}
-
+          </>
+        )}
       </main>
 
       {/* MODAL: TAKE OUTLET ORDER */}

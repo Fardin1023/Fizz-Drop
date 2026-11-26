@@ -677,7 +677,7 @@ export const SalesOfficerDashboard: React.FC = () => {
     setAllotLoadingShops(true);
 
     try {
-      const soId = officer?.id || 1;
+      const soId = officer?.id || psr?.sales_officer_id || 1;
       const srParam = initialRoute ? `&subRoute=${encodeURIComponent(initialRoute)}` : '';
       const res = await fetch(`http://localhost:8080/api/v1/psr/subroute-shops?salesOfficerId=${soId}${srParam}`);
       if (res.ok) {
@@ -748,7 +748,7 @@ export const SalesOfficerDashboard: React.FC = () => {
     }
     setAllotLoadingShops(true);
     try {
-      const soId = officer?.id || 1;
+      const soId = officer?.id || allotPsr?.sales_officer_id || 1;
       const res = await fetch(`http://localhost:8080/api/v1/psr/subroute-shops?salesOfficerId=${soId}&subRoute=${encodeURIComponent(selectedRoute)}`);
       if (res.ok) {
         const data = await res.json();
@@ -3715,24 +3715,28 @@ export const SalesOfficerDashboard: React.FC = () => {
                       })}
                     </optgroup>
                   )}
-                  <optgroup label={`🏢 Other Shops in ${officer?.assigned_area || 'Territory'} (${allAreaShops.length})`}>
-                    {allAreaShops
-                      .filter((shop) => {
-                        const sId = shop.outlet_id ?? shop.OUTLET_ID;
-                        return !subRouteShops.some((s) => (s.outlet_id ?? s.OUTLET_ID) === sId);
-                      })
-                      .map((shop) => {
-                        const sId = shop.outlet_id ?? shop.OUTLET_ID;
-                        const isSelected = allotSelectedOutletIds.includes(sId);
-                        const displayName = getShopDisplayName(shop);
-                        const addressText = shop.address || shop.ADDRESS || 'Address on file';
-                        return (
-                          <option key={`area-${sId}`} value={sId}>
-                            {isSelected ? '✓ ' : '+ '} {displayName} — {addressText}
-                          </option>
-                        );
-                      })}
-                  </optgroup>
+                  {(() => {
+                    const otherShops = allAreaShops.filter((shop) => {
+                      const sId = shop.outlet_id ?? shop.OUTLET_ID;
+                      return !subRouteShops.some((s) => (s.outlet_id ?? s.OUTLET_ID) === sId);
+                    });
+                    if (otherShops.length === 0) return null;
+                    return (
+                      <optgroup label={`🏢 Other Shops in ${officer?.assigned_area || 'Territory'} (${otherShops.length})`}>
+                        {otherShops.map((shop) => {
+                          const sId = shop.outlet_id ?? shop.OUTLET_ID;
+                          const isSelected = allotSelectedOutletIds.includes(sId);
+                          const displayName = getShopDisplayName(shop);
+                          const addressText = shop.address || shop.ADDRESS || 'Address on file';
+                          return (
+                            <option key={`area-${sId}`} value={sId}>
+                              {isSelected ? '✓ ' : '+ '} {displayName} — {addressText}
+                            </option>
+                          );
+                        })}
+                      </optgroup>
+                    );
+                  })()}
                 </select>
 
                 {/* Interactive Allotted Shops Checklist */}

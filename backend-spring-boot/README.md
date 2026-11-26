@@ -18,7 +18,8 @@ Production-ready enterprise Spring Boot REST API for FizzDrop, managing carbonat
 
 - **Java Development Kit (JDK)**: Java 25 or higher (`java -version`)
 - **Maven**: 3.9.16 (or use the included wrapper script)
-- **MySQL Server** (Optional for local persistent storage, port 3306)
+- **Oracle Database 23ai Free** (Primary persistent relational storage, port 1521, PDB `FREEPDB1`)
+- **MySQL Server** (Optional fallback persistent storage, port 3306)
 
 ---
 
@@ -52,11 +53,17 @@ If Maven is installed locally or via wrapper:
 ```properties
 server.port=8080
 
-# MySQL Connection Details
-spring.datasource.url=jdbc:mysql://localhost:3306/fizzdrop_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-spring.datasource.username=root
-spring.datasource.password=
-spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+# Oracle Database 23ai Free (Primary)
+spring.datasource.url=jdbc:oracle:thin:@localhost:1521/FREEPDB1
+spring.datasource.username=FIZZDROP
+spring.datasource.password=FizzDrop123#
+spring.datasource.driver-class-name=oracle.jdbc.OracleDriver
+
+# MySQL Connection Details (Optional Fallback)
+# spring.datasource.url=jdbc:mysql://localhost:3306/fizzdrop_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+# spring.datasource.username=root
+# spring.datasource.password=
+# spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
 
 # JPA / Hibernate auto table sync
 spring.jpa.hibernate.ddl-auto=update

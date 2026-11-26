@@ -332,7 +332,7 @@ export const SupplierAvailableProducts: React.FC<SupplierAvailableProductsProps>
 
             <button
               type="button"
-              onClick={fetchAvailableProducts}
+              onClick={() => fetchAvailableProducts()}
               title="Refresh Available Products"
               className="p-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-500 transition-colors cursor-pointer"
             >

@@ -55,11 +55,69 @@ public class OracleCompatibleJdbcTemplate extends JdbcTemplate {
                 sql = sql.replaceAll("(?i)\\bALTER\\s+TABLE\\s+(\\w+)\\s+MODIFY\\s+COLUMN\\s+", "ALTER TABLE $1 MODIFY ");
             }
             // Replace DATE(x) = CURDATE() with TRUNC(x) = TRUNC(SYSDATE)
-            if (sql.contains("CURDATE()")) {
-                sql = sql.replaceAll("(?i)DATE\\((\\w+)\\)\\s*=\\s*CURDATE\\(\\)", "TRUNC($1) = TRUNC(SYSDATE)");
+            if (sql.contains("CURDATE()") || sql.contains("curdate()")) {
+                sql = sql.replaceAll("(?i)\\bDATE\\((\\w+)\\)\\s*=\\s*CURDATE\\(\\)", "TRUNC($1) = TRUNC(SYSDATE)");
+                sql = sql.replaceAll("(?i)\\bCURDATE\\(\\)", "TRUNC(SYSDATE)");
+            }
+            // Replace NOW() with CURRENT_TIMESTAMP
+            if (sql.contains("NOW()") || sql.contains("now()")) {
+                sql = sql.replaceAll("(?i)\\bNOW\\(\\)", "CURRENT_TIMESTAMP");
+            }
+            // Replace IFNULL(...) with NVL(...)
+            if (sql.contains("IFNULL(") || sql.contains("ifnull(")) {
+                sql = sql.replaceAll("(?i)\\bIFNULL\\(", "NVL(");
+            }
+            // Replace LAST_INSERT_ID() with dual-compatible fallback
+            if (sql.contains("LAST_INSERT_ID") || sql.contains("last_insert_id")) {
+                sql = sql.replaceAll("(?i)\\bSELECT\\s+LAST_INSERT_ID\\(\\)\\s+AS\\s+(\\w+)", "SELECT 0 AS $1 FROM DUAL");
+                sql = sql.replaceAll("(?i)\\bSELECT\\s+LAST_INSERT_ID\\(\\)", "SELECT 0 FROM DUAL");
+                sql = sql.replaceAll("(?i)\\bLAST_INSERT_ID\\(\\)", "0");
             }
         }
         return sql;
+    }
+
+    private static Map<String, Object> normalizeMapKeys(Map<String, Object> row) {
+        if (row == null) return null;
+        java.util.LinkedHashMap<String, Object> map = new java.util.LinkedHashMap<>();
+        for (Map.Entry<String, Object> e : row.entrySet()) {
+            if (e.getKey() != null) {
+                map.put(e.getKey().toLowerCase(), e.getValue());
+                if (!e.getKey().equals(e.getKey().toLowerCase())) {
+                    map.put(e.getKey(), e.getValue());
+                }
+            }
+        }
+        return map;
+    }
+
+    private static List<Map<String, Object>> normalizeListKeys(List<Map<String, Object>> list) {
+        if (list == null) return java.util.Collections.emptyList();
+        List<Map<String, Object>> res = new java.util.ArrayList<>(list.size());
+        for (Map<String, Object> row : list) {
+            res.add(normalizeMapKeys(row));
+        }
+        return res;
+    }
+
+    @Override
+    public Map<String, Object> queryForMap(String sql) throws DataAccessException {
+        return normalizeMapKeys(super.queryForMap(adaptSql(sql)));
+    }
+
+    @Override
+    public Map<String, Object> queryForMap(String sql, @Nullable Object... args) throws DataAccessException {
+        return normalizeMapKeys(super.queryForMap(adaptSql(sql), args));
+    }
+
+    @Override
+    public List<Map<String, Object>> queryForList(String sql) throws DataAccessException {
+        return normalizeListKeys(super.queryForList(adaptSql(sql)));
+    }
+
+    @Override
+    public List<Map<String, Object>> queryForList(String sql, @Nullable Object... args) throws DataAccessException {
+        return normalizeListKeys(super.queryForList(adaptSql(sql), args));
     }
 
     @Override
@@ -148,18 +206,8 @@ public class OracleCompatibleJdbcTemplate extends JdbcTemplate {
     }
 
     @Override
-    public Map<String, Object> queryForMap(String sql, @Nullable Object... args) throws DataAccessException {
-        return super.queryForMap(adaptSql(sql), args);
-    }
-
-    @Override
     public <T> List<T> queryForList(String sql, Class<T> elementType, @Nullable Object... args) throws DataAccessException {
         return super.queryForList(adaptSql(sql), elementType, args);
-    }
-
-    @Override
-    public List<Map<String, Object>> queryForList(String sql, @Nullable Object... args) throws DataAccessException {
-        return super.queryForList(adaptSql(sql), args);
     }
 
     @Override

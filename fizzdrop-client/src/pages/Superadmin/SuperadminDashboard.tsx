@@ -121,8 +121,8 @@ export const SuperadminDashboard: React.FC = () => {
     if (!n) return;
     if (n.id) markAsRead(n.id);
     const dest = getNotificationDestination(n, 'SUPERADMIN');
-    if (dest.path === '/superadmin' && validTabs.includes(dest.tab)) {
-      handleTabChange(dest.tab);
+    if (dest.path === '/superadmin' && validTabs.includes(dest.tab as SuperadminTab)) {
+      handleTabChange(dest.tab as SuperadminTab);
     } else {
       navigate(dest.fullUrl);
     }

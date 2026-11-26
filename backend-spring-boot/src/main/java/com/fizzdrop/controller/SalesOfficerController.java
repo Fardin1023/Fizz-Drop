@@ -504,6 +504,48 @@ public class SalesOfficerController {
         Map<Long, Integer> depotStockMap = districtInventoryRepository.findByDistrictId(districtId).stream()
                 .collect(Collectors.toMap(DistrictInventory::getProductId, DistrictInventory::getCurrentStock, (a, b) -> a));
 
+        // Supplier's live depot stock: what this supplier purchased from Superadmin minus what they sold/dispatched
+        Map<Long, Integer> supplierPurchasedFromSuperadmin = new HashMap<>();
+        try {
+            List<Map<String, Object>> saOrders = jdbcTemplate.queryForList(
+                "SELECT sri.product_id, " +
+                "COALESCE(SUM(CASE WHEN sri.approved_quantity > 0 THEN sri.approved_quantity ELSE sri.requested_quantity END), 0) AS total_cases " +
+                "FROM stock_requisition_items sri " +
+                "JOIN stock_requisitions sr ON sri.requisition_id = sr.id " +
+                "WHERE sr.supplier_id = ? AND sr.status IN ('APPROVED', 'COMPLETED', 'DISPATCHED') " +
+                "GROUP BY sri.product_id",
+                activeSupplierId
+            );
+            for (Map<String, Object> row : saOrders) {
+                Long pid = ((Number) row.get("product_id")).longValue();
+                int cases = ((Number) row.get("total_cases")).intValue();
+                supplierPurchasedFromSuperadmin.put(pid, cases);
+            }
+        } catch (Exception ex) {
+            System.err.println("[SalesOfficerController] Failed to query superadmin purchased stock: " + ex.getMessage());
+        }
+
+        Map<Long, Integer> supplierSoldMap = new HashMap<>();
+        try {
+            String supIdWildcard = "%" + activeSupplierId + "%";
+            List<Map<String, Object>> soldRows = jdbcTemplate.queryForList(
+                "SELECT r.product_id, COALESCE(SUM(r.quantity), 0) as qty " +
+                "FROM outlet_requisitions r " +
+                "WHERE (r.supplier_id = ? OR (r.supplier_id IS NULL AND r.sales_officer_id IN (" +
+                "    SELECT so.id FROM sales_officers so WHERE so.supplier_id = ? OR so.allocated_supplier_ids LIKE ?" +
+                "))) AND r.status IN ('DISPATCHED', 'FULFILLED', 'DELIVERED', 'COMPLETED') " +
+                "GROUP BY r.product_id",
+                activeSupplierId, activeSupplierId, supIdWildcard
+            );
+            for (Map<String, Object> row : soldRows) {
+                Long pid = ((Number) row.get("product_id")).longValue();
+                int q = ((Number) row.get("qty")).intValue();
+                supplierSoldMap.put(pid, q);
+            }
+        } catch (Exception ex) {
+            System.err.println("[SalesOfficerController] Failed to query supplier sold requisitions: " + ex.getMessage());
+        }
+
         Map<Long, Integer> soInvMap = new HashMap<>();
         try {
             jdbcTemplate.query(
@@ -556,8 +598,16 @@ public class SalesOfficerController {
             pm.put("retail_price", dpp != null && dpp.getRetailPrice() != null ? dpp.getRetailPrice() : p.getRetailPrice());
             pm.put("image_url", p.getImageUrl());
 
-            // District buffer stock
-            pm.put("depot_buffer_stock", depotStockMap.getOrDefault(p.getProductId(), 50));
+            // Supplier Depot live stock (in sync with Supplier's Regional Depot)
+            int liveDepotStock;
+            if (!supplierPurchasedFromSuperadmin.isEmpty()) {
+                int pur = supplierPurchasedFromSuperadmin.getOrDefault(p.getProductId(), 0);
+                int sold = supplierSoldMap.getOrDefault(p.getProductId(), 0);
+                liveDepotStock = Math.max(0, pur - sold);
+            } else {
+                liveDepotStock = depotStockMap.getOrDefault(p.getProductId(), 50);
+            }
+            pm.put("depot_buffer_stock", liveDepotStock);
 
             // Sales Officer's own live purchased buffer stock
             int soPurchasedStock = 0;

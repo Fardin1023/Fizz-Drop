@@ -22,7 +22,9 @@ import {
   Store,
   Calendar,
   Building2,
+  Trash2,
 } from 'lucide-react';
+import { cleanOutletDisplayName } from '../../utils/franchiseUtils';
 
 export interface DeliveryTeam {
   id: number;
@@ -133,6 +135,11 @@ export const SupplierDeliveryManagement: React.FC<SupplierDeliveryManagementProp
   const [searchParams, setSearchParams] = useSearchParams();
   const urlSupplierId = searchParams.get('supplierId') ? Number(searchParams.get('supplierId')) : undefined;
   const [activeSupplierId, setActiveSupplierId] = useState<number | undefined>(supplierId || urlSupplierId || undefined);
+  const activeSupplierIdRef = React.useRef<number | undefined>(activeSupplierId);
+  useEffect(() => {
+    activeSupplierIdRef.current = activeSupplierId;
+  }, [activeSupplierId]);
+
   const [currentSupplier, setCurrentSupplier] = useState<any>(null);
   const [allSuppliers, setAllSuppliers] = useState<any[]>([]);
 
@@ -165,6 +172,8 @@ export const SupplierDeliveryManagement: React.FC<SupplierDeliveryManagementProp
 
   // New Team Modal State
   const [isNewTeamModalOpen, setIsNewTeamModalOpen] = useState<boolean>(false);
+  const [teamToDelete, setTeamToDelete] = useState<DeliveryTeam | null>(null);
+  const [deletingTeam, setDeletingTeam] = useState<boolean>(false);
   const [teamForm, setTeamForm] = useState({
     team_name: '',
     vehicle_registration_no: '',
@@ -179,7 +188,9 @@ export const SupplierDeliveryManagement: React.FC<SupplierDeliveryManagementProp
     setLoading(true);
     setErrorMsg(null);
     try {
-      const targetSupId = overrideSupId !== undefined ? overrideSupId : activeSupplierId;
+      const targetSupId = overrideSupId !== undefined 
+        ? overrideSupId 
+        : (activeSupplierIdRef.current || (searchParams.get('supplierId') ? Number(searchParams.get('supplierId')) : undefined));
 
       // 1. Fetch Supplier Profile Info & All Suppliers list
       const infoUrl = targetSupId
@@ -190,9 +201,12 @@ export const SupplierDeliveryManagement: React.FC<SupplierDeliveryManagementProp
         if (resInfo.ok) {
           const dInfo = await resInfo.json();
           if (dInfo.supplier_info) {
-            setCurrentSupplier(dInfo.supplier_info);
+            if (!targetSupId || dInfo.supplier_info.id === targetSupId) {
+              setCurrentSupplier(dInfo.supplier_info);
+            }
             if (!activeSupplierId && dInfo.supplier_info.id) {
               setActiveSupplierId(dInfo.supplier_info.id);
+              activeSupplierIdRef.current = dInfo.supplier_info.id;
             }
           }
           if (Array.isArray(dInfo.all_suppliers)) {
@@ -242,14 +256,21 @@ export const SupplierDeliveryManagement: React.FC<SupplierDeliveryManagementProp
   };
 
   const handleSwitchSupplier = (newSupId: number) => {
+    activeSupplierIdRef.current = newSupId;
     setActiveSupplierId(newSupId);
     setExpandedTripId(null);
-    const p = new URLSearchParams(window.location.search);
-    p.set('supplierId', String(newSupId));
-    window.history.replaceState({}, '', `${window.location.pathname}?${p.toString()}`);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('supplierId', String(newSupId));
+      return next;
+    }, { replace: true });
     try {
       window.dispatchEvent(new CustomEvent('fizzdrop_supplier_changed', { detail: { supplierId: newSupId } }));
     } catch (e) {}
+    const matched = allSuppliers.find((s) => s.id === newSupId);
+    if (matched) {
+      setCurrentSupplier(matched);
+    }
     fetchData(newSupId);
   };
 
@@ -257,6 +278,7 @@ export const SupplierDeliveryManagement: React.FC<SupplierDeliveryManagementProp
     const handleSupplierEvent = (e: any) => {
       const supId = e.detail?.supplierId;
       if (supId && supId !== activeSupplierId) {
+        activeSupplierIdRef.current = supId;
         setActiveSupplierId(supId);
         fetchData(supId);
       }
@@ -266,16 +288,18 @@ export const SupplierDeliveryManagement: React.FC<SupplierDeliveryManagementProp
   }, [activeSupplierId]);
 
   useEffect(() => {
-    if (supplierId && supplierId !== activeSupplierId) {
-      setActiveSupplierId(supplierId);
-      fetchData(supplierId);
+    const sId = supplierId || (searchParams.get('supplierId') ? Number(searchParams.get('supplierId')) : undefined);
+    if (sId && sId !== activeSupplierId) {
+      activeSupplierIdRef.current = sId;
+      setActiveSupplierId(sId);
+      fetchData(sId);
     }
-  }, [supplierId]);
+  }, [supplierId, searchParams]);
 
   useEffect(() => {
     fetchData();
     const interval = setInterval(() => {
-      fetchData();
+      fetchData(activeSupplierIdRef.current);
     }, 5000);
     return () => clearInterval(interval);
   }, [userId]);
@@ -348,6 +372,31 @@ export const SupplierDeliveryManagement: React.FC<SupplierDeliveryManagementProp
     }
   };
 
+  const handleDeleteTeam = async (id: number) => {
+    setDeletingTeam(true);
+    try {
+      const res = await fetch(`http://localhost:8080/api/v1/delivery/teams/${id}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSuccessMsg(data.message || 'Delivery team deleted successfully from database.');
+        setTeamToDelete(null);
+        setTeams((prev) => prev.filter((item) => item.id !== id));
+        if (selectedTeamId === id) {
+          setSelectedTeamId('');
+        }
+        fetchData();
+      } else {
+        setErrorMsg(data.message || 'Failed to delete delivery team.');
+      }
+    } catch {
+      setErrorMsg('Network error while deleting delivery team.');
+    } finally {
+      setDeletingTeam(false);
+    }
+  };
+
   const handleDispatchVehicle = async () => {
     if (!selectedTeamId) {
       alert('Please select a delivery team / vehicle.');
@@ -373,7 +422,7 @@ export const SupplierDeliveryManagement: React.FC<SupplierDeliveryManagementProp
             if (cases > 0) {
               itemsToDispatch.push({
                 outlet_id: o.outlet_id,
-                outlet_name: o.branch_name ? `${o.outlet_name} (${o.branch_name})` : o.outlet_name,
+                outlet_name: cleanOutletDisplayName(o),
                 branch_name: o.branch_name,
                 location_address: o.location_address,
                 contact_phone: o.contact_phone,
@@ -532,7 +581,7 @@ export const SupplierDeliveryManagement: React.FC<SupplierDeliveryManagementProp
             <span>Dispatch Vehicle to Outlets</span>
           </button>
           <button
-            onClick={fetchData}
+            onClick={() => fetchData()}
             disabled={loading}
             className="p-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all cursor-pointer"
             title="Refresh Deliveries"
@@ -673,6 +722,17 @@ export const SupplierDeliveryManagement: React.FC<SupplierDeliveryManagementProp
             selectedDispatchId={expandedTripId}
             onSelectDispatch={(disp) => setExpandedTripId(disp.id)}
             currentSupplier={currentSupplier}
+            suppliers={allSuppliers}
+            onSelectDistrict={(distId) => {
+              if (distId) {
+                const match = allSuppliers.find(
+                  (s) => s.primary_district_id === distId || (s.assigned_districts && s.assigned_districts.some((d: any) => (d.id || d) === distId))
+                );
+                if (match && match.id !== (activeSupplierId || currentSupplier?.id)) {
+                  handleSwitchSupplier(match.id);
+                }
+              }
+            }}
             height="520px"
           />
 
@@ -1145,17 +1205,7 @@ export const SupplierDeliveryManagement: React.FC<SupplierDeliveryManagementProp
                               />
                               <div>
                                 <h5 className="font-bold text-sm text-slate-900 flex items-center gap-2">
-                                  <span>{outlet.outlet_name}</span>
-                                  {outlet.branch_name && (
-                                    <span className="text-xs font-normal text-slate-500">
-                                      ({outlet.branch_name})
-                                    </span>
-                                  )}
-                                  {outlet.franchise_name && (
-                                    <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-slate-100 text-slate-700">
-                                      {outlet.franchise_name}
-                                    </span>
-                                  )}
+                                  <span>{cleanOutletDisplayName(outlet)}</span>
                                 </h5>
                                 <p className="text-xs text-slate-500">
                                   📍 {outlet.location_address} • 📞 {outlet.contact_phone}
@@ -1325,15 +1375,25 @@ export const SupplierDeliveryManagement: React.FC<SupplierDeliveryManagementProp
                     <span className="font-mono text-xs font-extrabold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-xl border border-blue-200">
                       {t.vehicle_registration_no}
                     </span>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                      t.status === 'AVAILABLE'
-                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                        : t.status === 'ON_DELIVERY'
-                        ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                        : 'bg-slate-100 text-slate-700 border border-slate-300'
-                    }`}>
-                      {t.status}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                        t.status === 'AVAILABLE'
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                          : t.status === 'ON_DELIVERY'
+                          ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                          : 'bg-slate-100 text-slate-700 border border-slate-300'
+                      }`}>
+                        {t.status}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setTeamToDelete(t)}
+                        title={`Delete ${t.team_name} from database`}
+                        className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
 
                   <h4 className="font-bold text-slate-900 text-sm">
@@ -1363,14 +1423,24 @@ export const SupplierDeliveryManagement: React.FC<SupplierDeliveryManagementProp
                   <span className="text-[10px] text-slate-400">
                     Registered: {new Date(t.created_at).toLocaleDateString()}
                   </span>
-                  <a
-                    href={`/delivery-team?regNo=${encodeURIComponent(t.vehicle_registration_no)}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-[11px] font-bold text-blue-600 hover:text-blue-800 hover:underline"
-                  >
-                    Open Team Portal →
-                  </a>
+                  <div className="flex items-center gap-3">
+                    <a
+                      href={`/delivery-team?regNo=${encodeURIComponent(t.vehicle_registration_no)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[11px] font-bold text-blue-600 hover:text-blue-800 hover:underline"
+                    >
+                      Open Team Portal →
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => setTeamToDelete(t)}
+                      className="text-[11px] font-bold text-rose-500 hover:text-rose-700 hover:underline cursor-pointer flex items-center gap-1 transition-colors"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span>Delete</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -1514,6 +1584,81 @@ export const SupplierDeliveryManagement: React.FC<SupplierDeliveryManagementProp
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Modal: Confirm Delete Delivery Team */}
+      {teamToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-md p-6 space-y-4">
+            <div className="flex items-start justify-between">
+              <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center border border-rose-100 shadow-2xs">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <button
+                type="button"
+                onClick={() => setTeamToDelete(null)}
+                disabled={deletingTeam}
+                className="text-slate-400 hover:text-slate-600 font-bold text-lg cursor-pointer"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="font-oswald text-lg font-bold text-slate-900">
+                Delete Delivery Team?
+              </h3>
+              <p className="text-xs text-slate-500">
+                Are you sure you want to delete this delivery team? This will permanently delete the team record from the database.
+              </p>
+            </div>
+
+            <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-1.5 text-xs text-slate-700">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Team Name:</span>
+                <span className="font-bold text-slate-900">{teamToDelete.team_name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Vehicle Reg:</span>
+                <span className="font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">{teamToDelete.vehicle_registration_no}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Lead Driver:</span>
+                <span className="font-medium text-slate-800">{teamToDelete.driver_name} ({teamToDelete.driver_phone})</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Capacity:</span>
+                <span className="font-medium text-slate-800">{teamToDelete.max_capacity_cases} cases ({teamToDelete.vehicle_type})</span>
+              </div>
+            </div>
+
+            {teamToDelete.status === 'ON_DELIVERY' && (
+              <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200 text-amber-800 text-[11px] flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <span>Notice: This team is currently marked as ON DELIVERY. It cannot be deleted until the trip is completed or cancelled.</span>
+              </div>
+            )}
+
+            <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setTeamToDelete(null)}
+                disabled={deletingTeam}
+                className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteTeam(teamToDelete.id)}
+                disabled={deletingTeam || teamToDelete.status === 'ON_DELIVERY'}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white font-bold text-xs shadow-md shadow-rose-600/20 flex items-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{deletingTeam ? 'Deleting from DB...' : 'Delete from Database'}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

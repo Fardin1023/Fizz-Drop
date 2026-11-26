@@ -69,6 +69,21 @@ public class OutletController {
             }
         }
 
+        // Clean redundant franchise prefixes in branch_name & outlet_name
+        String franchise = o.getFranchiseName();
+        if (franchise != null && !franchise.trim().isEmpty() && !"Local Shop".equalsIgnoreCase(franchise.trim())) {
+            String branch = o.getBranchName();
+            if (branch != null) {
+                String cleaned = branch.replaceAll("(?i)^" + java.util.regex.Pattern.quote(franchise) + "\\s*[–—\\-:]\\s*", "").trim();
+                if (!cleaned.isEmpty()) {
+                    o.setBranchName(cleaned);
+                }
+            }
+            if (o.getBranchName() != null && !o.getBranchName().trim().isEmpty()) {
+                o.setOutletName(franchise + " — " + o.getBranchName().trim());
+            }
+        }
+
         if (o.getDistrictId() != null && districtMap.containsKey(o.getDistrictId())) {
             District d = districtMap.get(o.getDistrictId());
             o.setDistrictName(d.getName());

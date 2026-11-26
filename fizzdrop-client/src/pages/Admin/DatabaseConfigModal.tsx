@@ -13,10 +13,10 @@ export const DatabaseConfigModal: React.FC<DatabaseConfigModalProps> = ({
   onConfigSaved,
 }) => {
   const [host, setHost] = useState('localhost');
-  const [port, setPort] = useState('3306');
-  const [user, setUser] = useState('root');
+  const [port, setPort] = useState('1521');
+  const [user, setUser] = useState('FIZZDROP');
   const [password, setPassword] = useState('');
-  const [database, setDatabase] = useState('fizzdrop_db');
+  const [database, setDatabase] = useState('FREEPDB1');
   const [dbStatus, setDbStatus] = useState<any>(null);
   const [testing, setTesting] = useState(false);
   const [feedback, setFeedback] = useState<{ success: boolean; msg: string } | null>(null);

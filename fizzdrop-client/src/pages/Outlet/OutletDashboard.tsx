@@ -13,6 +13,7 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Sparkles,
   AlertCircle,
   CheckCircle,
@@ -47,6 +48,7 @@ import { useNotifications } from '../../hooks/useNotifications';
 import { NotificationPopup } from '../../components/Notifications/NotificationPopup';
 import { NotificationDropdown } from '../../components/Notifications/NotificationDropdown';
 import { StripePaymentModal } from '../../components/Payment/StripePaymentModal';
+import { cleanBranchName, cleanOutletDisplayName } from '../../utils/franchiseUtils';
 
 export const OutletDashboard: React.FC = () => {
   const { user, outlet: authOutlet, isAuthenticated, isOutlet, loginAsOutlet, logout, isLoading } = useAuth();
@@ -92,6 +94,18 @@ export const OutletDashboard: React.FC = () => {
   // Active Outlet Data
   const [outlet, setOutlet] = useState<any>(authOutlet || null);
   const [allOutlets, setAllOutlets] = useState<any[]>([]);
+  const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState<boolean>(false);
+  const branchDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (branchDropdownRef.current && !branchDropdownRef.current.contains(e.target as Node)) {
+        setIsBranchDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
   const paramOutletId = searchParams.get('outletId') ? Number(searchParams.get('outletId')) : null;
   const authOutletId = authOutlet?.outlet_id || user?.branch_id;
   const activeOutletId = paramOutletId || authOutletId || outlet?.outlet_id || (allOutlets.length > 0 ? allOutlets[0].outlet_id : 2);
@@ -666,46 +680,105 @@ export const OutletDashboard: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#FAF4EB] text-[#2D2319] flex flex-col outlet-theme selection:bg-[#FFD18D]/40 selection:text-[#2D2319]">
       {/* TOP HEADER HUD */}
-      <header className="sticky top-0 z-40 bg-white border-b border-[#E2C799] shadow-xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between gap-4">
-          {/* Logo & Branch Title */}
-          <div className="flex items-center gap-3.5">
-            <Link to="/" className="flex items-center gap-2 group">
-              <div className="w-10 h-10 rounded-2xl bg-[#FDECAD] p-1 border border-[#DFBC87] flex items-center justify-center shadow-xs group-hover:scale-105 transition-all">
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-[#E8DFD5] shadow-xs">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-17 flex items-center justify-between gap-4">
+          {/* Logo & Outlet Identity */}
+          <div className="flex items-center gap-3">
+            <Link to="/" className="flex items-center gap-2 group shrink-0" title="FizzDrop Home">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#FFF9EE] to-[#FDECAD] p-1.5 border border-[#DFBC87] flex items-center justify-center shadow-xs group-hover:scale-105 transition-all">
                 <img src={logoImg} alt="FizzDrop" className="w-full h-full object-contain" />
               </div>
             </Link>
 
-            <div className="h-7 w-[1px] bg-[#E2C799] hidden sm:block" />
+            <div className="h-7 w-[1px] bg-[#E8DFD5] hidden sm:block" />
 
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm sm:text-base font-black text-[#2D2319] tracking-tight flex items-center gap-1.5">
-                  <Store className="w-4 h-4 text-[#B45309] shrink-0" />
-                  <span>{outlet?.franchise_name || 'Franchise'}</span>
-                  <span className="text-[#A88B6E] font-normal">—</span>
-                  <span className="text-[#78350F] font-bold">{outlet?.branch_name || outlet?.outlet_name || 'Branch'}</span>
-                </span>
-                <span className="hidden md:inline-flex px-2 py-0.5 rounded-full bg-[#F5F1BB] text-[#2D2319] text-[10px] font-bold border border-[#E2C799] uppercase">
-                  {outlet?.city || 'Dhaka'} • {outlet?.area || 'Retail Hub'}
-                </span>
-              </div>
-              <p className="text-[11px] text-[#6B5440] flex items-center gap-1 font-medium">
-                <MapPin className="w-3 h-3 text-[#A88B6E]" />
-                <span className="truncate max-w-[260px] sm:max-w-md">{outlet?.location_address || 'Outlet Address'}</span>
-              </p>
+            {/* Branch Identity & Interactive Switcher (Unified) */}
+            <div className="relative" ref={branchDropdownRef}>
+              <button
+                type="button"
+                onClick={() => setIsBranchDropdownOpen((prev) => !prev)}
+                className="text-left group/branch cursor-pointer py-1 px-2 -ml-2 rounded-xl hover:bg-[#FAF4EB] transition-colors"
+                title="Click to switch outlet branch"
+              >
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-1.5 text-sm sm:text-base font-extrabold text-[#2D2319] tracking-tight group-hover/branch:text-[#B45309] transition-colors">
+                    <Store className="w-4 h-4 text-[#B45309] shrink-0" />
+                    <span>{outlet?.franchise_name || 'Outlet'}</span>
+                    <span className="text-[#C5B4A3] font-light">—</span>
+                    <span className="text-[#8C4A10] font-bold">
+                      {cleanBranchName(outlet?.branch_name, outlet?.franchise_name) || outlet?.area || 'Branch'}
+                    </span>
+                    {allOutlets.length > 1 && (
+                      <ChevronDown
+                        className={`w-3.5 h-3.5 text-[#8C7A6B] transition-transform duration-200 ${
+                          isBranchDropdownOpen ? 'rotate-180 text-[#B45309]' : 'group-hover/branch:text-[#B45309]'
+                        }`}
+                      />
+                    )}
+                  </div>
+                  <span className="hidden md:inline-flex items-center px-2 py-0.5 rounded-md bg-[#FAF4EB] text-[#78350F] text-[10px] font-bold border border-[#E8DFD5] uppercase tracking-wider">
+                    {outlet?.city || 'Dhaka'} • {outlet?.area || 'Retail Hub'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-[#8C7A6B] flex items-center gap-1 font-medium mt-0.5">
+                  <MapPin className="w-3 h-3 text-[#B45309]/60 shrink-0" />
+                  <span className="truncate max-w-[240px] sm:max-w-md">{outlet?.location_address || 'Outlet Address'}</span>
+                </p>
+              </button>
+
+              {/* Branch Switcher Popover Menu */}
+              {isBranchDropdownOpen && (
+                <div className="absolute left-0 mt-2 w-72 sm:w-80 rounded-2xl bg-white/95 backdrop-blur-md border border-[#E8DFD5] shadow-xl shadow-stone-900/10 z-[120] p-1.5 max-h-72 overflow-y-auto animate-fade-in">
+                  <div className="px-3 py-2 text-[10px] font-black uppercase tracking-wider text-[#8C7A6B] border-b border-[#FAF4EB] mb-1 flex items-center justify-between">
+                    <span>Available Outlets ({allOutlets.length})</span>
+                    <span className="text-[9px] text-[#B45309] font-bold">Select to switch</span>
+                  </div>
+                  <div className="space-y-0.5">
+                    {allOutlets.map((o) => {
+                      const isSelected = (o.outlet_id || o.id) === (outlet?.outlet_id || activeOutletId);
+                      const bName = cleanBranchName(o.branch_name, o.franchise_name) || o.area || 'Branch';
+                      return (
+                        <button
+                          key={o.outlet_id || o.id}
+                          type="button"
+                          onClick={() => {
+                            handleSwitchBranch(Number(o.outlet_id || o.id));
+                            setIsBranchDropdownOpen(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition-colors cursor-pointer ${
+                            isSelected
+                              ? 'bg-[#FAF4EB] text-[#78350F] font-bold border border-[#DFBC87]'
+                              : 'text-[#2D2319] hover:bg-stone-50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 truncate">
+                            <Store className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-[#B45309]' : 'text-stone-400'}`} />
+                            <span className="truncate">
+                              {o.franchise_name || o.outlet_name} <span className="font-normal text-stone-500">({bName})</span>
+                            </span>
+                          </div>
+                          {isSelected && (
+                            <CheckCircle className="w-3.5 h-3.5 text-[#B45309] shrink-0 ml-1.5" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Quick Branch Switcher & Actions */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          {/* Quick Actions */}
+          <div className="flex items-center gap-2 sm:gap-2.5">
             {/* Quick POS Button */}
             <button
               onClick={() => {
                 setSelectedProductIdForSale(null);
                 setIsSaleModalOpen(true);
               }}
-              className="py-2 px-3.5 rounded-xl bg-[#2D2319] hover:bg-[#433022] text-[#FDECAD] font-black text-xs flex items-center gap-1.5 shadow-xs transition-all cursor-pointer border border-[#433022]"
+              className="py-2 px-3 sm:px-3.5 rounded-xl bg-[#241E17] hover:bg-[#382E24] text-[#FDECAD] font-bold text-xs flex items-center gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer border border-[#382E24]"
+              title="Open Point of Sale register"
             >
               <ShoppingCart className="w-3.5 h-3.5 text-[#FFD18D]" />
               <span className="hidden sm:inline">Record Sale (POS)</span>
@@ -718,26 +791,12 @@ export const OutletDashboard: React.FC = () => {
                 setSelectedProductIdForReq(null);
                 setIsRequisitionModalOpen(true);
               }}
-              className="py-2 px-3 rounded-xl bg-[#FDECAD] hover:bg-[#FFD18D] text-[#2D2319] font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer hidden md:flex border border-[#E2C799]"
+              className="py-2 px-3 rounded-xl bg-[#FAF4EB] hover:bg-[#F5ECE0] text-[#78350F] font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer hidden md:flex border border-[#E8DFD5]"
+              title="Request inventory restock"
             >
-              <Truck className="w-3.5 h-3.5 text-[#78350F]" />
+              <Truck className="w-3.5 h-3.5 text-[#B45309]" />
               <span>Order Restock</span>
             </button>
-
-            {/* Branch Switcher Dropdown */}
-            {allOutlets.length > 1 && (
-              <select
-                value={outlet?.outlet_id || activeOutletId}
-                onChange={(e) => handleSwitchBranch(Number(e.target.value))}
-                className="py-1.5 px-2.5 rounded-xl border border-[#E2C799] bg-[#F7E6C9] hover:bg-[#FFD18D] text-[#2D2319] text-xs font-bold focus:outline-none cursor-pointer"
-              >
-                {allOutlets.map((o) => (
-                  <option key={o.outlet_id} value={o.outlet_id}>
-                    Switch: {o.franchise_name || o.outlet_name} ({o.branch_name || o.area})
-                  </option>
-                ))}
-              </select>
-            )}
 
             {/* Real-time Inbound Notifications Bell */}
             <NotificationDropdown
@@ -748,6 +807,7 @@ export const OutletDashboard: React.FC = () => {
               onDeleteNotification={deleteNotification}
               onClearOldNotifications={clearOldNotifications}
               onSelectNotification={handleNotificationClick}
+              triggerClassName="p-2 rounded-xl border border-[#E8DFD5] bg-[#FAF4EB] hover:bg-[#F5ECE0] text-[#8C7A6B] hover:text-[#2D2319] transition-colors cursor-pointer relative flex items-center justify-center"
             />
 
             {/* Logout */}
@@ -757,7 +817,7 @@ export const OutletDashboard: React.FC = () => {
                 navigate('/outlet/login');
               }}
               title="Logout from branch"
-              className="p-2 rounded-xl border border-[#E2C799] bg-white hover:bg-[#F6DBD4] text-[#6B5440] hover:text-[#7C2D12] transition-colors cursor-pointer"
+              className="p-2 rounded-xl border border-[#E8DFD5] bg-[#FAF4EB] hover:bg-rose-50 text-[#8C7A6B] hover:text-rose-700 hover:border-rose-200 transition-colors cursor-pointer"
             >
               <LogOut className="w-4 h-4" />
             </button>
@@ -766,45 +826,73 @@ export const OutletDashboard: React.FC = () => {
       </header>
 
       {/* DASHBOARD HERO KPI BANNER */}
-      <section className="bg-gradient-to-r from-[#FFD18D] via-[#FDECAD] to-[#F7E6C9] text-[#2D2319] border-b border-[#DFBC87] py-6 px-4 sm:px-6 lg:px-8 relative overflow-hidden shadow-xs">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+      <section className="bg-gradient-to-r from-[#FFFDF9] via-[#FAF5EC] to-[#F5ECE0] border-b border-[#E8DFD5] py-6 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+        {/* Soft decorative background accents */}
+        <div className="absolute -top-12 -right-12 w-64 h-64 rounded-full bg-[#FFD18D]/15 blur-2xl pointer-events-none" />
+        <div className="absolute -bottom-12 -left-12 w-64 h-64 rounded-full bg-[#B45309]/5 blur-2xl pointer-events-none" />
+
+        <div className="max-w-7xl mx-auto flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/80 text-[#78350F] text-xs font-black border border-[#DFBC87] mb-2 shadow-2xs">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white text-[#78350F] text-xs font-bold border border-[#E8DFD5] mb-2.5 shadow-2xs">
               <Sparkles className="w-3.5 h-3.5 text-[#B45309]" />
-              <span>FRANCHISE RETAIL OUTLET PORTAL</span>
+              <span className="tracking-wide uppercase text-[10px] font-black">Retail Operations Overview</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse" />
+              <span className="text-[10px] font-bold text-emerald-700">Live</span>
             </div>
             <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-[#2D2319]">
-              {outlet?.outlet_name || 'Outlet Branch'}
+              Store Operations & Live Inventory
             </h2>
-            <p className="text-xs sm:text-sm text-[#433022] font-medium mt-1 max-w-xl">
-              Live beverage shelf inventory, customer transactions, stock adjustments & regional supplier restocks.
+            <p className="text-xs sm:text-sm text-[#6B5440] font-medium mt-1 max-w-xl leading-relaxed">
+              Real-time shelf inventory, customer transactions, stock adjustments & regional supplier restocks.
             </p>
           </div>
 
-          {/* Quick KPI Stat Pills */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="p-3 rounded-2xl bg-white/85 backdrop-blur-md border border-[#E2C799] shadow-2xs">
-              <p className="text-[10px] uppercase tracking-wider font-bold text-[#78350F]">Total Units</p>
-              <p className="text-2xl font-black text-[#2D2319] mt-0.5 font-mono">{kpi.total_stock_units}</p>
-              <p className="text-[10px] text-[#6B5440] font-medium">On Shelf & Backroom</p>
+          {/* Quick KPI Stat Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 lg:min-w-[620px]">
+            <div className="p-3.5 rounded-2xl bg-white border border-[#E8DFD5] shadow-xs flex flex-col justify-between hover:border-[#DFBC87] hover:shadow-sm transition-all">
+              <div className="h-6 flex items-center justify-between gap-1">
+                <span className="text-[10px] uppercase tracking-wider font-bold text-[#8C7A6B] whitespace-nowrap">Total Units</span>
+                <div className="w-6 h-6 rounded-lg bg-amber-50 flex items-center justify-center shrink-0">
+                  <Package className="w-3.5 h-3.5 text-amber-700" />
+                </div>
+              </div>
+              <p className="text-2xl font-black text-[#2D2319] mt-2 font-mono tracking-tight leading-none">{kpi.total_stock_units}</p>
+              <p className="text-[10px] text-[#A39282] font-medium mt-1 truncate">On Shelf & Backroom</p>
             </div>
 
-            <div className="p-3 rounded-2xl bg-white/85 backdrop-blur-md border border-[#E2C799] shadow-2xs">
-              <p className="text-[10px] uppercase tracking-wider font-bold text-[#7C2D12]">Low Stock</p>
-              <p className="text-2xl font-black text-[#7C2D12] mt-0.5 font-mono">{kpi.low_stock_count}</p>
-              <p className="text-[10px] text-[#6B5440] font-medium">&le; 15 units remaining</p>
+            <div className="p-3.5 rounded-2xl bg-white border border-[#E8DFD5] shadow-xs flex flex-col justify-between hover:border-[#DFBC87] hover:shadow-sm transition-all">
+              <div className="h-6 flex items-center justify-between gap-1">
+                <span className="text-[10px] uppercase tracking-wider font-bold text-[#7C2D12] whitespace-nowrap">Low Stock</span>
+                <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${kpi.low_stock_count > 0 ? 'bg-rose-50' : 'bg-stone-50'}`}>
+                  <AlertCircle className={`w-3.5 h-3.5 ${kpi.low_stock_count > 0 ? 'text-rose-600' : 'text-stone-400'}`} />
+                </div>
+              </div>
+              <p className={`text-2xl font-black mt-2 font-mono tracking-tight leading-none ${kpi.low_stock_count > 0 ? 'text-[#7C2D12]' : 'text-[#2D2319]'}`}>
+                {kpi.low_stock_count}
+              </p>
+              <p className="text-[10px] text-[#A39282] font-medium mt-1 truncate">&le; 15 units remaining</p>
             </div>
 
-            <div className="p-3 rounded-2xl bg-white/85 backdrop-blur-md border border-[#E2C799] shadow-2xs">
-              <p className="text-[10px] uppercase tracking-wider font-bold text-[#78350F]">Today Sales</p>
-              <p className="text-2xl font-black text-[#2D2319] mt-0.5 font-mono">{kpi.today_sales_count}</p>
-              <p className="text-[10px] text-[#6B5440] font-medium">Receipts generated</p>
+            <div className="p-3.5 rounded-2xl bg-white border border-[#E8DFD5] shadow-xs flex flex-col justify-between hover:border-[#DFBC87] hover:shadow-sm transition-all">
+              <div className="h-6 flex items-center justify-between gap-1">
+                <span className="text-[10px] uppercase tracking-wider font-bold text-[#8C7A6B] whitespace-nowrap">Today Sales</span>
+                <div className="w-6 h-6 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
+                  <ShoppingCart className="w-3.5 h-3.5 text-emerald-700" />
+                </div>
+              </div>
+              <p className="text-2xl font-black text-[#2D2319] mt-2 font-mono tracking-tight leading-none">{kpi.today_sales_count}</p>
+              <p className="text-[10px] text-[#A39282] font-medium mt-1 truncate">Receipts generated</p>
             </div>
 
-            <div className="p-3 rounded-2xl bg-white/85 backdrop-blur-md border border-[#E2C799] shadow-2xs">
-              <p className="text-[10px] uppercase tracking-wider font-bold text-[#78350F]">Today Revenue</p>
-              <p className="text-2xl font-black text-[#2D2319] mt-0.5 font-mono">৳{Number(kpi.today_sales_revenue).toFixed(0)}</p>
-              <p className="text-[10px] text-[#6B5440] font-medium">Collected today</p>
+            <div className="p-3.5 rounded-2xl bg-white border border-[#E8DFD5] shadow-xs flex flex-col justify-between hover:border-[#DFBC87] hover:shadow-sm transition-all">
+              <div className="h-6 flex items-center justify-between gap-1">
+                <span className="text-[10px] uppercase tracking-wider font-bold text-[#8C7A6B] whitespace-nowrap">Today Revenue</span>
+                <div className="w-6 h-6 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+                  <Banknote className="w-3.5 h-3.5 text-blue-700" />
+                </div>
+              </div>
+              <p className="text-2xl font-black text-[#2D2319] mt-2 font-mono tracking-tight leading-none">৳{Number(kpi.today_sales_revenue).toFixed(0)}</p>
+              <p className="text-[10px] text-[#A39282] font-medium mt-1 truncate">Collected today</p>
             </div>
           </div>
         </div>
@@ -852,16 +940,6 @@ export const OutletDashboard: React.FC = () => {
             >
               <Gift className="w-3.5 h-3.5 text-white" />
               <span>Special Offers</span>
-            </button>
-            <button
-              onClick={() => {
-                if (products.length > 0) setSelectedProductIdForReq(products[0].product_id);
-                setIsRequisitionModalOpen(true);
-              }}
-              className="px-4 py-2 rounded-xl bg-[#2D2319] hover:bg-[#433022] text-[#FDECAD] font-bold text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer active:scale-95 border border-[#433022]"
-            >
-              <Truck className="w-3.5 h-3.5 text-[#FFD18D]" />
-              <span>Order Stock via PSR</span>
             </button>
           </div>
         </div>
@@ -2121,7 +2199,7 @@ export const OutletDashboard: React.FC = () => {
 
                     <div className="p-4 rounded-2xl bg-[#FAF4EB] border border-[#E2C799]/70 space-y-1">
                       <span className="text-[10px] uppercase font-bold text-[#78350F]">Branch Identifier</span>
-                      <p className="text-base font-black text-[#2D2319]">{outlet?.branch_name || outlet?.outlet_name || 'N/A'}</p>
+                      <p className="text-base font-black text-[#2D2319]">{cleanBranchName(outlet?.branch_name, outlet?.franchise_name) || outlet?.area || 'N/A'}</p>
                     </div>
 
                     <div className="p-4 rounded-2xl bg-[#FAF4EB] border border-[#E2C799]/70 space-y-1">

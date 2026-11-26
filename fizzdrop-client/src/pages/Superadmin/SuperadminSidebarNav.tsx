@@ -82,7 +82,7 @@ export const SuperadminSidebarNav: React.FC<SuperadminSidebarNavProps> = ({
   const [isExpanded, setIsExpanded] = useState<boolean>(true);
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
   const [isProfileHovered, setIsProfileHovered] = useState<boolean>(false);
-  const flyoutTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const flyoutTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const categories: NavCategory[] = [
     {

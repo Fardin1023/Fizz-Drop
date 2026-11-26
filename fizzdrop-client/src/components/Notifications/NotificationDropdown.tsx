@@ -24,6 +24,7 @@ interface NotificationDropdownProps {
   onClearOldNotifications?: (readOnly?: boolean) => void;
   onSelectNotification?: (notification: AppNotification) => void;
   isScrolled?: boolean;
+  triggerClassName?: string;
 }
 
 export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
@@ -35,6 +36,7 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
   onClearOldNotifications,
   onSelectNotification,
   isScrolled = false,
+  triggerClassName,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -108,9 +110,13 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className={`relative text-slate-600 hover:text-blue-600 hover:bg-blue-50 border border-slate-200 transition-all duration-200 cursor-pointer ${
-          isScrolled ? 'p-1.5 rounded-lg' : 'p-2 rounded-xl'
-        } ${isOpen ? 'bg-blue-50 text-blue-600 border-blue-300 ring-2 ring-blue-500/20' : 'bg-white'}`}
+        className={
+          triggerClassName
+            ? `${triggerClassName} ${isOpen ? 'ring-2 ring-[#B45309]/30 border-[#B45309]' : ''}`
+            : `relative text-slate-600 hover:text-blue-600 hover:bg-blue-50 border border-slate-200 transition-all duration-200 cursor-pointer ${
+                isScrolled ? 'p-1.5 rounded-lg' : 'p-2 rounded-xl'
+              } ${isOpen ? 'bg-blue-50 text-blue-600 border-blue-300 ring-2 ring-blue-500/20' : 'bg-white'}`
+        }
         title="View Notifications"
         aria-label="Notifications"
       >

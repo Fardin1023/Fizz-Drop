@@ -1135,12 +1135,18 @@ public class InventoryController {
             int remaining = Math.max(0, p - d);
 
             if (p > 0) {
-                jdbcTemplate.update(
-                    "INSERT INTO sales_officer_inventory (sales_officer_id, product_id, current_stock, total_purchased, total_distributed, updated_at) " +
-                    "VALUES (?, ?, ?, ?, ?, NOW()) " +
-                    "ON DUPLICATE KEY UPDATE current_stock = ?, total_purchased = ?, total_distributed = ?, updated_at = NOW()",
-                    salesOfficerId, productId, remaining, p, d, remaining, p, d
+                int upd = jdbcTemplate.update(
+                    "UPDATE sales_officer_inventory SET current_stock = ?, total_purchased = ?, total_distributed = ?, updated_at = CURRENT_TIMESTAMP " +
+                    "WHERE sales_officer_id = ? AND product_id = ?",
+                    remaining, p, d, salesOfficerId, productId
                 );
+                if (upd == 0) {
+                    jdbcTemplate.update(
+                        "INSERT INTO sales_officer_inventory (sales_officer_id, product_id, current_stock, total_purchased, total_distributed, updated_at) " +
+                        "VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
+                        salesOfficerId, productId, remaining, p, d
+                    );
+                }
             }
             return remaining;
         } catch (Exception e) {
@@ -1360,10 +1366,14 @@ public class InventoryController {
         if (reqRows.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.fail("Outlet requisition not found."));
         }
-        Map<String, Object> reqRow = reqRows.get(0);
+        Map<String, Object> rawReqRow = reqRows.get(0);
+        Map<String, Object> reqRow = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> entry : rawReqRow.entrySet()) {
+            reqRow.put(entry.getKey() != null ? entry.getKey().toLowerCase() : "", entry.getValue());
+        }
         Long outletId = reqRow.get("outlet_id") != null ? ((Number) reqRow.get("outlet_id")).longValue() : null;
-        Long productId = ((Number) reqRow.get("product_id")).longValue();
-        int requestedQty = ((Number) reqRow.get("quantity")).intValue();
+        Long productId = reqRow.get("product_id") != null ? ((Number) reqRow.get("product_id")).longValue() : 0L;
+        int requestedQty = reqRow.get("quantity") != null ? ((Number) reqRow.get("quantity")).intValue() : 0;
         String reqCode = reqRow.get("requisition_code") != null ? reqRow.get("requisition_code").toString() : "";
         boolean isSoPurchase = reqCode.startsWith("SO-REQ-") || outletId == null;
 
@@ -1376,8 +1386,9 @@ public class InventoryController {
         }
         Long userId = (body != null && body.containsKey("user_id") && body.get("user_id") != null) ? Long.parseLong(body.get("user_id").toString()) : 4L;
 
-        // If supplier adjusted product price, update Product entity so Superadmin sees it
-        if (body != null && body.containsKey("unit_price") && body.get("unit_price") != null) {
+        // If supplier adjusted product price for retail outlet requisitions, update Product entity.
+        // For SO stock purchases, price is centrally assigned by Superadmin for individual districts and CANNOT be edited.
+        if (!isSoPurchase && body != null && body.containsKey("unit_price") && body.get("unit_price") != null) {
             try {
                 BigDecimal updatedPrice = new BigDecimal(body.get("unit_price").toString());
                 if (updatedPrice.compareTo(BigDecimal.ZERO) > 0) {
@@ -1386,7 +1397,7 @@ public class InventoryController {
                         prod.setOutletPrice(updatedPrice);
                         productRepository.save(prod);
                         // Also update requisition unit price and total amount
-                        jdbcTemplate.update("UPDATE outlet_requisitions SET unit_price = ?, total_amount = ? WHERE id = ?",
+                        jdbcTemplate.update("UPDATE outlet_requisitions SET unit_price = ?, total_amount = ?, updated_date = CURRENT_TIMESTAMP WHERE id = ?",
                                 updatedPrice, updatedPrice.multiply(BigDecimal.valueOf(dispatchQty)), id);
                     }
                 }
@@ -1457,21 +1468,27 @@ public class InventoryController {
                 });
             }
 
-            // Credit to Sales Officer Purchased Inventory Buffer
+            // Credit to Sales Officer Purchased Inventory Buffer (universal Oracle + MySQL upsert)
             if (targetOfficer != null) {
-                jdbcTemplate.update(
-                    "INSERT INTO sales_officer_inventory (sales_officer_id, product_id, current_stock, total_purchased, total_distributed, last_purchased_at, updated_at) " +
-                    "VALUES (?, ?, ?, ?, 0, NOW(), NOW()) " +
-                    "ON DUPLICATE KEY UPDATE current_stock = current_stock + ?, total_purchased = total_purchased + ?, last_purchased_at = NOW(), updated_at = NOW()",
-                    targetOfficer.getId(), productId, dispatchQty, dispatchQty, dispatchQty, dispatchQty
+                int updated = jdbcTemplate.update(
+                    "UPDATE sales_officer_inventory SET current_stock = current_stock + ?, total_purchased = total_purchased + ?, last_purchased_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP " +
+                    "WHERE sales_officer_id = ? AND product_id = ?",
+                    dispatchQty, dispatchQty, targetOfficer.getId(), productId
                 );
+                if (updated == 0) {
+                    jdbcTemplate.update(
+                        "INSERT INTO sales_officer_inventory (sales_officer_id, product_id, current_stock, total_purchased, total_distributed, last_purchased_at, updated_at) " +
+                        "VALUES (?, ?, ?, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                        targetOfficer.getId(), productId, dispatchQty, dispatchQty
+                    );
+                }
             }
 
             BigDecimal unitPrice = reqRow.get("unit_price") != null ? new BigDecimal(reqRow.get("unit_price").toString()) : (product.getOutletPrice() != null ? product.getOutletPrice() : BigDecimal.ZERO);
             BigDecimal totalAmt = unitPrice.multiply(BigDecimal.valueOf(dispatchQty));
             Long fulfillerSupplierId = (sp != null) ? sp.getId() : null;
             jdbcTemplate.update(
-                "UPDATE outlet_requisitions SET status = 'DISPATCHED', quantity = ?, unit_price = ?, total_amount = ?, supplier_id = COALESCE(supplier_id, ?), updated_date = NOW() WHERE id = ?",
+                "UPDATE outlet_requisitions SET status = 'DISPATCHED', quantity = ?, unit_price = ?, total_amount = ?, supplier_id = COALESCE(supplier_id, ?), updated_date = CURRENT_TIMESTAMP WHERE id = ?",
                 dispatchQty, unitPrice, totalAmt, fulfillerSupplierId, id
             );
 
@@ -1600,6 +1617,7 @@ public class InventoryController {
                 : Collections.emptyList();
 
             // 4. Query sold requisitions (fulfilled by THIS supplier to SO / outlets)
+            String supIdWildcard = "%" + currentSupplierId + "%";
             List<Map<String, Object>> soldRequisitions = (supplier != null) ? jdbcTemplate.queryForList(
                 "SELECT r.id, r.requisition_code, r.product_id, r.product_name, r.quantity, r.unit_price, r.total_amount, " +
                 "r.sales_officer_id, r.outlet_id, r.status, r.created_date, r.updated_date, " +
@@ -1607,10 +1625,10 @@ public class InventoryController {
                 "FROM outlet_requisitions r " +
                 "LEFT JOIN outlets o ON r.outlet_id = o.outlet_id " +
                 "WHERE (r.supplier_id = ? OR (r.supplier_id IS NULL AND r.sales_officer_id IN (" +
-                "    SELECT so.id FROM sales_officers so WHERE so.supplier_id = ? OR FIND_IN_SET(?, so.allocated_supplier_ids) > 0" +
+                "    SELECT so.id FROM sales_officers so WHERE so.supplier_id = ? OR so.allocated_supplier_ids LIKE ?" +
                 "))) AND r.status IN ('DISPATCHED', 'FULFILLED', 'DELIVERED', 'COMPLETED') " +
                 "ORDER BY r.updated_date DESC, r.created_date DESC",
-                currentSupplierId, currentSupplierId, String.valueOf(currentSupplierId)
+                currentSupplierId, currentSupplierId, supIdWildcard
             ) : Collections.emptyList();
 
             // 5. Query all outlet distributions (dispatched from SO to Outlets for THIS supplier)
@@ -1624,8 +1642,8 @@ public class InventoryController {
                 "LEFT JOIN outlets o ON d.outlet_id = o.outlet_id " +
                 "LEFT JOIN products p ON d.product_id = p.product_id " +
                 "WHERE (d.notes IS NOT NULL AND (" +
-                "    EXISTS (SELECT 1 FROM supplier_delivery_dispatches sdd WHERE d.notes LIKE CONCAT('%', sdd.dispatch_code, '%') AND sdd.supplier_id = ?) " +
-                "    OR EXISTS (SELECT 1 FROM outlet_requisitions req WHERE d.notes LIKE CONCAT('%', req.requisition_code, '%') AND req.supplier_id = ?)" +
+                "    EXISTS (SELECT 1 FROM supplier_delivery_dispatches sdd WHERE d.notes LIKE '%' || sdd.dispatch_code || '%' AND sdd.supplier_id = ?) " +
+                "    OR EXISTS (SELECT 1 FROM outlet_requisitions req WHERE d.notes LIKE '%' || req.requisition_code || '%' AND req.supplier_id = ?)" +
                 ")) " +
                 "ORDER BY d.distribution_date DESC",
                 currentSupplierId, currentSupplierId
@@ -1637,11 +1655,11 @@ public class InventoryController {
                 "product_id, product_name, quantity, unit_price, total_amount, urgency, status, updated_at " +
                 "FROM psr_orders WHERE status = 'DISPATCHED' AND (" +
                 "    supplier_id = ? OR (supplier_id IS NULL AND sales_officer_id IN (" +
-                "        SELECT so.id FROM sales_officers so WHERE so.supplier_id = ? OR FIND_IN_SET(?, so.allocated_supplier_ids) > 0" +
+                "        SELECT so.id FROM sales_officers so WHERE so.supplier_id = ? OR so.allocated_supplier_ids LIKE ?" +
                 "    ))" +
                 ") " +
                 "ORDER BY updated_at DESC",
-                currentSupplierId, currentSupplierId, String.valueOf(currentSupplierId)
+                currentSupplierId, currentSupplierId, supIdWildcard
             ) : Collections.emptyList();
 
             // 7. Calculate Aggregates
@@ -1929,6 +1947,7 @@ public class InventoryController {
                     sm.put("business_name", sp.getBusinessName());
                     sm.put("division_name", sp.getDivisionName());
                     sm.put("depot_address", sp.getDepotAddress());
+                    sm.put("primary_district_id", sp.getPrimaryDistrictId());
                     return sm;
                 })
                 .collect(Collectors.toList());
